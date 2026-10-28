@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -445,6 +446,174 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual(fuzz.suite.parse_args(argv[2:]).profile, yul["profiles"])
         self.assertEqual(fuzz.suite.parse_args([*argv[2:argv.index("--profile")], "--output", str(self.directory / "other")]).profile,
                          [profile for profile, family in families.items() if family == "pure"])
+
+
+FIXTURE_CHECK = fuzz.fixture_check  # the unpatched readiness check
+# The Sonatina O2 crash as semantic-fixtures.py records it, with another user's paths and thread.
+O2_CRASH = ("\nthread 'code-image-export' (17) panicked at /home/b/.cargo/git/checkouts/sonatina-a154b53739ea70c3/8ee2481/"
+            "crates/ir/src/dfg.rs:354:9:\nassertion failed: self.has_inst(inst_id)\nnote: run with `RUST_BACKTRACE=1`\n")
+
+
+def fixture_findings(seed, fixtures):
+    """A known crash, a reduced mismatch with its duplicate and a Lean language failure, on the first three fixtures."""
+    crash_fixture, mismatch_fixture, failure_fixture = fixtures[:3]
+    mismatch = {"fixture": mismatch_fixture, "step": 3, "category": "path-mismatch",
+                "signature": ["path-mismatch", ["output"], [["hull", "sonatina-o0"], ["yul"]]],
+                "mutant": {"operator": "word", "word": 0, "recorded": "0x1", "value": "0x5"}}
+    return [{"fixture": crash_fixture, "category": "compiler-crash", "paths": ["sonatina-o2"], "stage": "rust-code-images-O2",
+             "detail": O2_CRASH},
+            {**mismatch, "entry": "3.1", "reduction": {"status": "reduced", "steps": [], "calldata": "0x01", "value": 0}},
+            {**mismatch, "entry": "3.2", "reduction": {"status": "duplicate", "of": "3.1"}},
+            {"fixture": failure_fixture, "entry": "2.1", "step": 2, "category": "path-failure", "path": "hull",
+             "signature": ["path-failure", "hull", "language-failure"], "detail": "Solcore.Core.Value.word 7",
+             "reduction": {"status": "not-reproduced", "runs": 1}}]
+
+
+class FakeFixtures:
+    """Writes a harness-shaped report for each fixtures run, with the findings `scenario(seed, fixtures)` returns."""
+
+    def __init__(self, scenario, stop=None):
+        self.scenario, self.stop, self.calls = scenario, stop, []
+
+    def __call__(self, argv, stdout_path, stderr_path, stop, grace=120.0):
+        value = lambda name: argv[argv.index(name) + 1]
+        output, seed = Path(value("--output")), int(value("--seed"))
+        selected = [argv[index + 1] for index, item in enumerate(argv) if item == "--fixture"]
+        self.calls.append({"seed": seed, "fixtures": selected, "argv": argv})
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+        findings = self.scenario(seed, selected)
+        (output / "fixtures").mkdir(parents=True)
+        for fixture in selected:
+            fuzz.save(output / "fixtures" / (fixture + ".json"),
+                      {"id": fixture, "findings": [item for item in findings if item["fixture"] == fixture]})
+        totals = {"fixtures": len(selected), "agree": 3 * len(selected), "disagree": 0, "incomplete": len(selected),
+                  "unobserved": 1, "recorded": 2 * len(selected), "mutants": 2 * len(selected) + 1, "budgetStopped": 1,
+                  "unexecuted": 0, "exclusions": {"rust-checked-source:compile-failure": 1}}
+        fuzz.save(output / "report.json", {"schema": "solcore-lean.semantic-fixtures.v1", "coreReference": False,
+                                           "stop": self.stop, "toolsUnchanged": True, "findings": findings, "errors": [],
+                                           "totals": totals})
+        return (130 if self.stop == "signal" else 1 if findings else 0), False
+
+
+class FixtureRunTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="semantic-fuzz-fixtures-")
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name).resolve()
+        self.state = self.directory / "state"
+        self.receipt = self.directory / "semantic-tools-build.json"
+        self.receipt.write_text('{"tools": 1}')
+        self.check = {"status": "ready", "tools": {"scripts": 1}, "builds": {}, "manifests": {}, "fixtures": ["a"]}
+        for target, replacement in (("verify_tools", lambda config: self.receipt), ("fixture_check", lambda config: self.check)):
+            patcher = patch.object(fuzz, target, replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def main(self, *argv, fake=None):
+        fake = fake or FakeFixtures(lambda seed, fixtures: fixture_findings(seed, fixtures) if seed == 100 else [])
+        with patch.object(fuzz, "run_suite", fake), contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = fuzz.main(["run", "--state", str(self.state), "--base-seed", "100", "--backend", "fixtures",
+                              "--fixture-count", "4", *argv])
+        return code, fake
+
+    def test_each_cycle_runs_every_fixture_once_from_the_base_seed(self):
+        config = {"base_seed": 7, "shard_index": 0, "shard_count": 1, "fixture_count": 8}
+        pool = fuzz.fixture_pool(config)
+        self.assertEqual(len(pool), 168)
+        self.assertFalse(any(set(name) & set("*?[") for name in pool))  # ids pass to --fixture as exact globs
+        cycle = [fuzz.fixture_selection(config, iteration) for iteration in range(21)]
+        self.assertEqual(sorted(sum(cycle, [])), pool)
+        self.assertEqual({len(selection) for selection in cycle}, {8})
+        self.assertEqual(fuzz.fixture_selection(config, 3), cycle[3])
+        self.assertNotEqual(fuzz.fixture_selection(config, 21), cycle[0])
+        self.assertNotEqual(fuzz.fixture_selection({**config, "base_seed": 8}, 0), cycle[0])
+        shard = {**config, "shard_index": 1, "shard_count": 5}
+        self.assertEqual(fuzz.fixture_pool(shard), pool[1::5])
+        slices = [fuzz.fixture_selection(shard, iteration) for iteration in range(5)]
+        self.assertEqual(([len(selection) for selection in slices], sorted(sum(slices, []))), ([8, 8, 8, 8, 2], pool[1::5]))
+
+    def test_the_command_carries_the_root_seed_budgets_selection_and_paths(self):
+        config = {**fuzz.CONFIG_DEFAULTS, "base_seed": 10, "bin_dir": "/b", "cast": "/c/cast", "anvil": "/c/anvil"}
+        argv = fuzz.fixtures_command(config, 2, Path("/out"))
+        value = lambda name: argv[argv.index(name) + 1]
+        self.assertEqual([value(name) for name in ("--mode", "--seed", "--fixture-mutants", "--fixture-seconds", "--seconds", "--jobs")],
+                         ["mutation", "12", "32", "300.0", "1800.0", "2"])
+        self.assertEqual([argv[index + 1] for index, item in enumerate(argv) if item == "--fixture"], fuzz.fixture_selection(config, 2))
+        self.assertEqual((value("--hull-runner"), value("--cast"), value("--anvil")), ("/b/rust-hull-scenario", "/c/cast", "/c/anvil"))
+        self.assertIn("--reuse-exports", argv)
+        self.assertNotIn("--cast", fuzz.suite_command(config, 2, "yul", Path("/out")))
+
+    def test_runs_register_known_and_new_findings_keep_examples_and_prune(self):
+        code, fake = self.main("--iterations", "2", "--examples", "2")
+        self.assertEqual(code, 0)
+        selections = [fuzz.fixture_selection(json.loads((self.state / "config.json").read_text()), iteration) for iteration in (0, 1)]
+        self.assertEqual([(call["seed"], call["fixtures"]) for call in fake.calls], [(100, selections[0]), (101, selections[1])])
+        rows = fuzz.State(self.state).ledger()
+        self.assertEqual([(row["iteration"], row["backend"], row["suiteStatus"], row["fixtures"]) for row in rows],
+                         [(0, "fixtures", "failed", selections[0]), (1, "fixtures", "passed", selections[1])])
+        self.assertEqual(rows[0]["counts"], {"executed": 17, "matched": 12, "mismatched": 0, "errors": 0, "inconclusive": 5,
+                                             "fixtures": 4, "recorded": 8, "mutants": 9, "budgetStopped": 1, "unexecuted": 0,
+                                             "findings": 4, "exclusions": 1})
+        signatures = fuzz.State(self.state).registry()["signatures"]
+        crashed, = [sid for sid, entry in signatures.items() if entry["category"] == "compiler-crash"]
+        self.assertIn(crashed, fuzz.KNOWN)
+        self.assertEqual([(occurrence["case"], occurrence["new"]) for occurrence in rows[0]["occurrences"]],
+                         [("rust-code-images-O2", False), ("3.1", True), ("3.2", False), ("2.1", True)])
+        mismatched, = [entry for entry in signatures.values() if entry["category"] == "path-mismatch"]
+        self.assertEqual((mismatched["count"], mismatched["profiles"], len(mismatched["examples"])), (2, {selections[0][1]: 2}, 2))
+        example = self.state / mismatched["examples"][0]
+        self.assertEqual(json.loads((example / "fixture.json").read_text())["id"], selections[0][1])
+        replay = json.loads((example / "occurrence.json").read_text())["replay"]
+        self.assertEqual((replay[replay.index("--seed") + 1], replay[replay.index("--fixture") + 1:replay.index("--fixture") + 2]),
+                         ("100", [selections[0][1]]))
+        failed, = [entry for entry in signatures.values() if entry["category"] == "path-failure"]
+        self.assertEqual(failed["key"]["symptom"], {"value": "Solcore.Core.Value.word 7"})
+        kept = self.state / "runs/000000/fixtures"
+        self.assertEqual(sorted(path.name for path in (kept / "fixtures").iterdir()), sorted(name + ".json" for name in selections[0][:3]))
+        self.assertTrue((kept / "report.json").is_file())
+        self.assertFalse((self.state / "runs/000001").exists())
+        report = (self.state / "report.md").read_text()
+        self.assertIn("known: Sonatina O2 has_inst assertion", report)
+        self.assertIn("Fixtures: 4 pinned end-to-end fixtures per iteration", report)
+
+    def test_the_epoch_covers_the_harness_check_only_when_fixtures_run(self):
+        config = {"backend": list(fuzz.BACKENDS)}
+        with patch.object(fuzz, "harness_digest", return_value="h"):
+            suite_only = fuzz.current_epoch(config)
+            self.assertEqual(suite_only["id"], fuzz.canonical_id({"receipt": fuzz.suite.digest(self.receipt), "harness": "h"}))
+            self.assertNotIn("fixturesSha256", suite_only)
+            config["backend"] = [*fuzz.BACKENDS, "fixtures"]
+            with_fixtures = fuzz.current_epoch(config)
+            self.assertNotEqual(with_fixtures["id"], suite_only["id"])
+            self.check["manifests"] = {"rust-method-parity.json": "changed"}
+            self.assertNotEqual(fuzz.current_epoch(config)["id"], with_fixtures["id"])
+
+    def test_the_harness_check_must_report_ready(self):
+        ready = subprocess.CompletedProcess([], 0, json.dumps({"status": "ready", "tools": {}}) + "\n", "")
+        with patch.object(fuzz.subprocess, "run", return_value=ready) as run:
+            self.assertEqual(FIXTURE_CHECK({"bin_dir": "/b"})["status"], "ready")
+        self.assertEqual(run.call_args.args[0][2:], ["--check", "--hull-runner", "/b/rust-hull-scenario"])
+        refused = subprocess.CompletedProcess([], 2, "", "semantic-fixtures: directive tool receipt is stale")
+        with patch.object(fuzz.subprocess, "run", return_value=refused), self.assertRaisesRegex(fuzz.NotReady, "receipt is stale"):
+            FIXTURE_CHECK({})
+
+    def test_unready_harness_or_invalid_budgets_stop_before_any_run(self):
+        with patch.object(fuzz, "fixture_check", side_effect=fuzz.NotReady("solc is missing")):
+            code, fake = self.main("--iterations", "1")
+        self.assertEqual((code, fake.calls, fuzz.State(self.state).ledger()), (2, [], []))
+        code, fake = self.main("--iterations", "1", "--fixture-count", "0")
+        self.assertEqual((code, fake.calls), (2, []))
+
+    def test_an_interrupted_fixtures_run_is_set_aside_and_rerun(self):
+        code, fake = self.main("--iterations", "1", fake=FakeFixtures(fixture_findings, stop="signal"))
+        self.assertEqual((code, fuzz.State(self.state).ledger()), (0, []))
+        kept, = (self.state / "interrupted").iterdir()
+        self.assertTrue((kept / "run/report.json").is_file())
+        code, fake = self.main("--iterations", "1")
+        self.assertEqual([call["seed"] for call in fake.calls], [100])
+        self.assertEqual([row["iteration"] for row in fuzz.State(self.state).ledger()], [0])
 
 
 if __name__ == "__main__":

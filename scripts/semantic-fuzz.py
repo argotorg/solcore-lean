@@ -11,6 +11,12 @@ signature keep their archives, and runs are pruned to compact records, since
 random cases replay from their recorded seeds. A label records triage only:
 labelled signatures stay counted and listed. The driver compares no
 observations itself.
+
+The opt-in run kind `fixtures` runs scripts/semantic-fixtures.py in mutation
+mode on a seeded slice of the pinned end-to-end fixtures per iteration, within
+per-fixture mutant and time budgets and an iteration time budget. That
+harness compares compiled paths with each other and with upstream's recorded
+expectations, never with original Core.
 """
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ import argparse
 import contextlib
 import datetime
 import fcntl
+import functools
 import hashlib
 import importlib.util
 import json
@@ -42,6 +49,9 @@ suite = importlib.util.module_from_spec(_suite_spec)
 _suite_spec.loader.exec_module(suite)
 SCHEMA = "solcore-lean.semantic-fuzz.v1"
 BACKENDS = ("sonatina-o0", "sonatina-o2", "yul")
+# A fixtures run compares every compiled path of the pinned end-to-end fixtures at once.
+FIXTURES = "fixtures"
+RUN_KINDS = BACKENDS + (FIXTURES,)
 INCONCLUSIVE = {"inconclusive-resource"}
 # Categories identified by the failing tool's message rather than by the program.
 SYMPTOM_CATEGORIES = {"compiler-crash", "source-rejected", "compilation-rejected", "execution-error", "adapter-error",
@@ -59,8 +69,11 @@ CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backe
                    "seconds": 14400.0, "profile_seconds": 900.0,
                    "disk_bytes": 1024**3, "examples": 3, "crash_replay": True, "bin_dir": None, "upstream": None,
                    "target_dir": None,
-                   "anvil": None, "solc": None}
+                   "anvil": None, "solc": None, "fixture_count": 8, "fixture_mutants": 32, "fixture_seconds": 300.0,
+                   "fixture_run_seconds": 1800.0, "fixture_jobs": 2, "cast": None}
 PATH_OPTIONS = ("bin_dir", "upstream", "target_dir", "anvil", "solc")
+# Paths only a fixtures run reads; the suite takes none of them.
+FIXTURE_PATH_OPTIONS = ("cast",)
 
 
 class NotReady(Exception):
@@ -97,6 +110,15 @@ def remove(path):
 
 def canonical_id(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:12]
+
+
+# Findings recorded in questions.md before the fixtures run kind existed: they count, but never as new.
+KNOWN_FINDINGS = (
+    ({"backend": FIXTURES, "category": "compiler-crash", "stage": "rust-code-images-O2", "paths": ["sonatina-o2"],
+      "symptom": {"panic": "crates/ir/src/dfg.rs:354:9", "message": "assertion failed: self.has_inst(inst_id)"}},
+     "Sonatina O2 has_inst assertion on ignored-builtin-effects (questions.md, 2026-10-29)"),
+)
+KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS}
 
 
 def normalize(text):
@@ -274,6 +296,62 @@ def nodes_scale(config, iteration):
     return cycle[iteration % len(cycle)]
 
 
+def setting(config, key):
+    """A configured value; configurations created before a setting existed use its default."""
+    value = config.get(key)
+    return CONFIG_DEFAULTS[key] if value is None else value
+
+
+@functools.cache
+def harness():
+    """The fixture harness, loaded only for its inventory and seeded streams."""
+    spec = importlib.util.spec_from_file_location("semantic_fuzz_fixtures", ROOT / "scripts/semantic-fixtures.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def fixture_pool(config):
+    """The pinned fixtures of this shard, in id order."""
+    return [item["id"] for item in harness().inventory()][config["shard_index"]::config["shard_count"]]
+
+
+def fixture_selection(config, iteration):
+    """Each cycle runs every fixture of the pool once: consecutive slices of a permutation seeded by the base
+    seed and the cycle number."""
+    pool = fixture_pool(config)
+    count = min(setting(config, "fixture_count"), len(pool))
+    cycle, slot = divmod(iteration, -(-len(pool) // count))
+    stream = harness().Stream(harness().derive(config["base_seed"], "fixture-cycle", cycle))
+    for index in range(len(pool) - 1, 0, -1):
+        other = stream.below(index + 1)
+        pool[index], pool[other] = pool[other], pool[index]
+    return sorted(pool[slot * count:(slot + 1) * count])
+
+
+def fixture_paths(config):
+    argv = []
+    for key in ("upstream", "target_dir", "solc", "anvil", *FIXTURE_PATH_OPTIONS):
+        if config.get(key):
+            argv += ["--" + key.replace("_", "-"), config[key]]
+    if config.get("bin_dir"):
+        argv += ["--hull-runner", str(Path(config["bin_dir"]) / "rust-hull-scenario")]
+    return argv
+
+
+def fixtures_command(config, iteration, output, fixtures=None):
+    """A mutation run of the iteration's fixtures, or of `fixtures`, within the configured budgets."""
+    argv = [sys.executable, str(ROOT / "scripts/semantic-fixtures.py"), "--mode", "mutation",
+            "--seed", str(root_seed(config, iteration)), "--output", str(output), "--reuse-exports",
+            "--jobs", str(setting(config, "fixture_jobs")), "--fixture-mutants", str(setting(config, "fixture_mutants")),
+            "--fixture-seconds", str(setting(config, "fixture_seconds")),
+            "--seconds", str(setting(config, "fixture_run_seconds"))]
+    for fixture in fixture_selection(config, iteration) if fixtures is None else fixtures:
+        argv += ["--fixture", fixture]
+    return argv + fixture_paths(config)
+
+
 def suite_command(config, iteration, backend, output):
     argv = [sys.executable, str(ROOT / "scripts/semantic-suite.py"), "--mode", "random", "--backend", backend,
             "--seed", str(root_seed(config, iteration)), "--shard-index", str(config["shard_index"]),
@@ -296,7 +374,7 @@ def configure(state, args):
     """Create the configuration once; later invocations may only repeat it."""
     stored = load(state.config_path)
     given = {key: getattr(args, key) for key in CONFIG_DEFAULTS if getattr(args, key, None) is not None}
-    for key in PATH_OPTIONS:
+    for key in PATH_OPTIONS + FIXTURE_PATH_OPTIONS:
         if key in given:
             given[key] = str(Path(given[key]).resolve())
     if stored is not None:
@@ -316,6 +394,13 @@ def configure(state, args):
     if not config["size_cycle"] or any(not 1 <= scale <= 4 for scale in config["size_cycle"]):
         raise NotReady("--size-cycle needs scales between 1 and 4")
     for backend in config["backend"]:
+        if backend == FIXTURES:
+            if min(config["fixture_count"], config["fixture_mutants"]) < 1 or \
+                    min(config["fixture_seconds"], config["fixture_run_seconds"]) <= 0 or not 1 <= config["fixture_jobs"] <= 16:
+                raise NotReady("fixture counts, budgets and jobs must be positive, with at most 16 jobs")
+            if not fixture_pool(config):
+                raise NotReady("no pinned fixture falls on this shard")
+            continue
         if config["profile"] is not None and not profiles_for(config, backend):
             raise NotReady(f"no selected profile runs on {backend}")
         # Reject what the suite would reject before any run is recorded.
@@ -362,11 +447,32 @@ def verify_tools(config):
     return Path(report["receipt"])
 
 
+def fixture_check(config):
+    """The fixture harness's readiness: the receipts of the compilers and directive tools, solc, and the identity of
+    every script, binary and tool a fixtures run reads, with the parity manifests and the inventory."""
+    argv = [sys.executable, str(ROOT / "scripts/semantic-fixtures.py"), "--check", *fixture_paths(config)]
+    result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=1800)
+    lines = result.stdout.strip().splitlines()
+    check = None
+    with contextlib.suppress(ValueError):
+        check = json.loads(lines[-1]) if result.returncode == 0 and lines else None
+    if not isinstance(check, dict) or check.get("status") != "ready":
+        raise NotReady("the fixture harness is not ready: " + (result.stderr.strip() or result.stdout.strip())[-2000:])
+    return check
+
+
 def current_epoch(config):
     receipt = verify_tools(config)
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip() or None
     epoch = {"receiptSha256": suite.digest(receipt), "harnessSha256": harness_digest(), "gitHead": head}
-    epoch["id"] = canonical_id({"receipt": epoch["receiptSha256"], "harness": epoch["harnessSha256"]})
+    identity = {"receipt": epoch["receiptSha256"], "harness": epoch["harnessSha256"]}
+    if FIXTURES in config["backend"]:
+        # A state without fixtures keeps its epoch formula.
+        check = fixture_check(config)
+        epoch["fixturesSha256"] = hashlib.sha256(json.dumps({key: check.get(key) for key in (
+            "tools", "builds", "manifests", "fixtures")}, sort_keys=True).encode()).hexdigest()
+        identity["fixtures"] = epoch["fixturesSha256"]
+    epoch["id"] = canonical_id(identity)
     return epoch
 
 
@@ -440,6 +546,31 @@ def crash_sites(config, output, summary):
     return sites
 
 
+def note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time):
+    """Count one occurrence of a signature. While it has fewer than --examples kept, `keep(destination)` keeps the
+    occurrence's archive there and says whether it did. A known finding is counted but never new."""
+    entry = registry["signatures"].get(sid)
+    new = entry is None and sid not in KNOWN
+    if entry is None:
+        entry = registry["signatures"][sid] = {
+            "id": sid, "key": key, "kind": "inconclusive" if key["category"] in INCONCLUSIVE else "failure",
+            "category": key["category"], "stage": key["stage"], "symptom": key.get("symptom"), "count": 0,
+            "backends": {}, "profiles": {}, "firstSeen": brief, "lastSeen": brief, "examples": [], "recent": []}
+    retained = None
+    if destination.exists() or len(entry["examples"]) < config["examples"] and keep(destination):
+        retained = str(destination.relative_to(state.directory))
+    if first_time:
+        entry["count"] += 1
+        entry["backends"][brief["backend"]] = entry["backends"].get(brief["backend"], 0) + 1
+        entry["profiles"][brief["profile"]] = entry["profiles"].get(brief["profile"], 0) + 1
+        entry["lastSeen"] = brief
+        entry["recent"] = (entry["recent"] + [brief])[-RECENT:]
+        if retained and retained not in entry["examples"]:
+            entry["examples"].append(retained)
+    return {"signature": sid, "new": new and first_time, "profile": brief["profile"], "kind": brief["kind"],
+            "case": brief["case"], "retained": retained}
+
+
 def register(state, config, epoch, iteration, backend, output, summary, sites=None):
     """Count every finding occurrence once and keep the first examples of each signature."""
     sites = sites or {}
@@ -455,33 +586,68 @@ def register(state, config, epoch, iteration, backend, output, summary, sites=No
             brief = {"iteration": iteration, "backend": backend, "rootSeed": str(root_seed(config, iteration)),
                      "profile": row["profile"], "profileSeed": row.get("seed"), "kind": record["kind"],
                      "case": record["ident"], "epoch": epoch["id"], "program": record["program"]}
-            entry = registry["signatures"].get(sid)
-            new = entry is None
-            if new:
-                entry = registry["signatures"][sid] = {
-                    "id": sid, "key": key, "kind": "inconclusive" if key["category"] in INCONCLUSIVE else "failure",
-                    "category": key["category"], "stage": key["stage"], "symptom": key.get("symptom"), "count": 0,
-                    "backends": {}, "profiles": {}, "firstSeen": brief, "lastSeen": brief, "examples": [], "recent": []}
-            destination = state.directory / "findings" / sid / f"{iteration:06d}-{backend}-{row['profile']}-{record['ident']}"
-            retained = None
-            if destination.exists():
-                retained = str(destination.relative_to(state.directory))
-            elif len(entry["examples"]) < config["examples"] and record["archive"] and record["archive"].is_dir():
+
+            def keep(destination, record=record, row=row, brief=brief, sid=sid):
+                if not (record["archive"] and record["archive"].is_dir()):
+                    return False
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(record["archive"]), str(destination))
                 save(destination / "occurrence.json", {**brief, "signature": sid, "finding": record["finding"],
                                                        "suiteCommand": row.get("command")})
-                retained = str(destination.relative_to(state.directory))
-            if first_time:
-                entry["count"] += 1
-                entry["backends"][backend] = entry["backends"].get(backend, 0) + 1
-                entry["profiles"][row["profile"]] = entry["profiles"].get(row["profile"], 0) + 1
-                entry["lastSeen"] = brief
-                entry["recent"] = (entry["recent"] + [brief])[-RECENT:]
-                if retained and retained not in entry["examples"]:
-                    entry["examples"].append(retained)
-            occurrences.append({"signature": sid, "new": new and first_time, "profile": row["profile"],
-                                "kind": record["kind"], "case": record["ident"], "retained": retained})
+                return True
+            destination = state.directory / "findings" / sid / f"{iteration:06d}-{backend}-{row['profile']}-{record['ident']}"
+            occurrences.append(note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time))
+    if first_time:
+        registry["processedRuns"].append(run_id)
+    save(state.registry_path, registry)
+    return occurrences
+
+
+def fixture_signature_key(finding):
+    """A crash or path failure is its symptom on its path; a mismatch is its fixture and reduced input."""
+    key = {"backend": FIXTURES, "category": finding["category"]}
+    if finding["category"] == "compiler-crash":
+        return {**key, "stage": finding.get("stage"), "paths": finding.get("paths"), "symptom": symptom(finding.get("detail") or "")}
+    if finding["category"] == "path-failure":
+        status, detail = finding["signature"][2], finding.get("detail") or ""
+        # A language failure's Core value is exact; normalizing would merge its distinct reasons.
+        return {**key, "stage": "execution", "path": finding.get("path"), "status": status,
+                "symptom": {"value": detail} if status == "language-failure" else symptom(detail)}
+    reduction = finding.get("reduction") or {}
+    reduced = {name: reduction.get(name) for name in ("steps", "calldata", "value")} \
+        if reduction.get("status") in ("reduced", "budget-exhausted") else {"step": finding.get("step"), "mutant": finding.get("mutant")}
+    return {**key, "stage": "execution", "profile": finding["fixture"], "fingerprint": finding.get("signature"),
+            "program": canonical_id({"fixture": finding["fixture"], **reduced})}
+
+
+def register_fixture_findings(state, config, epoch, iteration, run_dir, outcome):
+    """Count each fixture finding once; a duplicate within a fixture shares the signature of the finding it repeats."""
+    registry = state.registry()
+    run_id = f"{iteration:06d}-{FIXTURES}"
+    first_time = run_id not in registry["processedRuns"]
+    findings = outcome.get("findings") or []
+    entries = {(finding["fixture"], finding.get("entry")): finding for finding in findings}
+    occurrences = []
+    for finding in findings:
+        reduction = finding.get("reduction") or {}
+        base = entries.get((finding["fixture"], reduction.get("of")), finding) if reduction.get("status") == "duplicate" else finding
+        key = fixture_signature_key(base)
+        sid = canonical_id(key)
+        case = finding.get("entry") or finding.get("stage") or "fixture"
+        brief = {"iteration": iteration, "backend": FIXTURES, "rootSeed": str(root_seed(config, iteration)),
+                 "profile": finding["fixture"], "profileSeed": None, "kind": "primary", "case": case, "epoch": epoch["id"],
+                 "program": key.get("program")}
+
+        def keep(destination, finding=finding, brief=brief, sid=sid):
+            destination.mkdir(parents=True)
+            record = run_dir / "fixtures" / (finding["fixture"] + ".json")
+            if record.is_file():
+                shutil.copy2(record, destination / "fixture.json")
+            save(destination / "occurrence.json", {**brief, "signature": sid, "finding": finding,
+                                                   "replay": fixtures_command(config, iteration, "OUTPUT", [finding["fixture"]])})
+            return True
+        destination = state.directory / "findings" / sid / f"{iteration:06d}-{FIXTURES}-{finding['fixture']}-{case}"
+        occurrences.append(note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time))
     if first_time:
         registry["processedRuns"].append(run_id)
     save(state.registry_path, registry)
@@ -530,7 +696,8 @@ def prune(run_dir, summary, keep):
 def retain_interrupted(state, run_dir):
     """An interrupted run is rerun from its seed; partial findings stay for inspection only."""
     logs = [run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log")]
-    if run_dir.exists() and any(run_dir.glob("*/findings/*/*")):
+    if run_dir.exists() and (any(run_dir.glob("*/findings/*/*")) or
+                             any((load(path) or {}).get("findings") for path in run_dir.glob("fixtures/*.json"))):
         destination = state.directory / "interrupted" / f"{run_dir.parent.name}-{run_dir.name}-{int(time.time())}"
         destination.mkdir(parents=True)
         shutil.move(str(run_dir), str(destination / "run"))
@@ -548,9 +715,17 @@ def unrecorded_runs(state, ledger):
     runs = state.directory / "runs"
     found = []
     for run_dir in sorted(runs.glob("*/*")) if runs.exists() else []:
-        if not run_dir.is_dir() or run_dir.name not in BACKENDS or not run_dir.parent.name.isdigit():
+        if not run_dir.is_dir() or run_dir.name not in RUN_KINDS or not run_dir.parent.name.isdigit():
             continue
         if (int(run_dir.parent.name), run_dir.name) in done:
+            continue
+        if run_dir.name == FIXTURES:
+            # The harness writes its report only when the run ends.
+            outcome = load(run_dir / "report.json")
+            if isinstance(outcome, dict) and outcome.get("stop") != "signal":
+                found.append((int(run_dir.parent.name), run_dir.name, run_dir, outcome))
+            else:
+                retain_interrupted(state, run_dir)
             continue
         summary = load(run_dir / "summary.json")
         if isinstance(summary, dict) and summary.get("status") not in (None, "running") and summary.get("stop") != "interrupted":
@@ -592,6 +767,70 @@ def record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_
     return row
 
 
+def fixture_status(outcome):
+    if not isinstance(outcome, dict):
+        return "missing-summary"
+    if outcome.get("errors") or not outcome.get("toolsUnchanged"):
+        return "error"
+    return "failed" if outcome.get("findings") else "passed"
+
+
+def fixture_counts(outcome):
+    """A fixtures run's entries in the suite's terms, and its own counts."""
+    totals = (outcome or {}).get("totals") or {}
+    return {"executed": sum(totals.get(key, 0) for key in ("agree", "disagree", "incomplete", "unobserved")),
+            "matched": totals.get("agree", 0), "mismatched": totals.get("disagree", 0),
+            "errors": len((outcome or {}).get("errors") or []),
+            "inconclusive": totals.get("incomplete", 0) + totals.get("unobserved", 0),
+            **{key: totals.get(key, 0) for key in ("fixtures", "recorded", "mutants", "budgetStopped", "unexecuted")},
+            "findings": len((outcome or {}).get("findings") or []), "exclusions": sum((totals.get("exclusions") or {}).values())}
+
+
+def fixture_problems(outcome):
+    """A missing report, harness errors and changed tools; budget stops are counted, not problems."""
+    if not isinstance(outcome, dict):
+        return [{"profile": None, "status": "missing-summary", "stop": None}]
+    problems = [{"profile": error["fixture"], "status": "harness-error", "stop": outcome.get("stop"),
+                 "detail": str(error["detail"])[-500:]} for error in outcome.get("errors") or []]
+    if not outcome.get("toolsUnchanged"):
+        problems.append({"profile": None, "status": "tools-changed", "stop": outcome.get("stop")})
+    return problems
+
+
+def prune_fixture_run(run_dir, outcome, status, keep):
+    """A passed run leaves its ledger row, since its mutants replay from the root seed. Otherwise the report and
+    the records of fixtures with findings or errors stay, or everything when the report is missing."""
+    if keep or not run_dir.exists() or not isinstance(outcome, dict):
+        return
+    if status == "passed":
+        for path in [run_dir, *(run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log"))]:
+            remove(path)
+        with contextlib.suppress(OSError):
+            run_dir.parent.rmdir()
+        return
+    kept = {finding["fixture"] for finding in outcome.get("findings") or []} | \
+        {error["fixture"] for error in outcome.get("errors") or []}
+    for path in list((run_dir / "fixtures").glob("*.json")):
+        if path.stem not in kept:
+            remove(path)
+
+
+def record_fixture_run(state, config, epoch, iteration, run_dir, outcome, exit_code, started, elapsed, keep):
+    status = fixture_status(outcome)
+    occurrences = register_fixture_findings(state, config, epoch, iteration, run_dir, outcome) if isinstance(outcome, dict) else []
+    row = {"schema": SCHEMA + "/run", "iteration": iteration, "backend": FIXTURES,
+           "rootSeed": str(root_seed(config, iteration)), "fixtures": fixture_selection(config, iteration),
+           "shardIndex": config["shard_index"], "shardCount": config["shard_count"], "epoch": epoch["id"],
+           "started": started, "finished": now(), "elapsedSeconds": elapsed, "exitCode": exit_code,
+           "suiteStatus": status, "stop": (outcome or {}).get("stop"), "counts": fixture_counts(outcome),
+           "occurrences": occurrences, "problems": fixture_problems(outcome),
+           "retainedRun": None if status == "passed" and not keep or not run_dir.exists()
+           else str(run_dir.relative_to(state.directory))}
+    state.append_ledger(row)
+    prune_fixture_run(run_dir, outcome, status, keep)
+    return row
+
+
 def report(state):
     """Write report.json and report.md from the configuration, ledger, registry and labels."""
     if not state.config_path.exists():
@@ -619,7 +858,7 @@ def report(state):
               for occurrence in row.get("occurrences", []) if occurrence.get("new")}
     signatures = []
     for sid, entry in registry["signatures"].items():
-        text = labels.get(sid, {}).get("label")
+        text = labels.get(sid, {}).get("label") or KNOWN.get(sid)
         signatures.append({**{key: entry.get(key) for key in ("id", "kind", "category", "stage", "symptom", "count",
                                                                 "backends", "profiles", "firstSeen", "lastSeen", "examples")},
                            "label": text, "triage": "known" if text else "untriaged", "newInLatestIteration": sid in newest})
@@ -647,11 +886,17 @@ def markdown(data):
     functions = config.get("functions")
     counts = (f"{config['cases']} cases per profile" if functions is None else
               f"{functions} whole functions per runtime-input profile and {config['cases']} cases per other profile")
+    suites = ("" if config["backend"] == [FIXTURES] else
+              f", {counts}, node-budget scales {', '.join(str(scale) for scale in config.get('size_cycle') or [1.0])} "
+              f"by iteration, profiles: {'suite default' if config['profile'] is None else ', '.join(config['profile'])}")
     lines = ["# Semantic fuzzing report", "", f"Generated {data['generated']} from `{data['state']}`.", "",
              f"Base seed {config['base_seed']}, shard {config['shard_index']} of {config['shard_count']}, "
-             f"backends {', '.join(config['backend'])}, {counts}, node-budget scales "
-             f"{', '.join(str(scale) for scale in config.get('size_cycle') or [1.0])} by iteration, profiles: "
-             f"{'suite default' if config['profile'] is None else ', '.join(config['profile'])}.", ""]
+             f"backends {', '.join(config['backend'])}{suites}.", ""]
+    if FIXTURES in config["backend"]:
+        lines += [f"Fixtures: {setting(config, 'fixture_count')} pinned end-to-end fixtures per iteration, at most "
+                  f"{setting(config, 'fixture_mutants')} mutants and {setting(config, 'fixture_seconds'):g} seconds per fixture, "
+                  f"{setting(config, 'fixture_run_seconds'):g} seconds per run, {setting(config, 'fixture_jobs')} at a time; "
+                  "compiled paths compared with each other and with upstream's recorded expectations, not with original Core.", ""]
     if data["epochs"]:
         epoch = data["epochs"][-1]
         lines += [f"Epoch `{epoch['id']}` since iteration {epoch['firstIteration']} (readiness receipt "
@@ -776,29 +1021,36 @@ class Driver:
         run_dir = state.run_directory(iteration, backend)
         run_dir.parent.mkdir(parents=True, exist_ok=True)
         started, began = now(), time.monotonic()
-        exit_code, interrupted = run_suite(suite_command(config, iteration, backend, run_dir),
+        fixtures = backend == FIXTURES
+        exit_code, interrupted = run_suite(fixtures_command(config, iteration, run_dir) if fixtures else
+                                           suite_command(config, iteration, backend, run_dir),
                                            run_dir.with_name(backend + ".stdout.log"),
                                            run_dir.with_name(backend + ".stderr.log"), self.stop)
-        summary = load(run_dir / "summary.json")
-        if interrupted or isinstance(summary, dict) and summary.get("stop") == "interrupted":
+        summary = load(run_dir / ("report.json" if fixtures else "summary.json"))
+        if interrupted or isinstance(summary, dict) and summary.get("stop") == ("signal" if fixtures else "interrupted"):
             with self.lock:
                 kept = retain_interrupted(state, run_dir)
                 self.end(f"interrupted in iteration {iteration} ({backend}); it reruns on resume", kept=kept)
             return
         summary = summary if isinstance(summary, dict) else None
-        sites = crash_sites(config, run_dir, summary) if summary else {}  # Replays run outside the lock.
+        sites = crash_sites(config, run_dir, summary) if summary and not fixtures else {}  # Replays run outside the lock.
         with self.lock:
             self.missing = self.missing + 1 if summary is None else 0
-            summary = summary or {"status": "missing-summary", "profiles": []}
-            row = record_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started,
-                             round(time.monotonic() - began, 3), args.keep_runs, sites)
+            if fixtures:
+                row = record_fixture_run(state, config, epoch, iteration, run_dir, summary, exit_code, started,
+                                         round(time.monotonic() - began, 3), args.keep_runs)
+            else:
+                row = record_run(state, config, epoch, iteration, backend, run_dir,
+                                 summary or {"status": "missing-summary", "profiles": []}, exit_code, started,
+                                 round(time.monotonic() - began, 3), args.keep_runs, sites)
             report(state)
             if self.missing >= MISSING_SUMMARY_LIMIT:
                 self.end(f"{self.missing} consecutive runs produced no suite summary; see their logs", 5)
         new = [occurrence["signature"] for occurrence in row["occurrences"] if occurrence["new"]]
         print(json.dumps({"iteration": iteration, "backend": backend, "rootSeed": row["rootSeed"], "status": row["suiteStatus"],
                           "occurrences": len(row["occurrences"]), "new": new, "problems": len(row["problems"])}), flush=True)
-        if new or any(problem.get("status") in ("adapter-error", "missing-summary") for problem in row["problems"]):
+        if new or any(problem.get("status") in ("adapter-error", "missing-summary", "harness-error", "tools-changed")
+                      for problem in row["problems"]):
             notify(args.notify_command, state, row, new)
 
 
@@ -810,8 +1062,12 @@ def run(args):
         previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
         try:
             for iteration, backend, run_dir, summary in unrecorded_runs(state, state.ledger()):
-                record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None,
-                           args.keep_runs, crash_sites(config, run_dir, summary))
+                if backend == FIXTURES:
+                    record_fixture_run(state, config, current_epoch(config), iteration, run_dir, summary, None, None, None,
+                                       args.keep_runs)
+                else:
+                    record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None,
+                               args.keep_runs, crash_sites(config, run_dir, summary))
             driver = Driver(state, config, args, stop)
             workers = [threading.Thread(target=driver.work, name=f"fuzz-worker-{index}", daemon=True)
                        for index in range(args.jobs)]
@@ -854,7 +1110,9 @@ def parse_args(argv=None):
     runner.add_argument("--base-seed", type=int, help="root seed of iteration zero (default: the creation time)")
     runner.add_argument("--shard-index", type=int)
     runner.add_argument("--shard-count", type=int)
-    runner.add_argument("--backend", action="append", choices=BACKENDS, help="repeat; default all three")
+    runner.add_argument("--backend", action="append", choices=RUN_KINDS,
+                        help="repeat; default the three suite backends; fixtures adds a mutation run of the pinned "
+                             "end-to-end fixtures on Hull, O0, O2 and Yul")
     runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection, and on Yul also the storage-family profiles; "
                              "the call profiles never run on Yul")
     runner.add_argument("--size-cycle", type=lambda text: [float(part) for part in text.split(",")],
@@ -862,7 +1120,13 @@ def parse_args(argv=None):
     for name, kind in (("cases", int), ("functions", int), ("attempts", int), ("nodes", int), ("seconds", float),
                        ("profile-seconds", float), ("disk-bytes", int), ("examples", int)):
         runner.add_argument("--" + name, type=kind)
-    for name in ("bin-dir", "upstream", "target-dir", "anvil", "solc"):
+    for name, kind, text in (("fixture-count", int, "fixtures per iteration (default 8)"),
+                             ("fixture-mutants", int, "mutants per fixture at most (default 32)"),
+                             ("fixture-seconds", float, "wall time per fixture (default 300)"),
+                             ("fixture-run-seconds", float, "wall time per fixtures run (default 1800)"),
+                             ("fixture-jobs", int, "fixtures run at a time (default 2)")):
+        runner.add_argument("--" + name, type=kind, help=text)
+    for name in ("bin-dir", "upstream", "target-dir", "anvil", "solc", "cast"):
         runner.add_argument("--" + name, type=Path)
     runner.add_argument("--iterations", type=int, default=0, help="stop after this many iterations (default: until stopped)")
     runner.add_argument("--jobs", type=int, default=1, help="runs in parallel; each run is one suite on one backend")

@@ -275,6 +275,34 @@ change: when a comparison gains observations, as the stateful profiles did with
 [whole committed storage](SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage),
 its mismatch fingerprints change and the same difference gets a new signature.
 
+`--backend fixtures` is an opt-in run kind, alone or beside the suite
+backends. It adds one run per iteration of the
+[pinned fixtures across paths](SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)
+in mutation mode. That harness compares compiled paths with each other and
+with upstream's recorded expectations, never with original Core.
+
+- Iteration `i` runs `--fixture-count` fixtures (default 8) with root seed
+  `base + i`. Each cycle of 21 iterations runs every fixture of the shard's
+  pool once, in slices of a permutation seeded by the base seed and the cycle.
+- Each fixture keeps at most `--fixture-mutants` mutants (default 32), a
+  seeded sample of its four per step, and gets `--fixture-seconds` of wall
+  time (default 300). The run gets `--fixture-run-seconds` (default 1,800),
+  and `--fixture-jobs` fixtures (default 2) run at a time.
+- An entry past a budget has the status `budget`, and a fixture not started
+  in time is unexecuted. Neither is a finding; the ledger counts both.
+- Findings register with the backend `fixtures`. A compiler crash or a path
+  failure registers by its symptom, and a path mismatch or an unmet
+  expectation by its fixture and reduced input. The first examples keep the
+  fixture's result record and the command that replays that fixture alone.
+- The Sonatina O2 crash on `ignored-builtin-effects` is listed as known: it
+  is counted but never new.
+- Readiness also runs `semantic-fixtures.py --check`. The epoch adds the
+  digest of what that check reports: the scripts, the compilers, the
+  directive tools, the Lean runner, solc, Anvil, cast and the parity
+  manifests. A state without fixtures keeps its epoch.
+- Exports are cached in `.upstream/semantic-fixtures` and locked per fixture.
+  `--cast` selects cast, and `--bin-dir` also selects the Lean runner.
+
 On a remote machine, use a Linux host with persistent disk, prepare the tools
 there once with `--prepare --allow-network`, and run the driver under a
 service manager or `tmux`. Local validation so far ran on macOS, so start with
