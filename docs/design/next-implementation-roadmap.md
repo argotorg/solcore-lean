@@ -2143,6 +2143,223 @@ load averages of 9 to 68 from other work on the machine:
   rejections are recorded locally without investigation, so the Yul fixed
   and random gates did not pass; no mismatch was found.
 
+**Trait hierarchies and method-level generics.** `runtime-traits` calls one
+trait. The pinned fixtures `superclass-dictionaries` (a trait bound by
+another, chains of two such bounds, a superclass method called through a
+subclass bound, method values and generic function values),
+`trait-method-generics` (a trait method with its own type parameter, called
+at two instances of it, also as a value) and `comptime-trait-arguments` were
+each a regression fixture upstream. One new pure profile,
+`runtime-trait-hierarchies`, puts a subclass of `runtime-traits`' trait and a
+chain above it into that profile's plans, with helpers bounded only by a
+subclass, method values, generic function values and the subclass's own
+method-level generic, and keeps an independent Core reference. It is a new
+profile rather than a second version of `runtime-traits`: it calls
+`TraitPlan`'s trait, impls, instance types, values, builders and closures
+unchanged, so `runtime-traits`' generator, corpus and matrices stay valid,
+while a second version would retire them without making either plan simpler.
+
+Before any code, a probe over unit 13's declarations, trait and impls
+compiled hand-written sources with the subclass `Sc_Sub<a> where a: Sc_Fold`
+as a marker, with its own method-level generic
+`sc_mix<u>(sc_x: a, sc_y: u) returns (word) where u: Sc_Fold`, and with that
+method named `sc_fold`, like the superclass's; the chain
+`Sc_Top<a> where a: Sc_Sub`; impls of both at Words, tuples, std sums, a plain
+and two generic enums; helpers bounded by `Sc_Sub` or `Sc_Top` that call the
+superclass's methods directly, as a method value or through a generic
+function value of another helper; the subclass's method directly, through
+`Sc_Top` and as a method value, each at two argument types; method and
+generic function values at closed types; `comptime` trait arguments; and a
+method returning its own type parameter. It ran on every path as unit 13's
+probe did, against a Python model at twelve inputs:
+- At small types every form matched on O0, O2 and Yul, on Anvil and in the
+  Lean Hull runner, and so did the values at closed types and the `comptime`
+  arguments at larger types. Three sources at larger types matched on O0 and
+  O2, and solc rejected their exported Yul with a `StackTooDeepError` in the
+  base trait's methods, as in unit 13: `sc_both` at `Sc_T1<sum<word, word>>`
+  and at `Sc_T1<Sc_T1<word>>`, and `sc_fold` at a tuple of two
+  `(word, sum<word, word>)`.
+- The checked frontend rejects a base-trait method reached through two
+  superclass steps, `Sc_Top` to `Sc_Sub` to `Sc_Fold`, at a tuple, a std sum
+  or a generic declaration, with `SC0401` ("cannot specialize expression:
+  type is not concrete") and `SC0406` ("missing evidence: superclass …:
+  Sc_Fold: no unique dictionary"): in a `Sc_Top`-bounded helper that calls
+  the method, or that calls a `Sc_Sub`-bounded helper directly or as a
+  function value. It accepts the same calls at a Word and at a plain
+  declaration, and one step at every kind: a `Sc_Sub`-bounded helper, a
+  function value inside one, and the subclass's own method through `Sc_Top`.
+  This is recorded locally without investigation.
+- Twelve plans of the generator below, seeds 1 to 12: eight contain a
+  base-method `top` use at such a type and were rejected on every backend;
+  the other four matched their Core reference on O0 and O2, and three on
+  Yul, the plan of seed 9 being rejected in `sc_both` at
+  `Sc_T0<Sc_T0<word>>`.
+
+Core, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, and no shared runtime code or proof
+changes. The existing profiles, corpora, emitters and emitter proofs stay
+unchanged, and this emitter has no proof yet. The definitions were fixed
+before execution:
+
+- Declarations, the base trait `Sc_Fold` and its impls: `runtime-traits`',
+  drawn by `TraitPlan` from this profile's stream; a generated plan has both
+  base methods and every base impl, the sum impl's `sc_both` with the
+  regression shape.
+- Subclass (`core-trait-hierarchies-v1`), one form per plan with equal
+  weights: the marker `trait Sc_Sub<a> where a: Sc_Fold {}`; or with its own
+  method `sc_mix<u>(sc_x: a, sc_y: u) returns (word) where u: Sc_Fold`; or
+  with that method named `sc_fold`, like the superclass's, every call being
+  qualified (`Sc_Sub.sc_fold(…)` beside `Sc_Fold.sc_fold(…)`). The chain is
+  the marker `trait Sc_Top<a> where a: Sc_Sub {}`.
+- Impls of `Sc_Sub` and of `Sc_Top`, in the order Word, tuple, sum,
+  declarations, each at a head where its superclass has an impl; a generated
+  plan has all of them, a reduced one those its uses and its kept impls need:
+  - `impl Sc_Sub<word>`, `impl<f, g> Sc_Sub<(f, g)> where f: Sc_Sub, g: Sc_Sub`,
+    `impl<f, g> Sc_Sub<sum<f, g>> where f: Sc_Sub, g: Sc_Sub`, and
+    `impl Sc_Sub<Sc_Ti>` or `impl<a> Sc_Sub<Sc_Ti<a>> where a: Sc_Sub`; the
+    same for `Sc_Top`, whose impls are empty, as are a marker's;
+  - with a method, the Word impl returns
+    `((sc_x comb Sc_Fold.sc_fold(sc_y)) op c)`; any other matches `sc_x`, one
+    arm per constructor in order binding its fields as `sc_a` and `sc_b`,
+    folds `Sc_Sub.sc_mix(v, sc_y)` at the bound values with a drawn operator,
+    then applies a drawn operator with a drawn constant; a nullary arm returns
+    its constant. Operators and constants are drawn as for the base impls.
+- Helpers, emitted when a use needs them, in this order, each returning
+  `(… op c)` with its own drawn operator and constant:
+  - `sc_up<t>` and `sc_up2<t>` where `t: Sc_Sub`, calling
+    `Sc_Fold.sc_fold(sc_x)` and `Sc_Fold.sc_both(sc_x, sc_y)`: one bound;
+  - `sc_top<t>` and `sc_top2<t>` where `t: Sc_Top`, calling the same: the
+    chain of two bounds;
+  - `sc_val<t>` and `sc_val2<t>` where `t: Sc_Sub`, calling a method value,
+    `let sc_f = Sc_Fold.sc_fold;` then `sc_f(sc_x)`;
+  - `sc_fun<t>` and `sc_fun2<t>` where `t: Sc_Sub`, calling a generic
+    function value, `let sc_f = sc_up;` then `sc_f(sc_x)`, with `sc_up` or
+    `sc_up2` emitted too;
+  - `sc_mixt<t, u>` where `t: Sc_Top, u: Sc_Fold`, calling
+    `Sc_Sub.sc_mix(sc_x, sc_y)` through one bound, and `sc_mixv<t, u>` where
+    `t: Sc_Sub, u: Sc_Fold`, calling the method value
+    `let sc_f = Sc_Sub.sc_mix;`.
+- Uses, one to six, each one method, one call form, a closed receiver type
+  and a builder:
+  - methods `unary` (`sc_fold`), `binary` (`sc_both`) and, when the subclass
+    has its method, `mix`, with equal weights;
+  - call forms with equal weights: for a base method `direct`, `sub`, `top`,
+    `value` or `function`; for `mix`, `direct` (`Sc_Sub.sc_mix`), `top`
+    (`sc_mixt`) or `value` (`sc_mixv`);
+  - a receiver type drawn as in `runtime-traits`: a depth from 0 to 3 with
+    weights 1, 3, 3 and 3, the first of four candidates of that depth whose
+    Core type fits the type limit, otherwise a Word;
+  - a binary use also calls at the builder's value of `input + s`, `s` from
+    1 to 4; a `mix` use calls at two argument types of the method's own
+    parameter, drawn in the same way, the second the first candidate that
+    differs from the first (otherwise a Word, or `(word, word)` when the first
+    is a Word), each with its builder, `sc_v<i>` and `sc_w<i>`, at `input`, and
+    its Word is the sum of the two calls.
+- Builders as in `runtime-traits`, `sc_u<i>` for receivers. `run(uint256)` of
+  `SynthesizedTraitHierarchies` returns `r_0 + 3 r_1 + 5 r_2 + …` over the
+  uses.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x7472616974730002`), in plan order: the declarations, the base impls,
+  the subclass form, the steps of its impls, the ten helpers, the use count,
+  then each use's method, call form, receiver depth and candidates, shift,
+  builder, and for `mix` each argument's depth, candidates and builder.
+- Core reference, with no source text and no data definitions:
+  - `TraitPlan`'s closures of the base methods, unchanged, for every type and
+    method reachable from a unary or binary use's receiver and from the
+    argument of every subclass closure at a Word, components first, in the
+    order first reached;
+  - one closure per receiver and argument type of the subclass's method
+    reachable from a `mix` use, the receiver's components at the same
+    argument first, compiled by `EnumMatch`'s arm-by-arm compilation; at a
+    Word it applies the argument's base fold closure;
+  - a closure per helper and instance: its operator and constant over the
+    base method's closure at the instance, so a superclass call through a
+    subclass bound, of one step or two, is the superclass instance's closure;
+    over the `sub` helper's closure for `function`; or over the subclass
+    closure at the receiver and argument;
+  - the builders as closures from Words, receivers then arguments, and the
+    entry, which binds every use's Word in order and combines them.
+
+  Admission checks the declarations and base impls as `runtime-traits` does,
+  the subclass form, that the `Sc_Sub` and `Sc_Top` impls are distinct,
+  ordered and over an impl of their superclass at the same head, with a method
+  one step per constructor and every impl a declaration's fields resolve to
+  present, that the helpers are exactly those the uses need, and every use's
+  method, call form, types, depths, shift, two distinct argument types,
+  builder values and the impls its calls need. A registered Lean test
+  compares the reference with a direct interpreter that dispatches each
+  method by the instance type when it is called.
+- Bounds as in `runtime-traits`: every receiver's and argument's Core type
+  has at most 64 type nodes and no fuel exhaustion, a case's complete
+  reference at most 4,096 nodes, and the node budget, default 2,048, minimum
+  256 and at most 4,096, bounds the applied reference by dropping uses from
+  the end. Of the first 500 seeds, the median reference had 1,128 nodes, the
+  largest 8,224 before and 2,710 after fitting, 108 plans dropped uses and
+  three kept a single use over the budget.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stage `hierarchy-profile`: a single use over the
+  budget; then, at the eight boundary inputs, a result other than a Word,
+  fuel exhaustion (an inconclusive resource exclusion), or the same Word for
+  all eight, as for 10 of the first 500 seeds.
+- Identity filter: as in `runtime-traits`, a single Word use whose arm
+  multiplies by 1 returns its input, so random campaigns apply
+  `exclude-boundary-identity-v1`; none of the first 500 seeds was an
+  identity.
+- Plans keep generating a base-method `top` use at every receiver type. 192
+  of the first 500 seeds have one at a tuple, std sum or generic declaration,
+  which the frontend rejects, so random campaigns report those plans as
+  `source-rejected`.
+- Reductions, each followed by recomputing the helpers the uses need, a newly
+  needed one adding 0:
+  - remove a use, keeping one;
+  - remove a base method when no use calls it, the unary one only without a
+    subclass method;
+  - name a shadowing subclass method `sc_mix`, or remove the subclass's
+    method when no use calls it;
+  - remove an impl of any of the three traits that no use and no kept impl
+    needs;
+  - reduce the nesting of a receiver or argument type as `runtime-traits`
+    does, mapping its builder values;
+  - call a `top`, `value` or `function` use through `sub`, or any use
+    directly;
+  - remove a builder value of a receiver or argument, keeping one, or replace
+    a leaf by `sc_x`;
+  - remove a declaration nothing refers to, with its impls;
+  - then the inputs 0, 1 and half the input, with the plan unchanged.
+
+  Every candidate is admitted and sealed by the full checker, and strictly
+  smaller lexicographically in plan size (declarations, base methods, impl
+  arms and constants, the subclass form, its impls' steps, the chain's impls,
+  helpers, call forms, type nodes and value weights of receivers and
+  arguments), then input. A reduced origin records the parent plan and input.
+  A shrink response stops before its cases would exceed 1.5 MB.
+- Specified hierarchy shapes, from the plan, never measured:
+  - instances: `<kind>:<method>` for every reachable base closure and
+    `<kind>:mix` for every reachable subclass closure, a kind being `word`,
+    `tuple`, `sum`, `plain` or `generic`;
+  - calls: `<method>:<call>` for every use;
+  - depths: each receiver type's depth, 0 to 3;
+  - arguments: the kind of every reachable generic declaration's argument;
+  - parameters: the kind of every argument type of the subclass's method;
+  - forms: `tuple:` or `enum:` and the binary match form of every reachable
+    binary base closure at a tuple or declaration;
+  - subclass: `marker`, `mix` or `shadow`.
+- Fixed corpus coverage: every value above and the eight boundary inputs. The
+  corpus is generated with the default budget: from seed 1 upwards, every
+  seed whose plan is accepted and covers a missing value is taken, until
+  nothing is missing, each plan at all eight inputs, except a plan with a
+  base-method `top` use at a tuple, std sum or generic declaration. It does
+  not avoid the Yul `StackTooDeepError`.
+
+`comptime` trait arguments compiled and matched on every path in the probe,
+but only with constant values: they would need a constant-only value form and
+a `comptime` qualification of every position of a type, and their uses would
+not depend on the input, so they do not fit one plan and are not generated. A
+method returning its own type parameter also matched and is not generated,
+`sc_mix` being this profile's method-level generic. Traits of several
+parameters and method values at closed types are not generated either.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
