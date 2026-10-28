@@ -5893,6 +5893,188 @@ reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
+**Pinned end-to-end fixtures as a cross-path oracle.** Every generated
+program has its own original Core reference, but the generators reach only the
+language they were built for. The pinned checkout's 168 end-to-end fixtures
+(`tests/e2e/*/main.sol`) also cover traits with constrained generic impls,
+comptime, closures, derived classes and std's generic ABI decoder for derived
+ADT arguments, and record upstream's own expectations. No original Core exists
+for them. So `scripts/semantic-fixtures.py` compares their compiled paths with
+each other and with each fixture's recorded expectation, and runs seeded
+mutated inputs of the recorded calls across the paths only. Agreement here is
+agreement among compiled paths; it is never reported as a Core comparison.
+
+A probe preceded the definitions. It read the upstream harness
+(`crates/test-directives`, `crates/test-utils/src/e2e.rs` and both backends'
+`tests/e2e.rs`), exported every fixture on every path, and ran four fixtures'
+recorded directives on all four paths. The results:
+- **Directive forms.** The pinned grammar has two exclusive modes per fixture.
+  - Method directives, in 96 fixtures: 617 typed `#[(arguments) -> expected]`
+    comments and one `#[send(arguments)]` (`persistent-storage`). Upstream
+    ABI-encodes typed values against the method's static ABI signature and
+    runs each as an `eth_call` without `from`, which discards its state. It
+    requires exact return bytes, any revert, or an exact revert payload. A
+    send is a transaction from the standard Anvil account that must succeed;
+    its output is not checked.
+  - Raw scenarios, in 72 fixtures: one optional `#[scenario]` metadata line,
+    one optional `#[deploy(bytes, value)]` (71 explicit), and 626
+    `#[raw(calldata, value, label)]` transactions from a fixed sender, run in
+    order on a fresh Osaka chain. Successful calls require exact bytes; a
+    `revert` without bytes accepts any failed receipt.
+- **Admission.** The existing parity manifests already pin all 168 fixtures
+  by source hash, mode, contract, call count, Hull fuel and available gas,
+  and the existing extractor and resolver supply exact directives.
+  - The checked public driver rejects three fixtures before Hull, as recorded
+    in Q008 and Q010: `storage-array` and `ufcs-array` (`SC0231`) and
+    `module-local-function-evidence` (`SC0108`).
+  - The other 165 export checked Hull with one deployment object holding one
+    leaf runtime object, so no fixture contract creates another. All 165
+    compile on Sonatina O0 and 164 on O2. All 165 give a Yul object that the
+    pinned solc compiles to one creation object with one runtime sub-object
+    and no link or immutable references.
+  - The code-image tool panicked compiling `ignored-builtin-effects` at O2,
+    with an assertion in Sonatina's `ir/src/dfg.rs`, though the upstream O2
+    harness passes it. This is a new compiler crash; it went to
+    `questions.md` without investigation.
+- **Observations.** Lean Core reports per transaction the status (returned,
+  reverted, invalid, out of fuel or a failure), return or revert bytes, logs,
+  the contract's whole storage and every account's storage, balances and the
+  account world. On Anvil, receipts, the call tracer and the prestate diff give
+  the status, return or revert bytes, logs, every changed slot of every account
+  reread at the receipt block, and balances. With a zero base fee and gas
+  price, EVM balances change only by value transfers, as the Lean ledger does.
+- Four fixtures, two of each mode (`00answer`, `persistent-storage`,
+  `abi-dyn-sum` and `deposit`), matched their recorded expectations on all
+  four paths and agreed on every compared field. The Lean runner reports no state for a failed
+  transaction, so only successful steps compare state. A first version of the
+  harness then agreed on all four paths for 156 recorded steps and mutants of
+  four fixtures, with four mutants per step.
+
+So nothing shared changes: no Core, runtime, proof, importer, runner, backend
+or `semantic-fuzz.py` change. `export-rust-yul.py` gains an additive
+`--fixture` admission, and the new script reuses the existing exporters,
+extractor, resolver and `rust-hull-scenario` runner unchanged. The definitions
+were fixed before execution:
+
+- **Fixtures and directives:** the 168 fixtures pinned in
+  `scripts/rust-scenario-parity.json` and `scripts/rust-method-parity.json`,
+  with every recorded directive. A changed source hash, mode, contract or
+  directive count stops the run.
+- **Paths:**
+  - `hull`: the pinned driver's checked Hull run by `rust-hull-scenario` on
+    Lean Core, with the Sonatina O0 code images for code observables;
+  - `sonatina-o0` and `sonatina-o2`: the code-image tool's creation image of
+    the fixture's deployment object, on Anvil;
+  - `yul`: the driver's Yul object for that deployment, compiled by solc
+    0.8.35 (optimizer on, Osaka) through `export-rust-yul.py --fixture`, on
+    Anvil.
+- **Yul admission:** `--fixture ID` admits only that fixture's own contract,
+  from its pinned path and source hash, with every existing check: exactly
+  one checked Hull deployment object with one leaf runtime object, one solc
+  object with one runtime sub-object, and no link or immutable references.
+  The generated wrappers' admission is unchanged. Its checked Hull must equal
+  the code images' checked Hull byte for byte.
+- **Environment:** Anvil 1.5.1 with Osaka, chain id 31337, timestamp
+  1,700,000,000, a 30,000,000 block gas limit, base fee zero and every
+  transaction at gas price zero; one fresh chain per fixture, every backend
+  from the same snapshot, so the contract address is the same.
+  - Method fixtures deploy from the standard account
+    `0xf39f…2266` (10,000 ether) at `0x5fbd…0aa3`. Each ordinary directive is a
+    transaction from the zero address, value zero, on a snapshot that is
+    reverted afterwards, as upstream's `eth_call` omits `from` and keeps no
+    state. A send is a persisted transaction from the standard account. Each
+    gets 30,000,000 gas.
+  - Raw fixtures fund `0x1212…0012` with `0x10000000000000000000000000` wei,
+    deploy at `0x822d…7a56` with the recorded bytes and value, and send each
+    raw call as a persisted transaction with its recorded value, all with
+    20,000,000 gas, as upstream does.
+  - Lean Core receives the same callers, values, address and balances, the
+    manifests' fuel (10,000,000 per transaction, 15,000,000 for `basic` and
+    25,000,000 for `deposit`) and their fixed available gas of 30,000,000 for
+    the nine fixtures whose calls pass `gas()` on. It does not meter gas.
+- **Observations:** per deployment, recorded step and mutant:
+  - the status: returned, reverted, exceptional (an EVM failure without a
+    confirmed `REVERT`, Lean `invalid`), a resource limit (out of fuel, out of
+    gas, time or output) or a path failure (any other Lean status, a code
+    mismatch, a refused submission);
+  - the return or revert bytes, except a deployment's, whose code bytes are
+    backend-specific; the Lean runner itself requires its deployed code to
+    equal the O0 image;
+  - the logs, in order, with address, topics and data;
+  - after a successful step, the whole storage of every account (nonzero
+    slots), and the balances of the contract and the fixture's sender.
+- **Comparisons:**
+  - each path's status and bytes against the recorded expectation, by
+    upstream's rule: exact bytes for a typed result or `success(bytes)`, any
+    failed receipt for a raw `revert`, a confirmed revert for a typed
+    `revert`, exact bytes for `revert(bytes)`, and success for a send or a
+    deployment expected to succeed;
+  - the paths with each other on every observation above, for recorded steps
+    and mutants alike. Two completed paths that differ in any field disagree.
+    A path that hits a resource limit is left out, and makes a step on which
+    the others agree incomplete rather than agreeing.
+- **Mutation:** each recorded call, send and raw transaction, and each raw
+  deployment with constructor bytes or a value, gets mutants that change
+  exactly one thing, never the selector:
+  - The arguments are read as 32-byte words after the selector, or from the
+    start of a deployment's constructor bytes. A typed directive's words, a
+    raw call's whose selector equals a standard-ABI method of the driver's ABI
+    and whose recorded bytes decode canonically, and constructor bytes that
+    decode against the constructor's inputs are classified by that signature
+    as typed leaves, offsets, lengths and content. Other words, including
+    derived ADT arguments, are unclassified.
+  - A word becomes one of its class's boundary Words, never the recorded one:
+    - `uint256` and `bytes32`: `0`, `1`, `2^255`, `2^256 - 1` and the
+      recorded value ± 1;
+    - `address`: `0`, `1`, `2^160 - 1`, `2^160` and `2^256 - 1`;
+    - `bool`: `0`, `1`, `2` and `2^256 - 1`;
+    - `int256`: `0`, `1`, `2^256 - 1`, `2^255 - 1` and `2^255`;
+    - narrower integers: `0`, the range ends and the first Words outside
+      it, and `2^256 - 1` for unsigned ones;
+    - fixed bytes: `0`, all ones, the recorded value with dirty padding, and
+      the recorded value right-aligned;
+    - an offset: `0`, the recorded offset ± 32 and + 1, the input length and
+      the input length less 31, `2^64`, `2^256 - 32` and `2^256 - 1`;
+    - a length: `0`, the recorded length ± 1, `2^32`, `2^64` and `2^256 - 1`;
+    - content: `0`, `2^256 - 1` and the recorded word with its lowest bit
+      flipped;
+    - an unclassified word: `0`, `1`, `32`, the recorded value ± 1, `2^64`,
+      `2^255`, `2^256 - 32` and `2^256 - 1`.
+  - Or a word becomes one seeded Word, kept inside a typed leaf's range.
+  - Or the frame changes: the arguments lose their last byte or word or all
+    of them, gain one zero byte or one word of `0xff`, or a raw call, send or
+    deployment toggles its value between zero and one wei.
+  - A SplitMix64 stream from the root seed, the fixture id and the step index
+    orders the families (each word class, seeded Words and the frame) and
+    draws one candidate per family in turn, up to 4 mutants per step.
+  - A mutant runs right before its recorded step, against the state the
+    recorded steps before it left, with the same sender and value, as a
+    transaction whose changes are then discarded; a deployment mutant is its
+    own fresh deployment. Mutants are compared across the paths only.
+- **Exclusions,** each recorded with its stage and reason: an unsupported
+  directive (extraction or resolution refused), a compile failure (the checked
+  source rejected, or code-image, Yul or solc compilation refused), an export
+  refusal (the Yul object checks) or a resource limit. Hull needs the O0
+  images and every path the checked source. A compiler crash excludes its
+  path and is a finding.
+- **Findings:** a path mismatch, a path's expectation mismatch on a recorded
+  step, a path failure, or a compiler crash. A harness error fails the run
+  without becoming a finding.
+- **Reduction:** each distinct finding of a fixture is rerun from a fresh
+  deployment on every admitted path. It keeps only the recorded steps that
+  persist state before it, then drops each of those, last first, while the
+  same finding recurs. A mutated word or length then moves toward the recorded
+  one: the nearest power-of-two distance that keeps the finding, then
+  bisection inside it. Each reduction has 48 runs and 900 seconds.
+- **Runs:** a fixed run of every admitted fixture's recorded steps on all four
+  paths, then a seeded mutation run with root seed `20261111`, both with the
+  scripts, the native tools, the driver, the code-image tool, the directive
+  tools, solc, Anvil and cast frozen. The mutation run may reuse exports
+  that the fixed run's frozen tools produced.
+- **Out of scope:** code bytes and what derives from them, gas, transient
+  storage across transactions, balances of other accounts, and fixtures the
+  checked driver rejects. Joining the suite or the fuzz driver is later work.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
