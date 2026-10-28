@@ -253,10 +253,14 @@ class State:
 
 
 def profiles_for(config, backend):
+    """Yul runs the pure and storage-family profiles, configured or not, and never
+    the call profiles. The suite's own Yul default is only the pure profiles, so the
+    storage family is selected explicitly."""
+    if backend == "yul":
+        selected = list(suite.PROFILES) if config["profile"] is None else config["profile"]
+        return [profile for profile in selected if suite.PROFILES[profile][1] != "call"]
     if config["profile"] is None:
         return None  # The suite's own default selection for this backend.
-    if backend == "yul":
-        return [profile for profile in config["profile"] if suite.PROFILES[profile][1] == "pure"]
     return list(config["profile"])
 
 

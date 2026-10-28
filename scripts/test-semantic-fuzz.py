@@ -410,16 +410,41 @@ class FuzzTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             fuzz.parse_args(["run", "--jobs", "0"])
 
-    def test_configuration_is_checked_with_the_suite_and_yul_runs_pure_profiles(self):
+    def test_configuration_is_checked_with_the_suite_and_yul_runs_pure_and_storage_family_profiles(self):
         code, fake = self.main("run", "--state", str(self.state), "--cases", "0")
         self.assertEqual((code, fake.calls, (self.state / "config.json").exists()), (2, [], False))
+        # The call profiles never run on Yul, so a configuration of only them runs nothing there.
+        code, fake = self.main("run", "--state", str(self.directory / "yul-calls"), "--base-seed", "1", "--backend", "yul",
+                               "--profile", "stateful-calls", "--profile", "stateful-forwarded-value", "--iterations", "1")
+        self.assertEqual((code, fake.calls), (2, []))
         code, fake = self.main("run", "--state", str(self.directory / "yul"), "--base-seed", "1", "--backend", "yul",
                                "--profile", "stateful-storage", "--iterations", "1")
-        self.assertEqual((code, fake.calls), (2, []))
+        self.assertEqual((code, [call["profiles"] for call in fake.calls]), (0, [["stateful-storage"]]))
         code, fake = self.main("run", "--state", str(self.directory / "mixed"), "--base-seed", "1", "--backend", "sonatina-o0",
-                               "--backend", "yul", "--profile", "closed-g0", "--profile", "stateful-storage", "--iterations", "1")
+                               "--backend", "yul", "--profile", "closed-g0", "--profile", "stateful-storage",
+                               "--profile", "stateful-calls", "--iterations", "1")
         self.assertEqual(code, 0)
-        self.assertEqual([call["profiles"] for call in fake.calls], [["closed-g0", "stateful-storage"], ["closed-g0"]])
+        self.assertEqual([call["profiles"] for call in fake.calls],
+                         [["closed-g0", "stateful-storage", "stateful-calls"], ["closed-g0", "stateful-storage"]])
+
+    def test_default_yul_iterations_select_the_storage_family_beside_the_pure_profiles(self):
+        families = {profile: family for profile, (_, family, _) in fuzz.suite.PROFILES.items()}
+        code, fake = self.main("run", "--state", str(self.state), "--base-seed", "1", "--backend", "sonatina-o0",
+                               "--backend", "yul", "--iterations", "1")
+        self.assertEqual(code, 0)
+        sonatina, yul = fake.calls
+        # Sonatina keeps the suite's own default selection, every profile.
+        self.assertEqual((sonatina["backend"], sonatina["profiles"]), ("sonatina-o0", []))
+        self.assertEqual(yul["backend"], "yul")
+        self.assertEqual(yul["profiles"], [profile for profile, family in families.items() if family != "call"])
+        self.assertEqual(sorted({families[profile] for profile in yul["profiles"]}), ["pure", "storage"])
+        self.assertEqual(len([profile for profile in yul["profiles"] if families[profile] == "storage"]), 15)
+        # The suite parses the explicit selection; its own default for Yul stays the pure profiles.
+        config = json.loads((self.state / "config.json").read_text())
+        argv = fuzz.suite_command(config, 0, "yul", self.directory / "unused")
+        self.assertEqual(fuzz.suite.parse_args(argv[2:]).profile, yul["profiles"])
+        self.assertEqual(fuzz.suite.parse_args([*argv[2:argv.index("--profile")], "--output", str(self.directory / "other")]).profile,
+                         [profile for profile, family in families.items() if family == "pure"])
 
 
 if __name__ == "__main__":

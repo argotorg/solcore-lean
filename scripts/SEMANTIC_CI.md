@@ -188,7 +188,13 @@ python3 scripts/semantic-fuzz.py label --state .upstream/semantic-fuzz SIGNATURE
 
 Iteration `i` runs the suite in random mode once per backend, with root seed
 `base + i`, so the backends compare the same generated programs. All three
-backends run by default, Yul with the pure profiles only. Machines that share
+backends run by default. On Yul the driver runs the pure and the fifteen
+storage-family profiles, whether profiles are configured or not, and never the
+two call profiles. It selects the storage family explicitly, since the suite's
+own Yul default is the pure profiles. With the default sixteen cases, this adds
+240 eight-transaction scenarios to each Yul iteration, about 2,400 seconds at
+the default node budgets; no storage-family profile took more than 205 seconds
+of its 900. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
 first `run` fixes the configuration in `config.json`: backends, profiles,
 cases (default 16), whole functions (`--functions`, unset by default),
