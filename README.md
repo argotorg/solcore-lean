@@ -135,7 +135,7 @@ programs pass the Core checker; accepted programs carry a proof of Core typing.
 The [source emitter](Solcore/Synthesis/Source/Emitter.lean) renders a restricted
 subset as a fixed Solcore contract. A native case tool records seeds and
 versions, rechecks saved inputs and recomputes the original Core result.
-Random campaigns of the fourteen G0-based profiles use the generator's fourth
+Random campaigns of the sixteen G0-based profiles use the generator's fourth
 revision: the second revision, which mixes each draw and widens its bank of
 boundary literals, under a per-case swarm mask that enables about half of the
 operators and forms, restricted to those the profile's emitter renders. Random
@@ -164,8 +164,8 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the seventeen pure profiles with `--backend yul`, and for the
-fifteen storage-family profiles when they are selected. Its EVM bytes are
+available for the nineteen pure profiles with `--backend yul`, and for the
+sixteen storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -176,7 +176,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same thirty-four-profile suite runs locally with shared time and disk limits.
+The same thirty-seven-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -246,6 +246,12 @@ Bounded recursion calls a recursive source function, or two that call each
 other, to a depth of up to seven taken from the input, against an unrolled
 finite Core reference; all 63 fixed recursion cases match on O0, O2 and Yul
 ([bounded recursion](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bounded-recursion)).
+Two profiles compose these constructs: a loop body that creates a closure
+capturing a loop-carried local and applies it in the same iteration, and a
+bounded loop inside every frame of the three recursion forms, each against
+unrolled finite Core references. All 48 fixed loop-closure and 78 fixed
+recursive-loop cases match on O0, O2 and Yul
+([composed control flow](scripts/SEMANTIC_DIFFERENTIAL.md#compare-composed-control-flow)).
 M1 through M4 are complete for these restricted profiles.
 
 The first stateful profile compares one to three ordered transactions against
@@ -440,17 +446,28 @@ dispatch for 110 single calls. The twelve fixed scenarios and sixteen random
 scenarios at each of two node budgets match on both Sonatina levels. See
 [several methods](scripts/SEMANTIC_DIFFERENTIAL.md#compare-several-methods).
 
-All seventeen stateful profiles also compare the installed contracts' whole
+The storage-loop profile runs a bounded source `while` loop over declared
+slots. Each iteration reads slot 0, slot 1, the slot the previous iteration
+wrote and its own slot, which an earlier transaction may have written, and
+writes its step result to its own slot and to slot 0. The iteration count is
+the input under a mask of at most seven, and original Core unrolls the loop
+into finite guards over literal slots. The twelve fixed scenarios and sixteen
+random scenarios at each of two node budgets match on both Sonatina levels and
+on Yul. See
+[storage-writing loops](scripts/SEMANTIC_DIFFERENTIAL.md#compare-storage-writing-loops).
+
+All eighteen stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The fixed corpora of all seventeen profiles, 218
-scenarios and 601 transaction prefixes, still match on both Sonatina levels,
-and a synthetic stray write that the declared slots could not see is caught and
-reduced to one transaction. See
+whole storage unchanged. The latest fixed run of all eighteen profiles, 230
+scenarios and 632 transaction prefixes, matched on Sonatina O0, and every
+corpus has also matched on O2 with whole storage compared. A synthetic stray
+write that the declared slots could not see is caught and reduced to one
+transaction. See
 [whole committed storage](scripts/SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage).
 
 The generic profile instantiates one source selection function at Word, pair

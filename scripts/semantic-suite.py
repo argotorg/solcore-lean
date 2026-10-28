@@ -443,7 +443,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirty-five for Sonatina, the seventeen pure profiles for Yul, "
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all thirty-seven for Sonatina, the nineteen pure profiles for Yul, "
                              "which also runs the sixteen storage-family profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
