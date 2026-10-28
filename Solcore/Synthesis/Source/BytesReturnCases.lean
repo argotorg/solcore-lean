@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.BytesReturnExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-bytes-return-case.v1"
 def planSchema : String := "solcore-lean.bytes-return-plan.v1"
-def profileVersion : String := "stateful-bytes-returns-v1/bytes-sequence-seed-v1"
+def profileVersion : String := "stateful-bytes-returns-v1/bytes-sequence-seed-v2"
 def templateVersion : String := "bytes-result-count-last-length-revert-odd-flags-v1"
 def corpusSchema : String := "solcore-lean.semantic-bytes-return-corpus.v1"
 
@@ -158,11 +158,13 @@ def parityPatterns : List (List Bool) :=
 
 /-- Three flags, three inputs, the completion pattern, then per transaction a
 length selector and a uniform length. Each choice uses the high half of one
-draw from a separate stream. -/
+draw from a separate stream, which starts at SplitMix64's finalizer of the seed
+xor its domain, so that consecutive seeds' choices do not step by a fixed
+residue. -/
 def sequenceBounds : List Nat := [6, 6, 6, 6, 6, 6, 4, 14, 14, 14, 65, 65, 65]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x62797465732d7371)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x62797465732d7371))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

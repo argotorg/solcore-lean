@@ -4673,7 +4673,8 @@ The profile's definitions were fixed before execution:
   as for the other storage-family profiles. The step must not give equal
   outputs at all boundary inputs.
 - **Transactions:** `{id, flags, input, calldata, value}`, one to eight per
-  scenario, drawn in blocks of three from a separate stream. Each block
+  scenario, drawn in blocks of three from a separate stream (mixed since
+  `tuple-sequence-seed-v2`; see "Mixed sequence seeds" below). Each block
   draws:
   - three flags from the boundary bank, each with the parity of one of the
     four completion patterns;
@@ -4903,7 +4904,8 @@ The profile's definitions were fixed before execution:
   as for the other storage-family profiles. The step must not give equal
   outputs at all boundary inputs.
 - **Transactions:** `{id, flags, input, length, calldata, value}`, one to
-  eight per scenario, drawn in blocks of three from a separate stream. Each
+  eight per scenario, drawn in blocks of three from a separate stream (mixed
+  since `bytes-sequence-seed-v2`; see "Mixed sequence seeds" below). Each
   block draws:
   - three flags from the boundary bank, each with the parity of one of the
     four completion patterns;
@@ -6463,6 +6465,39 @@ with another, on any recorded step or mutant. This is agreement among compiled
 paths and with upstream's recorded expectations; no original Core reference
 exists for these fixtures. Hosted CI has not run the harness, which needs the
 pinned tools and Anvil.
+
+**Mixed sequence seeds for the tuple and bytes returns.** The block choices
+of `stateful-tuple-returns` and `stateful-bytes-returns` came from a raw
+lcg64-v1 stream started at the block seed xor a domain. Consecutive seeds then
+give starts one apart, and each draw is affine in its start, so its high half
+modulo a small bound moves by a near-constant residue from seed to seed. A
+measurement over three windows of 64 consecutive seeds (from the suite's
+derived seeds for root seed 1 and for each profile's random-suite root, and
+seeds 0 to 63) found the first block losing values:
+- the first transaction's flags drew only three to five of the six bank
+  indices in a window, and the bytes profile's second flags only the even
+  ones in one window;
+- the third transaction's input repeated in 44 to 54 of 63 consecutive seeds
+  and missed one or two values in three of the six windows; it feeds the step
+  and slot 2, so the third transaction saw fewer inputs;
+- the other first-block draws kept their values but stepped by one fixed
+  residue in 17 to 31 of 63 seeds. Later blocks were unaffected: their seeds
+  are the high halves of `Sequence.blockSeeds`' own stream.
+
+The definitions, fixed before the matrices:
+- **Stream:** each block's `sequenceChoices` starts at SplitMix64's finalizer
+  (`GeneratorV2.mix`) of the block seed xor the profile's domain, as the enum
+  profiles' streams do. The bounds, their order, the domains, the block seeds,
+  the step and the tuple arity stay as they are.
+- **Versions:** `stateful-tuple-returns-v1/tuple-sequence-seed-v2` and
+  `stateful-bytes-returns-v1/bytes-sequence-seed-v2`; the contracts, sources,
+  templates and schemas keep their versions.
+- **Fixed corpora:** imported entries keep their recorded transactions. The
+  generated entries keep their seeds (2, 4 and 11 at 384 nodes and 5, 7 and 8
+  at 512 for tuples; 2, 4 and 9 and 6, 8 and 13 for `bytes`) and their steps,
+  and their expected histories are recomputed by the source model. Coverage
+  must stay complete.
+- **Fuzz state:** an existing state needs `--accept-new-epoch`.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).

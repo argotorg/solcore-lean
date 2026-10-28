@@ -5422,6 +5422,9 @@ definitions and the runtime design.
   (n - 2)`.
 - **Transactions:** `{id, flags, input, calldata, value}`. Generation draws
   `n` per scenario by a SplitMix64 hash of the seed, and the plan records it.
+  Each block of three transactions draws its flags, inputs and completion
+  pattern from a stream that starts at SplitMix64's finalizer of the block
+  seed xor the profile's domain (`tuple-sequence-seed-v2`).
 
 ### Running and validation
 
@@ -5561,7 +5564,9 @@ one variant per exact length.
 - **Transactions:** `{id, flags, input, length, calldata, value}`, with
   lengths from 0 to 64. Generation draws each length from the bank 0, 1, 31,
   32, 33, 63 and 64 with probability one half, and otherwise uniformly from 0
-  to 64.
+  to 64. Each block of three transactions draws from a stream that starts at
+  SplitMix64's finalizer of the block seed xor the profile's domain
+  (`bytes-sequence-seed-v2`).
 
 ### Running and validation
 
