@@ -3140,6 +3140,40 @@ So neither the shared runtime, the Hull importer nor any proof changes.
 - **Out of scope:** gas, value, other methods, malformed calldata, loop
   bounds other than `input & M`, `for` loops, and `break` or `continue`.
 
+**Results.** The checks before any random run:
+- The golden cases passed on both the guarded contract and the source-loop
+  model; a flipped expectation fails.
+- The model equalled the guarded contract on 392 transactions of 64 generated
+  scenarios, and every case and reduction replayed.
+- The gate passed on the final tree before `c1f6bde28`: the full Lean build
+  and tests, the kernel check, 733 Python tests, every corpus check and the
+  diff check.
+
+The matrices ran on `c1f6bde28` with 90 digests frozen: scripts, the 27 native
+tools, solc, Anvil, and the Rust driver and code-image exporter. None changed
+during any run.
+- **Fixed corpora:**
+  - O0: all eighteen stateful corpora matched, 230 scenarios and 632
+    prefixes; the seventeen earlier ones kept 218 and 601.
+  - The new corpus matched its 12 scenarios and 31 prefixes with complete
+    coverage on O0, O2 and Yul, in 64, 64 and 101 seconds:
+    - masks 0, 1, 3 and 7, and iteration counts 0 to 7;
+    - six reverts after loop writes;
+    - slots 2 to 8 carried across transactions.
+- **Random suites:** root seed `20261028`, sixteen eight-transaction
+  scenarios with G0 revision three, at 384 and 512 nodes on O0, O2 and Yul.
+  Every run matched 16 scenarios and 128 prefixes:
+  - masks 1, 3 and 7 drawn 4, 8 and 4 times;
+  - iteration counts 0 to 7 drawn 37, 35, 21, 23, 4, 2, 3 and 3 times;
+  - 23 reverts after loop writes;
+  - slots 2 to 7 carried across transactions;
+  - 16 attempts and no exclusion;
+  - the two budgets draw the same masks and transactions, and the step
+    differs in 15 of the 16 cases.
+
+A random run took 92 to 98 seconds on Sonatina and 142 to 148 on Yul. There
+was no finding. Hosted CI has not run the profile.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples), `bytes` beyond 256 bytes, strings, ABI-encoded
 return values, which first need a contract entry convention for more than one

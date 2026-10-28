@@ -4160,6 +4160,29 @@ generated seeds. Required coverage:
 The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs it
 as for the other storage-family profiles.
 
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpus:** matched all 12 scenarios and 31 prefixes with complete
+  coverage on Sonatina O0 and O2 and on Yul, in 64, 64 and 101 seconds. The
+  seventeen other stateful corpora still matched on O0, 218 scenarios and 601
+  prefixes.
+- **Random suites:** root seed `20261028`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 128 prefixes, in 92 to 98 seconds on Sonatina
+  and 142 to 148 on Yul:
+  - masks 1, 3 and 7 came 4, 8 and 4 times;
+  - every iteration count from 0 to 7 occurred;
+  - 23 transactions reverted after loop writes;
+  - slots 2 to 7 were read by a later transaction after an earlier committed
+    one wrote them;
+  - no seed was excluded;
+  - both budgets drew the same transactions, and a step differs in 15 of the
+    16 cases.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The thirteen
@@ -4338,7 +4361,7 @@ preservation proof.
 
 ## Compare storage-family contracts on Yul
 
-The fifteen storage-family profiles also run with `--backend yul --solc PATH`.
+The sixteen storage-family profiles also run with `--backend yul --solc PATH`.
 They compile as the pure profiles do: the checked Rust driver's Yul goes
 through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The two
 call profiles stay on Sonatina, because each of their sources compiles a parent
@@ -4366,7 +4389,7 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the seventeen pure and the twelve
+- **Admission:** `export-rust-yul.py` admits the seventeen pure and the thirteen
   storage-family wrappers, taken from the adapters' profile tables; the three
   malformed profiles reuse wrappers. Each must compile to one creation object
   with one runtime sub-object and no link or immutable references.
@@ -4400,6 +4423,10 @@ with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
 ### Results
+
+These results cover the fifteen profiles admitted first. The storage-loop
+profile, added later under the same boundary, reports its Yul runs in its own
+section.
 
 A feasibility probe preceded the code. It ran the unchanged storage adapter on
 the first four scenarios of each fixed corpus, with the EVM deploying solc's
