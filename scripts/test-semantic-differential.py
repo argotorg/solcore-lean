@@ -288,6 +288,42 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.ENUM_CASE_SCHEMA], "SynthesizedEnums")
         self.assertEqual(runner.ENUM_VERSIONS, ("profileVersion", "boundaryVersion"))
 
+    def test_trait_plan_envelope_and_shape_inventory(self):
+        declaration = {"generic": True, "sameName": False, "constructors": [["param"], []]}
+        impl = {"head": "sum", "unary": [], "binary": [], "form": "nested", "mismatch": ["1", "2"]}
+        helper = {"call": "lifted", "method": "binary", "op": "sub", "constant": "9"}
+        use = {"method": "binary", "call": "lifted", "type": {"sum": ["word", "word"]}, "shift": 4,
+               "builder": {"offset": 0, "values": []}}
+        plan = {"schema": "solcore-lean.trait-plan.v1", "declarations": [declaration] * 3, "methods": ["binary"],
+                "impls": [impl] * 6, "helpers": [helper] * 4, "uses": [use] * 6}
+        runner.validate_trait_plan(plan)
+        for methods in (["unary"], ["unary", "binary"]):
+            runner.validate_trait_plan({**plan, "methods": methods})
+        runner.validate_trait_plan({**plan, "helpers": [], "uses": [{**use, "call": "direct", "shift": 0}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.enum-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "declarations": []}, {**plan, "declarations": [declaration] * 4},
+                        {**plan, "methods": []}, {**plan, "methods": ["binary", "unary"]}, {**plan, "methods": ["unary"] * 2},
+                        {**plan, "impls": []}, {**plan, "impls": [impl] * 7}, {**plan, "impls": [{**impl, "form": "flat"}]},
+                        {**plan, "impls": [{**impl, "extra": 0}]}, {**plan, "helpers": [helper] * 5},
+                        {**plan, "helpers": [{**helper, "call": "direct"}]}, {**plan, "helpers": [{**helper, "method": "ternary"}]},
+                        {**plan, "uses": []}, {**plan, "uses": [use] * 7}, {**plan, "uses": [{**use, "call": "inline"}]},
+                        {**plan, "uses": [{**use, "method": "nullary"}]}, {**plan, "uses": [{**use, "shift": 5}]},
+                        {**plan, "uses": [{**use, "shift": "4"}]}, {**plan, "uses": [{**use, "extra": 0}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_trait_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.TRAIT_SHAPES.items()}
+        runner.validate_trait_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "calls": ["unary:direct", "binary:direct"]},
+                        {**shapes, "depths": ["0", "0"]}, {**shapes, "depths": ["4"]}, {**shapes, "depths": [0]},
+                        {**shapes, "shapes": ["product-of-sum"]}):
+            with self.assertRaises(ValueError):
+                runner.validate_trait_shapes(invalid)
+        self.assertEqual({key: len(values) for key, values in runner.TRAIT_SHAPES.items()},
+                         {"instances": 10, "calls": 6, "depths": 4, "arguments": 5, "forms": 4, "shapes": 1})
+        self.assertEqual(runner.CASE_PROFILES[runner.TRAIT_CASE_SCHEMA], "runtime-traits")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.TRAIT_CASE_SCHEMA], "SynthesizedTraits")
+        self.assertEqual(runner.TRAIT_VERSIONS, ("profileVersion", "boundaryVersion"))
+
     def test_generic_plan_requires_an_admitted_type_and_original_step(self):
         plan = {"schema": "solcore-lean.generic-plan.v1", "variant": "word", "stepProgram": {}}
         for variant in ("word", "pair", "sum"):
@@ -643,7 +679,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 22)
+        self.assertEqual(len(runner.CASE_PROFILES), 23)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

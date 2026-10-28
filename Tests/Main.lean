@@ -1848,6 +1848,7 @@ import Solcore.Test.SourcePrimitiveCorpus
 import Solcore.Test.SourceAssemblyCases
 import Solcore.Test.SourceAssemblyMemoryCases
 import Solcore.Test.SourceEnumCases
+import Solcore.Test.SourceTraitCases
 import Solcore.Test.CallGraphGenerator
 import Solcore.Test.SourceCallGraphEmitter
 import Solcore.Test.SourceCallGraphCases
@@ -4040,6 +4041,7 @@ def run : IO Unit := do
   SourceAssemblyCases.testSourceAssemblyCases
   SourceAssemblyMemoryCases.testSourceAssemblyMemoryCases
   SourceEnumCases.testSourceEnumCases
+  SourceTraitCases.testSourceTraitCases
   CallGraphGenerator.testCallGraphGenerator
   SourceCallGraphEmitter.testSourceCallGraphEmitter
   SourceCallGraphCases.testSourceCallGraphCases

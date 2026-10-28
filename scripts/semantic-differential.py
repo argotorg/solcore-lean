@@ -67,6 +67,17 @@ ENUM_SHAPES = {
                  "shadow", "tuple", "variable", "wildcard"),
     "wildcards": ("arm", "column", "component", "deep", "field"),
     "depths": ("1", "2", "3")}
+TRAIT_CASE_SCHEMA = "solcore-lean.semantic-trait-case.v1"
+TRAIT_VERSIONS = ("profileVersion", "boundaryVersion")
+# The specified shape values of the trait profile, from the plan, never measured.
+TRAIT_SHAPES = {
+    "instances": ("generic:binary", "generic:unary", "plain:binary", "plain:unary", "sum:binary", "sum:unary",
+                  "tuple:binary", "tuple:unary", "word:binary", "word:unary"),
+    "calls": ("binary:direct", "binary:generic", "binary:lifted", "unary:direct", "unary:generic", "unary:lifted"),
+    "depths": ("0", "1", "2", "3"),
+    "arguments": ("generic", "plain", "sum", "tuple", "word"),
+    "forms": ("enum:columns", "enum:nested", "tuple:columns", "tuple:nested"),
+    "shapes": ("sum-of-product",)}
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -94,7 +105,7 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  NESTED_LOOP_CASE_SCHEMA: "runtime-nested-loops", RECURSION_CASE_SCHEMA: "runtime-recursion",
                  RECURSIVE_LOOP_CASE_SCHEMA: "runtime-recursive-loops", LOOP_CLOSURE_CASE_SCHEMA: "runtime-loop-closures",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules",
-                 ENUM_CASE_SCHEMA: "runtime-enums"}
+                 ENUM_CASE_SCHEMA: "runtime-enums", TRAIT_CASE_SCHEMA: "runtime-traits"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -107,7 +118,7 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   NESTED_LOOP_CASE_SCHEMA: "SynthesizedNestedLoops", RECURSION_CASE_SCHEMA: "SynthesizedRecursion",
                   RECURSIVE_LOOP_CASE_SCHEMA: "SynthesizedRecursiveLoops", LOOP_CLOSURE_CASE_SCHEMA: "SynthesizedLoopClosures",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules",
-                  ENUM_CASE_SCHEMA: "SynthesizedEnums"}
+                  ENUM_CASE_SCHEMA: "SynthesizedEnums", TRAIT_CASE_SCHEMA: "SynthesizedTraits"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -418,6 +429,48 @@ def validate_enum_shapes(values, label="enumShapes") -> dict:
     return values
 
 
+def validate_trait_plan(plan) -> dict:
+    """Validate the envelope and the plan's counts; native replay checks every
+    declaration, impl, helper, use, type and value, the seed and the emission."""
+    if (not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.trait-plan.v1"
+            or set(plan) != {"schema", "declarations", "methods", "impls", "helpers", "uses"}):
+        raise ValueError("unsupported trait plan schema")
+    declarations, methods, impls, helpers, uses = (plan[key] for key in ("declarations", "methods", "impls", "helpers", "uses"))
+    if not isinstance(declarations, list) or not 1 <= len(declarations) <= 3:
+        raise ValueError("trait plan requires one to three declarations")
+    if methods not in (["unary"], ["binary"], ["unary", "binary"]):
+        raise ValueError("trait plan methods are unary, binary or both, in that order")
+    if not isinstance(impls, list) or not 1 <= len(impls) <= 6 or any(
+            not isinstance(impl, dict) or set(impl) != {"head", "unary", "binary", "form", "mismatch"}
+            or impl["form"] not in ("nested", "columns") for impl in impls):
+        raise ValueError("trait impls have a head, per-method steps, a binary match form and mismatch constants")
+    if not isinstance(helpers, list) or len(helpers) > 4 or any(
+            not isinstance(helper, dict) or set(helper) != {"call", "method", "op", "constant"}
+            or helper["call"] not in ("generic", "lifted") or helper["method"] not in ("unary", "binary")
+            for helper in helpers):
+        raise ValueError("trait helpers are generic or lifted, for one method each")
+    if not isinstance(uses, list) or not 1 <= len(uses) <= 6:
+        raise ValueError("trait plan requires one to six uses")
+    for use in uses:
+        if (not isinstance(use, dict) or set(use) != {"method", "call", "type", "shift", "builder"}
+                or use["method"] not in ("unary", "binary") or use["call"] not in ("direct", "generic", "lifted")
+                or type(use["shift"]) is not int or not 0 <= use["shift"] <= 4):
+            raise ValueError("trait uses call one method directly, generically or lifted, with a shift of at most four")
+    return plan
+
+
+def validate_trait_shapes(values, label="traitShapes") -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    if not isinstance(values, dict) or set(values) != set(TRAIT_SHAPES):
+        raise ValueError(f"{label} must name every trait shape dimension")
+    for key, allowed in TRAIT_SHAPES.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -520,6 +573,8 @@ def validate_case(case: dict) -> None:
         validate_assembly_memory_plan(case.get("assemblyMemoryPlan"))
     if case["schema"] == ENUM_CASE_SCHEMA:
         validate_enum_plan(case.get("enumPlan"))
+    if case["schema"] == TRAIT_CASE_SCHEMA:
+        validate_trait_plan(case.get("traitPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -571,6 +626,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
             raise ValueError("enum referenceNodes must be an integer from 1 to 4,096")
         validate_enum_shapes(provenance.get("enumShapes"))
+    if case["schema"] == TRAIT_CASE_SCHEMA:
+        for key in TRAIT_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing trait provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("trait referenceNodes must be an integer from 1 to 4,096")
+        validate_trait_shapes(provenance.get("traitShapes"))
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -594,7 +656,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -1053,6 +1115,7 @@ def execute(args, report: dict) -> None:
         ASSEMBLY_LOOP_CASE_SCHEMA: "runtime Word input, an inline Yul for loop with break, continue, leave or a two-result step function versus finite Core guards, directly generated acyclic Word helper step graph as Yul functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CALL_GRAPH_CASE_SCHEMA: "runtime Word input, directly generated internal Word pairs/sums, projections and case payload scopes with acyclic Word helper calls, Sonatina O0, run(uint256) ABI Word",
         ENUM_CASE_SCHEMA: "runtime Word input, user-defined plain and generic enums built from the input and matched with nested constructor and tuple patterns, wildcards and nested matches versus Core sums, products and caseE, Sonatina O0, run(uint256) ABI Word",
+        TRAIT_CASE_SCHEMA: "runtime Word input, one trait with a unary and a binary method and impls at Words, tuples, std sums and user-defined enums, called directly and through constrained generic functions at values built from the input, versus one Core closure per reached instance and method, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

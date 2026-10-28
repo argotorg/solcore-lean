@@ -18,6 +18,7 @@ import Solcore.Synthesis.Source.CallGraphLoopCases
 import Solcore.Synthesis.Source.AssemblyLoopCases
 import Solcore.Synthesis.Source.AggregateCallGraphCases
 import Solcore.Synthesis.Source.EnumCases
+import Solcore.Synthesis.Source.TraitCases
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
@@ -89,6 +90,9 @@ private def generator (command : String) : Option Generator :=
   | "enum-generate" => some ⟨false, true, true,
       fun seed nodes count attempts fuel _ inputs acceptance =>
         Enums.generateCases seed nodes count attempts fuel inputs acceptance⟩
+  | "trait-generate" => some ⟨false, true, true,
+      fun seed nodes count attempts fuel _ inputs acceptance =>
+        Traits.generateCases seed nodes count attempts fuel inputs acceptance⟩
   | "function-generate" => some ⟨true, true, true,
       fun seed nodes count attempts fuel revision inputs acceptance =>
         Function.generateCases seed nodes count attempts fuel revision inputs acceptance⟩
@@ -154,9 +158,10 @@ private def generationOptions (spec : Generator) (options : List String) :
   return (revision.getD .v1, inputs.getD .boundary, acceptance.getD .profile)
 
 /-- Node budgets bound G0 programs and composed references at 512 nodes; an
-enum plan's applied reference is bounded at its case limit. -/
+enum or trait plan's applied reference is bounded at its case limit. -/
 private def maximumNodes (command : String) : Nat :=
-  if command == "enum-generate" then Enums.caseLimit else 512
+  if command == "enum-generate" then Enums.caseLimit
+  else if command == "trait-generate" then Traits.caseLimit else 512
 
 private def execute (args : List String) : IO Json := do
   if let command :: seed :: nodes :: count :: attempts :: fuel :: options := args then
@@ -219,6 +224,11 @@ private def execute (args : List String) : IO Json := do
       let plan ← get (Enums.checkedPlan (← readJson file))
       let input ← get (Primitive.inputWord input)
       get (Enums.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
+  | "trait-emit" :: file :: input :: rest =>
+      let plan ← get (Traits.checkedPlan (← readJson file))
+      let input ← get (Primitive.inputWord input)
+      get (Traits.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
   | "function-emit" :: file :: input :: rest =>
       let function ← get (Function.checkedFunction (← readJson file))
@@ -346,6 +356,9 @@ private def execute (args : List String) : IO Json := do
       else if (json.getObjValAs? String "schema").toOption == some Enums.caseSchema then
         let checked ← get (Enums.caseProgram json)
         return Enums.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some Traits.caseSchema then
+        let checked ← get (Traits.caseProgram json)
+        return Traits.observe checked.plan checked.input fuel
       else
         let checked ← get (caseProgram json)
         return observe checked fuel
@@ -393,7 +406,9 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some AssemblyMemory.caseSchema then
           AssemblyMemory.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some Enums.caseSchema then
-          Enums.replayCase json fuel else replayCase json fuel)
+          Enums.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some Traits.caseSchema then
+          Traits.replayCase json fuel else replayCase json fuel)
   | "shrink" :: file :: limit :: rest =>
       let json ← readJson file
       let limit ← natural "shrink limit" limit 4096
@@ -439,8 +454,10 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some AssemblyMemory.caseSchema then
           AssemblyMemory.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some Enums.caseSchema then
-          Enums.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|assembly-memory-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|enum-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands, assembly-loop-generate or enum-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|assembly-memory-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit|enum-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+          Enums.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some Traits.caseSchema then
+          Traits.shrinkCases json limit fuel else shrinkCases json limit fuel)
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|assembly-memory-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|enum-generate|trait-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands, assembly-loop-generate, enum-generate or trait-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate or generic-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|assembly-memory-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit|enum-emit|trait-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try
