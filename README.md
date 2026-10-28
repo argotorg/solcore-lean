@@ -164,8 +164,8 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the nineteen pure profiles with `--backend yul`, and for the
-sixteen storage-family profiles when they are selected. Its EVM bytes are
+available for the twenty pure profiles with `--backend yul`, and for the
+eighteen storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -176,7 +176,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same thirty-seven-profile suite runs locally with shared time and disk limits.
+The same forty-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -203,6 +203,14 @@ Solcore local. Its original Core is the primitive function itself, so only the
 source differs. The 72-case corpus combines the primitive corpus's functions
 in each of the three forms at the eight boundary inputs
 ([inline Yul](scripts/SEMANTIC_DIFFERENTIAL.md#compare-inline-yul)).
+The `runtime-assembly-loops` profile renders a call-graph loop plan as one
+`assembly` block: the helpers become Yul functions and the loop a Yul `for`
+loop, in five forms that use a plain loop, `break`, `continue`, `leave` from a
+Yul function, and helpers with two return values. Its original Core is the
+call-graph loop plan itself. All 90 fixed cases match on O0, O2 and Yul. In
+random runs of eight functions, 70 of 80 cases match on each backend and one
+function's ten cases crash the compiler, a retained finding
+([inline Yul loops and functions](scripts/SEMANTIC_DIFFERENTIAL.md#compare-inline-yul-loops-and-functions)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -384,10 +392,9 @@ exact archive replay. See the
 
 The long-bytes profile extends the bytes profile to payloads of up to 256
 bytes, folding up to eight 32-byte chunks through the checked step into their
-own slots, which generalizes the bytes profile's two-chunk contract. Multi-word
-return values were not built: original Core's contract entry returns exactly
-one Word, so they need a new entry convention in the shared contract runtime.
-Its twelve fixed scenarios and sixteen recorded random scenarios match on both
+own slots, which generalizes the bytes profile's two-chunk contract. Static
+multi-word return values came later, with their own contract entry convention
+(below). Its twelve fixed scenarios and sixteen recorded random scenarios match on both
 Sonatina levels, with reduction and exact archive replay. See the
 [usage guide](scripts/SEMANTIC_DIFFERENTIAL.md#compare-bytes-payloads-beyond-64-bytes).
 
@@ -456,15 +463,39 @@ random scenarios at each of two node budgets match on both Sonatina levels and
 on Yul. See
 [storage-writing loops](scripts/SEMANTIC_DIFFERENTIAL.md#compare-storage-writing-loops).
 
-All eighteen stateful profiles also compare the installed contracts' whole
+The Keccak-loop profile runs the same kind of bounded loop over std mapping
+entries. Each iteration hashes its entry's slot from the counter and the
+input, reads and writes the entry and slot 0, and emits one log with the
+counter and the key as topics and the written value as data, so Keccak,
+memory, storage and log lowering meet inside a loop body. A key mask decides
+which iterations share an entry, and transactions whose inputs share their
+high bits share entries too. The thirteen fixed scenarios and sixteen random
+scenarios at each of two node budgets match on both Sonatina levels and on
+Yul, with every log compared. See
+[loops over Keccak-addressed entries](scripts/SEMANTIC_DIFFERENTIAL.md#compare-loops-over-keccak-addressed-entries-and-logs).
+
+The tuple-return profile's method returns a static ABI tuple of two to four
+Words, and all three paths compare the whole return data. Original Core
+returns it through a new contract entry convention, `wordTupleOutcomeV1`,
+which decodes right-nested Word pairs into their concatenated Words; reverts
+and traps still carry one Word. A nested word call carries one Word, so the
+one-level nested executor treats a tuple contract as unavailable to calls and
+creation, and the one-Word theorems take that as a premise. The twelve fixed
+scenarios and sixteen random scenarios at each of two node budgets match on
+both Sonatina levels and on Yul. A `bytes` return gave identical bytes on
+every path in a probe but was not built, because original Core has no
+variable-length value. See
+[ABI-encoded tuple returns](scripts/SEMANTIC_DIFFERENTIAL.md#compare-abi-encoded-tuple-returns).
+
+All twenty stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all eighteen profiles, 230
-scenarios and 632 transaction prefixes, matched on Sonatina O0, and every
+whole storage unchanged. The latest fixed run of all twenty profiles, 255
+scenarios and 697 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
