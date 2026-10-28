@@ -4950,6 +4950,73 @@ changes. The definitions were fixed before execution:
   arrays of enums or structs, nested mappings, contract-local types, the ABI
   encoding of enum or struct values, gas, value and malformed calldata.
 
+**Results.** The checks before any random run:
+- The golden tests passed. Both emitted contracts equal the hand-written text,
+  and original Core and the slot-map model gave all 24 hand-written rows of
+  the three shapes. The adapter's independent Python layout model agreed with
+  the same rows, and a changed expectation failed.
+- Original Core equalled the slot-map model on 12 generated scenarios of eight
+  transactions under G0 revision three and 8 of three under revision one.
+  - Every case and the reductions of two cases replayed.
+  - Every variant count, enum position, Word type and method was drawn among
+    64 cases, and the node counts were those fixed above.
+  - Keys, fields, variants and methods outside the case, changed observed
+    slots, the excluded shapes and methods out of order were refused.
+- The corpus test replayed 26 scenarios and 75 transactions with every
+  original Core history equal to the model's expected history, and its own
+  coverage recomputation found all 20 overwrite pairs.
+- An unfrozen O0 run of the corpus matched 26 scenarios and 75 prefixes with
+  complete coverage, and three random eight-transaction cases matched 24
+  prefixes.
+- The gate passed on the final tree before `61aa80760`: the forbidden-term
+  scan, `lake build` (10,251 jobs), 33 native tools prepared offline,
+  `lake test`, the kernel check, 788 Python tests, every `Tests/scripts` check
+  with the storage-rollback corpus, and the diff check.
+
+The matrices ran on `61aa80760` with 96 digests frozen: the 33 native tools,
+every `scripts/*.py` and `*.rs`, solc, Anvil, and the Rust driver and
+code-image exporter. None changed during any run, and all 540 case results
+record that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-four stateful corpora matched, 328 scenarios and 896
+    prefixes, in 3,189 seconds. The twenty-three earlier ones kept their 302
+    scenarios and 821 prefixes.
+  - The new corpus matched with complete coverage on O0, O2 and Yul: 26
+    scenarios and 75 prefixes in 427, 291 and 410 seconds.
+  - It covered every shape class and all 20 overwrite pairs. It updated both
+    kinds of field in the record and in an entry, read a stale Word with each
+    read method, wrote both keys of each mapping and across the wrap, and
+    reverted 9 writes, at least one of every writing method.
+- **Random suites:** root seed `20261033` (derived seed
+  `5853803009084555399`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul.
+  - O2 matched 16 scenarios and 128 prefixes at both budgets, in 200 and 320
+    seconds.
+  - O0 and Yul both import the Sonatina O0 images on their Hull path. On both,
+    the Hull deployment of one contract at 384 nodes and three at 512 ran out
+    of the suite's default Hull fuel of 10,000,000. Each such case was
+    reported `inconclusive-resource`, and the other 15 and 13 scenarios
+    matched.
+  - Each of those contracts deploys within 15,000,000. Rerun with
+    `--core-fuel 40000000` under the same freeze, all four runs matched 16
+    scenarios and 128 prefixes, in 198 and 201 seconds on O0 and 300 and 314
+    on Yul.
+  - Variant counts 2, 3 and 4 came 2, 10 and 4 times, enum positions 0, 1 and
+    2 came 6, 5 and 5 times, and `uint256` 12 times. The key bases 0, 1, 3,
+    `2^255` and `2^256 - 1` came 3, 4, 3, 4 and 2 times.
+  - All twelve methods were called, and 35 transactions reverted, 22 of them
+    writes of every writing method.
+  - Four overwrite pairs, updates of both kinds in the record and in an
+    entry, a stale read by `getRecord`, and both keys of each mapping
+    occurred.
+  - No seed was excluded. The three backends ran the same cases at each
+    budget, and the two budgets drew the same shapes, keys, methods and
+    transactions, with the step differing in all 16 cases.
+
+There was no finding. The pinned front end's rejection of `records[k].f = v`
+is a diagnostic of an unsupported form, not a defect. Hosted CI has not run
+the profile.
+
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 `bytes` return values beyond 64 bytes and other dynamic return values, or

@@ -5082,6 +5082,30 @@ The coverage dimensions are `AdtVariantCounts`, `AdtPayloads`,
 The wrapper is a storage-family wrapper, so `--backend yul --solc PATH` runs
 it as for the other storage-family profiles.
 
+### Results
+
+The matrices ran on the committed code with scripts, native tools, solc,
+Anvil, and the Rust driver and code-image exporter frozen.
+- **Fixed corpus:** it matched with complete coverage on Sonatina O0 and O2
+  and on Yul, 26 scenarios and 75 prefixes in 427, 291 and 410 seconds. The
+  twenty-three other stateful corpora still matched on O0, 302 scenarios and
+  821 prefixes.
+- **Random suites:** root seed `20261033`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  - O2 matched 16 scenarios and 128 prefixes at both budgets.
+  - On O0 and Yul, which import the Sonatina O0 images on their Hull path,
+    the Hull deployment of one contract at 384 nodes and three at 512
+    needed more than the suite's default 10,000,000 Hull fuel. Those cases
+    were reported `inconclusive-resource`.
+  - Each deploys within 15,000,000. Rerun with `--core-fuel 40000000`, every
+    run matched 16 scenarios and 128 prefixes.
+  - Every variant count, enum position, Word type and method was drawn, and
+    22 transactions reverted after writes, of every writing method.
+  - No seed was excluded, and both budgets drew the same shapes, keys,
+    methods and transactions, with the step differing in all 16 cases.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare ABI-encoded tuple returns
 
 Every other stateful profile returns one Word. The `stateful-tuple-returns`
