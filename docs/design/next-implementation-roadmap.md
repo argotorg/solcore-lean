@@ -2429,6 +2429,260 @@ load averages of 5 to 17 from other work on the machine:
   are recorded locally without investigation, so the fixed Yul and random
   gates did not pass; no mismatch was found.
 
+**Solcore memory values.** Every earlier pure profile keeps its intermediate
+values in Words, tuples, sums and enums and reaches memory only through inline
+Yul (`runtime-assembly-memory`). The pinned fixtures `concat`, `slices`,
+`zeroize-memory-range`, `loop-value-copies`, `abi-byte-memory` and
+`abi-codec-memory` use std's memory values directly, the fixture comparison
+met Hull's memory boundary there, and memory lowering is where several
+upstream regressions were fixed. One new pure profile,
+`runtime-memory-values`, generates std's memory values in straight-line code
+and inside this lane's bounded `while` forms, and keeps an original Core
+reference that models the values abstractly.
+
+Before any code, a probe compiled hand-written sources through checked Hull
+export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner,
+against a Python byte-list model at twelve inputs:
+- What std offers pure code at the pinned revision:
+  - `memory<bytes>` from Words: `to_bytes(bytes32(w))`, and `concat(x, y)` of
+    any two of `bytes32`, `memory<bytes>`, `memory_ref` and `empty(n)` (`n`
+    zero bytes); `MemorySize.len(v)` is the length, and no `Length` impl
+    covers memory values;
+  - no `IndexAccess` for `memory<bytes>` (a TODO in std): Word and byte reads
+    at an index go through std's own range checks,
+    `mload(MemoryPointer.ptr(truncate(slice_(v, i), 32)))` and
+    `shr(248, mload(MemoryPointer.ptr(truncate(slice_(v, i), 1))))` with
+    `mload` and `shr` imported from `std.opcodes`, and writes through the same
+    pointers with `mstore` and `mstore8`;
+  - slices: `slice_(v, start)` and `truncate(v, length)` return `memory_ref`
+    views and nest into windows; copies: `to_bytes(v)` of a value or a slice;
+    hashes: `keccak256_(v)` of a value or a slice. `sha256` and `ripemd160`
+    call precompiles and are not used;
+  - Word arrays `memory<DynArray<uint256>>`: literals `[…]`,
+    `allocateDynamicArray(@uint256, n)`, which writes only the length, `a[i]`,
+    `IndexAccess.get` and `IndexAccess.set`; memory has no `a[i] = v` and no
+    length function.
+- Out of range: `slice_` or `truncate` past a value's end, and so a Word or
+  byte access or write past it, and `IndexAccess.get` or `set` past an array's
+  end revert with exactly the four bytes `0xb4120f14`, std's `OutOfBounds()`,
+  on every path, also at input-dependent indices and inside loops. Nothing
+  panics or halts exceptionally.
+- Value or reference: a second variable names the same value, a slice is a
+  view of its value, and a helper's write is its caller's, so a write through
+  any of them is seen through all the others; `to_bytes`, `concat` and array
+  literals make new values, which later writes leave unchanged. A helper that
+  returns its array argument returns the same array.
+- Inside the single and nested `while` forms, array reads and writes at
+  counter indices, values allocated in every iteration, a value grown by
+  `concat` across iterations, a slice reassigned in the loop and hashes after
+  the loop matched on every path, and so did every straight-line source,
+  including hashes of 0 to 160 bytes across the block boundary at 136. The
+  exception is Sonatina O0: for loops whose body writes a `memory<bytes>`
+  value or slice through a helper (`mstore` or `mstore8`, generic or not), or
+  inline beside an allocation in the same body, it returned Words that differ
+  from Hull's, O2's, Yul's and the model's whenever the loop ran and returned.
+  The same write inline alone, the allocation alone, the same calls unrolled
+  and array writes through `IndexAccess.set` or a helper in a loop matched.
+  This is recorded locally without investigation.
+- Twelve plans of the generator below, seeds 1 to 12, matched the model on
+  O0, O2 and Yul, on Anvil and in the Lean Hull runner, out-of-range reverts
+  included. A separate Python model of the plans agreed with the Lean
+  reference on 150 seeds at 13 inputs.
+
+Core, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, and no shared runtime code or proof
+changes. The reference needs no Core memory support beyond what the inline Yul
+memory profile uses: Words, pairs, sums and closures, and the Core
+Keccak-f[1600] permutation and digest builders of the Hull import path. One
+shared script changes, the pure adapter `semantic-differential.py`: for this
+profile's cases only, three reverts with the same data are a match (below).
+The existing profiles, corpora, emitters and emitter proofs stay unchanged,
+and this emitter has no proof yet. The definitions were fixed before
+execution:
+
+- Plans (`core-memory-values-v1`): `run(uint256)` of `SynthesizedMemoryValues`
+  binds `sc_x` to the input and `sc_r` to 0, runs one to ten steps and returns
+  `sc_r`. A step is an action or a loop. Actions:
+  - `bytes`: `let sc_b<n>: memory<bytes> = to_bytes(P);` or `concat(P, Q)`, a
+    part being `bytes32(W)`, `empty(k)` with `k` at most 40, or a bytes value
+    or slice in scope; at most 128 bytes;
+  - `slice`: `let sc_s<n>: memory_ref = slice_(V, a);`, `truncate(V, b)` or
+    `truncate(slice_(V, a), b)` of a bytes value or slice, within its length;
+  - `alias`, outside loops: `let sc_b<n>: memory<bytes> = sc_b<m>;`, or the
+    same of an array;
+  - `array`: `let sc_a<n>: memory<DynArray<uint256>> = [uint256(W), …];` of one
+    to four elements, or `allocateDynamicArray(@uint256, k)` followed by
+    `IndexAccess.set` of every element in order;
+  - `write` at an index `I`: a Word or a byte into a bytes value or slice,
+    inline (`mstore(MemoryPointer.ptr(truncate(slice_(V, I), 32)), W);` or
+    `mstore8(MemoryPointer.ptr(truncate(slice_(V, I), 1)), W);`) or through
+    the helpers `sc_put` and `sc_put8`; an element, by
+    `IndexAccess.set(A, uint256(I), uint256(W));` or the helper `sc_aput`;
+  - `observe`: `sc_r = ((sc_r * c) op O);`, `op` being `+` or `^`, `c` odd
+    from 3 to 31, and `O` one of `MemorySize.len(V)`, `sc_word(V, I)`,
+    `sc_byte(V, I)`, `Typedef.rep(keccak256_(V))`,
+    `Typedef.rep(A[uint256(I)])` and `Typedef.rep(IndexAccess.get(A, uint256(I)))`.
+
+  A plan declares at most four bytes variables, three slices and two arrays,
+  numbered in declaration order; a loop's declarations go out of scope after
+  it. A Word access or write needs at least 32 bytes and a byte access one.
+  At most seven hashes run on any input, a hash in a loop counting the loop's
+  most iterations.
+- Words `W`: `sc_x`, `(sc_x + c)`, `(sc_x * c)`, `(sc_x ^ c)`, `sc_r` or, in a
+  loop, its position. Indices `I`: a literal in range;
+  `mod(shr(s, sc_x), m)` with `s` in 0, 1, 3, 8, 128 and 252 and `m` from 1 to
+  eight past the in-range positions; or, in a loop, `((P * a) + b)` over its
+  position `P` with `a` in 1, 2, 3, 11 and 32 and `b` at most 8, printed
+  without a factor 1 or an offset 0. Input and position indices may fall out
+  of range.
+- Loops, at most one per plan, of one to three actions other than `alias`:
+  `while (sc_limit > sc_counter)` with `sc_limit = (sc_x & m)`, `m` in 1, 3
+  and 7, and position `sc_counter`; or the nested form of
+  `runtime-nested-loops` with `sc_outer = (sc_x & m)`, inner bound
+  `(sc_x & k)` or `((sc_i + 1) & k)`, `m` and `k` in 1 and 3, and position
+  `(sc_i + sc_j)`.
+- Helpers `sc_word`, `sc_byte`, `sc_put` and `sc_put8`, generic over
+  `a: MemorySize, a: MemoryPointer`, and `sc_aput`, each emitted when an
+  action uses it, with `mload`, `mstore`, `mstore8`, `shr` and `mod` imported
+  from `std.opcodes`.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x6d656d76616c0001`), in plan order:
+  - one to eight steps, and half the plans a loop at a drawn position, single
+    with weight 3 and nested with weight 2, its masks and bound uniform, of
+    one to three actions;
+  - each action's kind among those the scope admits, weighted bytes 3,
+    slice 3, alias 1, array 2, write 3 and observe 5 (in a loop 1, 1, 0, 1, 3
+    and 4);
+  - a build is a copy (`to_bytes`) with weight 1, of a slice half the time
+    when one is in scope, and a concatenation with weight 2, which keeps its
+    left part past 128 bytes; parts weigh word 3, zeros 2 and value 4 (a copy:
+    1, 1 and 4), a value part being the longest in scope half the time; `k` of
+    `empty(k)` is 0, 1 to 31, 32 or 33 to 40 with equal weights;
+  - a cut keeps at least half of its value, a window at least half of what its
+    start, at most a quarter, leaves;
+  - an observation reads the longest bytes value or slice a quarter of the
+    time, otherwise any variable in scope; on bytes its access weighs length
+    1, Word 3, byte 2 and hash 3, on arrays `a[i]` and `IndexAccess.get`
+    equally;
+  - a write's target is any variable with a byte or an element, a Word or a
+    byte equally when the value has 32 bytes, inline or through a helper
+    equally;
+  - Words weigh `sc_x` 3, each constant form 1, `sc_r` 1 and the position 3;
+    indices weigh a literal 2, the input 3 and the position 3;
+  - a plan without an observation ends with one, preceded by
+    `to_bytes(bytes32(sc_x))` when nothing is in scope.
+- Core reference, with no source text and no data definitions:
+  `fun input => …` of type `sum word unit`:
+  - a value is its byte list: a static length and its bytes packed big-endian
+    into at most four Words, zero past the length; a slice is a start and a
+    length over its value; a second variable is its value; an array is its
+    elements;
+  - builds, copies, slices and accesses at a literal are static shifts and
+    masks; an access or write at an input or position index first returns
+    the right injection when the index is past the in-range positions, then
+    selects Words by the index;
+  - a write rebinds the value's Words, so every variable and slice of the
+    value sees it and no copy does;
+  - one closure computes Keccak-256 of every length up to 128 bytes from the
+    length and four Words, each Word byte-reversed by five group swaps so that
+    its four 64-bit lanes are shifts of it, Ethereum's `0x01` at the length
+    and `0x80` at offset 135, then the Core permutation and digest; it is
+    bound once when the plan hashes (2,723 nodes);
+  - a loop is a closure over its position and state (the accumulator and the
+    Words of every outer value its body writes) that returns the left
+    injection of the new state, or the right injection on an out-of-range
+    access, chained over the ordinals below its mask behind guards
+    `limit > k`, as in `runtime-loops`' reference but with no cell; the
+    nested form's outer closure binds the inner bound and chains an inner
+    closure.
+    After the chain the reference continues with the final state or returns
+    the right injection;
+  - the result is the left injection of `sc_r`, or the right injection, which
+    a case observes as the revert data `0xb4120f14`.
+
+  Admission checks the step and body counts, one loop at most, and every
+  step against the scope it is drawn in: kinds, variables in scope, lengths,
+  cuts, literal indices in range, index and Word forms and their constants,
+  positions only in loops, loop forms and declaration counts; then at least
+  one observation and the hash bound. A registered Lean test compares the
+  reference with a direct interpreter of the plan over byte lists, with real
+  loops and std's range checks.
+- Bounds: the node budget, default 1,024, minimum 256 and at most 2,048,
+  bounds the applied reference without the hash closure; steps are dropped
+  from the end while it exceeds the budget, more than one step remains and
+  the rest still observes. A case's whole reference is at most 5,120 nodes.
+  Of the first 1,000 seeds at the default budget, the budgeted reference had
+  a median of 150 and at most 631 nodes, the whole reference at most 3,288,
+  and none dropped a step; at 256 nodes, 60 of 500 dropped steps and 50 stayed
+  over it.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Observations: the returned Word, or a revert, compared exactly by its data.
+  `semantic-differential.py` matches a case of this profile when its three
+  paths returned the same Word or reverted with the same data, and only then;
+  any other profile still needs three returned Words. The campaign's
+  perturbation test adapter flips the low bit of a matched revert's last
+  byte, as it flips a matched Word's low bit.
+- Exclusions, under the stage `memory-profile`: a plan still over the budget;
+  then, at the eight boundary inputs, fuel exhaustion (an inconclusive
+  resource exclusion), a result other than a Word or the right injection, or
+  the same outcome for all eight, one Word or out of range everywhere, as for
+  145 of the first 1,000 seeds. None exhausted 1,000,000 fuel.
+- Identity filter: a plan whose only observation reads `sc_x` back returns
+  its input, so random campaigns apply `exclude-boundary-identity-v1`; 41 of
+  the first 1,000 seeds are identities. A plan with an out-of-range boundary
+  input is never one.
+- Reductions:
+  - remove a step, or a loop's action keeping one, renumbering the later
+    variables of a removed declaration's kind, never removing one still used;
+  - lower a loop's mask (7 to 3 to 1), make a nested loop single with mask 1,
+    lower a nested loop's masks or make its inner bound the input's;
+  - replace a Word by `sc_x`, an index by the literal 0, a concatenation by a
+    copy of either part, a part's Word by `sc_x` or its zeros by none, a window
+    by its drop or its take, a drop or take by 0, an allocated array by a
+    literal or drop its last element, a helper write by the inline one, a
+    bytes access by the length, `IndexAccess.get` by `a[i]`, `^` by `+` or a
+    fold constant by 3;
+  - then the inputs 0, 1 and half the input, with the plan unchanged.
+
+  Every candidate is admitted and sealed by the full checker, and strictly
+  smaller lexicographically in plan size (its constructors, then the sum of
+  its numeric literals), then input. A reduced origin records the parent plan
+  and input. A shrink response stops before its cases would exceed 1.5 MB.
+- Specified memory shapes, from the plan, never measured:
+  - values: `bytes`, `slice`, `array:literal`, `array:allocated`,
+    `alias:bytes` and `alias:array`;
+  - parts: `<to_bytes or concat>:<word, zeros, bytes or slice>`;
+  - cuts: `<drop, take or window>:<bytes or slice>`;
+  - writes: `<bytes or slice>:<word or byte>:<inline or helper>`,
+    `array:inline` and `array:helper`;
+  - observations: `<length, word, byte or hash>:<bytes or slice>`,
+    `element:index` and `element:get`;
+  - indices: `<word, byte, element, put, put8 or set>:<literal, input or
+    counter>` for every indexed access and write;
+  - hazards, in plan order: `alias` for a write through one whole variable
+    observed through another of the same value, `view` when the write or the
+    observation is through a slice, `copy` for a copy observed after its
+    source was written, and `helper` for a value observed after a helper
+    wrote it;
+  - loops: `none`, `single:1`, `single:3`, `single:7`, `nested:input` and
+    `nested:counter`;
+  - body: the kinds of a loop's actions;
+  - hashes: the hashed lengths' classes `0`, `1-31`, `32`, `33-63`, `64`,
+    `65-95`, `96`, `97-127` and `128`.
+
+  Generation draws all 82 values within the first 1,000 seeds, the last at
+  seed 548.
+- Fixed corpus coverage: every value above except `put:counter` and
+  `put8:counter`, and the eight boundary inputs. The corpus is generated with
+  the default budget: from seed 1 upwards, every seed whose plan is accepted
+  and covers a missing value is taken, until nothing is missing, each plan at
+  all eight inputs, except a plan whose loop writes a bytes value or slice,
+  as 127 of the first 1,000 seeds' plans do, which Sonatina O0 can
+  miscompile as above.
+  Those two index values occur only in such loops. Random campaigns keep
+  generating them.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
