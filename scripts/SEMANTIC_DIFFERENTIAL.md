@@ -6302,6 +6302,32 @@ Three Lean tests check the profile:
 - `SourceArrayReturnCorpus` checks the corpus histories against the model,
   its coverage, and its refusal of tampered entries.
 
+### Results
+
+The matrices ran on `38aa27284` with scripts, native tools, solc, Anvil, and
+the Rust driver, code-image exporter and directive tools frozen.
+- **Fixed corpus:** all 23 scenarios and 55 prefixes matched with complete
+  coverage on Sonatina O0 and O2 and on Yul, O2 in 154 seconds and Yul in 243.
+  - On O0 all twenty-eight stateful corpora matched, 404 scenarios and 1,097
+    prefixes.
+  - The twenty-seven others kept their 381 scenarios and 1,042 prefixes.
+- **Random suites:** root seed `20261039`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 128 prefixes with complete coverage, in 113 to
+  118 seconds on Sonatina and 175 and 178 on Yul.
+  - No attempt was excluded.
+  - All four element types came, with counts 0 to 3, in 9 of the 16 classes
+    of element type and count.
+  - 98 transactions returned and 30 reverted.
+  - The cases were identical on the three backends at each budget.
+- **Before the matrices:**
+  - Unfrozen smoke runs matched the corpus on all three backends and four
+    random O0 cases.
+  - A synthetic output difference reduced to an empty `uint256` array and one
+    transaction, once the campaign's case identity included the shape.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-three

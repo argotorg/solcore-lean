@@ -7150,6 +7150,73 @@ elements beyond 64 bytes, inner arrays beyond two Words, other element types
 such as `address`, `bool` and `bytes32`, value-bearing calls and other
 methods.
 
+**Results.** The checks before any matrix:
+- **Golden tests:** original Core and the source model gave all 22
+  written-out rows of the eight scenarios, a changed Word failed, and the
+  dirty memory byte past a 31-byte element was zero in the output.
+- **Cases test:** original Core equalled the source model on 40 scenarios of
+  eight transactions under G0 revision three at 384 nodes, 24 of three under
+  revision one, and 12 of four at 512.
+  - Every case and the reductions of eight cases replayed, and the shell sizes
+    were those fixed above.
+  - Generation drew every element type and every count.
+  - The shape draws over 256 seeds drew every element type with every count,
+    every bank length, uniform partial-Word lengths and every inner length.
+- **Adapter:** its own Python encoder equalled all 55 corpus rows of original
+  Core. Its tests check every element type, a byte of each class of a returned
+  array, and the refusal of transactions off their plan's shape.
+- **Corpus test:** it replayed 23 scenarios and 55 transactions with every
+  original Core history equal to the model's, and refused tampered entries.
+- **Smoke runs,** unfrozen, before the profile commit:
+  - fixed O0, O2 and Yul each matched 23 scenarios and 55 prefixes with
+    complete coverage;
+  - four random O0 cases matched 32 prefixes;
+  - a synthetic output difference on imported Hull at `tx-1` of `bytes-three`
+    (three `bytes` elements of 32, 33 and 0 bytes, three transactions) reduced
+    in 23 attempts, 22 accepted, to an empty `uint256` array and that one
+    transaction, its `choice` and `length` changed with the plan.
+- **Shrink fix:** the first synthetic shrink stopped at an empty `bytes`
+  array, one step early. The campaign's case identity, the program and the
+  transactions, could not tell it from an empty array of `uint256`, whose
+  Core program is the same. The identity now adds the plan's shape for this
+  profile only.
+- **Gate** on `38aa27284`, in 28 minutes:
+  - the kernel check and `lake build` (10,296 jobs);
+  - 37 native tools prepared offline and verified;
+  - `lake test`, 855 Python tests in 15 suites and the 18 corpus validators;
+  - the diff check.
+
+The matrices ran on `38aa27284` with 163 digests frozen: every script, the
+37 native tools, solc, Anvil, and the Rust driver, code-image exporter and
+directive tools. None changed during any run, and all 546 case results record
+that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-eight stateful corpora matched, 404 scenarios and 1,097
+    prefixes, in 2,626 seconds. The twenty-seven earlier ones kept their 381
+    scenarios and 1,042 prefixes.
+  - The new corpus matched its 23 scenarios and 55 prefixes with complete
+    coverage on O0, O2 and Yul, O2 in 154 seconds and Yul in 243.
+- **Random suites:** root seed `20261039` (derived seed
+  `9993732319527061728`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul. All six runs matched 16
+  scenarios and 128 prefixes with complete coverage, in 113 to 118 seconds on
+  Sonatina and 175 and 178 on Yul.
+  - No attempt was excluded at either budget.
+  - **Shapes:** 6 `uint256`, 4 `bytes4`, 4 `uint256[]` and 2 `bytes`
+    arrays, with counts 0 to 3 drawn 3, 3, 4 and 6 times. They fell in 9 of
+    the 16 classes of element type and count.
+  - **Outcomes:** 98 transactions returned and 30 reverted. 82 of the
+    returns followed a committed transaction and 55 a revert.
+  - **Inner lengths:** the two `bytes` arrays had elements of 25 and 64
+    bytes; the inner arrays had lengths 0 (four times), 1 (once) and 2
+    (twice).
+  - **Agreement across runs:** the cases were identical on the three
+    backends at each budget. Both budgets drew the same shapes and
+    transactions for all 16 seeds, with the step differing in 9.
+
+There was no finding: no mismatch and no upstream defect. Hosted CI has not
+run the profile.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
