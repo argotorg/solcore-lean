@@ -6174,10 +6174,10 @@ run the profile.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
-`bytes` return values beyond 64 bytes, returned enums and enum arguments
-beyond the recorded shapes and other dynamic return values, or callers beyond
-the three fixed senders, needs its own observation, rollback, deployment and
-reduction definitions first.
+`bytes` return values beyond 64 bytes, returned enums, enum arguments and
+enum arrays beyond the recorded shapes and other dynamic return values, or
+callers beyond the three fixed senders, needs its own observation, rollback,
+deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
@@ -6757,6 +6757,68 @@ The definitions were fixed before execution:
 Out of scope: nested arrays of enums, enums with array fields, more than two
 reads per call, arrays beyond three elements, calldata beyond 1 KiB,
 value-bearing calls and other methods.
+
+**Results.** The checks before any matrix:
+- The golden tests passed. Original Core, under the two comparison rules, and
+  the Lean model gave all 37 written-out rows of the five shapes and the six
+  raw-calldata rows, among them an aliased table entry and the order of std's
+  checks, and a flipped expectation failed.
+- Original Core equalled the Lean model on the cases test's generated
+  scenarios: 40 of eight transactions under G0 revision three at 384 nodes,
+  24 of three under revision one and 12 of four at 512.
+  - Every case and the reductions of eight cases replayed.
+  - Generation drew every constructor count, field kind, element count, read
+    position, bank length, all fifteen malformation kinds and all six
+    outcomes, and the node counts were those fixed above for every shape
+    class.
+- The adapter's Python model recomputed the calldata and std's decision of
+  all 648 transactions of 96 generated cases, and its tests check std's
+  decision for every malformation kind and the order of its checks.
+- The corpus test replayed 17 scenarios and 48 transactions with every
+  original Core history equal to the model's, and refused tampered entries.
+- A first commit of the profile emitted a step call with two extra
+  parentheses, which no Lean test parses. An unfrozen smoke run showed every
+  corpus source rejected; the commit was amended before any matrix, and the
+  smoke runs then matched 17 scenarios with complete coverage on O0, O2 and
+  Yul.
+- The gate passed on `049b9c875`: the kernel check, `lake build` (10,284
+  jobs), 36 native tools prepared offline, `lake test`, 821 Python tests, the
+  corpus validators and the diff check.
+
+The matrices ran on `049b9c875` with 158 digests frozen: the 36 native tools,
+every script, solc, Anvil, and the Rust driver and code-image exporter. None
+changed during any run, and all 511 case results record that revision with no
+tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-seven stateful corpora matched, 381 scenarios and 1,042
+    prefixes, in 2,595 seconds. The twenty-six earlier ones kept their 364
+    scenarios and 994 prefixes.
+  - The new corpus matched with complete coverage on O0, O2 and Yul: 17
+    scenarios and 48 prefixes, on O2 in 145 seconds and on Yul in 220.
+- **Random suites:** root seed `20261037` (derived seed
+  `840500722863701625`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul. All six runs matched 16
+  scenarios and 128 prefixes, in 155 to 166 seconds on Sonatina and 228 and 236
+  on Yul:
+  - 26 and 28 transactions returned at the two budgets and 10 and 11 reverted
+    in the body. std rejected 92 and 89: 36 and 37 with `0x7f52b2bf`, 33 and
+    28 with `0x08638556`, 17 and 18 with `0x4924aef0` and 6 each with empty
+    revert data;
+  - every malformation kind but `length` came at both budgets. std accepted
+    16 and 16 malformed transactions: retags, trailing bytes, unread tags, an
+    unread head Word, a shared body, nonzero padding, a tail offset into the
+    body and a cut of the padding;
+  - every position of one, two and three elements and every field kind in
+    static and dynamic arrays was read at both budgets, with 12 and 13
+    distinct `bytes` lengths;
+  - 9 and 8 shapes were static and 7 and 8 dynamic; 3 and 4 had two `bytes`
+    constructors, and 6 and 5 the struct;
+  - at 384 nodes, 1 of 17 attempts was excluded for a step budget too small
+    for the drawn template; at 512 none was;
+  - the cases were identical on the three backends at each budget.
+
+There was no finding: no mismatch and no upstream defect. Hosted CI has not
+run the profile.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
