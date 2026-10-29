@@ -18,7 +18,10 @@ python3 scripts/build-rust-directive-resolver.py
 ```
 
 These commands build small packages against the pinned upstream dependencies.
-They use Cargo offline and share `.upstream/rust-parity-target`. The original
+They use Cargo offline and share `.upstream/rust-parity-target`.
+`prepare-semantic-tools.py --prepare` also builds the directive extractor and
+resolver offline, and its receipt covers both
+([suite preparation](SEMANTIC_CI.md)). The original
 compiler checking pipeline remains enabled. The code-image tool compiles actual
 Sonatina bytes and linker extents; it never executes EVM instructions. The
 default optimization is O0; `--optimization O2` selects the real O2 pipeline.
@@ -111,7 +114,8 @@ those four paths
 ([pinned fixtures across paths](SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
 On that route the code-image tool crashes at O2 on `ignored-builtin-effects`,
 which the in-memory upstream harness above passes; the crash is a recorded
-finding.
+finding. The fuzz driver can run that comparison as an opt-in run kind
+([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
 ## Check the harness itself
 

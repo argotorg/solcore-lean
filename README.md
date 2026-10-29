@@ -171,8 +171,8 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-three pure profiles with `--backend yul`, and for the
-twenty-four storage-family profiles when they are selected. Its EVM bytes are
+available for the twenty-four pure profiles with `--backend yul`, and for the
+twenty-five storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -183,11 +183,13 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same forty-nine-profile suite runs locally with shared time and disk limits.
+The same fifty-one-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
 suites with advancing seeds and counts their findings in a signature registry.
+An opt-in run kind also runs the pinned fixture comparison in mutation mode,
+a slice of the fixtures per iteration within per-fixture and per-run budgets.
 
 The `runtime-primitives` profile adds division/remainder, shifts, signed
 operations, byte selection, sign extension, exponentiation, leading-zero count
@@ -247,6 +249,16 @@ match on O0 and O2. On Yul, 32 and 84 of them match, and solc rejects one
 plan's specialized binary method in each run with `StackTooDeepError`, a
 recorded finding
 ([traits and constrained generic impls](scripts/SEMANTIC_DIFFERENTIAL.md#compare-traits-and-constrained-generic-impls)).
+The `runtime-trait-hierarchies` profile adds a subclass of that trait, as a
+marker or with its own method-level generic, and a chain of two such bounds.
+It calls them directly, through subclass-bounded helpers, through method values
+and through generic function values. All 104 fixed cases match on O0 and O2,
+and 96 match on Yul, where solc rejects one plan's base-trait method with
+`StackTooDeepError` as for traits. Random plans keep a base method reached
+through two superclass bounds at tuples, sums and generic enums, which the
+checked frontend rejects on every backend, a recorded finding; the other 72
+of 96 random cases match on all three backends
+([trait hierarchies and method-level generics](scripts/SEMANTIC_DIFFERENTIAL.md#compare-trait-hierarchies-and-method-level-generics)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -268,7 +280,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the fourteen profiles whose functions can be identities they
+inputs, and in the fifteen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
@@ -584,15 +596,28 @@ tag's empty revert data by rule. The 21 fixed scenarios and sixteen random
 scenarios at each of two node budgets match on both Sonatina levels and on
 Yul. See [enum arguments](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-arguments).
 
-All twenty-six stateful profiles also compare the installed contracts' whole
+The enum-array profile's method takes a calldata array of up to three values
+of such an enum and two indices. std checks the array's head at dispatch and
+reads the two indexed elements through `abiArrayGet`, static elements inline
+and dynamic ones behind an offset table. Transactions mix canonical encodings
+with fourteen malformations, among them array lengths and offsets beyond the
+calldata, element offsets into the offset table, shared bodies, retags and
+out-of-range indices. Original Core decodes the head and both elements itself
+in std's order. The paths compare std's error selectors, `ArrayOutOfBounds()`
+among them, and an unknown tag's empty revert data by rule. The 17 fixed
+scenarios and sixteen random scenarios at each of two node budgets match on
+both Sonatina levels and on Yul. See
+[enum arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-arrays).
+
+All twenty-seven stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all twenty-six profiles,
-364 scenarios and 994 transaction prefixes, matched on Sonatina O0, and every
+whole storage unchanged. The latest fixed run of all twenty-seven profiles,
+381 scenarios and 1,042 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
