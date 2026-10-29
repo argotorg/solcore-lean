@@ -7856,6 +7856,112 @@ that revision with no tracked difference.
 - **Findings:** none, no mismatch and no upstream defect, and `questions.md`
   is untouched.
 
+**Mixed sequence seeds for the stateful profiles.** The tuple and bytes
+returns' measurement above was repeated for the other stateful profiles' first
+block, on the same three windows of 64 consecutive seeds per profile. Most of
+their block choices still come from a raw lcg64-v1 stream started at the block
+seed xor a domain, and they lose values over consecutive seeds:
+- `stateful-adt-storage`'s first method draw took 6 of 12 values in every
+  window and its first variant 6 to 9, `stateful-keyed-storage`'s first two
+  keys 3 or 4 of 6, and the first parameter of both malformation streams
+  alternated between two residues in some windows, reaching 4 of 8
+  malformation bank entries there;
+- 32 more of the 249 first-block draws lost values in at least one window,
+  among them the loop flags, the call-value inputs, the long-bytes lengths
+  and the nested arrays' elements;
+- 160 of the other 211 kept their values but repeated, or stepped by one
+  fixed residue, far more or less often than independent draws, in up to 62
+  of 63 consecutive seeds;
+- scenario-level draws taken from the first block's stream (the event-log
+  sites and guard set, the call-value deployment value), the seeded payload
+  bytes of `stateful-bytes` and `stateful-long-bytes` (some long-bytes
+  positions took one value in 64 seeds), the malformation streams and
+  `stateful-methods`' method shapes start the same way.
+
+Three profiles draw otherwise:
+- `stateful-methods` takes eight candidate step seeds for method `p` as whole
+  raw draws from `seed xor ("method-s" + p)`. For `p = 1` that is
+  `"method-t"`, the domain of its sequence stream, so the first block's target
+  and inputs are the high halves of method 1's candidates, and the
+  candidates' helper counts (`1 + v % 3`) repeated in up to 41 of 63 seeds;
+- `stateful-storage` takes its three inputs from the block seed's base-6
+  digits, `[s % 6, s / 6 % 6, s % 6]`, and `stateful-storage-rollback` reuses
+  them. The third transaction repeats the first one's input in every block,
+  the first input steps by one bank index per seed, and its digit is also
+  the step's helper-count digit (`1 + s % 3`);
+- `stateful-calls` takes them from the decimal digits
+  `[s % 10, s / 10 % 10, s / 100 % 10]`, so over 64 consecutive seeds its
+  second input took 7 of 10 values and its third one value in every window.
+
+The definitions, fixed before any code change:
+- **Streams:** every raw lcg64-v1 stream of a stateful case module that starts
+  at a seed xor a domain starts at SplitMix64's finalizer (`GeneratorV2.mix`)
+  of that value, as the tuple, bytes and enum streams do. This covers each
+  block's sequence choices, the malformation choices, the seeded payloads and
+  the method shapes. The choices keep the high half of each draw modulo their
+  bounds; the bounds, their order, the domains, the block seeds
+  (`Sequence.blockSeeds`) and the steps' template seeds stay as they are.
+- **Method step seeds:** `stepSeeds seed p` draws from a stream that starts at
+  the finalizer of `seed xor ("methstep" + p)`, and each candidate is the
+  finalizer of its raw draw (`GeneratorV2.draw`), so its helper count and
+  template digits are not affine in the seed. With at most four methods,
+  `"methstep" + p` never carries out of its last byte and meets no other
+  domain of the module.
+- **Digit draws:** the storage indices are not intended. No definition or
+  test asks the third transaction to repeat the first one's input, and the
+  fixed corpus covers a repeated input with the imported entry
+  `identity-repeated`. They become three draws below 6 from a mixed stream at
+  domain `"store-sq"`, which the rollback profile keeps reusing with its odd
+  second transaction. The calls profile's digits have the same defect and
+  become three draws below 10 at domain `"calls-sq"`. The origin field keeps
+  its name, `sequenceIndices`.
+- **Versions:** a new sequence-seed version per changed profile:
+  `stateful-storage-v2/sequence-seed-v2`,
+  `stateful-storage-rollback-v2/parity-sequence-v2`,
+  `stateful-calls-v2/sequence-seed-v2`, and `...-sequence-seed-v2` in place of
+  `...-sequence-seed-v1` for keyed storage, dynamic arrays, logs, call value,
+  `bytes`, forwarded value, mapping, ledger, long bytes, nested arrays, the
+  three malformed profiles, methods, storage loops, Keccak loops and ADT
+  storage. Contracts, sources, templates, schemas and the step versions keep
+  theirs. The two inline Yul loop profiles keep `form-seed-v1` and record
+  their parents' new `loopProfileVersion`.
+- **Fixed corpora:** imported entries keep their transactions and histories.
+  Generated entries keep their seeds and budgets, and their expected
+  histories are recomputed without the profile's Core contract:
+  - by the source model where the profile has one (storage loops, Keccak
+    loops, their inline Yul forms and ADT storage);
+  - by std's decoding model and the canonical contract for the three
+    malformed profiles, and by std's dispatch model with each step run alone
+    for the methods, as when those corpora were built;
+  - for keyed storage, dynamic arrays, logs, call value, `bytes`, forwarded
+    value, mapping, ledger, long bytes and nested arrays, whose histories were
+    computed by a separate evaluator outside Lean, by a direct model of the
+    profile's protocol above with the step run alone in Core. Each model must
+    first reproduce every recorded history of its current corpus, imported
+    and generated.
+
+  Coverage must stay complete. Where a regenerated entry loses a requirement,
+  the fewest generated entries are replaced by the smallest seeds above
+  theirs, at the same budget, that restore it, and the replacements are
+  listed. The storage, rollback and calls corpora record no histories; their
+  validators check coverage.
+- **Measurement:** every changed draw is measured again on the same three
+  windows: distinct values, repeats and the most frequent fixed step of 63. A
+  draw is flagged in a window when it misses values (any of up to nine, or two
+  of up to fourteen), or when the binomial tail of its repeats on either side,
+  or of its most frequent step times the `b - 1` steps, is below 0.001. The
+  calls and rollback profiles use their own derived seeds for roots 1 and
+  `20261026`.
+- **Matrices,** with every script and native tool frozen: the fixed corpora
+  of every stateful profile on O0, the changed ones on O2, and the changed
+  storage-family ones on Yul; then one random suite per backend over the
+  changed profiles, root seed `20261113`, sixteen eight-transaction scenarios
+  per profile at the default budgets, G0 revision three.
+- **Fuzz state:** the native tools change, so an existing state needs
+  `--accept-new-epoch`, and a saved case of a changed profile refuses replay
+  under the new version. A fixed corpus keeps its scenario and prefix counts
+  unless an entry is added or removed.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
