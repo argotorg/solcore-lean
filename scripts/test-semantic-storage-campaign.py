@@ -2465,5 +2465,88 @@ class EnumArrayCampaignTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "enum-array coverage belongs to the enum-array profile"):
             campaign.validate_manifest({**other, "requiredArrayPositions": ["1:0"]})
 
+
+def array_return_case(rows=((0, 5), (1, 9), (2, 7)), origin=None, plan=None):
+    value = fixtures.array_return_case(rows, plan)
+    value["arrayReturnPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class ArrayReturnCampaignTests(unittest.TestCase):
+    def test_coverage_names_shapes_outcomes_inner_lengths_carries_and_node_budgets(self):
+        value = array_return_case()
+        self.assertEqual(campaign.dimensions("stateful-array-returns"),
+                         campaign.DIMENSIONS + ("ArrayReturnShapes", "ArrayReturnOutcomes", "ArrayReturnBytesLengths",
+                                                "ArrayReturnInnerLengths", "ArrayReturnCarries", "ArrayReturnNodeBudgets"))
+        # Three bytes elements of 31, 0 and 64 bytes return after the committed
+        # tx-0 and past the revert of tx-1; an imported case has no node budget.
+        self.assertEqual(campaign.array_returns_coverage(value, ["returned", "reverted", "returned"]),
+                         {"ArrayReturnShapes": {"bytes:3"}, "ArrayReturnOutcomes": {"bytes:returned", "bytes:reverted"},
+                          "ArrayReturnBytesLengths": {0, 31, 64}, "ArrayReturnInnerLengths": set(),
+                          "ArrayReturnCarries": {"committed", "rollback"}, "ArrayReturnNodeBudgets": set()})
+        self.assertEqual(campaign.inputs(value), {"5", "7", "9"})
+        # Nothing returned names no shape and no length; an inner array's
+        # lengths are their own dimension; a generated case records its budget.
+        nested = {**fixtures.ARRAY_RETURN_PLAN, "elements": "uint256[]", "count": 2, "lengths": [2, 0]}
+        self.assertEqual(campaign.array_returns_coverage(array_return_case(rows=((1, 1),), plan=nested), ["reverted"]),
+                         {"ArrayReturnShapes": set(), "ArrayReturnOutcomes": {"uint256[]:reverted"},
+                          "ArrayReturnBytesLengths": set(), "ArrayReturnInnerLengths": set(),
+                          "ArrayReturnCarries": set(), "ArrayReturnNodeBudgets": set()})
+        generated = array_return_case(rows=((1, 1), (0, 2)), plan=nested,
+                                      origin={"kind": "array-return-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.array_returns_coverage(generated, ["reverted", "returned"]),
+                         {"ArrayReturnShapes": {"uint256[]:2"}, "ArrayReturnOutcomes": {"uint256[]:reverted", "uint256[]:returned"},
+                          "ArrayReturnBytesLengths": set(), "ArrayReturnInnerLengths": {0, 2},
+                          "ArrayReturnCarries": {"rollback"}, "ArrayReturnNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-array-returns"))
+            instance.summary["coverage"].update(requiredArrayReturnBytesLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredArrayReturnNodeBudgets=[384, 512],
+                                                requiredArrayReturnShapes=list(campaign.ARRAY_RETURN_EXTRA["ArrayReturnShapes"]))
+            histories = fixtures.array_return_histories(value)
+            instance.record_coverage(value, "matched", histories)
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedArrayReturnShapes"], coverage["matchedArrayReturnBytesLengths"],
+                              coverage["matchedArrayReturnCarries"]), (["bytes:3"], [0, 31, 64], ["committed", "rollback"]))
+            self.assertEqual((coverage["missingArrayReturnBytesLengths"], coverage["missingArrayReturnNodeBudgets"]),
+                             ([1, 32, 33, 63], [384, 512]))
+            self.assertEqual(len(coverage["missingArrayReturnShapes"]), 15)
+
+    def test_an_empty_array_of_another_element_type_is_another_case(self):
+        # An empty array's Core program and transactions are the same for every
+        # element type, whose emitted source differs; the shape tells them apart.
+        empty = {**fixtures.ARRAY_RETURN_PLAN, "count": 0, "lengths": []}
+        words = array_return_case(plan={**empty, "elements": "uint256"})
+        self.assertNotEqual(campaign.case_hash(array_return_case(plan=empty)), campaign.case_hash(words))
+        self.assertEqual(campaign.case_hash(words), campaign.case_hash(array_return_case(plan={**empty, "elements": "uint256"})))
+        # Other profiles keep their identity: the program and the transactions.
+        value = bytes_return_case()
+        self.assertEqual(campaign.case_hash(value), campaign.common.digest(campaign.common.json_bytes(
+            {key: value[key] for key in ("program", "transactions")})))
+
+    def test_the_fixed_corpus_validates_and_its_array_return_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-array-return-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-array-returns")
+        self.assertEqual((manifest["requiredArrayReturnBytesLengths"], manifest["requiredArrayReturnInnerLengths"],
+                          manifest["requiredArrayReturnNodeBudgets"], manifest["requiredArrayReturnCarries"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [0, 1, 2], [384, 512], ["committed", "rollback"]))
+        for dimension in ("ArrayReturnShapes", "ArrayReturnOutcomes"):
+            self.assertEqual(manifest["required" + dimension], list(campaign.ARRAY_RETURN_EXTRA[dimension]))
+        for key, changed in (("requiredArrayReturnShapes", ["uint256:4"]), ("requiredArrayReturnShapes", ["bytes32:1"]),
+                             ("requiredArrayReturnOutcomes", ["bytes:rejected"]), ("requiredArrayReturnBytesLengths", [65]),
+                             ("requiredArrayReturnBytesLengths", [True]), ("requiredArrayReturnInnerLengths", [3]),
+                             ("requiredArrayReturnCarries", ["rejection"]), ("requiredArrayReturnNodeBudgets", [448]),
+                             ("requiredArrayReturnNodeBudgets", [384, 384]), ("requiredArrayReturnShapes", [])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredArrayReturnShapes"})
+        other = json.loads((ROOT / "scripts/semantic-bytes-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "array-return coverage belongs to the array-return profile"):
+            campaign.validate_manifest({**other, "requiredArrayReturnShapes": ["uint256:0"]})
+
 if __name__ == "__main__":
     unittest.main()

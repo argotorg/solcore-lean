@@ -185,6 +185,18 @@ ENUM_ARRAY_EXTRA = {"ArrayElementCounts": (0, 1, 2, 3),
                     "ArrayAccepted": adapter.ENUM_ARRAY_KINDS[1:],
                     "ArrayCarries": ("committed", "rollback", "rejection"), "ArrayNodeBudgets": (384, 512)}
 ENUM_ARRAY_DIMENSIONS = DIMENSIONS + tuple(ENUM_ARRAY_EXTRA)
+# Array returns: the returned shapes as `element:count`, each element type's
+# outcomes as `element:status`, the inner lengths of returned `bytes` and
+# `uint256[]` elements, the carries `committed` and `rollback` into a returned
+# array, and the node budgets of generated cases.
+ARRAY_RETURN_EXTRA = {"ArrayReturnShapes": tuple(f"{element}:{count}" for element in adapter.ARRAY_RETURN_ELEMENTS
+                                                 for count in range(adapter.MAX_ARRAY_RETURN_COUNT + 1)),
+                      "ArrayReturnOutcomes": tuple(f"{element}:{status}" for element in adapter.ARRAY_RETURN_ELEMENTS
+                                                   for status in ("returned", "reverted")),
+                      "ArrayReturnBytesLengths": tuple(range(adapter.ARRAY_RETURN_ELEMENTS["bytes"][1] + 1)),
+                      "ArrayReturnInnerLengths": tuple(range(adapter.ARRAY_RETURN_ELEMENTS["uint256[]"][1] + 1)),
+                      "ArrayReturnCarries": ("committed", "rollback"), "ArrayReturnNodeBudgets": (384, 512)}
+ARRAY_RETURN_DIMENSIONS = DIMENSIONS + tuple(ARRAY_RETURN_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -223,6 +235,8 @@ def dimensions(profile_name):
         return ENUM_ARGUMENT_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "enum-arrays":
         return ENUM_ARRAY_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "array-returns":
+        return ARRAY_RETURN_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -436,6 +450,26 @@ def enum_returns_coverage(case, statuses):
             "EnumCarries": carries, "EnumNodeBudgets": budgets}
 
 
+def array_returns_coverage(case, statuses):
+    """The plan's shape and its inner lengths when an array returned, each
+    element type's outcomes, the carries into a returned array from an earlier
+    committed transaction and past an earlier revert, and a generated case's
+    node budget."""
+    plan = case[adapter.profile(case)["planKey"]]
+    element = plan["elements"]
+    returned = [index for index, status in enumerate(statuses) if status == "returned"]
+    carries = ({"committed"} if any("returned" in statuses[:index] for index in returned) else set()) | (
+        {"rollback"} if any("reverted" in statuses[:index] for index in returned) else set())
+    origin = case["provenance"]["origin"]
+    budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    lengths = set(plan["lengths"]) if returned else set()
+    return {"ArrayReturnShapes": {f"{element}:{plan['count']}"} if returned else set(),
+            "ArrayReturnOutcomes": {f"{element}:{status}" for status in statuses},
+            "ArrayReturnBytesLengths": lengths if element == "bytes" else set(),
+            "ArrayReturnInnerLengths": lengths if element == "uint256[]" else set(),
+            "ArrayReturnCarries": carries, "ArrayReturnNodeBudgets": budgets}
+
+
 def enum_arguments_coverage(case):
     """Each transaction's decision on its calldata: the decoded constructors'
     positions and fields, decoded `bytes` lengths and the malformations std
@@ -608,6 +642,10 @@ def case_hash(case):
     identity = {key: case[key] for key in ("program", "transactions")}
     if adapter.has_balances(case):
         identity["deploymentValue"] = str(adapter.deployment_value(case))
+    if adapter.has_array_returns(case):
+        # An empty array's Core program is the same for every element type,
+        # whose emitted source differs.
+        identity["arrayShape"] = {key: case[adapter.profile(case)["planKey"]][key] for key in ("elements", "count", "lengths")}
     return common.digest(common.json_bytes(identity))
 
 
@@ -801,6 +839,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"enum-array coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in ENUM_ARRAY_EXTRA):
         raise ValueError("enum-array coverage belongs to the enum-array profile")
+    if selected["abi"] == "array-returns":
+        for dimension, allowed in ARRAY_RETURN_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"array-return coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in ARRAY_RETURN_EXTRA):
+        raise ValueError("array-return coverage belongs to the array-return profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     if selected.get("forms"):
@@ -1020,7 +1065,8 @@ def keyed_analysis(analysis):
                                                 adapter.ADT_HISTORY_SCHEMA,
                                                 adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
                                                 adapter.BYTES_RETURN_HISTORY_SCHEMA, adapter.ENUM_RETURN_HISTORY_SCHEMA,
-                                                adapter.ENUM_ARGUMENT_HISTORY_SCHEMA, adapter.ENUM_ARRAY_HISTORY_SCHEMA)
+                                                adapter.ENUM_ARGUMENT_HISTORY_SCHEMA, adapter.ENUM_ARRAY_HISTORY_SCHEMA,
+                                                adapter.ARRAY_RETURN_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -1206,6 +1252,8 @@ class Campaign:
             values.update(enum_arguments_coverage(case))
         elif self.specification["abi"] == "enum-arrays":
             values.update(enum_arrays_coverage(case))
+        elif self.specification["abi"] == "array-returns":
+            values.update(array_returns_coverage(case, statuses))
         if self.specification.get("forms"):
             values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
@@ -1277,6 +1325,7 @@ class Campaign:
                           "enum-returns": tuple(ENUM_RETURN_EXTRA),
                           "enum-arguments": tuple(ENUM_ARGUMENT_EXTRA),
                           "enum-arrays": tuple(ENUM_ARRAY_EXTRA),
+                          "array-returns": tuple(ARRAY_RETURN_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(

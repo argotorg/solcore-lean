@@ -107,6 +107,8 @@ PROFILES = {
     # of the array wrapper, 190 or 229 nodes, and the shape's decoder, 26 to 452
     # nodes, lie outside it.
     "stateful-enum-array-arguments": ("semantic-enum-array", "storage", 384),
+    # The array-return shell takes 89 to 175 nodes of 384, by shape.
+    "stateful-array-returns": ("semantic-array-return", "storage", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
@@ -116,7 +118,7 @@ DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "s
                           "stateful-adt-storage",
                           "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns",
                           "stateful-bytes-returns", "stateful-enum-returns", "stateful-enum-arguments",
-                          "stateful-enum-array-arguments")
+                          "stateful-enum-array-arguments", "stateful-array-returns")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
 
@@ -221,7 +223,8 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-bytes-returns": args.bytes_return_case_tool,
                      "stateful-enum-returns": args.enum_return_case_tool,
                      "stateful-enum-arguments": args.enum_argument_case_tool,
-                     "stateful-enum-array-arguments": args.enum_array_case_tool}
+                     "stateful-enum-array-arguments": args.enum_array_case_tool,
+                     "stateful-array-returns": args.array_return_case_tool}
     forwarded = profile == "stateful-forwarded-value"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
             storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else args.call_case_tool}[family]
@@ -485,8 +488,8 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all fifty-one for Sonatina, the twenty-four pure profiles for Yul, "
-                             "which also runs the twenty-five storage-family profiles when they are selected")
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all fifty-two for Sonatina, the twenty-four pure profiles for Yul, "
+                             "which also runs the twenty-six storage-family profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1, help="seed shard count; every shard still runs all selected profiles")
@@ -529,7 +532,8 @@ def parse_args(argv=None):
                 "bytes_return_case_tool": "semantic-bytes-return-tool",
                 "enum_return_case_tool": "semantic-enum-return-tool",
                 "enum_argument_case_tool": "semantic-enum-argument-tool",
-                "enum_array_case_tool": "semantic-enum-array-tool"}
+                "enum_array_case_tool": "semantic-enum-array-tool",
+                "array_return_case_tool": "semantic-array-return-tool"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))

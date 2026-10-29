@@ -4863,5 +4863,222 @@ class EnumArrayTests(unittest.TestCase):
         self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
         self.assertFalse(result["pairs"]["directCore/rustEvm"])
 
+
+ARRAY_RETURN_PLAN = {"schema": "solcore-lean.array-return-plan.v1", "elements": "bytes", "count": 3,
+                     "lengths": [31, 0, 64], "stepProgram": {}}
+ARRAY_RETURN_BASES = {"uint256": 1, "bytes4": 1, "bytes": 65, "uint256[]": 3}
+
+
+def array_return_case(rows=((0, 5), (1, 9), (2, 7), (0, 3)), plan=None):
+    """Envelope fixture only: native replay checks the actual array-return
+    program. Every transaction carries the plan's shape."""
+    plan = dict(ARRAY_RETURN_PLAN if plan is None else plan)
+    choice = sum(length * ARRAY_RETURN_BASES[plan["elements"]] ** index for index, length in enumerate(plan["lengths"]))
+    transactions = [{"id": f"tx-{index}", "flags": str(flags), "input": str(value), "choice": str(choice),
+                     "length": str(plan["count"]), "calldata": "0x15509d2b" + f"{flags:064x}" + f"{value:064x}" +
+                     f"{choice:064x}" + f"{plan['count']:064x}", "value": "0"}
+                    for index, (flags, value) in enumerate(rows)]
+    return {"schema": runner.ARRAY_RETURN_CASE_SCHEMA, "program": {}, "source": "protocol fixture only",
+        "arrayReturnPlan": plan, "initialState": {"storage": []}, "observedSlots": ["0", "1", "2"],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedArrayReturns", "method": "run", "signature": "run(uint256,uint256,uint256,uint256)",
+            "selector": "0x15509d2b", "deployPath": ["SynthesizedArrayReturnsDeploy"],
+            "runtimePath": ["SynthesizedArrayReturnsDeploy", "SynthesizedArrayReturns"], "constructorCalldata": "0x"},
+        "transactions": transactions}
+
+
+def written_array(plan, result, calls, last, padding=0):
+    """The ABI encoding of the plan's array, written out from the ABI
+    specification: element i from a = r * K + i and b = ((calls * K) xor last)
+    + i, inline for uint256 and left-aligned bytes4, otherwise an offset table
+    relative to the element region and the tails; a bytes value's last Word
+    filled with `padding`."""
+    count = plan["count"]
+    a = [(result * MULTIPLIER + i) % 2**256 for i in range(count)]
+    b = [((calls * MULTIPLIER % 2**256 ^ last) + i) % 2**256 for i in range(count)]
+    words = lambda values: b"".join(value.to_bytes(32, "big") for value in values)
+    head = words([32, count])
+    if plan["elements"] == "uint256":
+        return head + words(a)
+    if plan["elements"] == "bytes4":
+        return head + words([(value & 0xffffffff) << 224 for value in a])
+    tails = []
+    for i, length in enumerate(plan["lengths"]):
+        if plan["elements"] == "bytes":
+            tails.append(words([length]) + words([a[i], b[i]])[:length] + bytes([padding]) * (-length % 32))
+        else:
+            tails.append(words([length] + [a[i], b[i]][:length]))
+    offsets = [32 * count + sum(len(tail) for tail in tails[:i]) for i in range(count)]
+    return head + words(offsets) + b"".join(tails)
+
+
+def array_return_history(value, path, step=lambda x: x + 1, padding=0, revert_words=1):
+    """Rows of the array-return protocol with a known step: r = step(slot 0 +
+    input) goes to slot 0, slot one grows by one and the input goes to slot two;
+    a return carries `written_array`, and odd flags revert with `revert_words`
+    copies of r."""
+    rows, prior = [], [0, 0, 0]
+    plan = value["arrayReturnPlan"]
+    for index, tx in enumerate(value["transactions"]):
+        x = int(tx["input"])
+        result = step((prior[0] + x) % 2**256) % 2**256
+        after = [result, (prior[1] + 1) % 2**256, x]
+        reverted = int(tx["flags"]) % 2 == 1
+        output = result.to_bytes(32, "big") * revert_words if reverted else written_array(plan, result, after[1], prior[2], padding)
+        committed = list(prior) if reverted else after
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + output.hex(), "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    result = {"schema": runner.ARRAY_RETURN_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "initialStorage": methods_slots([0, 0, 0]), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"]), "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def array_return_histories(value=None, **options):
+    value = array_return_case() if value is None else value
+    return {path: array_return_history(value, path, **options) for path in runner.PATHS}
+
+
+class ArrayReturnTests(unittest.TestCase):
+    def test_an_array_return_case_records_its_shape_in_every_transaction(self):
+        value = array_return_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-array-return-tool", "rust-hull-keyed-storage-scenario", True, "array-returns", "0x15509d2b"))
+        self.assertTrue(runner.has_array_returns(value))
+        self.assertFalse(runner.has_array_returns(bytes_return_case()) or runner.has_bytes_returns(value) or
+                         runner.has_tuples(value) or runner.has_enum_returns(value) or runner.uses_selector_rule(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]],
+                         ["returned", "reverted", "returned", "returned"])
+        self.assertEqual(runner.array_return_arguments(value), (31 + 64 * 65 ** 2, 3))
+        self.assertEqual(runner.array_return_words(value), 2 + 3 + (1 + 1) + 1 + (1 + 2))
+        self.assertEqual(runner.observed_slots(value), ("0", "1", "2"))
+        self.assertIn("memory array", runner.scope(value))
+        # A transaction off its plan's shape is refused even with its own calldata.
+        for key, changed in (("choice", str(31 + 64 * 65 ** 2 + 1)), ("length", "2")):
+            invalid = copy.deepcopy(value)
+            tx = invalid["transactions"][0]
+            tx[key] = changed
+            tx["calldata"] = "0x15509d2b" + "".join(f"{int(tx[field]):064x}" for field in ("flags", "input", "choice", "length"))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        for key, changed in (("calldata", "0x15509d2b" + "00" * 128), ("value", "1"), ("flags", "2"), ("input", "6")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # Plans outside the shapes are refused.
+        for plan in ({"elements": "bytes", "count": 4, "lengths": [0, 0, 0, 0]}, {"elements": "bytes", "count": 2, "lengths": [0]},
+                     {"elements": "bytes", "count": 1, "lengths": [65]}, {"elements": "uint256[]", "count": 1, "lengths": [3]},
+                     {"elements": "uint256", "count": 1, "lengths": [0]}, {"elements": "bytes32", "count": 1, "lengths": []},
+                     {"elements": "uint256", "count": True, "lengths": []}):
+            invalid = copy.deepcopy(value)
+            invalid["arrayReturnPlan"].update(plan)
+            with self.subTest(plan=plan), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = ["0", "1"]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_a_returned_array_carries_its_encodings_words_and_a_revert_one_word(self):
+        value = array_return_case()
+        histories = array_return_histories(value)
+        self.assertEqual(runner.compare(histories, value)["category"], "matched")
+        rows = histories["directCore"]["transactions"]
+        self.assertEqual([len(runner.common.hex_bytes(row["output"], "output")) for row in rows], [352, 32, 352, 352])
+        self.assertEqual([runner.output_words(value, row) for row in rows], [11, 1, 11, 11])
+        for index, tx in enumerate(value["transactions"]):
+            prior = rows[index - 1]["committedStorage"] if index else histories["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+            self.assertEqual(runner.array_return_fields(value, tx, rows[index], prior), [])
+        # tx-2 returns, past the revert of tx-1, the offsets 96, 160 and 192,
+        # 31 bytes of (6 + 7 + 1) * K and a zero byte, an empty element, and
+        # (14 * K) + 2 and ((2 * K) xor 5) + 2.
+        output = runner.common.hex_bytes(rows[2]["output"], "output")
+        self.assertEqual(output[:160], b"".join(value.to_bytes(32, "big") for value in (32, 3, 96, 160, 192)))
+        self.assertEqual(output[160:192], (31).to_bytes(32, "big"))
+        self.assertEqual(output[192:224], (14 * MULTIPLIER % 2**256).to_bytes(32, "big")[:31] + bytes(1))
+        self.assertEqual(output[224:256], bytes(32))
+        self.assertEqual(output[256:320], (64).to_bytes(32, "big") + ((14 * MULTIPLIER + 2) % 2**256).to_bytes(32, "big"))
+        self.assertEqual(output[320:], (((2 * MULTIPLIER % 2**256) ^ 5) + 2).to_bytes(32, "big"))
+        prior, tx = rows[1]["committedStorage"], value["transactions"][2]
+        for slot in ("1", "2"):
+            changed = copy.deepcopy(rows[2])
+            entry = next(item for item in changed["committedStorage"] if item["slot"] == slot)
+            entry["value"] = str(int(entry["value"]) + 1)
+            with self.subTest(slot=slot):
+                self.assertIn("committedStorage", runner.array_return_fields(value, tx, changed, prior))
+        # The offset, the length, a table entry, an inner length, a data byte
+        # and a padding byte are each checked.
+        for position in (31, 63, 95, 191, 192, 222, 223, 255, 319, 351):
+            changed = copy.deepcopy(rows[2])
+            broken = bytearray(output)
+            broken[position] ^= 1
+            changed["output"] = "0x" + broken.hex()
+            with self.subTest(position=position):
+                self.assertEqual(runner.array_return_fields(value, tx, changed, prior), ["output"])
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+        # A truncated or extended array breaks the length rule and the protocol.
+        for changed_output in (rows[2]["output"][:-64], rows[2]["output"] + "00" * 32, rows[2]["output"] + "00"):
+            changed = {**rows[2], "output": changed_output}
+            with self.subTest(length=len(changed_output)):
+                self.assertFalse(runner.conforms(value, tx, changed, prior))
+                self.assertEqual(runner.array_return_fields(value, tx, changed, prior), ["output"])
+        # A revert is checked by rollback and its one-Word length, not by the protocol.
+        self.assertEqual(runner.array_return_fields(value, value["transactions"][1], {**rows[1], "output": "0x" + "00" * 32},
+                                                    rows[0]["committedStorage"]), [])
+        self.assertFalse(runner.conforms(value, value["transactions"][1], {**rows[1], "output": rows[1]["output"] + "00" * 32},
+                                         rows[0]["committedStorage"]))
+
+    def test_every_element_type_and_count_follows_std_s_encoding(self):
+        for plan, words in (({"elements": "uint256", "count": 3, "lengths": []}, 5),
+                            ({"elements": "uint256", "count": 0, "lengths": []}, 2),
+                            ({"elements": "bytes4", "count": 2, "lengths": []}, 4),
+                            ({"elements": "bytes", "count": 2, "lengths": [1, 33]}, 2 + 2 + 2 + 3),
+                            ({"elements": "uint256[]", "count": 3, "lengths": [0, 1, 2]}, 2 + 3 + 1 + 2 + 3)):
+            value = array_return_case(rows=((0, 5), (2, 7)), plan={**ARRAY_RETURN_PLAN, **plan})
+            runner.validate_case(value)
+            histories = array_return_histories(value)
+            with self.subTest(plan=plan):
+                self.assertEqual(runner.compare(histories, value)["category"], "matched")
+                self.assertEqual(runner.array_return_words(value), words)
+                rows = histories["directCore"]["transactions"]
+                self.assertEqual(len(runner.common.hex_bytes(rows[1]["output"], "output")), 32 * words)
+        # A bytes4 element is left-aligned: (6 * K) mod 2^32, shifted by 224.
+        value = array_return_case(rows=((0, 5),), plan={**ARRAY_RETURN_PLAN, "elements": "bytes4", "count": 1, "lengths": []})
+        output = runner.array_return_encoding(value, 6, 1, 0)
+        self.assertEqual(output[64:], (((6 * MULTIPLIER) & 0xffffffff) << 224).to_bytes(32, "big"))
+        self.assertEqual(output[68:], bytes(28))
+
+    def test_a_protocol_break_on_every_path_is_a_mismatch_although_the_paths_agree(self):
+        value = array_return_case()
+        for options in ({"padding": 1}, {"revert_words": 2}):
+            broken = array_return_histories(value, **options)
+            result = runner.compare(broken, value)
+            with self.subTest(options=options):
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertTrue(all(result["pairs"].values()))
+                self.assertIn("output", result["fields"])
+        # Another shape's encoding on every path of the case is a mismatch too.
+        other = array_return_histories(array_return_case(plan={**ARRAY_RETURN_PLAN, "lengths": [31, 1, 64]}))
+        result = runner.compare(other, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertTrue(all(result["pairs"].values()))
+        # A different step on one path is an ordinary difference.
+        changed = array_return_histories(value)
+        changed["rustEvm"] = array_return_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(changed, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        self.assertIn("committedStorage", result["fields"])
+
 if __name__ == "__main__":
     unittest.main()

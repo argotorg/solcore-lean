@@ -439,7 +439,7 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual(yul["backend"], "yul")
         self.assertEqual(yul["profiles"], [profile for profile, family in families.items() if family != "call"])
         self.assertEqual(sorted({families[profile] for profile in yul["profiles"]}), ["pure", "storage"])
-        self.assertEqual(len([profile for profile in yul["profiles"] if families[profile] == "storage"]), 25)
+        self.assertEqual(len([profile for profile in yul["profiles"] if families[profile] == "storage"]), 26)
         # The suite parses the explicit selection; its own default for Yul stays the pure profiles.
         config = json.loads((self.state / "config.json").read_text())
         argv = fuzz.suite_command(config, 0, "yul", self.directory / "unused")

@@ -2220,6 +2220,9 @@ import Solcore.Test.SourceEnumArgumentCorpus
 import Solcore.Test.SourceEnumArrayGolden
 import Solcore.Test.SourceEnumArrayCases
 import Solcore.Test.SourceEnumArrayCorpus
+import Solcore.Test.SourceArrayReturnGolden
+import Solcore.Test.SourceArrayReturnCases
+import Solcore.Test.SourceArrayReturnCorpus
 import Solcore.Test.SourceAggregatePrimitives
 import Solcore.Test.SourceAggregateMeaning
 import Solcore.Test.SourceEventLogEmitter
@@ -4278,6 +4281,9 @@ def main : IO UInt32 := do
   Tests.SourceEnumArrayGolden.testSourceEnumArrayGolden
   Tests.SourceEnumArrayCases.testSourceEnumArrayCases
   Tests.SourceEnumArrayCorpus.testSourceEnumArrayCorpus
+  Tests.SourceArrayReturnGolden.testSourceArrayReturnGolden
+  Tests.SourceArrayReturnCases.testSourceArrayReturnCases
+  Tests.SourceArrayReturnCorpus.testSourceArrayReturnCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives
   Tests.SourceAggregateMeaning.testSourceAggregateMeaning
   Tests.SourceEventLogEmitter.testSourceEventLogEmitter

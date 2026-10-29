@@ -5695,7 +5695,8 @@ it, `enumOutcomeV1`. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the
 definitions and the runtime design, including why the tags are carried by the
 value and not recorded in the convention. Enum arguments are compared in
-[Compare enum arguments](#compare-enum-arguments).
+[Compare enum arguments](#compare-enum-arguments), and returned memory arrays
+in [Compare returned arrays](#compare-returned-arrays).
 
 ### Definitions
 
@@ -6176,6 +6177,130 @@ the Rust driver and code-image exporter frozen.
   - the cases were identical on the three backends at each budget.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
+
+
+## Compare returned arrays
+
+The `stateful-array-returns` profile returns std's ABI encoding of a memory
+array and compares the whole return data on all three paths.
+- **Inside the compiler's boundary:** the pinned checked driver refuses a
+  declared array output (Q008, SC0231). So the method declares
+  `returns (uint256)`, builds a `memory<DynArray<t>>`, encodes it with std's
+  `abi_encode` and ends with the `return_` opcode, as std's `do_exec` does
+  after a method returns.
+- **Original Core** needs no new convention: it returns the encoding's Words
+  through `wordTupleOutcomeV1`.
+- **Arrays of user enums** stay out, because std has no memory array of
+  multi-Word ADTs.
+
+The [roadmap](../docs/design/next-implementation-roadmap.md) records the
+probe and the definitions.
+
+### Definitions
+
+- **Contract:** `SynthesizedArrayReturns` with `run(uint256 flags, uint256
+  input, uint256 choice, uint256 length) returns (uint256)`, selector
+  `0x15509d2b`, zero value. Slots 0 to 2 are the `bytes` profile's.
+- **Shape:**
+  - an element type, `uint256`, `bytes4`, `bytes` or `uint256[]` (memory
+    element types `uint256`, `bytes4`, `memory<bytes>` and
+    `memory<DynArray<uint256>>`);
+  - a count from 0 to 3;
+  - for `bytes` and `uint256[]`, one inner length per element: 0 to 64 bytes,
+    or 0 to 2 Words.
+- **Shape read at run time:** the source reads the count as `length % 4` and
+  inner length `i` as `(choice / B^i) % B`, with `B` 65 for `bytes` and 3 for
+  `uint256[]`, so that no optimizer folds std's encoder loops.
+  - Every transaction carries exactly the plan's `length` and `choice`, the
+    latter zero for inline elements.
+  - The adapter and native replay refuse any other values, and reductions
+    change the plan and every transaction's arguments together.
+- **Transaction:** as for `bytes`, `r = step(prior + input)` and the three
+  writes; odd flags revert with the one Word `r`. Otherwise element `i` below
+  the count is built from `a = r·K + i` and `b = ((count·K) xor last) + i`:
+  - `uint256`: `a`;
+  - `bytes4`: `bytes4(a & 0xffffffff)`, which std left-aligns;
+  - `bytes`: 96 bytes from `allocate_memory` holding the length, `a` and `b`.
+    The memory past the length stays dirty, and std's
+    `encodeIntoFromBytesLike` zeroes the padding;
+  - `uint256[]`: an inner array of the first length Words of `a, b`.
+- **Return data:** the offset 32 and the count, then the inline Words, or one
+  offset per element relative to the element region and the tails in order:
+  2 to 14 Words.
+- **Original Core:** one host contract that reads only the flags and the
+  input and builds every Word from the plan's constants. These are the
+  offsets, the lengths and the masks that keep a data Word's leading bytes.
+- **Transactions:** `{id, flags, input, choice, length, calldata, value}`.
+  - The shape and the sequence come from two streams that start at
+    SplitMix64's finalizer of the seed xor their domains.
+  - Generation draws the element type and the count uniformly.
+  - It draws each `bytes` length from the bank 0, 1, 31, 32, 33, 63 and 64
+    with probability one half, otherwise uniformly from 0 to 64, and each
+    inner array's length uniformly from 0 to 2.
+
+### Running and validation
+
+```sh
+lake build semanticArrayReturnTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-array-return-corpus.json \
+  --output .upstream/semantic-array-return-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-array-returns \
+  --cases 16 --output .upstream/semantic-array-return-random
+```
+
+- **Schemas:** plans use `solcore-lean.array-return-plan.v1` under
+  `arrayReturnPlan`, with `elements`, `count` and `lengths`. Cases use
+  `solcore-lean.semantic-array-return-case.v1` and histories
+  `solcore-lean.array-return-history.v1`.
+- **Node budget:** the shell takes 89 to 175 nodes by shape, inside the node
+  budget. The suite's default of 384 nodes leaves 209 to 295 for the step, and
+  `--nodes-scale 2` caps the doubled budget at 512. Contracts are bounded by
+  512 nodes.
+- **Shrinking:** a case reaches about 70 KB, so a native shrink response
+  carries at most 32 candidates. The campaign's case identity, which shrinking
+  uses to skip a case it has already run, adds the plan's shape to the program
+  and the transactions. An empty array's Core program is the same for every
+  element type, whose emitted source differs.
+
+The adapter's output rule for this profile: a returned row carries the
+encoding's Words, two plus one per element plus each `bytes` element's length
+Word and `⌈L/32⌉` data Words, or each inner array's length Word and Words. A
+revert returns 32 bytes. A returned row must also follow the protocol on every
+path:
+- the output is the adapter's own encoding of the plan's array from the
+  committed slots 0 and 1 and the prior slot 2, byte for byte, the padding
+  included;
+- the committed slot 1 is the prior slot 1 plus one, and the committed slot 2
+  is the input.
+
+A revert is checked by rollback and its one-Word length.
+
+Reductions, each changing the plan and every transaction's `choice` and
+`length` together:
+- remove transactions;
+- drop the last element;
+- change the element type to `uint256`;
+- shorten inner lengths: zero or half for `bytes`, one less for an inner array;
+- reduce the step, then clear flags to their parity bit and inputs to their
+  low byte.
+
+Three Lean tests check the profile:
+- `SourceArrayReturnGolden` checks rows for eight scenarios across the four
+  element types, written out as hexadecimal Words computed outside Lean by an
+  encoder written from the ABI specification. Both original Core and the
+  source model must give each row; a changed Word is detected, and a byte of
+  dirty memory past a 31-byte element is zero in the output.
+- `SourceArrayReturnCases` checks generated scenarios at both budgets against
+  the source model, which runs std's array encoder over the elements' memory.
+  It also checks:
+  - replay and the shell sizes;
+  - the shape draws over 256 seeds;
+  - that reductions change shapes and arguments together;
+  - the refusal of a transaction off its plan's shape and of plans outside
+    the shapes.
+- `SourceArrayReturnCorpus` checks the corpus histories against the model,
+  its coverage, and its refusal of tampered entries.
 
 ## Compare whole committed storage
 

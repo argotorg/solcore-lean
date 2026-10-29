@@ -86,6 +86,8 @@ ENUM_ARGUMENT_CASE_SCHEMA = "solcore-lean.semantic-enum-argument-case.v1"
 ENUM_ARGUMENT_HISTORY_SCHEMA = "solcore-lean.enum-argument-history.v1"
 ENUM_ARRAY_CASE_SCHEMA = "solcore-lean.semantic-enum-array-case.v1"
 ENUM_ARRAY_HISTORY_SCHEMA = "solcore-lean.enum-array-history.v1"
+ARRAY_RETURN_CASE_SCHEMA = "solcore-lean.semantic-array-return-case.v1"
+ARRAY_RETURN_HISTORY_SCHEMA = "solcore-lean.array-return-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -328,6 +330,20 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ENUM_ARRAY_HISTORY_SCHEMA,
         "signature": None, "selector": None, "rollback": True, "keyed": False,
         "declared": True, "abi": "enum-arrays", "shrinkBatch": 16},
+    # One method declared to return uint256 that returns std's ABI encoding of a
+    # memory array of up to three uint256, bytes4, bytes or uint256[] elements:
+    # std's abi_encode, then the return_ opcode, as std's dispatcher does after
+    # a method returns. The plan fixes the array's shape and every transaction
+    # carries it as its choice and length; every path's whole return data is
+    # compared. A case reaches about 70 KB, so a native shrink response carries
+    # at most 32 candidates.
+    "stateful-array-returns": {"caseSchema": ARRAY_RETURN_CASE_SCHEMA, "planSchema": "solcore-lean.array-return-plan.v1",
+        "planKey": "arrayReturnPlan", "corpusSchema": "solcore-lean.semantic-array-return-corpus.v1",
+        "originKind": "array-return-generated", "contract": "SynthesizedArrayReturns",
+        "caseTool": "semantic-array-return-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ARRAY_RETURN_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
+        "declared": True, "abi": "array-returns", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -449,6 +465,14 @@ ENUM_ARRAY_KINDS = ("none", "short", "selector", "truncate", "trailing", "offset
                     "share", "unused", "tail", "length", "padding")
 STD_OUT_OF_BOUNDS = "0x7f52b2bf"
 MAX_ARRAY_ELEMENTS = 3
+# The array-return profile: the tuple profile's slots; a plan returns up to
+# three elements of one of these element types, each `bytes` or `uint256[]`
+# element with an inner length up to its bound, which the source reads from the
+# digits of this base in `choice`. The element Words use the bytes-return
+# multiplier.
+ARRAY_RETURN_SLOTS = [str(slot) for slot in range(3)]
+ARRAY_RETURN_ELEMENTS = {"uint256": (1, 0), "bytes4": (1, 0), "bytes": (65, 64), "uint256[]": (3, 2)}
+MAX_ARRAY_RETURN_COUNT = 3
 # std's bound on a decoded `bytes` length, ~0 - 63.
 MAX_DECODED_LENGTH = 2**256 - 64
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
@@ -507,6 +531,9 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     if profile(case)["abi"] == "enum-returns":
+        # Odd flags revert after the writes.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
+    if profile(case)["abi"] == "array-returns":
         # Odd flags revert after the writes.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
@@ -801,8 +828,11 @@ def tuple_arity(case: dict) -> int:
 def output_words(case: dict, row: dict) -> int:
     """The Words a completed row's output carries: a returned tuple its arity,
     a returned `bytes` value its offset, its length and its data padded to
-    whole Words, a returned enum value its encoding's Words (`enum_words`),
-    every other row one."""
+    whole Words, a returned enum value its encoding's Words (`enum_words`), a
+    returned array its encoding's Words (`array_return_words`), every other
+    row one."""
+    if has_array_returns(case) and row["status"] == "returned":
+        return array_return_words(case)
     if has_enum_returns(case) and row["status"] == "returned":
         return enum_words(case, case["transactions"][row["index"]])
     if has_bytes_returns(case) and row["status"] == "returned":
@@ -1403,6 +1433,88 @@ def enum_array_fields(case: dict, transaction: dict, row: dict, prior: list[dict
     return fields
 
 
+def has_array_returns(case: dict) -> bool:
+    return profile(case)["abi"] == "array-returns"
+
+
+def valid_array_return_plan(plan: dict) -> bool:
+    """An element type, a count of at most three and, for `bytes` and
+    `uint256[]` elements, one inner length per element within its bound."""
+    element, count, lengths = plan.get("elements"), plan.get("count"), plan.get("lengths")
+    if element not in ARRAY_RETURN_ELEMENTS or type(count) is not int or not 0 <= count <= MAX_ARRAY_RETURN_COUNT or \
+            not isinstance(lengths, list) or any(type(length) is not int for length in lengths):
+        return False
+    bound = ARRAY_RETURN_ELEMENTS[element][1]
+    return len(lengths) == (count if bound else 0) and all(0 <= length <= bound for length in lengths)
+
+
+def array_return_arguments(case: dict) -> tuple[int, int]:
+    """The plan's run-time arguments: `choice`, the inner lengths as digits of
+    the element type's base, and `length`, the count."""
+    plan = case[profile(case)["planKey"]]
+    base = ARRAY_RETURN_ELEMENTS[plan["elements"]][0]
+    return sum(length * base ** index for index, length in enumerate(plan["lengths"])), plan["count"]
+
+
+def array_return_words(case: dict) -> int:
+    """A returned array's Words: the offset, the length, one head Word per
+    element and each `bytes` or `uint256[]` element's length Word and data."""
+    plan = case[profile(case)["planKey"]]
+    tail = {"bytes": lambda length: 1 + (length + 31) // 32, "uint256[]": lambda length: 1 + length}.get(plan["elements"])
+    return 2 + plan["count"] + (sum(tail(length) for length in plan["lengths"]) if tail else 0)
+
+
+def array_return_encoding(case: dict, result: int, calls: int, last: int) -> bytes:
+    """std's encoding of the plan's array, element `i` built from
+    `a = result * K + i` and `b = ((calls * K) xor last) + i`: the offset 32 and
+    the length, then the inline Words of `uint256` and left-aligned `bytes4`
+    elements, or one offset per element relative to the element region and then
+    the element tails: a `bytes` value's length and data zero-padded to whole
+    Words, an inner array's length and Words."""
+    plan = case[profile(case)["planKey"]]
+    element, count = plan["elements"], plan["count"]
+
+    def word(value: int) -> bytes:
+        return (value % 2**256).to_bytes(32, "big")
+    a = [(result * RETURN_MULTIPLIER + index) % 2**256 for index in range(count)]
+    b = [((calls * RETURN_MULTIPLIER % 2**256 ^ last) + index) % 2**256 for index in range(count)]
+    head = word(32) + word(count)
+    if element == "uint256":
+        return head + b"".join(word(value) for value in a)
+    if element == "bytes4":
+        return head + b"".join(word((value % 2**32) << 224) for value in a)
+    tails = []
+    for index, length in enumerate(plan["lengths"]):
+        if element == "bytes":
+            data = (word(a[index]) + word(b[index]))[:length]
+            tails.append(word(length) + data + bytes(-length % 32))
+        else:
+            tails.append(word(length) + b"".join(word(value) for value in (a[index], b[index])[:length]))
+    offsets, position = [], 32 * count
+    for tail in tails:
+        offsets.append(word(position))
+        position += len(tail)
+    return head + b"".join(offsets) + b"".join(tails)
+
+
+def array_return_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a returned row that break the array-return protocol: slot one
+    grows by one, slot two is the input, and the output is std's encoding of the
+    plan's array (`array_return_encoding`) of the committed slot zero, the
+    committed slot one and the prior slot two. A revert is checked by
+    rollback."""
+    if row["status"] != "returned":
+        return []
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    before = {entry["slot"]: int(entry["value"]) for entry in prior}
+    fields = []
+    if after["1"] != (before["1"] + 1) % 2**256 or after["2"] != int(common.word(transaction.get("input"), "transaction input")):
+        fields.append("committedStorage")
+    if common.hex_bytes(row["output"], "output") != array_return_encoding(case, after["0"], after["1"], before["2"]):
+        fields.append("output")
+    return fields
+
+
 def has_logs(case: dict) -> bool:
     return profile(case).get("logs", False)
 
@@ -1696,6 +1808,14 @@ def declared_scope(case: dict) -> str:
                 "initially empty storage; the whole return data, std's error selector or empty revert data, and "
                 "committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; no "
                 "gas/balance/nonce or memory equivalence")
+    if has_array_returns(case):
+        return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions that carry the plan's array "
+                "shape as their choice and length and return std's ABI encoding of a memory array of up to three "
+                "uint256, bytes4, bytes values of zero to 64 bytes or uint256[] values of zero to two Words, built from "
+                "the step result and slot 1 after its write times an odd constant, the latter xor slot 2 before its "
+                "write, through abi_encode and return_; initially empty storage; the whole return data and committed "
+                "values at slots 0..2 on all paths and no nonzero undeclared slot on Hull/EVM; no gas/balance/nonce or "
+                "memory equivalence")
     if has_enum_returns(case):
         return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions that return the chosen "
                 "constructor of a user enum of two to four constructors with no fields, one or two Words or a bytes "
@@ -2281,6 +2401,16 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "array-returns":
+            choice, length = array_return_arguments(case)
+            if int(common.word(tx.get("choice"), "transaction choice")) != choice or \
+                    int(common.word(tx.get("length"), "transaction length")) != length:
+                raise ValueError("an array-return transaction carries its plan's inner lengths as its choice and its "
+                                 "count as its length")
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "input", "choice", "length")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its four original Words")
+            continue
         if selected["abi"] == "bytes-returns":
             if int(common.word(tx.get("length"), "transaction length")) > MAX_RETURN_LENGTH:
                 raise ValueError("a bytes-return transaction requests at most 64 bytes")
@@ -2339,6 +2469,9 @@ def validate_case(case) -> None:
     if selected["abi"] == "enum-arguments" and not valid_enum_argument_plan(plan):
         raise ValueError("enum-argument plan requires two to four constructors with distinct bank names and known "
                          "field types, at most two with bytes")
+    if selected["abi"] == "array-returns" and not valid_array_return_plan(plan):
+        raise ValueError("array-return plan requires an element type of uint256, bytes4, bytes or uint256[], at most "
+                         "three elements and one inner length within its bound per bytes or uint256[] element")
     if selected["abi"] == "enum-returns" and not valid_enum_plan(plan):
         raise ValueError("enum-return plan requires two to four constructors with distinct bank names and known fields, "
                          "at most two with bytes")
@@ -2369,6 +2502,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "tuples":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != TUPLE_SLOTS:
             raise Finding("unsupported-scope", "input", "tuple-return profile starts empty and observes slots zero through two")
+    elif selected["abi"] == "array-returns":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_RETURN_SLOTS:
+            raise Finding("unsupported-scope", "input", "array-return profile starts empty and observes slots zero through two")
     elif selected["abi"] == "bytes-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes-return profile starts empty and observes slots zero through two")
@@ -2625,8 +2761,9 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     `ledger_fields` fixes what the balance-dependent polarity leaves open. A
     returned tuple carries its arity's Words and follows `tuple_fields`. A
     returned `bytes` value carries its padded length and follows
-    `bytes_return_fields`, and a returned enum value its encoding's Words and
-    `enum_return_fields`. A decoded enum argument follows
+    `bytes_return_fields`, a returned enum value its encoding's Words and
+    `enum_return_fields`, and a returned array its encoding's Words and
+    `array_return_fields`. A decoded enum argument follows
     `enum_argument_fields`, and a decoded enum array `enum_array_fields`."""
     expected = expected_status(case, tx)
     # A std rejection reverts with exactly its selector, after the selector rule.
@@ -2660,6 +2797,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
     if has_bytes_returns(case) and bytes_return_fields(case, tx, row, prior):
         return False
     if has_enum_returns(case) and enum_return_fields(case, tx, row, prior):
+        return False
+    if has_array_returns(case) and array_return_fields(case, tx, row, prior):
         return False
     if has_enum_arguments(case) and enum_argument_fields(case, tx, row, prior):
         return False
@@ -2845,6 +2984,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if has_enum_returns(case):
             # A returned enum value follows the protocol byte by byte; a revert is already covered by rollback.
             broken = sorted({field for name, row in rows.items() for field in enum_return_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
+        if has_array_returns(case):
+            # A returned array follows the protocol byte by byte; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in array_return_fields(case, tx, row,
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
