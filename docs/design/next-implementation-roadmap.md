@@ -6179,8 +6179,8 @@ Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 `bytes` return values beyond 64 bytes, returned enums, enum arguments, enum
 arrays and array returns beyond the recorded shapes and other dynamic return
-values, or callers beyond the three fixed senders, needs its own observation,
-rollback, deployment and reduction definitions first.
+values, constructor arguments, or callers beyond the three fixed senders, needs
+its own observation, rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
@@ -7216,6 +7216,70 @@ that revision with no tracked difference.
 
 There was no finding: no mismatch and no upstream defect. Hosted CI has not
 run the profile.
+
+**Constructor arguments, feasibility only.** Every synthesized contract deploys
+with empty constructor calldata. A probe asked what the pinned compiler derives
+for a constructor taking Words, `bytes` and a user enum, and what truncated or
+malformed arguments do at deployment. Nothing was built.
+- **Derived deployment code** (`crates/hir-ty/src/prepare.rs`):
+  - The deployment main sets the free-memory pointer and reverts with empty
+    data when `codesize() < datasize("<C>Deploy")`.
+  - A non-payable constructor reverts with `0xb5988ea3` when it receives value.
+  - It then copies and decodes the arguments, runs the source body and returns
+    the runtime object.
+- **The copy,** `copy_arguments_for_constructor`:
+  - It takes `argSize = codesize() - datasize("<C>Deploy")` bytes from the
+    code suffix into a length-prefixed `memory<bytes>` at the free pointer.
+  - It decodes them with std's `abi_decode` through a `MemoryWordReader`
+    bounded by `argSize`.
+  - Calldata is unused, and a constructor without parameters decodes nothing.
+- **Decoding:** std's ordinary derived decoders.
+  - Each read and advance is checked against the end of the arguments, else
+    `ABIInputTruncated()` (`0x08638556`); an unknown tag reverts with empty
+    data.
+  - Unlike `do_exec`, there is no up-front head check, so arguments fail only
+    when a read runs past their end. Trailing bytes are ignored.
+- **Probe:** five hand-written contracts, with constructors `(uint256,
+  uint256)`, `(uint256, bytes)`, `(uint256, E)` for a static and a dynamic
+  three-constructor enum, and `()`. Each stores what it decoded and is then
+  called once.
+  - 52 argument cases, canonical and malformed, ran on Anvil (O0, O2 and
+    Yul), where the creation data is the init code and then the arguments.
+  - They also ran on the Lean Hull runner with the O0 and O2 images, whose
+    `prepareDeployment` appends the scenario's constructor calldata to the init
+    image.
+  - All 260 path rows were equal to each other and to an independent model of
+    std's memory-reader decoding. 29 deployments succeeded and their calls
+    matched; 19 reverted with `0x08638556` and 4 with empty data.
+  - Some malformed arguments deployed: a static enum's tag alone (64 bytes of
+    a 128-byte head), a narrower constructor's head, `bytes` offsets of 0 and
+    65 decoded where they pointed, and junk after a parameterless
+    constructor.
+- **Original Core** has no deployment phase. `initialWorldForContract`
+  installs a contract with empty storage, and nested creation passes one input
+  Word.
+  - A scratch prototype used only public `ContractRuntime` API. It ran a
+    checked initializer as a top-level invocation over the argument bytes,
+    then replaced its account's code with the runtime contract's through
+    `Account.withCode`, which keeps the storage.
+  - Canonical arguments committed the decoded slots, and the runtime read
+    them. Cut arguments reverted with the Word `0x08638556` and installed
+    nothing.
+
+**Recommendation:** a later storage profile, `stateful-constructor-arguments`.
+It needs no change to `ContractRuntime`, Core, the Hull importer or the
+backends.
+- **Constructor:** one constructor from a small grammar: Words, a `bytes` of
+  up to 64 bytes, or a user enum of two to four constructors. Its arguments
+  are canonical or carry one malformation from the probe's kinds.
+- **Original Core:** an initializer that decodes the argument bytes itself
+  under std's memory-reader rules, run as the deployment phase in the case
+  module.
+- **Adapter support,** additive and for this profile only:
+  - the EVM paths append the arguments to the init code;
+  - the Hull runner receives them as its constructor calldata;
+  - the deployment row is compared under the selector and empty-revert rules;
+  - a failed deployment ends the scenario on every path.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
