@@ -6177,10 +6177,10 @@ run the profile.
 
 Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
-`bytes` return values beyond 64 bytes, returned enums, enum arguments and
-enum arrays beyond the recorded shapes and other dynamic return values, or
-callers beyond the three fixed senders, needs its own observation, rollback,
-deployment and reduction definitions first.
+`bytes` return values beyond 64 bytes, returned enums, enum arguments, enum
+arrays and array returns beyond the recorded shapes and other dynamic return
+values, or callers beyond the three fixed senders, needs its own observation,
+rollback, deployment and reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
@@ -7000,6 +7000,155 @@ tracked difference.
 
 There was no finding: no mismatch and no upstream defect. Hosted CI has not
 run the profile.
+
+
+**Dynamic array returns.** Every returned value so far is static Words, a
+`bytes` value or an enum. The pinned std encodes memory arrays, and it was read
+before any code:
+- **The compiler's boundary:** the checked driver refuses a public method that
+  returns a memory array. This is Q008's SC0231: `memory<DynArray<uint256>>`
+  has no canonical ABI evidence, whether alone, in a tuple or as an enum field,
+  although std has its encoder; `memory<array<t>>` has no encoder at all. The
+  profile stays inside the boundary. Its source declares `returns (uint256)`
+  and ends with std's `abi_encode` and the `return_` opcode, as std's `do_exec`
+  does after a method returns, and the checked driver accepts it as written.
+- **No memory arrays of multi-Word ADTs:** std's memory array holds one Word
+  per element, and both its `IndexAccess` and its `ABIEncode` require
+  `t: Typedef<word>`. So a memory array of a user enum, static or with
+  `bytes`, can be neither built nor encoded, and `calldata<array<t>>` is
+  input-only. Arrays of user enums stay out.
+- **The encoder,** `ABIEncode<memory<DynArray<t>>>` and its element codecs:
+  - the offset 32, then the length;
+  - the elements at stride 32 in the element region after the length Word: a
+    `uint256` inline, a `bytes4` shifted left by 224;
+  - a `bytes` element's offset relative to the element region, then
+    `encodeIntoFromBytesLike`'s copy of its length Word and data, and zeros to
+    a whole Word;
+  - an inner `memory<DynArray<uint256>>` the same way, with its length and its
+    Words.
+
+A probe compiled four hand-written contracts that return `uint256[]`,
+`bytes4[]`, `bytes[]` and `uint256[][]` of zero to three elements this way.
+Each ran seven transactions, one reverting, with `bytes` lengths from 0 to 64
+and inner lengths from 0 to 2.
+- The paths were imported Hull with the O0 and O2 images, and O0, O2 and Yul
+  on Anvil.
+- All 140 path rows (status, whole return data and slots) were equal to each
+  other and to an independent model of the ABI encoding.
+- The padding was zero, although the memory past each `bytes` length was
+  dirty.
+
+Feasibility needs no shared change. Original Core returns the encoding's Words
+through the existing `wordTupleOutcomeV1`. `Solcore/ContractRuntime/`, the Hull
+importer, Core, every backend and lane B's scripts stay as they are. Lengths
+that vary between transactions would need a variable-length runtime
+convention, which is not scheduled.
+
+The definitions were fixed before execution:
+- **Contract:** `SynthesizedArrayReturns` with `run(uint256 flags, uint256
+  input, uint256 choice, uint256 length) returns (uint256)`, selector
+  `0x15509d2b`, zero value.
+- **Shape:**
+  - an element type: `uint256`, `bytes4`, `bytes` (`memory<bytes>`) or
+    `uint256[]` (`memory<DynArray<uint256>>`);
+  - a count from 0 to 3;
+  - for `bytes` and `uint256[]`, one inner length per element: 0 to 64 bytes,
+    or 0 to 2 Words.
+
+  The plan records `{elements, count, lengths}` under `arrayReturnPlan`.
+- **Shape read at run time:**
+  - The source reads the count as `length % 4` and inner length `i` as
+    `(choice / B^i) % B`, where `B` is 65 for `bytes` and 3 for `uint256[]`.
+    Constants would let an optimizer fold std's encoder loops, so that O2
+    would test another program than O0.
+  - Every transaction passes `length`, the count, and `choice`, the inner
+    lengths as those digits, zero for inline elements. The adapter and native
+    replay refuse any other values, and reductions change the plan and every
+    transaction's arguments together.
+  - The source therefore depends only on the element type and the step.
+- **Transaction:** the `bytes` profile's slots and protocol:
+  - `r = step(prior + input)` goes to slot 0, slot 1 grows by one, and the
+    input goes to slot 2; odd flags revert with `r`.
+  - Otherwise element `i` below the count is built from `a = r·K + i` and
+    `b = ((count·K) xor last) + i`. Here `count` is slot 1 after its write and
+    `last` slot 2 before its write.
+    - `uint256`: `a`;
+    - `bytes4`: `bytes4(a & 0xffffffff)`;
+    - `bytes`: a fresh 96-byte allocation holding the inner length, `a` and
+      `b`, whose value is the first length bytes of `a ‖ b`; the memory past
+      the length stays dirty;
+    - `uint256[]`: an inner array of the first length Words of `a, b`.
+  - Then come `abi_encode(items)` and `return_(ptr + 32, mload(ptr))`.
+- **Return data:** std's encoding, 2 to 14 Words; a revert returns one Word.
+  - The offset 32 and the count come first.
+  - Then either the inline Words, or one offset per element relative to the
+    element region, the first `32·count`, followed by the tails in order.
+- **Original Core** (`core-array-return-contract-v1`, entry
+  `wordTupleOutcomeV1` of the encoding's Words):
+  - It reads only the flags and the input.
+  - It builds every Word itself from the plan's constants: the offsets, the
+    lengths, and the masks that keep a data Word's leading bytes. Lean computes
+    the constants, and no std code runs.
+- **Node budget:** the shell takes 89 to 175 nodes by shape, which leaves 209
+  to 295 of the 384 default for the step. Contracts are bounded by 512.
+- **Step:** one checked aggregate step with one to three helpers, generated as
+  for the other storage-family profiles. It must not give equal outputs at all
+  boundary inputs.
+- **Generation:** a shape stream and a sequence stream, each starting at
+  SplitMix64's finalizer of the seed xor its domain.
+  - **Shape:**
+    - the element type and the count, uniformly;
+    - a `bytes` length from the bank 0, 1, 31, 32, 33, 63 and 64 with
+      probability one half, otherwise uniformly from 0 to 64;
+    - an inner array's length uniformly from 0 to 2.
+  - **Sequence:** per block of three, three flags and three inputs from the
+    boundary bank, with the parities of one of the four completion patterns.
+
+  Random runs generate the step with G0 revision three.
+- **Observations:** status, the whole return data, slots 0 to 2 and the whole
+  committed storage, per prefix.
+  - A returned row's output must be the adapter's own encoding of the plan's
+    array, from the committed slots 0 and 1 and the prior slot 2.
+  - Slot 1 must grow by one and slot 2 hold the input.
+  - A revert returns one Word and keeps the prior slots.
+- **Exclusions, in order:** a node budget too small for the shell or above
+  512; the step's own exclusions; a step whose boundary outputs agree; Core
+  fuel exhaustion (resource); a history that does not follow its prescribed
+  parities.
+- **Reductions,** each sealed and strictly smaller in transactions, then the
+  count, the element type (`uint256`, `bytes4`, `uint256[]`, `bytes`), the
+  total inner length, program size, and flags and inputs:
+  - one-transaction removals;
+  - the last element dropped;
+  - `uint256` elements of the same count;
+  - shorter inner lengths: zero or half for `bytes`, one less for an inner
+    array;
+  - step reductions, the flags' parity bit and the input's low byte.
+- **Campaign dimensions,** with distinct names to stay additive:
+  - `ArrayReturnShapes` (`element:count`) and `ArrayReturnOutcomes`
+    (`element:status`);
+  - `ArrayReturnBytesLengths` and `ArrayReturnInnerLengths`;
+  - `ArrayReturnCarries` and `ArrayReturnNodeBudgets`.
+- **Fixed corpus:** imported entries over the bytes-return corpus's four
+  imported steps, and generated seeds at both budgets. It must cover:
+  - every element type with every count and with both outcomes;
+  - the bank's `bytes` lengths and inner lengths 0 to 2;
+  - carries from a committed transaction and past a revert;
+  - both node budgets.
+- **Golden cases:** rows for eight scenarios across the four element types,
+  written out as hexadecimal Words.
+  - They are computed outside Lean by an encoder written from the ABI
+    specification.
+  - They cover counts 0 to 3, the bank's `bytes` lengths and inner lengths 0
+    to 2.
+  - Original Core and the source model must give them exactly, and a byte of
+    dirty memory past a `bytes` length must be zero in the output.
+
+Out of scope: arrays of user enums or structs, declared array outputs (Q008),
+lengths that vary between transactions, more than three elements, `bytes`
+elements beyond 64 bytes, inner arrays beyond two Words, other element types
+such as `address`, `bool` and `bytes32`, value-bearing calls and other
+methods.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
