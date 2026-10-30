@@ -8423,6 +8423,237 @@ twenty real occurrences, at least one per signature, to the list, and run a
 fake suite in which a known crash counts but is not new while a crash at
 another call site and a mismatch are new.
 
+**Call returns.** No profile compared a caller that decodes a callee's
+multi-Word return data. Every multi-Word convention is unavailable to the
+one-level nested executor, whose word calls carry one Word each way. A probe
+on main `2575105be` found:
+- **std's calls:** the language has no typed external call, and std's one
+  wrapper is `raw_call(target, value, payload)`.
+  - It returns the success flag and the whole return data, which
+    `returndatasize` and `returndatacopy` copy into a `memory<bytes>`.
+  - `abi_decode(ret, @T, @MemoryWordReader)` then decodes them with the
+    constructor arguments' reader: from offset 0, with no up-front size check.
+    A read past the end is `ABIInputTruncated()`, and an unknown tag empty
+    revert data.
+- **The paths agree:** 60 cases of tuple, `bytes` and enum returns, 39 of them
+  short or malformed through `return_`, and a child revert gave identical rows
+  on imported Hull with O0 and O2 images, on O0, O2 and Yul. Every row equalled
+  an independent Python model.
+- **Yul:** Yul ran the pair only from two single-contract sources. The
+  exporter refuses a two-contract source and admits only the pure and storage
+  adapters' names.
+
+A Core parent cannot read return data, since no Core host function does. A
+Core extension is a separate design question. So `stateful-call-returns` writes
+its reference in continuation-passing form, through a new convention in
+`Solcore/ContractRuntime/`, with no change to Core, the Hull importer, the
+backends or lane B's scripts. The call adapter, campaign and suite gain
+additive branches for this profile only.
+
+The definitions were fixed before execution:
+- **Boundary:** one call per transaction, at depth one, with zero value
+  everywhere and no logs. The call's target is always the bound child.
+- **Contracts:** each is compiled from its own source on every path, with zero
+  value and an empty constructor:
+  - the child `SynthesizedReturnCallee`, with one method `get(uint256 x)`
+    (`0x9507d39a`);
+  - the parent `SynthesizedReturnCaller`, with one method
+    `run(uint256 target, uint256 input) returns (uint256)` (`0x7357f5d2`). Its
+    source declares the child's enum when it decodes one.
+- **Child:** with `o = slot 0`, `c = slot 1 + 1` and `r = step(x + o)`, it
+  writes `r` to slot 0 and `c` to slot 1.
+  - An odd `x` reverts with the 32 bytes of `r`.
+  - Otherwise it returns the plan's value, built from `d0 = r·K` and
+    `d1 = (c·K) xor x`, where K is the bytes returns' multiplier:
+    - `tuple n`, with n from 2 to 4: the first n of `(r, c, x, o)`;
+    - `bytes L`, with L from 0 to 64: the first L bytes of `d0 ‖ d1`;
+    - `enum`: a shape as for `stateful-enum-returns` and a chosen
+      constructor, whose fields are none, `d0`, `d0, d1` or those L bytes.
+- **Delivery:**
+  - `typed`: the method declares the value's type and returns it through std's
+    encoder;
+  - `raw`, with one malformation: the method declares `uint256`, writes the
+    value's canonical encoding with that malformation to memory and ends with
+    `return_`.
+
+  The canonical encodings are std's: the tuple's Words; the offset 32, the
+  length and the zero-padded data of `bytes`; and an enum's body inline when
+  it is static, or after the offset 32 when it is dynamic.
+- **Malformations,** each applied where it fits, with its generation bank,
+  for a canonical size `n`:
+  - `truncate`: cuts at 0, at each Word boundary below `n` and one byte
+    before it, and at `n - 1`;
+  - `trailing`: 1, 31, 32 or 33 bytes of the zeros, ones and ramp patterns;
+  - `offset`, the head offset Word at 0 of `bytes` or of a dynamic enum: 0 and
+    1, which point into the head, then `n - 31`, `n`, `2^255` and
+    `2^256 - 32`;
+  - `length`, the `bytes` length Word, of the value or of an enum's `bytes`
+    constructor: 0, `L - 1`, `L + 1`, the longest that fits, one more, and
+    `2^256 - 1`;
+  - `tag`, an enum's tag: 0, the tag plus one, the tag xor `2^255` and
+    `2^256 - 1`;
+  - `tagCut`: those unknown tags, with the data cut right after the tag;
+  - `tail`, the tail offset of a dynamic enum's `bytes` field, relative to the
+    body: 0, 32, one byte past the end and `2^256 - 1`;
+  - `narrow`: a static enum cut to the chosen constructor's head when it is
+    narrower than the widest. For a constructor without fields that is its tag
+    alone.
+- **std's decision** on return data of size `m`, as std's `MemoryWordReader`
+  takes `raw_call`'s copy:
+  - reading starts at 0, with no up-front size check;
+  - a tuple's Words lie at 0, 32 and so on, each needing its 32 bytes;
+  - `bytes` needs its offset Word at 0, an offset `t <= m`, the length Word at
+    `t` and a length `L <= m - t - 32`;
+  - a static enum needs the tag at 0, compared with each constructor's tag in
+    declaration order before any field, then the chosen constructor's fields;
+  - a dynamic enum needs its offset Word at 0 and an offset `o <= m`, then the
+    body at `o` as for a static enum, with a `bytes` field's tail offset
+    relative to the body;
+  - a failure is `0x08638556`, an unknown tag is empty revert data, and
+    trailing bytes are ignored.
+- **Parent:** each transaction runs in four steps.
+  1. With `p = slot 0`, it writes `p + input` to slot 0.
+  2. It calls `raw_call(address(target), 0, 0x9507d39a ‖ input)`.
+  3. With the flag `ok` and the return data's size `m`, it records a decoded
+     record `(i, w0, w1, w2, w3)`:
+     - when `ok`, decoding as the plan's type, which reverts the parent with
+       std's data on a rejection:
+       - a tuple's Words go to `w0` to `w3`;
+       - `bytes` gives `(L, chunk 0, chunk 1)`;
+       - an enum gives the one-based constructor index `i` and its fields as
+         for `stateful-enum-arguments`: `d0`, then `d1`, or a `bytes`
+         length and two chunks;
+     - otherwise the revert data's first Word as `w0`, when `m >= 32`.
+  4. It writes `ok + 2m` to slot 1, `i` to slot 2 and `w0` to `w3` to slots 3
+     to 6. With `s` the sum of slot 0, `i` and `w0` to `w3`, wrapping, it
+     reverts with the 32 bytes of `s` when the input's bit 1 is set, and
+     otherwise returns `s`.
+- **Runtime convention,** additive in `Solcore/ContractRuntime/`:
+  - **Raw bytes:** `rawBytesOutcomeV1 extraWords` is a child convention whose
+    returned side is a unit marker, a length Word `ℓ` and `extraWords + 1`
+    data Words. Its return data are the first `ℓ mod (32 · (extraWords + 1) +
+    1)` data bytes. A revert carries one Word and a trap a reason, as for the
+    other conventions. It does not return one Word, so word calls and
+    creation treat it as unavailable.
+  - **Call and resume:** a public function runs a parent given as two checked
+    contracts, at the parent's address and with its caller:
+    1. the call phase, installed as the parent's code, under
+       `wordTupleOutcomeV1`, returns the target, the selector, the argument
+       and the Words it keeps;
+    2. the child resolved at the target, of any convention, runs as a
+       top-level invocation with the parent as caller, zero value and the
+       selector's four bytes and the argument's 32 as its input. Its status
+       Word is 1 for a return, 0 for a revert, 2 for a trap, and 3 when the
+       target does not resolve;
+    3. the resume phase, under `wordOutcomeV1`, runs with the parent's code
+       swapped for it. Its input data are the kept Words, the status Word and
+       the return data `D`: the child's returned or reverted bytes, else
+       nothing. It runs in the world after the child.
+
+    Every step goes through the public top-level runner, and the parent's
+    code is restored afterwards. A revert or trap of the call phase or the
+    resume phase commits the pre-transaction world, and running out of fuel
+    in any step is reported with its step.
+  - **Laws:**
+    - a reverted or trapped child leaves the call phase's world;
+    - `D` is the child's outcome as the top-level runner encodes it;
+    - the child's invocation is the stated one;
+    - root rollback;
+    - the parent's code and every account's balance are unchanged.
+  - **Premises:** the nested executor, its one-Word admission and every public
+    theorem keep their statements; the new laws are additive.
+- **Original Core:**
+  - **The child:** under `wordTupleOutcomeV1`, `boundedBytesOutcomeV1` or the
+    enum's `enumOutcomeV1` when typed, and under `rawBytesOutcomeV1` when raw.
+    It reads `x` at 4.
+  - **The parent's call phase** writes slot 0 and keeps the input.
+  - **The parent's resume phase** takes std's decision on `D` at base offset
+    64 through `inputDataSize` and `inputDataWordBE?`, with Lean's Keccak-256
+    tags. It reverts with the error selector's Word, or the Word zero for empty
+    data.
+- **Paths:**
+  - original Core, through the convention;
+  - imported Hull: a new runner, `rust-hull-call-return-scenario`, deploys the
+    child and the parent from their own checked Hull and images and runs each
+    transaction through linked Hull's actual call;
+  - O0 and O2: both images on Anvil.
+  - Yul follows once `scripts/export-rust-yul.py` admits the two names. Each
+    source has one creation object and one runtime object, so its object-shape
+    checks hold.
+- **Node budget:** the child's shell (its reads, the step's call, its writes
+  and its revert) and the step count, and the default of 384 leaves the rest
+  for the step. The returned value's construction and the parent's two phases
+  lie outside it. The child and each phase are bounded by 1,024 nodes.
+- **Generation:** a shape stream and a sequence stream, each from SplitMix64's
+  finalizer of the seed xor its domain.
+  - **Kind:** a tuple with probability 3/8, with n uniform, `bytes` with 2/8
+    and an enum with 3/8, its shape drawn as for `stateful-enum-returns` and
+    its constructor uniform.
+  - **Length:** `L` from the bank 0, 1, 31, 32, 33, 63 and 64 with
+    probability one half, otherwise uniform from 0 to 64.
+  - **Delivery:** typed with probability one third; otherwise raw, with a
+    kind uniform among those that apply and then an entry of its bank uniform.
+  - **Sequence:** per block of three, three inputs from the boundary bank of
+    `stateful-calls`.
+  - **Transactions:** up to eight. Random runs use G0 revision three.
+- **Observations,** per transaction and prefix:
+  - the status and the whole return data;
+  - the parent's slots 0 to 6 and the child's slots 0 and 1;
+  - both contracts' whole committed storage and balances;
+  - the committed logs, which must stay empty.
+
+  Comparisons:
+  - Original Core's revert Word maps to std's selector, or to `0x`, by the
+    selector and empty-revert rules, exactly when the transaction's prescribed
+    rejection says so. Each transaction records it, computed by a Lean
+    byte-level model of the child's bytes and std's decision. The adapter
+    recomputes it with its own Python model.
+  - A returned parent's slots 1 to 6 must equal the adapter's own decoding of
+    the child's bytes, rebuilt from the child's committed slots and the input.
+  - A child revert under a returned parent keeps the child's prior storage,
+    and a parent revert keeps both prior storages.
+- **Exclusions, in order:**
+  - a node budget too small for the child's shell or above 512;
+  - the step's own exclusions, and a step whose boundary outputs agree;
+  - Core fuel exhaustion, as a resource;
+  - a history that does not follow its prescribed outcomes.
+- **Reductions,** each sealed and strictly smaller in this order:
+  transactions, the kind, the enum's shape, the malformation's bank position,
+  the length, program size and the inputs.
+  - **Removals:** one transaction at a time.
+  - **Malformations:** dropped, which makes the delivery typed, or an earlier
+    entry of its bank.
+  - **Length:** a shorter `bytes` length, zero or half.
+  - **Kind:** an enum or `bytes` becomes `tuple 2`, and `tuple n` becomes
+    `tuple (n - 1)`. A malformation that no longer applies is dropped.
+  - **Enum shape:** unused constructors dropped while two remain, and narrower
+    fields as for `stateful-enum-returns`.
+  - **Then:** step reductions, then inputs from the boundary bank.
+- **Campaign dimensions,** besides the call family's:
+  - `ReturnKinds` and `ReturnDeliveries`;
+  - `ReturnMalformations`, `ReturnDecisions` and `ReturnAccepted`;
+  - `ReturnBytesLengths` and `ReturnEnumFields`;
+  - `ReturnRollbacks` and `ReturnNodeBudgets`.
+- **Fixed corpus:** imported entries over the imported steps of
+  `stateful-calls`, and generated seeds at both budgets. It must cover:
+  - every kind, static and dynamic enums apart, typed and raw;
+  - every malformation kind, all three decisions, and malformations that std
+    accepted;
+  - the bank's `bytes` lengths and every decoded enum field kind;
+  - a child revert under a returned parent and under a reverted one, a parent
+    revert after a returned child, and a rejection;
+  - both node budgets.
+- **Golden cases:** rows written out as hexadecimal text by the probe's
+  independent Python model of std's decision, over the probe's bank and each
+  kind's canonical encodings. The Lean model and the resume phase must give
+  them exactly.
+
+Out of scope:
+- calls to an unresolvable or code-less target, which the convention fails
+  but the EVM answers with empty success;
+- nonzero values, logs, more than one call, nested depth and creation;
+- other return types, and child reverts of other than 32 bytes.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
