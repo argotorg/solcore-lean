@@ -6602,6 +6602,36 @@ Three Lean tests check the profile:
 - `SourceConstructorArgumentCorpus` checks the corpus histories against the
   model, its coverage, and its refusal of tampered entries.
 
+### Results
+
+The matrices ran on `2678e44c8` with scripts, native tools, solc, Anvil, and
+the Rust driver, code-image exporter and directive tools frozen.
+- **Fixed corpus:** all 40 scenarios and 53 prefixes matched with complete
+  coverage on Sonatina O0 and O2 and on Yul, O2 in 258 seconds and Yul in 408.
+  - On O0 all twenty-nine stateful corpora matched, 444 scenarios and 1,150
+    prefixes.
+  - The twenty-eight others kept their 404 scenarios and 1,097 prefixes.
+- **Random suites:** root seed `20261040`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on all three backends.
+  Each matched 16 scenarios and 88 prefixes with complete coverage, in 108 to
+  111 seconds on Sonatina and 168 and 170 on Yul.
+  - No attempt was excluded.
+  - Every parameter kind came: 4 `uint256,bytes`, 4 `uint256,uint256`, 3
+    static and 2 dynamic enums, 2 `none` and 1 `uint256`.
+  - 11 deployments were accepted, 2 of them with trailing bytes and one with
+    a static enum cut to its tag alone. 3 were rejected with empty data and 2
+    with `0x08638556`, and those five ended their scenarios.
+  - 70 transactions returned and 18 reverted.
+  - The cases were identical on the three backends at each budget.
+- **Before the matrices:**
+  - Unfrozen smoke runs matched the corpus on all three backends and four
+    random O0 cases, one of them a deployment rejected with empty data.
+  - A synthetic output difference on imported Hull at `tx-1` of the
+    `two-bytes` entry reduced in 44 attempts, 22 accepted, to a parameterless
+    constructor with empty arguments and that one transaction.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-four

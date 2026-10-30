@@ -7777,6 +7777,85 @@ Out of scope: value-bearing deployments, whose non-payable check reverts with
 creation with arguments; init code shorter than the deploy object; and more
 than one constructor.
 
+**Results.** The checks before any matrix:
+- **Golden tests:** original Core and the Lean model gave all 71 written-out
+  deployments, 40 accepted and 31 rejected, and the five raw-argument rows of
+  the order of std's checks; changed rows failed.
+- **Cases test:** original Core equalled the Lean model, the deployment row
+  first, on 40 scenarios of eight transactions under G0 revision three at 384
+  nodes, 24 of three under revision one, and 12 of four at 512.
+  - Every case and the reductions of twelve cases replayed, and the node
+    counts were those fixed above.
+  - Generation drew every parameter kind, static and dynamic enums apart, and
+    all three outcomes, and rejected deployments kept no transactions.
+  - The draws over 256 seeds reached each of the 27 pairs of a parameter kind
+    and a malformation that applies to it, each of the 13 pairs of a
+    parameter kind and a std outcome it can have, every bank length and a
+    uniform partial-Word length.
+- **Adapter:** its own Python model of std's decision gave the recorded
+  arguments and outcome of 200 generated cases and of the 34 imported corpus
+  entries. Its tests pin the decision on fifteen records, the deployment row's
+  selector and empty-revert rules, the protocol of a runtime row, the Hull
+  path's stop at a rejected deployment and the CREATE address.
+- **Corpus test:** it replayed 40 scenarios and 53 transactions with every
+  original Core history equal to the model's, and refused tampered entries.
+- **Hull runner:** the keyed-storage runner requires one to eight calls, so a
+  scenario without transactions sends one placeholder call. A rejected
+  deployment never reaches it, since the runner reports the failed deployment
+  and stops, and after an accepted deployment the adapter drops its row. The
+  runner is unchanged.
+- **Smoke runs,** unfrozen, before the profile commit:
+  - fixed O0, O2 and Yul each matched 40 scenarios and 53 prefixes with
+    complete coverage;
+  - four random O0 cases matched, one of them a deployment rejected with
+    empty data, and 24 prefixes;
+  - a synthetic output difference on imported Hull at `tx-1` of `two-bytes`
+    (a dynamic enum of two `bytes` constructors, three transactions and a
+    3,904-byte step) reduced in 44 attempts, 22 accepted, to a parameterless
+    constructor with empty arguments, that one transaction and a 2,297-byte
+    step.
+- **Gate** on `2678e44c8`, in 24 minutes, then the 18 corpus validators in 5
+  more:
+  - the kernel check and `lake build` (10,303 jobs);
+  - 38 native tools prepared offline and verified;
+  - `lake test` and 866 Python tests in 15 suites;
+  - the diff check.
+
+The matrices ran on `2678e44c8` with 168 digests frozen: every script, the
+38 native tools, solc, Anvil, and the Rust driver, code-image exporter and
+directive tools. None changed during any run, and all 620 case results record
+that revision with no tracked difference.
+- **Fixed corpora:**
+  - O0: all twenty-nine stateful corpora matched, 444 scenarios and 1,150
+    prefixes, in 2,890 seconds. The twenty-eight earlier ones kept their 404
+    scenarios and 1,097 prefixes, and the new corpus took 256 seconds.
+  - The new corpus matched its 40 scenarios and 53 prefixes with complete
+    coverage on O0, O2 and Yul, O2 in 258 seconds and Yul in 408.
+- **Random suites:** root seed `20261040` (derived seed
+  `6291349506167304380`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul. All six runs matched 16
+  scenarios and 88 prefixes with complete coverage, in 108 to 111 seconds on
+  Sonatina and 168 and 170 on Yul.
+  - No attempt was excluded at either budget.
+  - **Parameters:** 4 `uint256,bytes`, 4 `uint256,uint256`, 3 static and 2
+    dynamic enums, 2 `none` and 1 `uint256`.
+  - **Arguments:** 8 canonical, 2 each cut, with trailing bytes or with an
+    unknown tag cut after it, 1 narrowed static enum and 1 offset into the
+    head.
+  - **Deployments:** 11 accepted, among them both trailing-byte cases and a
+    static enum cut to the tag of its first constructor, which has no fields.
+    3 were rejected with empty data, an offset of 32 and both cut tags, and 2
+    with `0x08638556`. The five rejected deployments keep no transactions, so
+    88 transactions ran, not 128.
+  - **Outcomes:** 70 transactions returned and 18 reverted. 59 of the returns
+    followed a committed transaction and 41 a revert.
+  - **Agreement across runs:** the cases were identical on the three
+    backends at each budget. Both budgets drew the same parameters,
+    arguments and transactions for all 16 seeds, with the step differing in
+    15.
+- **Findings:** none, no mismatch and no upstream defect, and `questions.md`
+  is untouched.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
