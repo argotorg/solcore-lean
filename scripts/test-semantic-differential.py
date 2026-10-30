@@ -1349,6 +1349,83 @@ class ArtifactTests(unittest.TestCase):
                 runner.read_json(path, 4)
 
 
+class DigestCacheTests(unittest.TestCase):
+    """A campaign's tool digests and version outputs; files stand in for tools."""
+
+    def test_an_unchanged_file_is_hashed_once_and_every_write_or_replacement_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tool"
+            path.write_bytes(b"first build")
+            cache = runner.DigestCache()
+            with patch.object(runner, "file_digest", wraps=runner.file_digest) as hashed:
+                self.assertEqual([cache.digest(path), cache.digest(path)], [runner.digest(b"first build")] * 2)
+                self.assertEqual(hashed.call_count, 1)
+                # The same size and modification time: the status-change time still moves.
+                status = path.stat()
+                time.sleep(0.01)
+                path.write_bytes(b"other build")
+                os.utime(path, ns=(status.st_atime_ns, status.st_mtime_ns))
+                self.assertEqual(path.stat().st_mtime_ns, status.st_mtime_ns)
+                self.assertEqual(cache.digest(path), runner.digest(b"other build"))
+                replacement = Path(directory) / "replacement"
+                replacement.write_bytes(b"third build")
+                replacement.replace(path)
+                self.assertEqual(cache.digest(path), runner.digest(b"third build"))
+                self.assertEqual(hashed.call_count, 3)
+
+    def test_a_file_written_while_it_is_hashed_is_never_reused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tool"
+            path.write_bytes(b"first build")
+            original = runner.file_digest
+
+            def rewritten(target):
+                value = original(target)
+                time.sleep(0.01)
+                target.write_bytes(b"rebuilt")
+                return value
+
+            cache = runner.DigestCache()
+            with patch.object(runner, "file_digest", side_effect=rewritten):
+                self.assertEqual(cache.digest(path), runner.digest(b"first build"))
+            self.assertEqual(cache.digests, {})
+            self.assertEqual(cache.digest(path), runner.digest(b"rebuilt"))
+
+    def test_identity_reuses_a_version_only_through_a_campaign_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tool = Path(directory) / "tool"
+            tool.write_text("#!/bin/sh\necho tool 1.0\n")
+            tool.chmod(0o755)
+            cache = runner.DigestCache()
+
+            def identity(cached):
+                report = {"processes": []}
+                args = SimpleNamespace(total_timeout=30, timeout=10, output_limit=1024 * 1024, digest_cache=cached)
+                return runner.Runner(args, report).identity(tool, version=True), report["processes"]
+
+            first, second, uncached = identity(cache), identity(cache), identity(None)
+            for result, _ in (first, second, uncached):
+                self.assertEqual(result, {"path": str(tool.resolve()), "sha256": runner.file_digest(tool), "version": "tool 1.0"})
+            self.assertEqual([process["stage"] for _, processes in (first, second, uncached) for process in processes],
+                             ["tool-version"] * 3)
+            self.assertNotIn("reused", first[1][0])
+            self.assertEqual(second[1], [{**first[1][0], "reused": True}])
+            self.assertNotIn("reused", uncached[1][0])
+            # A rebuilt tool is hashed and asked again; a failing one is never kept.
+            time.sleep(0.01)
+            tool.write_text("#!/bin/sh\necho tool 2.0\n")
+            rebuilt = identity(cache)
+            self.assertEqual(rebuilt[0]["version"], "tool 2.0")
+            self.assertNotIn("reused", rebuilt[1][0])
+            time.sleep(0.01)
+            tool.write_text("#!/bin/sh\necho broken\nexit 3\n")
+            for _ in range(2):
+                with self.assertRaises(runner.Finding) as caught:
+                    identity(cache)
+                self.assertEqual((caught.exception.category, caught.exception.stage), ("adapter-error", "tool-version"))
+            self.assertEqual(len(cache.versions), 2)
+
+
 class SharedCompilationTests(unittest.TestCase):
     """Sharing policy with a stand-in exporter; campaigns check real compilations."""
 
@@ -1422,6 +1499,25 @@ class SharedCompilationTests(unittest.TestCase):
         # The compiling case ran the stage itself; the other case records it as shared.
         self.assertEqual(second["processes"], [{**first["processes"][0], "reused": True}])
         self.assertNotIn("reused", first["processes"][0])
+
+    def test_a_campaign_digest_cache_keeps_the_identity_and_sees_a_rebuilt_compiler(self):
+        cache = runner.DigestCache()
+        identities = []
+        with self.stages():
+            for rebuild in (False, False, True):
+                args, report, case = self.case()
+                if rebuild:
+                    time.sleep(0.01)
+                    (self.target / "debug/solcore-driver").write_text("rebuilt driver")
+                expected = runner.compile_identity(args, report, "sonatina-o0", ("case.sol",))
+                args.digest_cache = cache
+                self.assertEqual(runner.compile_identity(args, report, "sonatina-o0", ("case.sol",)), expected)
+                self.compile(args, report, case)
+                identities.append(report["compilation"])
+        self.assertEqual([compilation["reused"] for compilation in identities], [False, True, False])
+        self.assertNotEqual(identities[2]["key"], identities[0]["key"])
+        self.assertEqual(identities[2]["identity"]["compilers"]["debug/solcore-driver"], runner.digest(b"rebuilt driver"))
+        self.assertEqual(len(self.exports), 2)
 
     def test_a_different_source_backend_tool_or_library_compiles_again(self):
         changes = [lambda report: None, lambda report: None,

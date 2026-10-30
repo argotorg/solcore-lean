@@ -13,6 +13,7 @@ import copy
 import importlib.util
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import signal
@@ -260,7 +261,25 @@ def generate_in_requests(request, count: int, attempts: int, seed: int, per_func
 
 
 def directory_bytes(path: Path) -> int:
-    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+    """The bytes of the files under `path`, as `rglob` and `is_file` count them,
+    with one status call per file; an entry removed during the walk counts
+    nothing. Every resource guard walks the whole output, so this runs often."""
+    total, folders = 0, [path]
+    while folders:
+        try:
+            entries = os.scandir(folders.pop())
+        except FileNotFoundError:
+            continue
+        with entries:
+            for entry in entries:
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        folders.append(entry.path)
+                    elif entry.is_file():
+                        total += entry.stat().st_size
+                except FileNotFoundError:
+                    pass
+    return total
 
 
 def program_hash(case: dict) -> str:
@@ -1266,6 +1285,8 @@ class Campaign:
         # one compilation; reduction candidates compile on their own.
         self.compilations = m2.CompileCache(self.work / "compilations")
         self.compiled_sources = set()
+        # Every case hashes the same tools; an unchanged file is hashed once.
+        self.digests = m2.DigestCache()
         # Random generation records how many case-tool requests it took.
         self.generation_requests = {"requests": None, "outputLimitRetries": None}
         self.counter = 0
@@ -1567,7 +1588,7 @@ class Campaign:
     def case_args(self, case_path: Path, run_dir: Path, compilations=None):
         left = max(0.001, self.deadline - time.monotonic())
         return SimpleNamespace(case=case_path, replay=None, output=run_dir, backend=self.args.backend, solc=self.args.solc,
-            compile_cache=compilations,
+            compile_cache=compilations, digest_cache=self.digests,
             case_tool=self.args.case_tool, core_runner=self.args.core_runner, anvil=self.args.anvil,
             upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
@@ -1583,7 +1604,8 @@ class Campaign:
         folder = self.work / f"run-{self.counter:06d}"
         folder.mkdir()
         input_path = self.work / f"input-{self.counter:06d}.json"
-        save_json(input_path, case)
+        # The adapter reads and removes this file and writes its own case.json.
+        save_json(input_path, case, compact=True)
         args = self.case_args(input_path, folder, self.compilations if reuse else None)
         report = {"schema": m2.REPORT_SCHEMA, "backend": self.args.backend, "processes": [], "observations": {}, "rawObservations": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
@@ -1778,7 +1800,8 @@ class Campaign:
         self.recorded_input_selection("boundary" if profile in RUNTIME_INPUT_PROFILES else None)
         self.recorded_acceptance("profile" if profile in IDENTITY_FILTER_PROFILES else None)
         save_json(self.args.output / "corpus.json", manifest)
-        self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest))}
+        self.summary["corpus"] = {"path": str(self.args.corpus), "sha256": m2.digest(m2.json_bytes(manifest)),
+                                  "generationRequests": 0}
         coverage = self.summary["coverage"]
         coverage["requiredFeatures"] = sorted(set(manifest.get("requiredFeatures", [])))
         coverage["requiredWordLiterals"] = sorted({m2.word(value) for value in manifest.get("requiredWordLiterals", [])}, key=int)
@@ -1836,6 +1859,9 @@ class Campaign:
         if "aggregateShapeCoverage" in self.summary:
             self.summary["aggregateShapeCoverage"]["requiredShapes"] = aggregate_shape_requirements(manifest)
         cases, excluded, ids, accepted_ids = [], [], [], []
+        # A generation request yields the case of every boundary input, so the
+        # entries of one recipe share its response; nothing else is shared.
+        responses = {}
         attempted = 0
         for entry in manifest["cases"][:self.args.cases]:
             self.guard()
@@ -1847,10 +1873,13 @@ class Campaign:
             ids.append(entry["id"])
             if "generation" in entry:
                 request = entry["generation"]
-                response = self.tool([generate_command,
-                    str(request["seed"]), str(request["maxProgramNodes"]),
-                    str(len(profile_inputs(profile))) if runtime_input else "1",
-                    "1", str(self.args.direct_fuel), *version], "corpus-generation")
+                command = (generate_command, str(request["seed"]), str(request["maxProgramNodes"]),
+                           str(len(profile_inputs(profile))) if runtime_input else "1",
+                           "1", str(self.args.direct_fuel), *version)
+                if command not in responses:
+                    responses[command] = self.tool(list(command), "corpus-generation")
+                    self.summary["corpus"]["generationRequests"] = len(responses)
+                response = responses[command]
                 generated = response.get("cases", [])
                 if runtime_input:
                     generated = [case for case in generated if case.get("input") == entry["input"]]

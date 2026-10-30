@@ -632,6 +632,46 @@ class BudgetAndReceiptTests(unittest.TestCase):
                 instance.guard()
             self.assertEqual(caught.exception.stage, 'campaign-disk')
 
+    def test_directory_size_counts_the_files_rglob_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, outside = Path(directory) / 'output', Path(directory) / 'outside'
+            (root / 'a' / 'b').mkdir(parents=True)
+            outside.mkdir()
+            (root / 'a' / 'one.json').write_bytes(b'1' * 10)
+            (root / 'a' / 'b' / 'two.json').write_bytes(b'2' * 200)
+            (root / 'three').write_bytes(b'3' * 3000)
+            (outside / 'big').write_bytes(b'4' * 40000)
+            # A linked file counts as its target; a linked folder is not entered; a dangling link counts nothing.
+            (root / 'linked-file').symlink_to(outside / 'big')
+            (root / 'linked-folder').symlink_to(outside, target_is_directory=True)
+            (root / 'dangling').symlink_to(outside / 'missing')
+            self.assertEqual(campaign.directory_bytes(root),
+                             sum(item.stat().st_size for item in root.rglob('*') if item.is_file()))
+            self.assertEqual(campaign.directory_bytes(root), 10 + 200 + 3000 + 40000)
+            self.assertEqual(campaign.directory_bytes(Path(directory) / 'absent'), 0)
+
+    def test_cases_share_the_campaign_digest_cache_and_read_a_compact_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.upstream, config.target_dir = Path('/unused/upstream'), Path('/unused/target')
+            instance = campaign.Campaign(config)
+            case = memory_policy_case()
+            seen = []
+
+            def execute(adapter_args, report):
+                seen.append((adapter_args.digest_cache, adapter_args.case.read_bytes()))
+                report.update(matched())
+
+            with patch.object(campaign.m2, 'execute', side_effect=execute):
+                instance.execute_case(case)
+                instance.execute_case(case, reuse=False)
+            self.assertIsInstance(instance.digests, campaign.m2.DigestCache)
+            for cache, saved in seen:
+                self.assertIs(cache, instance.digests)
+                self.assertEqual(json.loads(saved), case)
+                self.assertEqual(saved.count(b'\n'), 1)
+            self.assertEqual(len(seen), 2)
+
     def test_time_guard_preserves_existing_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             instance = campaign.Campaign(options(directory))
@@ -1019,7 +1059,10 @@ class RecipeCoverageTests(unittest.TestCase):
             config = options(directory)
             config.profile = 'runtime-mutation'
             config.corpus = Path(directory) / 'manifest.json'
-            config.corpus.write_text(json.dumps(self.manifest()))
+            manifest = self.manifest()
+            # Another recipe, so materialization stops at its own request.
+            manifest['cases'][1]['generation']['seed'] = '1'
+            config.corpus.write_text(json.dumps(manifest))
             instance = campaign.Campaign(config)
             calls = 0
 
@@ -2149,6 +2192,42 @@ class MemoryCoverageTests(unittest.TestCase):
                         memory_shapes(hashes=['32', '32']), memory_shapes(indices=['word:register'])):
             with self.assertRaises(ValueError):
                 campaign.specified_memory_values(memory_policy_case(shapes=invalid))
+
+    def test_entries_of_one_recipe_share_one_generation(self):
+        """A recipe's response holds every boundary input's case; its entries take
+        theirs from it, a missing input is excluded and another recipe is requested."""
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.attempts, config.shrink_attempts = self.PROFILE, 5, 5, 0
+            value = self.manifest()
+            first, second = {'seed': '1', 'maxProgramNodes': 1024}, {'seed': '2', 'maxProgramNodes': 1024}
+            value['cases'] = [{'id': name, 'input': value_input, 'expectedFeatures': [], 'generation': request}
+                for name, value_input, request in (('a-0', '0', first), ('a-255', '255', first), ('b-0', '0', second),
+                                                   ('a-1', '1', first), ('a-2', '2', first))]
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls, responses = [], []
+
+            def tool(arguments, stage):
+                calls.append((arguments, stage))
+                cases = [memory_policy_case(int(boundary)) for boundary in campaign.PRIMITIVE_INPUTS
+                         if (arguments[1], boundary) != ('1', '2')]
+                for case in cases:
+                    case['provenance']['origin']['seed'] = arguments[1]
+                responses.append({'cases': cases})
+                return responses[-1]
+
+            instance.tool = tool
+            response = instance.prepare_cases()
+        self.assertEqual(calls, [(['memory-values-generate', seed, '1024', '8', '1', '1000'], 'corpus-generation')
+                                 for seed in ('1', '2')])
+        self.assertEqual([(case['input'], case['provenance']['origin']['seed']) for case in response['cases']],
+                         [('0', '1'), ('255', '1'), ('0', '2'), ('1', '1')])
+        self.assertEqual(response['cases'][0], responses[0]['cases'][0])
+        self.assertEqual([(item['id'], item['stage'], item['detail']) for item in response['excluded']],
+                         [('a-2', 'generation', responses[0])])
+        self.assertEqual((response['attempted'], response['status']), (5, 'generation-exhausted'))
+        self.assertEqual(instance.summary['corpus']['generationRequests'], 2)
+        self.assertEqual(instance.summary['corpus']['acceptedIds'], ['a-0', 'a-255', 'b-0', 'a-1'])
 
     def test_imported_plan_routes_to_memory_values_emit(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -3914,32 +3993,45 @@ class CallGraphLoopCoverageTests(unittest.TestCase):
             config = options(directory); config.profile, config.cases, config.attempts = self.PROFILE, len(entries), len(entries)
             config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(manifest))
             instance = campaign.Campaign(config); calls = []
-            def tool(arguments, stage):
-                entry = entries[len(calls)]
+            def build(entry):
                 case = self.case(7, int(entry['input']), entry['expectedHelperCount'], entry['expectedCallShapes'])
                 case['provenance'].update({key: manifest[key] for key in self.VERSIONS})
                 case['provenance']['features'] = list(entry['expectedFeatures'])
                 if 'generation' in entry:
                     request = entry['generation']
                     case['provenance']['origin'].update(seed=request['seed'], maxProgramNodes=request['maxProgramNodes'])
-                    calls.append((arguments, stage))
-                    return {'cases': [case]}
-                case['loopPlan'] = copy.deepcopy(entry['loopPlan'])
-                self.assertEqual(json.loads(Path(arguments[1]).read_text()), entry['loopPlan'])
+                return case
+            def tool(arguments, stage):
                 calls.append((arguments, stage))
+                if stage == 'corpus-generation':
+                    # The native generator answers with every input's case of one graph.
+                    return {'cases': [build(entry) for entry in entries if 'generation' in entry and
+                        [entry['generation']['seed'], str(entry['generation']['maxProgramNodes'])] == arguments[1:3]]}
+                plan = json.loads(Path(arguments[1]).read_text())
+                entry = next(entry for entry in entries if entry.get('loopPlan') == plan and entry['input'] == arguments[2])
+                case = build(entry); case['loopPlan'] = copy.deepcopy(plan)
                 return case
             instance.tool = tool
             response = instance.prepare_cases()
         self.assertEqual(len(response['cases']), len(entries))
         self.assertEqual(response['excluded'], [])
-        self.assertEqual(len(calls), len(entries))
-        for (arguments, stage), entry in zip(calls, entries):
+        self.assertEqual([case['input'] for case in response['cases']], [entry['input'] for entry in entries])
+        expected = []
+        for entry in entries:
             if 'generation' in entry:
                 request = entry['generation']
-                self.assertEqual((arguments, stage), (['call-graph-loop-generate', request['seed'],
-                    str(request['maxProgramNodes']), '6', '1', '1000'], 'corpus-generation'))
+                command = (['call-graph-loop-generate', request['seed'], str(request['maxProgramNodes']), '6', '1', '1000'],
+                           'corpus-generation')
+                if command not in expected:
+                    expected.append(command)
             else:
-                self.assertEqual((arguments[0], arguments[2:], stage), ('call-graph-loop-emit', [entry['input'], '1000'], 'corpus-emission'))
+                expected.append((['call-graph-loop-emit', entry['input'], '1000'], 'corpus-emission'))
+        self.assertEqual([(arguments if stage == 'corpus-generation' else [arguments[0], *arguments[2:]], stage)
+                          for arguments, stage in calls], expected)
+        # The eighteen generated entries are three recipes', each generated once.
+        recipes = sum(stage == 'corpus-generation' for _, stage in calls)
+        self.assertEqual((recipes, sum('generation' in entry for entry in entries)), (3, 18))
+        self.assertEqual(instance.summary['corpus']['generationRequests'], recipes)
         summary = instance.summary
         self.assertEqual(summary['counts']['generated'], len(entries))
         self.assertEqual(summary['loopCoverage']['generatedMasks'], [0, 1, 3, 7])
@@ -4543,34 +4635,44 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
                 case['provenance']['features'] = list(entry['expectedFeatures'])
                 return case
             def tool(arguments, stage):
-                entry = entries[len(calls)]
                 calls.append((arguments, stage))
-                if 'generation' in entry:
+                if stage == 'corpus-generation':
+                    entry = next(entry for entry in entries if 'generation' in entry and
+                        [entry['generation']['seed'], str(entry['generation']['maxProgramNodes'])] == arguments[1:3])
                     request = entry['generation']
                     cases = [build(entry, value) for value in campaign.PRIMITIVE_INPUTS]
                     for case in cases:
                         case['provenance']['origin'].update(seed=request['seed'], maxProgramNodes=request['maxProgramNodes'])
                     # The native generator answers with all eight boundary inputs of one graph; the campaign selects one.
                     return {'cases': cases}
-                programs.append(json.loads(Path(arguments[1]).read_text()))
-                return build(entry, entry['input'])
+                program = json.loads(Path(arguments[1]).read_text())
+                programs.append(program)
+                return build(next(entry for entry in entries if entry.get('program') == program
+                                  and entry['input'] == arguments[2]), arguments[2])
             instance.tool = tool
             response = instance.prepare_cases()
         self.assertEqual(len(response['cases']), len(entries))
         self.assertEqual(response['excluded'], [])
         self.assertEqual(response['status'], 'complete')
         self.assertEqual([case['input'] for case in response['cases']], [entry['input'] for entry in entries])
-        self.assertEqual(len(calls), len(entries))
         fixed = [entry for entry in entries if 'program' in entry]
         self.assertEqual(programs, [entry['program'] for entry in fixed])
-        for (arguments, stage), entry in zip(calls, entries):
+        expected = []
+        for entry in entries:
             if 'generation' in entry:
                 request = entry['generation']
-                self.assertEqual((arguments, stage), (['aggregate-call-graph-generate', request['seed'],
-                    str(request['maxProgramNodes']), '8', '1', '1000'], 'corpus-generation'))
+                command = (['aggregate-call-graph-generate', request['seed'], str(request['maxProgramNodes']), '8', '1', '1000'],
+                           'corpus-generation')
+                if command not in expected:
+                    expected.append(command)
             else:
-                self.assertEqual((arguments[0], arguments[2:], stage),
-                    ('aggregate-call-graph-emit', [entry['input'], '1000'], 'corpus-emission'))
+                expected.append((['aggregate-call-graph-emit', entry['input'], '1000'], 'corpus-emission'))
+        self.assertEqual([(arguments if stage == 'corpus-generation' else [arguments[0], *arguments[2:]], stage)
+                          for arguments, stage in calls], expected)
+        # The twenty-four generated entries are three recipes', each generated once.
+        recipes = sum(stage == 'corpus-generation' for _, stage in calls)
+        self.assertEqual((recipes, sum('generation' in entry for entry in entries)), (3, 24))
+        self.assertEqual(instance.summary['corpus']['generationRequests'], recipes)
         summary = instance.summary
         self.assertEqual(summary['counts']['generated'], len(entries))
         self.assertEqual(summary['corpus']['acceptedIds'], [entry['id'] for entry in entries])
@@ -4586,7 +4688,8 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             config = options(directory); config.profile, config.cases = self.PROFILE, 2
             manifest = self.manifest(True)
-            manifest['cases'].append({**manifest['cases'][0], 'id': 'second', 'input': '0'})
+            manifest['cases'].append({**manifest['cases'][0], 'id': 'second', 'input': '0',
+                                      'generation': {**manifest['cases'][0]['generation'], 'seed': '2'}})
             config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(manifest))
             instance = campaign.Campaign(config); calls = 0
             def tool(_arguments, _stage):

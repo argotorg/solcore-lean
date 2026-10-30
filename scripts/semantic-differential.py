@@ -228,6 +228,41 @@ def file_digest(path: Path) -> str:
     return result.hexdigest()
 
 
+class DigestCache:
+    """Tool digests and version outputs shared by the cases of one campaign.
+
+    A file is hashed again whenever its path, device, inode, size, modification
+    or status-change time differs from those it was hashed with. Writing a file
+    always moves its status-change time, which cannot be set back, so a reused
+    digest is that of the same bytes. A version output is reused with its
+    process record, marked as reused, while its tool's file is unchanged.
+    """
+
+    def __init__(self):
+        self.digests: dict[tuple, str] = {}
+        self.versions: dict[tuple, dict] = {}
+
+    @staticmethod
+    def key(path: Path) -> tuple:
+        status = path.stat()
+        return str(path), status.st_dev, status.st_ino, status.st_size, status.st_mtime_ns, status.st_ctime_ns
+
+    def digest(self, path: Path) -> str:
+        key = self.key(path)
+        if key not in self.digests:
+            value = file_digest(path)
+            if self.key(path) != key:
+                return value  # Changed while it was read: never reused.
+            self.digests[key] = value
+        return self.digests[key]
+
+
+def tool_digest(args, path: Path) -> str:
+    """A campaign's cached digest of an unchanged tool file, otherwise a fresh one."""
+    cache = getattr(args, "digest_cache", None)
+    return file_digest(path) if cache is None else cache.digest(path)
+
+
 def resolve_backend(explicit: str | None, saved_report: dict | None = None) -> str:
     """Only an absent legacy field means O0; replay cannot change compilation."""
     if saved_report is not None and not isinstance(saved_report, dict):
@@ -1043,10 +1078,18 @@ class Runner:
     def identity(self, path: Path, version=False) -> dict:
         path = path.resolve(strict=True)
         self.guard()
-        result = {"path": str(path), "sha256": file_digest(path)}
+        result = {"path": str(path), "sha256": tool_digest(self.args, path)}
         self.guard()
         if version:
-            outcome = self.process("tool-version", [str(path), "--version"], 10)
+            cache = getattr(self.args, "digest_cache", None)
+            key = None if cache is None else cache.key(path)
+            outcome = None if cache is None else cache.versions.get(key)
+            if outcome is not None:
+                self.report["processes"].append({**outcome, "reused": True})
+            else:
+                outcome = self.process("tool-version", [str(path), "--version"], 10)
+                if cache is not None and not outcome["returncode"] and cache.key(path) == key:
+                    cache.versions[key] = outcome
             if outcome["returncode"]:
                 raise Finding("adapter-error", "tool-version", str(path))
             result["version"] = outcome["stdout"].strip()
@@ -1207,10 +1250,10 @@ def compile_identity(args, report: dict, backend: str, names: tuple[str, ...]) -
     identity = {"schema": COMPILATION_SCHEMA, "backend": backend,
         "imageOptimization": optimization_for_backend(image_backend(backend)),
         "sources": {name: file_digest(args.output / name) for name in names},
-        "library": {path.relative_to(library).as_posix(): file_digest(path) for path in sorted(library.rglob("*.sol"))},
+        "library": {path.relative_to(library).as_posix(): tool_digest(args, path) for path in sorted(library.rglob("*.sol"))},
         "upstream": str(args.upstream), "targetDir": str(args.target_dir), "python": sys.executable,
         "runnerSha256": report["tools"]["runnerSha256"], "exporters": report["tools"]["exporters"],
-        "compilers": {name: file_digest(target / name) for name in COMPILERS}}
+        "compilers": {name: tool_digest(args, target / name) for name in COMPILERS}}
     if "bundleTransportSha256" in report["tools"]:
         identity["bundleTransportSha256"] = report["tools"]["bundleTransportSha256"]
     if backend == "yul":
