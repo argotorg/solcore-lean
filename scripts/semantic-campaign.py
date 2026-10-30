@@ -174,10 +174,18 @@ RESOURCE = "inconclusive-resource"
 SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "compiler-crash", "execution-error"}
 
 
-def save_json(path: Path, value) -> None:
+# Saved cases of these profiles carry Core references of thousands of nodes,
+# about ten times larger indented than compact; their retained case files are
+# compact JSON, so that the fixed corpus fits one profile's disk budget. Digests
+# and replay are unchanged.
+COMPACT_CASE_PROFILES = ("runtime-memory-calls",)
+
+
+def save_json(path: Path, value, *, compact: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".writing")
-    temporary.write_bytes(m2.json_bytes(value))
+    temporary.write_bytes((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+                          if compact else m2.json_bytes(value))
     temporary.replace(path)
 
 
@@ -1892,7 +1900,8 @@ class Campaign:
                     raise ValueError(f"corpus helper count changed for {entry['id']}")
             cases.append(case)
             accepted_ids.append(entry["id"])
-            save_json(self.args.output / "cases" / f"{len(cases)-1:04d}.json", case)
+            save_json(self.args.output / "cases" / f"{len(cases)-1:04d}.json", case,
+                      compact=profile in COMPACT_CASE_PROFILES)
             self.summary["counts"]["generated"] = len(cases)
             coverage["generatedFeatures"] = sorted(set(coverage["generatedFeatures"]) | set(case["provenance"]["features"]))
             coverage["generatedWordLiterals"] = sorted(set(coverage["generatedWordLiterals"]) | word_literals(case["program"]), key=int)
@@ -1986,7 +1995,8 @@ class Campaign:
             expected_schema = PROFILE_SCHEMAS[self.args.profile]
             if case["schema"] != expected_schema:
                 raise ValueError("case tool returned a different generation profile")
-            save_json(self.args.output / "cases" / f"{index:04d}.json", case)
+            save_json(self.args.output / "cases" / f"{index:04d}.json", case,
+                      compact=self.args.profile in COMPACT_CASE_PROFILES)
         for index, case in enumerate(cases):
             self.guard()
             folder, report, analysis = self.execute_case(case)

@@ -2337,6 +2337,10 @@ class MemoryCallCoverageTests(unittest.TestCase):
                 instance.run()
             self.assertEqual(calls, [('memory-calls-emit', value['cases'][0]['memoryCallPlan'], ['255', '1000'],
                                       'corpus-emission')])
+            # The retained case is compact JSON of the same case.
+            retained = (Path(directory) / 'cases' / '0000.json').read_bytes()
+            self.assertEqual(json.loads(retained), memory_call_policy_case())
+            self.assertEqual(retained.count(b'\n'), 1)
             coverage = instance.summary['memoryCallCoverage']
             self.assertEqual((coverage['requiredIndices'], coverage['generatedIndices'], coverage['matchedIndices']),
                              (['word:input'], ['word:input'], ['word:input']))
@@ -2368,6 +2372,17 @@ class MemoryCallCoverageTests(unittest.TestCase):
                              (['word:input', 'word:literal'], ['word:input']))
             self.assertEqual((coverage['missingIndices'], coverage['missingPasses']), (['word:literal'], ['pair']))
             self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_only_this_profile_retains_compact_cases(self):
+        self.assertEqual(campaign.COMPACT_CASE_PROFILES, (self.PROFILE,))
+        case = memory_call_policy_case()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'case.json'
+            campaign.save_json(path, case, compact=True)
+            self.assertEqual(json.loads(path.read_bytes()), case)
+            self.assertLess(len(path.read_bytes()), len(campaign.m2.json_bytes(case)))
+            campaign.save_json(path, case)
+            self.assertEqual(path.read_bytes(), campaign.m2.json_bytes(case))
 
     def test_committed_corpus_requires_complete_coverage(self):
         manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
