@@ -6504,8 +6504,9 @@ Further state/ABI work, such as deeper nesting, static multi-word ABI elements
 (`uint256[3]` or tuples) in calldata, `bytes` beyond 256 bytes, strings,
 `bytes` return values beyond 64 bytes, returned enums, enum arguments, enum
 arrays and array returns beyond the recorded shapes and other dynamic return
-values, constructor arguments, or callers beyond the three fixed senders, needs
-its own observation, rollback, deployment and reduction definitions first.
+values, constructor arguments beyond the recorded parameters, or callers beyond
+the three fixed senders, needs its own observation, rollback, deployment and
+reduction definitions first.
 Gas-sensitive equivalence, precompiles and arbitrary external accounts keep
 their separate explicit scopes.
 
@@ -7605,6 +7606,176 @@ backends.
   - the Hull runner receives them as its constructor calldata;
   - the deployment row is compared under the selector and empty-revert rules;
   - a failed deployment ends the scenario on every path.
+
+
+**Constructor arguments.** The feasibility report above recommended the
+`stateful-constructor-arguments` profile. It is built as recommended, with no
+change to `Solcore/ContractRuntime/`, Core, the Hull importer, the backends
+or lane B's driver scripts. The adapter, campaign and suite gain additive
+branches for this profile only:
+- the case carries the arguments;
+- the EVM paths append them to the init code;
+- the Hull runner receives them as its constructor calldata, as
+  `LinkedContract.prepareDeployment` already supports;
+- the deployment row is compared;
+- a failed deployment ends the scenario on every path.
+
+The definitions were fixed before execution:
+- **Contract:** `SynthesizedConstructorArguments`, zero value, with one
+  constructor and one method `run(uint256 flags, uint256 input) returns
+  (uint256)`, selector `0x7357f5d2`.
+- **Parameters,** one of:
+  - `none`: `constructor()`, which writes 1 to slot 1;
+  - `uint256`: `constructor(a)`, which writes `a` to slot 1;
+  - `uint256,uint256`: `constructor(a, b)`, which writes `a` and `b` to
+    slots 1 and 2;
+  - `uint256,bytes`: `constructor(a, payload)` with `payload` of at most 64
+    bytes. It writes `a`, the length `L`, the first payload Word when
+    `L > 0` and the second when `L > 32` to slots 1 to 4;
+  - `uint256,enum`: `constructor(a, value)` with a user enum as for
+    `stateful-enum-arguments`. That is two to four constructors from the name
+    bank with no fields, one or two Words, the struct `ScPair` or `bytes`, at
+    most two with `bytes`; the enum is static exactly when none has `bytes`.
+    The constructor writes `a`, the one-based constructor index and the
+    decoded Words `w0, w1, w2` as for that profile to slots 1 to 5.
+
+  The plan records `{parameters, constructors, stepProgram}` under
+  `constructorArgumentsPlan`.
+- **Runtime:** each transaction computes
+  `r = step(slot 0 + input + slot 1 + ... + slot 5)`, where the sum wraps, and
+  writes `r` to slot 0. Odd flags revert with `r`; even flags return it.
+- **Deployment record:** `{a, choice, first, second, length, malformation}`.
+  - The canonical arguments are empty, `a`, `a b`, or `a`, the offset 64, `L`
+    and the payload zero-padded to whole Words.
+  - For an enum they are `a` and the body inline for a static enum, or `a`,
+    the offset 64 and the body for a dynamic one. The body is as for
+    `stateful-enum-arguments`: the tag, the fields zero-padded to the body's
+    head, then a `bytes` field's length Word and padded payload.
+  - Here `b` and the enum's field Words are `first` and `second`, and a
+    payload is the first `L` bytes of `first·K ‖ second·K`.
+- **std's decision** on the argument bytes, of size `n`, as the compiler's
+  generated copy and std's `MemoryWordReader` take it:
+  - reading starts at 0, with no up-front head check;
+  - each Word read needs its 32 bytes, and each advance must stay inside the
+    arguments;
+  - the order is `a`, then the offset Word at 32 and the `bytes` length Word
+    and length that must fit after it, or the enum's tag and fields as for
+    `stateful-enum-arguments`, relative to the body at 32 or at the offset
+    `o <= n`;
+  - a failure is `ABIInputTruncated()` (`0x08638556`), and an unknown tag,
+    compared before any field, is empty revert data;
+  - trailing and unread bytes are ignored, and parameterless constructors
+    read nothing.
+- **Malformations,** each applied where it fits, with its generation bank,
+  for a canonical size `n`:
+  - `truncate`: cuts at 0, at each Word boundary below `n` and one byte
+    before it, and at `n - 1`;
+  - `trailing` (also the junk after a parameterless constructor): 1, 31, 32
+    or 33 bytes of the zeros, ones and ramp patterns;
+  - `offset`, the Word at 32 of a `bytes` value or a dynamic enum: 0 and 32,
+    which point into the head, then `n - 31`, `n`, `2^255` and `2^256 - 32`;
+  - `length`, the `bytes` length Word of the parameter or of an enum's
+    `bytes` constructor: 0, `L - 1`, `L + 1`, the longest that fits, one
+    more, and `2^256 - 1`;
+  - `tag`, the enum's tag: 0, the tag plus one, the tag xor `2^255` and
+    `2^256 - 1`;
+  - `tagCut`: those unknown tags with the arguments cut right after the tag;
+  - `tail`, a dynamic enum's `bytes` tail offset: 0, 32, one byte past the
+    end and `2^256 - 1`;
+  - `narrow`, a static enum cut to the chosen constructor's head when it is
+    narrower than the widest, which for a constructor without fields is its
+    tag alone.
+- **Deployment outcomes:** deployed, `0x08638556` or empty data. Each case
+  records the prescribed `stdRejection`, computed by a Lean byte-level model
+  of std's decision, and the adapter recomputes it with its own Python model.
+- **Original Core:**
+  - The initializer (`core-constructor-argument-initializer-v1`, entry
+    `wordOutcomeV1`) takes std's decision on its input data, the argument
+    bytes, through `inputDataSize` and `inputDataWordBE?`, with Lean's
+    Keccak-256 tags.
+  - It writes the record to slots 1 to 5 and returns the Word zero, or
+    reverts with the error selector Word, or the Word zero for empty data.
+  - The deployment phase runs it as a top-level invocation and on return
+    installs the runtime contract (`core-constructor-argument-runtime-v1`)
+    with `Account.withCode`, which keeps the storage. A revert installs
+    nothing.
+- **Node budget:** the runtime shell takes 69 nodes, so the default of 384
+  leaves 315 for the step.
+  - The initializer lies outside the budget: 76 nodes for no parameters, 96
+    and 101 for the Words, 237 for `bytes`, 138 to 278 for a static enum and
+    343 to 611 for a dynamic one.
+  - The runtime is bounded by 512 nodes and the initializer by 1,024.
+- **Generation:** a shape stream and a sequence stream, each from SplitMix64's
+  finalizer of the seed xor its domain.
+  - **Parameters:** `none`, `uint256` and `uint256,uint256` with probability
+    1/8 each, `uint256,bytes` with 2/8 and an enum with 3/8, its shape drawn
+    as for `stateful-enum-arguments`.
+  - **Record:** `a`, `first` and `second` from the boundary bank; a uniform
+    choice; a `bytes` length from the bank 0, 1, 31, 32, 33, 63 and 64 with
+    probability one half, otherwise uniform from 0 to 64.
+  - **Malformation:** canonical with probability one third; otherwise a kind
+    uniformly among those that apply, then an entry of its bank uniformly.
+  - **Sequence:** per block of three, three flags and three inputs from the
+    boundary bank, with the parities of one of the four completion patterns.
+  - **Transactions:** a scenario has up to eight, and none when the
+    deployment is rejected, since a failed deployment ends the scenario.
+
+  Random runs generate the step with G0 revision three.
+- **Observations:**
+  - **Deployment row:** the status, std's revert data, slots 0 to 5 and the
+    whole committed storage.
+    - Original Core's revert Word maps to std's selector or to `0x` by the
+      selector and empty-revert rules, exactly when the prescribed rejection
+      says so.
+    - A deployed record must be the adapter's own decoding of the arguments.
+  - **Transactions:** each one's status, whole return data, slots 0 to 5 and
+    whole committed storage, per prefix. Slots 1 to 5 must keep the record,
+    a return must carry the committed slot 0, and a revert one Word with the
+    prior slots.
+  - **Failed deployment:** the scenario ends with that row. The EVM path
+    binds the would-be creation address, since Anvil reports none.
+- **Exclusions, in order:**
+  - a node budget too small for the shell or above 512;
+  - the step's own exclusions, and a step whose boundary outputs agree;
+  - Core fuel exhaustion (resource);
+  - a history that does not follow its prescribed outcomes.
+- **Reductions,** each sealed and strictly smaller in transactions, then the
+  parameters (`none`, `uint256`, `uint256,uint256`, `uint256,bytes`, then
+  the enum), the enum's shape, the malformation's bank position, the length,
+  program size and the values:
+  - one-transaction removals;
+  - the malformation dropped, or an earlier entry of its bank;
+  - a shorter `bytes` length: zero or half;
+  - simpler parameters: a static enum, `uint256,bytes` and
+    `uint256,uint256` become `uint256`, which becomes `none`. A malformation
+    that no longer applies is dropped, and a rejected deployment keeps no
+    transactions;
+  - the enum's unused constructors dropped while two remain, and narrower
+    fields as for `stateful-enum-arguments`;
+  - step reductions, zero record Words, then the flags' parity bit and the
+    input's low byte.
+- **Campaign dimensions,** with distinct names to stay additive:
+  `ConstructorParameters`, `ConstructorMalformations`, `ConstructorOutcomes`,
+  `ConstructorAccepted`, `ConstructorBytesLengths`, `ConstructorEnumFields`,
+  `ConstructorCarries` and `ConstructorNodeBudgets`.
+- **Fixed corpus:** imported entries over the imported steps of
+  `stateful-enum-arguments`, and generated seeds at both budgets. It must
+  cover:
+  - every parameter kind, static and dynamic enums apart;
+  - every malformation kind and all three outcomes, and malformations that
+    std accepted;
+  - the bank's `bytes` lengths and every decoded enum field kind;
+  - runtime carries after a committed transaction and past a revert;
+  - both node budgets.
+- **Golden cases:** rows written out as hexadecimal text by an independent
+  Python model of std's decision, covering every parameter kind with
+  canonical and malformed arguments and the order of std's checks. Original
+  Core under both rules and the Lean model must give them exactly.
+
+Out of scope: value-bearing deployments, whose non-payable check reverts with
+`0xb5988ea3`; constructors with more parameters or other types; nested
+creation with arguments; init code shorter than the deploy object; and more
+than one constructor.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
