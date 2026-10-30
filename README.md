@@ -171,7 +171,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-five pure profiles with `--backend yul`, and for the
+available for the twenty-six pure profiles with `--backend yul`, and for the
 twenty-seven storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
@@ -183,7 +183,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-four-profile suite runs locally with shared time and disk limits.
+The same fifty-five-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -271,6 +271,16 @@ is std's `OutOfBounds()` revert, compared exactly. All 232 fixed cases and 96
 random cases of eight functions match on O2 and Yul. Sonatina O0 returns other
 Words for 4 fixed and 8 random cases whose loops use memory values, a recorded
 finding ([Solcore memory values](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-values)).
+The `runtime-memory-calls` profile passes those values across calls in
+straight-line code: one to three helpers read them, write through them and
+return them, a slice of them or a fresh copy, pack them into a pair or take
+them out of a pair, std sum or user enum, and call earlier helpers; generic
+helpers over std's memory traits run at more than one type, and function
+values and closures carry them. Its original Core inlines every call into the
+same byte-list model, so a returned argument is the caller's value and a
+written argument is seen by the caller. All 328 fixed cases and 96 random
+cases of eight functions match on O0, O2 and Yul
+([Solcore memory calls](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-calls)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -292,7 +302,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the sixteen profiles whose functions can be identities they
+inputs, and in the seventeen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
