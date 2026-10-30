@@ -2752,7 +2752,11 @@ first); they now draw them from mixed streams too. Generated corpus entries
 keep their seeds where coverage allows, and their histories are recomputed
 without the profiles' Core contracts; the
 [roadmap](../docs/design/next-implementation-roadmap.md) has the
-measurements and the replaced entries.
+measurements and the replaced entries. On `3ba476f2c` with every script, corpus
+and tool frozen, the fixed corpora matched on O0 (all twenty-eight stateful
+profiles, 404 scenarios and 1,097 prefixes), on O2 and on Yul, and the random
+suites from root seed `20261113` matched on O0 and Yul; on O2 two cases crashed
+Sonatina's signextend folding, a recorded upstream symptom.
 
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions

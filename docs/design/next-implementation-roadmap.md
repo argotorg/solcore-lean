@@ -7962,6 +7962,84 @@ The definitions, fixed before any code change:
   under the new version. A fixed corpus keeps its scenario and prefix counts
   unless an entry is added or removed.
 
+**Results.** The checks before any matrix:
+- **Measurement:** on the same windows, 269 of the 271 first-block draws
+  (with the storage and calls inputs and the methods' step-seed digits) kept
+  every value in every window, against 231 before; the two others, the long
+  bytes' first two lengths, took 11 of 12 values in window C. One draw in one
+  window was flagged, against 211 draws before. The most repeats fell from 63
+  to 39 of 63 and the most frequent fixed step from 63 to 38, both for
+  two-valued draws, whose expectation is 31.5. The fewest distinct values of
+  a seeded payload byte over 64 seeds rose from 13 to 51 (`bytes`) and from 1
+  to 49 (long bytes).
+- **Models:** before the code change, the ten direct models reproduced all 125
+  recorded histories of their corpora (and the 24 declared slot lists of the
+  mapping and ledger), and the builders of the other nine corpora all 39
+  recorded generated histories.
+- **Corpora:** every generated entry's history changed, and every imported
+  entry's stayed equal to its model. Coverage stayed complete in 17 of the 22
+  corpora. Seven entries were replaced, each by the smallest seed above its
+  own at the same budget that restores it, in corpus order:
+  - `stateful-dynamic-array`: `generated-948` by 950, for the pattern
+    `returned,returned,returned`;
+  - `stateful-malformed-bytes`: `generated-1` by 96, for
+    `returned,returned,reverted`;
+  - `stateful-logs`: `generated-119` by 1173, for the step features `sgt`,
+    `shl`, `shr` and `div`, which the site draws had moved out of the steps'
+    budgets;
+  - `stateful-storage-rollback`: `generated-1` by 12, for the input 7, which
+    only its odd second transaction can carry;
+  - `stateful-methods`: `generated-0`, `generated-1` and `generated-2` by 5,
+    9 and 322, for the three missing patterns with a revert first, at least
+    three entries since each adds one pattern.
+
+  No corpus changed its scenario or transaction count. Four totals changed:
+  the log corpus commits 29 logs instead of 27, the mapping and ledger
+  corpora declare 59 and 47 slots instead of 55 and 50, and the Keccak-loop
+  corpora commit 79 and 139 logs instead of 77 and 137. The mapping and
+  ledger slots also equal Foundry's `cast keccak`.
+- **Tamper checks:** twelve tests relied on a property of a generated case
+  that the new streams could change. A first gate failed on one: the
+  long-bytes cases test replaced a payload with `0x`, which the mixed stream
+  had made seed 0's first payload. The eight status flips (seven corpus tests
+  and call value), the two payload replacements and the amount replacement
+  now write a value that differs from the current one, and the ledger test
+  requires a four-transaction pattern that no fixed corpus can contain, as
+  the later corpus tests do.
+- **Gate** on the final tree: the kernel check, `lake build` (10,296 jobs), 37
+  native tools prepared offline, `lake test`, 883 Python tests, the 19 corpus
+  validator runs and the diff check.
+
+The matrices ran on `3ba476f2c` with 158 digests frozen: the 37 native tools,
+every script and corpus, the parity manifests, solc, Anvil, cast, the Rust
+driver, the code-image exporter and both directive tools. None changed during
+any run, and all 2,005 case results record that revision with no tracked
+difference.
+- **Fixed corpora:** O0 matched all twenty-eight stateful corpora, 404
+  scenarios and 1,097 prefixes with complete coverage, in 2,718 seconds, so
+  no scenario or prefix count changed. O2 matched the twenty-two changed ones,
+  304 scenarios and 832 prefixes, in 2,020 seconds, and Yul the twenty
+  changed storage-family ones, 276 scenarios and 755 prefixes, in 2,739.
+- **Random suites:** root seed `20261113`, sixteen eight-transaction
+  scenarios per changed profile at the default budgets, G0 revision three:
+  - O0 matched 352 scenarios and 2,816 prefixes in 2,563 seconds and Yul 320
+    and 2,560 in 3,508;
+  - O2 matched 347 of 352 scenarios and 2,776 of 2,816 prefixes in 2,572
+    seconds. Two cases crashed Sonatina's O2 code-image export with
+    `arithmetic operation overflow`, a recorded upstream symptom whose replay
+    names the signextend folding of the comptime and dynamic-array
+    occurrences: one keyed-storage and one ADT-storage case. The ADT-storage
+    reduction then exceeded the tool-output limit on its shrink candidates, so
+    that campaign left three of its sixteen cases unexecuted;
+  - generation excluded 10 seeds on Sonatina and 7 on Yul, ordinary budget and
+    operator exclusions, and the cases were identical on the three backends;
+  - an independent Python recomputation of the mixed streams equals the
+    recorded first-block choices of the nineteen profiles whose choices do not
+    depend on a further stream.
+
+There was no mismatch. The crashes are recorded in `questions.md` as seen
+again. An existing fuzz state needs `--accept-new-epoch`.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
