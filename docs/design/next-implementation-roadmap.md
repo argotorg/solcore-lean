@@ -8654,6 +8654,95 @@ Out of scope:
 - nonzero values, logs, more than one call, nested depth and creation;
 - other return types, and child reverts of other than 32 bytes.
 
+**Results.** The checks before any matrix:
+- **Convention:** the laws above are proved without `sorry`, axioms or
+  `native_decide`, and no earlier statement changed.
+  `Solcore/Test/ContractCallResume.lean` decodes raw return data as written
+  out, finds a word call to a raw child unavailable, and runs a small parent
+  through the composition: a returned child commits and delivers its bytes, a
+  reverted one leaves the call phase's world and delivers its revert Word, a
+  parent revert commits nothing, a target that does not resolve fails with no
+  data, and the parent's code and every balance stay.
+- **Golden tests:** the probe's independent Python model wrote 58 rows as
+  hexadecimal text, the 39 raw return data of its bank and 19 canonical
+  encodings, five of them decoded as another type: 29 records, 24 rejections
+  with `0x08638556` and 5 with empty data. The Lean byte-level model and
+  original Core's resume phase, under the selector and empty-revert rules,
+  gave every row exactly; changed rows failed.
+- **Cases test:** original Core through the convention equalled the Lean
+  model, with every transaction's prescribed rejection, on 40 scenarios of
+  eight transactions under G0 revision three at 384 nodes, 24 of three under
+  revision one, and 12 of four at 512.
+  - Every typed child delivered exactly the bytes of its canonical encoding,
+    every case and the reductions of twelve cases replayed, and the node
+    counts were those fixed above.
+  - Generation drew every kind, static and dynamic enums apart, and the
+    outcomes returned, reverted, `0x08638556` and `0x`.
+  - The draws over 256 seeds reached each of the 22 pairs of a kind and a
+    delivery that applies to it, each of the 10 pairs of a kind and a std
+    decision it can have, every bank length and a uniform partial-Word length,
+    with every child's shell inside 58 to 114 nodes.
+- **Adapter:** its own Python model of the child's bytes and std's decision
+  gave the prescribed rejection of all 1,600 transactions of 200 generated
+  cases (476 accepted, 233 `0x08638556`, 61 empty and 830 child reverts, where
+  no decoding runs) and of the 71 transactions of the 39 imported corpus
+  entries. Its tests pin every golden decision, the child's bytes under each
+  malformation, the selector and empty-revert rules only where prescribed, the
+  protocol and rollback on every path, and the Hull history's schema.
+- **Corpus test:** it replayed 45 scenarios and 89 transactions with every
+  original Core history equal to the model's, and refused tampered entries.
+- **Hull runner:** `LinkedContract.compileObject` builds its code catalog from
+  its own program only, so the new runner links the parent with the child's
+  linked runtime added to that catalog, as one compilation of both sources
+  would supply. The shared linker is unchanged.
+- **Smoke runs,** unfrozen, before the profile commit:
+  - fixed O0 and O2 each matched 45 scenarios and 89 prefixes with complete
+    coverage, in 513 and 599 seconds;
+  - four random O0 cases matched, and 32 prefixes;
+  - a synthetic output difference on imported Hull at `tx-1` of
+    `quad-trailing` (a tuple of four Words with 33 trailing ramp bytes, three
+    transactions and the `fresh-cell-arbitrary-entry` step) reduced in 11
+    attempts, 10 accepted, to a typed tuple of two Words, that one
+    transaction with input 0 and a step 24% smaller as compact JSON.
+- **Gate** on the tree committed as `f6419f821`:
+  - the kernel check and `lake build` (10,317 jobs);
+  - `lake test` in 28 minutes, with the 18 corpus validators and the
+    chunked-generation check beside it in 7;
+  - 887 Python tests in 15 suites and the diff check;
+  - 40 native tools prepared offline and verified on the commit.
+
+The matrices ran on `f6419f821` with 191 digests frozen: every tracked script
+under `scripts` and `Tests/scripts`, the 40 native tools, solc, Anvil, and the
+Rust driver, code-image exporter and directive tools. None changed during any
+run, and all 598 case results record that revision with no tracked
+difference.
+- **Fixed corpora:**
+  - O0: all thirty stateful corpora matched, 489 scenarios and 1,239
+    prefixes, in 3,432 seconds. The twenty-nine earlier ones kept their 444
+    scenarios and 1,150 prefixes, and the new corpus took 513 seconds.
+  - The new corpus matched its 45 scenarios and 89 prefixes with complete
+    coverage on O0 and O2, O2 in 600 seconds.
+- **Random suites:** root seed `20261041` (derived seed
+  `1330793226701288047`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0 and O2. All four runs matched 16 scenarios
+  and 128 prefixes with complete coverage, in 200 to 213 seconds.
+  - No attempt was excluded at either budget.
+  - **Kinds:** 6 tuples (2 of two Words, 1 of three and 3 of four), 4 `bytes`
+    values, and 2 static and 4 dynamic enums.
+  - **Deliveries:** 4 typed, 6 cut, 3 with trailing bytes, 2 with an unknown
+    tag and 1 with a `bytes` length into the padding.
+  - **Children:** 60 returned and 68 reverted. std accepted 28 of the returns,
+    among them trailing bytes and the length into the padding, and rejected
+    32, 25 with `0x08638556` and 7 with empty data.
+  - **Parents:** 49 returned and 79 reverted, so every rollback pattern came:
+    28 child reverts under a returned parent, 40 under a reverted one, 7
+    parent reverts after an accepted return, and the 32 rejections.
+  - **Agreement across runs:** the cases were identical on O0 and O2 at each
+    budget. Both budgets drew the same plans and inputs for all 16 seeds,
+    with the step differing in 14.
+- **Findings:** none, no mismatch and no upstream defect, and `questions.md`
+  is untouched.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

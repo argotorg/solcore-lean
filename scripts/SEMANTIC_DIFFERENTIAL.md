@@ -6906,6 +6906,36 @@ python3 scripts/semantic-suite.py --mode random --profile stateful-call-returns 
   std's decision and the source model, in which each step runs alone in
   Core. The corpus check compares it with the convention's actual history.
 
+### Results
+
+The matrices ran on `f6419f821` with scripts, native tools, solc, Anvil, and
+the Rust driver, code-image exporter and directive tools frozen.
+- **Fixed corpus:** all 45 scenarios and 89 prefixes matched with complete
+  coverage on Sonatina O0 and O2, O0 in 513 seconds and O2 in 600.
+  - On O0 all thirty stateful corpora matched, 489 scenarios and 1,239
+    prefixes.
+  - The twenty-nine others kept their 444 scenarios and 1,150 prefixes.
+- **Random suites:** root seed `20261041`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on both Sonatina levels.
+  Each matched 16 scenarios and 128 prefixes with complete coverage, in 200
+  to 213 seconds.
+  - No attempt was excluded.
+  - Every kind came: 6 tuples, 4 `bytes` values, 2 static and 4 dynamic
+    enums, 4 of them typed and 12 raw.
+  - Of 60 returned children, std accepted 28, among them trailing bytes and a
+    `bytes` length into the padding, and rejected 25 with `0x08638556` and
+    7 with empty data. 68 children reverted.
+  - 49 parents returned and 79 reverted.
+  - The cases were identical on both levels at each budget.
+- **Before the matrices:**
+  - Unfrozen smoke runs matched the corpus on O0 and O2 and four random O0
+    cases.
+  - A synthetic output difference on imported Hull at `tx-1` of the
+    `quad-trailing` entry reduced in 11 attempts, 10 accepted, to a typed
+    tuple of two Words and that one transaction.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-five
