@@ -172,7 +172,7 @@ gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
 available for the twenty-four pure profiles with `--backend yul`, and for the
-twenty-five storage-family profiles when they are selected. Its EVM bytes are
+twenty-six storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -183,7 +183,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-one-profile suite runs locally with shared time and disk limits.
+The same fifty-two-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -609,15 +609,29 @@ scenarios and sixteen random scenarios at each of two node budgets match on
 both Sonatina levels and on Yul. See
 [enum arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-enum-arrays).
 
-All twenty-seven stateful profiles also compare the installed contracts' whole
+The array-return profile's method returns std's ABI encoding of a memory array
+of zero to three `uint256`, `bytes4`, `bytes` or `uint256[]` elements, and all
+three paths compare the whole return data: the offset and the count, inline
+Words or an offset table, and each `bytes` or inner array's tail, with std's
+zero padding over dirty memory past each `bytes` length. The pinned compiler
+refuses a declared array output, so the method declares a Word return and ends
+as std's dispatcher does, with `abi_encode` and the `return_` opcode. The
+element type is fixed per contract, while the count and the inner lengths are
+read at run time from the arguments, so no optimizer folds std's encoder
+loops. Original Core builds every Word itself and returns them through
+`wordTupleOutcomeV1`. The 23 fixed scenarios and sixteen random scenarios at
+each of two node budgets match on both Sonatina levels and on Yul. See
+[returned arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-returned-arrays).
+
+All twenty-eight stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all twenty-seven profiles,
-381 scenarios and 1,042 transaction prefixes, matched on Sonatina O0, and every
+whole storage unchanged. The latest fixed run of all twenty-eight profiles,
+404 scenarios and 1,097 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See

@@ -27,7 +27,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-and the directive extractor and resolver offline, and the thirty-six native Lean
+and the directive extractor and resolver offline, and the thirty-seven native Lean
 tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
@@ -89,8 +89,8 @@ cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
 `--backend yul` selects the twenty-four pure profiles by default (1,298 fixed
-cases). The twenty-five storage-family profiles also run on Yul when `--profile`
-selects them, with 353 fixed scenarios
+cases). The twenty-six storage-family profiles also run on Yul when `--profile`
+selects them, with 376 fixed scenarios
 ([storage-family contracts on Yul](SEMANTIC_DIFFERENTIAL.md#compare-storage-family-contracts-on-yul));
 selecting either call profile fails before execution. Each random Yul run of
 the default selection with `--cases 16` requests 384 cases. The shared
@@ -99,9 +99,9 @@ separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 1,679 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 1,679 | Sonatina O2 | Sonatina O2 |
-| `yul` | 1,298 pure; 353 storage-family when selected | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 1,702 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 1,702 | Sonatina O2 | Sonatina O2 |
+| `yul` | 1,298 pure; 376 storage-family when selected | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure and
@@ -110,7 +110,7 @@ those observations do not depend on code layout; code-dependent observations
 and the two call profiles remain unsupported on Yul. Reports record this
 distinction in `pathBackends`.
 
-The default selection is all fifty-one profiles: twenty-four pure profiles,
+The default selection is all fifty-two profiles: twenty-four pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
 mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
@@ -122,9 +122,11 @@ logs in inline Yul, a method that returns a static tuple of two to four Words,
 a method that returns a `bytes` value of zero to 64 bytes, enum and struct
 values in contract fields and behind mapping keys, a method that returns a
 value of a user-defined enum of two to four constructors, a method that
-takes one, canonically encoded or malformed, and a method that takes a calldata
-array of up to three of them and two indices, canonically encoded or malformed.
-Fixed mode runs all 1,679 manifest cases or scenarios. It rejects `--cases`,
+takes one, canonically encoded or malformed, a method that takes a calldata
+array of up to three of them and two indices, canonically encoded or malformed,
+and a method that returns std's encoding of a memory array of up to three
+`uint256`, `bytes4`, `bytes` or `uint256[]` elements.
+Fixed mode runs all 1,702 manifest cases or scenarios. It rejects `--cases`,
 `--functions` and `--nodes` overrides rather than silently truncating required
 coverage. Repeat `--profile NAME` to select a smaller suite.
 
@@ -199,12 +201,12 @@ python3 scripts/semantic-fuzz.py label --state .upstream/semantic-fuzz SIGNATURE
 
 Iteration `i` runs the suite in random mode once per backend, with root seed
 `base + i`, so the backends compare the same generated programs. All three
-backends run by default. On Yul the driver runs the pure and the twenty-five
+backends run by default. On Yul the driver runs the pure and the twenty-six
 storage-family profiles, whether profiles are configured or not, and never the
 two call profiles. It selects the storage family explicitly, since the suite's
 own Yul default is the pure profiles. With the default sixteen cases, this adds
-400 eight-transaction scenarios to each Yul iteration, about 4,450 seconds at
-the default node budgets and 4,600 at doubled ones, estimated from each
+416 eight-transaction scenarios to each Yul iteration, about 4,630 seconds at
+the default node budgets and 4,780 at doubled ones, estimated from each
 profile's own Yul runs. No storage-family profile took more than 345 seconds
 of its 900. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
