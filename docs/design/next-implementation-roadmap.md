@@ -8743,6 +8743,60 @@ difference.
 - **Findings:** none, no mismatch and no upstream defect, and `questions.md`
   is untouched.
 
+**Known mismatch classes in the fuzz registry: definitions.** A mismatch's key
+is its reduced program. So a recorded semantic defect that random plans keep
+drawing registers new signatures at every occurrence. The case in point is
+Sonatina O0's on the `runtime-memory-values` profile ("Sonatina O0 returns
+other Words for loops that write std memory values" in `questions.md`). On
+main `2575105be`, four O0 driver iterations over that profile alone, from root
+seed 1 with eight whole functions each, registered 25 occurrences as 24 new
+signatures. A mismatch class names one recorded semantic defect narrowly:
+- its backend, its profile and the category `semantic-mismatch`;
+- the stage: the fingerprint's, none for this class, since every path ran to
+  its end;
+- which paths disagree with which: exactly `directCore/rustEvm` and
+  `importedHull/rustEvm`. So the EVM path disagrees with original Core and
+  with Hull, which agree. The class also fixes the shapes, every path
+  returning a Word, and requires a real, not synthetic, mismatch;
+- a structural property shared by the recorded reductions, checked on the
+  occurrence's final plan: the reduced plan, or the original when no
+  reduction step was accepted.
+
+The first class is Sonatina O0's on `runtime-memory-values`. Its property is
+a loop of the single form whose body first observes a bytes value or slice
+(its length, a Word, a byte or its hash) and later takes a slice or writes to
+a bytes value or slice, inline or through a helper, at either width. Every
+real occurrence's final plan has it: lane A's twelve in the main checkout's
+`.upstream/semantic-unit15-memory-values/matrix-35925b5f8/` and the 25 of the
+live run above, reduced or not. In particular:
+- the fixed corpus's reduction kept `MemorySize.len(sc_b0)` and then
+  `slice_(sc_s0, 12)`;
+- the random suite's kept `MemorySize.len(sc_b1)` and then
+  `sc_put8(sc_b1, 0, sc_x)`;
+- partial reductions read a hash or a byte before the slice, or a Word before
+  the helper write;
+- the live run's read a length or a hash before an inline byte write, in
+  loops that also build a bytes value.
+
+The probe's recorded matches in `questions.md` fall outside the property: a
+write alone in a loop, a value built and read without a write, array writes,
+and helper writes outside loops. No recorded occurrence has a nested loop, so
+nested loops stay outside too.
+
+Registration:
+- An occurrence in a class counts under the class's signature (its backend,
+  category, stage, profile and class name), with its backends and profiles,
+  first and last occurrence, recent occurrences and the first `--examples`
+  archives. Each brief names the occurrence's own program. The occurrence
+  shows as known with the class's label, never as new.
+- Every other mismatch stays new under its reduced-program key, including
+  the same pattern on O2 or Yul, another profile on O0, Core and Hull
+  disagreeing, other path shapes, and a final plan without the property.
+- Existing signatures keep their keys. A state keeps the program signatures
+  it registered for this defect; later occurrences count under the class.
+- The epoch hashes the readiness receipt and the harness scripts other than
+  the driver and its tests, so the classes alone need no new epoch.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
