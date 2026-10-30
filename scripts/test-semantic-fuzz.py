@@ -111,6 +111,104 @@ UPSTREAM_OCCURRENCES = [
      STACK_TOO_DEEP, None),
 ]
 
+# Real occurrences of Sonatina O0's recorded defect "Sonatina O0 returns other Words
+# for loops that write std memory values" (questions.md), all with this fingerprint:
+# lane A's fixed and random O0 suites of runtime-memory-values at 35925b5f8, and a
+# fuzz-driver run on O0 alone from root seed 1 with eight functions per iteration on
+# main 2575105be, whose iteration 0 repeats lane A's random suite. Each row is one
+# final plan's steps, reduced or the original, with the cases that ended at it.
+MEMORY_LOOP_FINGERPRINT = {"backend": "sonatina-o0", "category": "semantic-mismatch",
+                           "disagreeingPairs": ["directCore/rustEvm", "importedHull/rustEvm"],
+                           "pathShapes": {"directCore": {"payload": "word", "status": "returned"},
+                                          "importedHull": {"payload": "word", "status": "returned"},
+                                          "rustEvm": {"payload": "word", "status": "returned"}},
+                           "stage": None, "synthetic": False}
+MEMORY_LOOP_PLANS = [
+    ("lane A fixed O0 cases 185, 187 (reduced)", 2,
+     '[{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"action":{"cut":"take","kind":"slice","length":26,"source":"sc_b0"}},{"body":[{"access":{"access":"length"},'
+     '"constant":3,"fold":"add","kind":"observe","value":"sc_b0"},{"cut":"drop","kind":"slice","source":"sc_s0",'
+     '"start":12}],"loop":{"form":"single","mask":1}}]'),
+    ("lane A fixed O0 case 189 (reduced)", 1,
+     '[{"action":{"elements":[{"constant":118,"operand":"mul"},{"operand":"acc"}],"form":"literal","kind":"array"}},'
+     '{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"action":{"cut":"take","kind":"slice","length":26,"source":"sc_b0"}},{"body":[{"access":{"access":"hash"},'
+     '"constant":11,"fold":"add","kind":"observe","value":"sc_s0"},{"access":{"access":"byte",'
+     '"index":{"index":"literal","value":22}},"constant":13,"fold":"add","kind":"observe","value":"sc_b0"},'
+     '{"cut":"drop","kind":"slice","source":"sc_s0","start":12}],"loop":{"form":"single","mask":1}}]'),
+    ("lane A fixed O0 case 191 (original)", 1,
+     '[{"action":{"elements":[{"constant":118,"operand":"mul"},{"operand":"acc"}],"form":"literal","kind":"array"}},'
+     '{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"action":{"cut":"take","kind":"slice","length":26,"source":"sc_b0"}},{"action":{"access":{"access":"hash"},'
+     '"constant":31,"fold":"add","kind":"observe","value":"sc_b0"}},{"action":{"access":{"access":"element",'
+     '"form":"index","index":{"index":"input","modulus":2,"shift":3}},"constant":9,"fold":"xor","kind":"observe",'
+     '"value":"sc_a0"}},{"body":[{"access":{"access":"hash"},"constant":11,"fold":"add","kind":"observe",'
+     '"value":"sc_s0"},{"access":{"access":"byte","index":{"index":"literal","value":22}},"constant":13,"fold":"add",'
+     '"kind":"observe","value":"sc_b0"},{"cut":"drop","kind":"slice","source":"sc_s0","start":12}],'
+     '"loop":{"form":"single","mask":1}}]'),
+    ("lane A random O0 case 25; driver iteration 0 case 25 (reduced)", 2,
+     '[{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"action":{"kind":"alias","source":"sc_b0"}},{"body":[{"access":{"access":"length"},"constant":3,"fold":"add",'
+     '"kind":"observe","value":"sc_b1"},{"form":"helper","index":{"index":"literal","value":0},"kind":"write",'
+     '"target":"sc_b1","value":{"operand":"input"},"width":"byte"}],"loop":{"form":"single","mask":1}}]'),
+    ("lane A random O0 case 26; driver iteration 0 case 26 (reduced)", 2,
+     '[{"action":{"build":"concat","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"},{"count":32,'
+     '"part":"zeros"}]}},{"action":{"kind":"alias","source":"sc_b0"}},{"body":[{"access":{"access":"word",'
+     '"index":{"index":"literal","value":9}},"constant":13,"fold":"add","kind":"observe","value":"sc_b1"},'
+     '{"form":"helper","index":{"index":"literal","value":58},"kind":"write","target":"sc_b1",'
+     '"value":{"constant":145,"operand":"xor"},"width":"byte"}],"loop":{"form":"single","mask":3}},'
+     '{"action":{"elements":[{"operand":"acc"},{"constant":252,"operand":"mul"}],"form":"literal","kind":"array"}}]'),
+    ("lane A random O0 cases 27, 29, 31, 33, 34, 35; driver iteration 0 cases 27, 29, 31, 33, 34, 35 (original)", 12,
+     '[{"action":{"build":"concat","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"},{"count":32,'
+     '"part":"zeros"}]}},{"action":{"kind":"alias","source":"sc_b0"}},{"action":{"access":{"access":"length"},'
+     '"constant":17,"fold":"xor","kind":"observe","value":"sc_b0"}},{"body":[{"access":{"access":"word",'
+     '"index":{"index":"literal","value":9}},"constant":13,"fold":"add","kind":"observe","value":"sc_b1"},'
+     '{"form":"helper","index":{"index":"literal","value":58},"kind":"write","target":"sc_b1",'
+     '"value":{"constant":145,"operand":"xor"},"width":"byte"}],"loop":{"form":"single","mask":3}},'
+     '{"action":{"elements":[{"constant":211,"operand":"mul"}],"form":"allocated","kind":"array"}},'
+     '{"action":{"elements":[{"operand":"acc"},{"constant":252,"operand":"mul"}],"form":"literal","kind":"array"}}]'),
+    ("driver iteration 1 case 25 (reduced)", 1,
+     '[{"body":[{"build":"concat","kind":"bytes","parts":[{"count":32,"part":"zeros"},{"count":0,"part":"zeros"}]},'
+     '{"access":{"access":"length"},"constant":3,"fold":"add","kind":"observe","value":"sc_b0"},{"form":"inline",'
+     '"index":{"index":"literal","value":0},"kind":"write","target":"sc_b0","value":{"operand":"input"},'
+     '"width":"byte"}],"loop":{"form":"single","mask":1}}]'),
+    ("driver iteration 3 cases 51, 53, 55, 56, 57, 59 (original)", 6,
+     '[{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"body":[{"access":{"access":"hash"},"constant":31,"fold":"add","kind":"observe","value":"sc_b0"},'
+     '{"form":"inline","index":{"index":"literal","value":20},"kind":"write","target":"sc_b0",'
+     '"value":{"constant":187,"operand":"xor"},"width":"byte"},{"build":"to_bytes","kind":"bytes",'
+     '"parts":[{"count":0,"part":"zeros"}]}],"loop":{"form":"single","mask":3}},{"action":{"access":{"access":"byte",'
+     '"index":{"index":"literal","value":4}},"constant":31,"fold":"add","kind":"observe","value":"sc_b0"}}]'),
+    ("driver iteration 1 cases 27, 29, 31, 32, 33, 34, 35 (original)", 7,
+     '[{"body":[{"build":"concat","kind":"bytes","parts":[{"count":32,"part":"zeros"},{"count":0,"part":"zeros"}]},'
+     '{"access":{"access":"length"},"constant":3,"fold":"xor","kind":"observe","value":"sc_b0"},{"form":"inline",'
+     '"index":{"index":"literal","value":11},"kind":"write","target":"sc_b0","value":{"operand":"counter"},'
+     '"width":"byte"}],"loop":{"form":"single","mask":7}}]'),
+    ("driver iteration 3 case 50 (reduced)", 1,
+     '[{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"body":[{"access":{"access":"hash"},"constant":31,"fold":"add","kind":"observe","value":"sc_b0"},'
+     '{"form":"inline","index":{"index":"literal","value":20},"kind":"write","target":"sc_b0",'
+     '"value":{"constant":187,"operand":"xor"},"width":"byte"},{"build":"to_bytes","kind":"bytes",'
+     '"parts":[{"count":0,"part":"zeros"}]}],"loop":{"form":"single","mask":3}}]'),
+    ("driver iteration 1 case 26 (reduced)", 1,
+     '[{"body":[{"build":"concat","kind":"bytes","parts":[{"count":32,"part":"zeros"},{"count":0,"part":"zeros"}]},'
+     '{"access":{"access":"length"},"constant":3,"fold":"add","kind":"observe","value":"sc_b0"},{"form":"inline",'
+     '"index":{"index":"literal","value":11},"kind":"write","target":"sc_b0","value":{"operand":"counter"},'
+     '"width":"byte"}],"loop":{"form":"single","mask":3}}]'),
+    ("driver iteration 3 case 49 (reduced)", 1,
+     '[{"action":{"build":"to_bytes","kind":"bytes","parts":[{"operand":{"operand":"input"},"part":"word"}]}},'
+     '{"body":[{"access":{"access":"length"},"constant":3,"fold":"add","kind":"observe","value":"sc_b0"},'
+     '{"form":"inline","index":{"index":"literal","value":0},"kind":"write","target":"sc_b0",'
+     '"value":{"operand":"input"},"width":"byte"},{"build":"to_bytes","kind":"bytes","parts":[{"count":0,'
+     '"part":"zeros"}]}],"loop":{"form":"single","mask":1}}]'),
+]
+
+
+def memory_mismatch(program, steps):
+    """A memory-value mismatch with the real fingerprint, on the run's backend, and a final case of these steps."""
+    case = {"memoryValuePlan": {"schema": "solcore-lean.memory-value-plan.v1", "steps": steps}}
+    return ("semantic-mismatch", "", program, None, {"fingerprint": MEMORY_LOOP_FINGERPRINT, "case": case})
+
 
 class FakeSuite:
     """Writes a suite-shaped output for each requested (seed, backend)."""
@@ -141,9 +239,12 @@ class FakeSuite:
             (output / f"{index:02d}-{profile}.stdout.log").write_text("log")
             entries = []
             for case, (category, detail, program, *site) in enumerate(findings):
+                real = site[1] if len(site) > 1 else {}
                 location = folder / "findings/real" / f"{case:04d}"
                 (location / "original").mkdir(parents=True)
                 (location / "original/analysis.json").write_text(json.dumps({"comparison": {"category": category, "detail": detail}}))
+                if "case" in real:
+                    (location / "original/case.json").write_text(json.dumps(real["case"]))
                 if site and site[0]:
                     work = output / ".work" / f"run-{case:06d}"
                     (location / "original/case.sol").write_text("contract C {}")
@@ -153,11 +254,13 @@ class FakeSuite:
                             sys.executable, str(self.stage), f"{work}/case.sol", "--root", str(work), "--frame",
                             *(site[0] if isinstance(site[0], list) else [site[0]])]}]}))
                 (location / "shrink.json").write_text("{}")
+                fingerprint = {"backend": backend, "category": category, "stage": "rust-code-images",
+                               "disagreeingPairs": ["directCore/rustEvm"] if category == "semantic-mismatch" else [],
+                               "synthetic": False}
                 entries.append({"caseIndex": case, "synthetic": False, "finalCaseSha256": program,
-                                "fingerprint": {"backend": backend, "category": category, "stage": "rust-code-images",
-                                                "disagreeingPairs": ["directCore/rustEvm"] if category == "semantic-mismatch" else [],
-                                                "synthetic": False},
-                                "originalArchive": f"findings/real/{case:04d}/original", "history": f"findings/real/{case:04d}/shrink.json"})
+                                "fingerprint": {**real["fingerprint"], "backend": backend} if "fingerprint" in real else fingerprint,
+                                "originalArchive": f"findings/real/{case:04d}/original", "history": f"findings/real/{case:04d}/shrink.json",
+                                "finalArchive": f"findings/real/{case:04d}/original"})
             summary_rows.append({"profile": profile, "status": "failed" if findings else "passed", "output": folder.name,
                                  "seed": str(seed), "findings": entries, "secondaryFindings": [], "command": ["campaign"],
                                  "campaign": {"counts": {"executed": 4, "matched": 4 - len(findings), "errors": len(findings)},
@@ -351,7 +454,8 @@ class FuzzTests(unittest.TestCase):
             self.assertIn(sid, fuzz.KNOWN, (source, profile, backend))
             keys.add(sid)
         # Every listed suite signature has an occurrence; each is a symptom, never a reduced program.
-        self.assertEqual(set(fuzz.KNOWN) - keys, {fuzz.canonical_id(fuzz.KNOWN_FINDINGS[0][0])})
+        self.assertEqual({fuzz.canonical_id(key) for key, _ in fuzz.KNOWN_FINDINGS} - keys,
+                         {fuzz.canonical_id(fuzz.KNOWN_FINDINGS[0][0])})
         self.assertTrue(all("symptom" in key and "program" not in key for key, _ in fuzz.KNOWN_FINDINGS))
         _, profile, backend, category, stage, detail, _ = UPSTREAM_OCCURRENCES[0]
         fingerprint = {"backend": backend, "category": category, "stage": stage}
@@ -379,6 +483,73 @@ class FuzzTests(unittest.TestCase):
         report = (self.state / "report.md").read_text()
         self.assertIn("known: Sonatina O2 demanded-bits overflow", report)
         self.assertIn("known: Sonatina O2 signextend folding overflow", report)
+
+    def final_case(self, steps):
+        """A final archive holding a memory-value case of these plan steps."""
+        folder = Path(tempfile.mkdtemp(dir=self.directory))
+        folder.joinpath("case.json").write_text(json.dumps(
+            {"memoryValuePlan": {"schema": "solcore-lean.memory-value-plan.v1", "steps": steps}}))
+        return folder
+
+    def test_recorded_mismatch_classes_hold_their_real_occurrences(self):
+        (key, _, _, label), = fuzz.MISMATCH_CLASSES
+        self.assertEqual(sum(count for _, count, _ in MEMORY_LOOP_PLANS), 37)
+        for source, _, steps in MEMORY_LOOP_PLANS:
+            final = self.final_case(json.loads(steps))
+            self.assertEqual(fuzz.signature_key("runtime-memory-values", MEMORY_LOOP_FINGERPRINT, "", "a" * 64, None, final),
+                             key, source)
+        self.assertEqual(fuzz.KNOWN[fuzz.canonical_id(key)], label)
+        self.assertNotIn("program", key)
+        # Without its final case an occurrence keeps the key it had before the classes.
+        self.assertEqual(fuzz.signature_key("runtime-memory-values", MEMORY_LOOP_FINGERPRINT, "", "a" * 64)["program"], "a" * 64)
+
+    def test_mismatch_classes_leave_near_misses_new(self):
+        steps = json.loads(MEMORY_LOOP_PLANS[3][2])  # MemorySize.len(sc_b1) and then sc_put8(sc_b1, 0, sc_x)
+        *before, loop = steps
+        observe, write = loop["body"]
+        plans = {"a write alone": [*before, {**loop, "body": [write]}],
+                 "a write before the observation": [*before, {**loop, "body": [write, observe]}],
+                 "an array write": [*before, {**loop, "body": [observe, {**write, "target": "sc_a0"}]}],
+                 "an array observation": [*before, {**loop, "body": [{**observe, "value": "sc_a0"}, write]}],
+                 "no loop": [*before, {"action": observe}, {"action": write}],
+                 "a nested loop": [*before, {**loop, "loop": {"form": "nested", "outer": 1, "bound": "input", "inner": 1}}]}
+        reverted = {**MEMORY_LOOP_FINGERPRINT["pathShapes"], "rustEvm": {"payload": "bytes", "status": "reverted"}}
+        fingerprints = {"O2": {"backend": "sonatina-o2"}, "Yul": {"backend": "yul"},
+                        "Core and Hull disagreeing": {"disagreeingPairs": ["directCore/importedHull", "directCore/rustEvm"]},
+                        "a revert": {"pathShapes": reverted}, "a synthetic mismatch": {"synthetic": True}}
+        cases = [(name, "runtime-memory-values", {}, plan) for name, plan in plans.items()]
+        cases += [(name, "runtime-memory-values", changes, steps) for name, changes in fingerprints.items()]
+        cases.append(("another profile on O0", "runtime-assembly-memory", {}, steps))
+        for name, profile, changes, plan in cases:
+            fingerprint = {**MEMORY_LOOP_FINGERPRINT, **changes}
+            key = fuzz.signature_key(profile, fingerprint, "", "b" * 64, None, self.final_case(plan))
+            self.assertEqual(key, fuzz.signature_key(profile, fingerprint, "", "b" * 64), name)
+            self.assertNotIn(fuzz.canonical_id(key), fuzz.KNOWN, name)
+        # A final case that cannot be read stays outside every class.
+        self.assertEqual(fuzz.signature_key("runtime-memory-values", MEMORY_LOOP_FINGERPRINT, "", "b" * 64, None,
+                                            self.directory / "missing")["program"], "b" * 64)
+
+    def test_runs_count_mismatch_class_occurrences_as_known(self):
+        known = [memory_mismatch(str(index) * 64, json.loads(steps)) for index, (_, _, steps) in enumerate(MEMORY_LOOP_PLANS[:3], 1)]
+        *before, loop = json.loads(MEMORY_LOOP_PLANS[0][2])
+        alone = memory_mismatch("4" * 64, [*before, {**loop, "body": loop["body"][1:]}])
+
+        def scenario(seed, backend):
+            return [("runtime-memory-values", known + [alone] if backend == "sonatina-o0" else known)]
+        code, _ = self.main("run", "--state", str(self.state), "--base-seed", "100", "--backend", "sonatina-o0",
+                            "--backend", "sonatina-o2", "--profile", "runtime-memory-values", "--examples", "2",
+                            "--iterations", "1", scenario=scenario)
+        self.assertEqual(code, 0)
+        rows = {row["backend"]: row for row in self.ledger()}
+        self.assertEqual([occurrence["new"] for occurrence in rows["sonatina-o0"]["occurrences"]], [False, False, False, True])
+        # The same pattern on O2 is no occurrence of the O0 class.
+        self.assertEqual([occurrence["new"] for occurrence in rows["sonatina-o2"]["occurrences"]], [True, True, True])
+        entry = self.registry()["signatures"][fuzz.canonical_id(fuzz.MISMATCH_CLASSES[0][0])]
+        self.assertEqual((entry["count"], entry["backends"], len(entry["examples"])), (3, {"sonatina-o0": 3}, 2))
+        self.assertEqual([brief["program"] for brief in entry["recent"]], ["1" * 64, "2" * 64, "3" * 64])
+        report = (self.state / "report.md").read_text()
+        self.assertIn("known: Sonatina O0 returns other Words for loops that write std memory values", report)
+        self.assertIn("class loop-observes-then-slices-or-writes", report)
 
     def test_stop_file_lock_and_disk_limit_prevent_runs(self):
         self.start("--iterations", "1")

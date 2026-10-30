@@ -115,7 +115,7 @@ def canonical_id(value):
 # Upstream findings recorded in questions.md: they count, but never as new. Each
 # key is a stable symptom taken from a real occurrence through the driver, a crash
 # by its panic and call site and a rejection by its first error line; mismatches,
-# whose keys are reduced programs, are never listed.
+# whose keys are reduced programs, are never listed here but in MISMATCH_CLASSES.
 PRIMITIVE_TYPES = "primitive-types-0.14.0/src/lib.rs:43:1"
 DEMANDED_BITS = ["<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_binary",
                  "<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_from_value"]
@@ -145,7 +145,55 @@ KNOWN_FINDINGS = (
       "symptom": {"message": "Dynamic exception type: boost::wrapexcept<solidity::yul::StackTooDeepError>"}},
      "solc StackTooDeepError on specialized trait methods (questions.md, 2026-10-29)"),
 )
-KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS}
+
+
+def memory_value(ref):
+    """A bytes value `sc_b<n>` or a slice `sc_s<n>` of a memory-value plan; arrays are `sc_a<n>`."""
+    return isinstance(ref, str) and re.fullmatch(r"sc_[bs]\d+", ref) is not None
+
+
+def loop_observes_then_slices_or_writes(case):
+    """A single loop whose body observes a bytes value or slice and later takes a slice or writes to one."""
+    for step in (case.get("memoryValuePlan") or {}).get("steps") or []:
+        if (step.get("loop") or {}).get("form") != "single":
+            continue
+        observed = False
+        for action in step.get("body") or []:
+            kind = action.get("kind")
+            if observed and (kind == "slice" or kind == "write" and memory_value(action.get("target"))):
+                return True
+            observed = observed or kind == "observe" and memory_value(action.get("value"))
+    return False
+
+
+# Recorded semantic defects of questions.md whose occurrences differ only in their
+# programs: a mismatch counts under a class, never as new, when its profile, its
+# fingerprint's backend, category, stage, disagreeing paths and path shapes, and its
+# final case (the reduced one, else the original) have the class's properties, each
+# taken from the recorded reductions. Every other mismatch keeps its reduced program.
+RETURNED_WORDS = {path: {"payload": "word", "status": "returned"} for path in ("directCore", "importedHull", "rustEvm")}
+MISMATCH_CLASSES = (
+    ({"backend": "sonatina-o0", "category": "semantic-mismatch", "stage": None, "profile": "runtime-memory-values",
+      "class": "loop-observes-then-slices-or-writes"},
+     {"disagreeingPairs": ["directCore/rustEvm", "importedHull/rustEvm"], "pathShapes": RETURNED_WORDS, "synthetic": False},
+     loop_observes_then_slices_or_writes,
+     "Sonatina O0 returns other Words for loops that write std memory values (questions.md, 2026-10-29)"),
+)
+KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS} | \
+    {canonical_id(key): label for key, _, _, label in MISMATCH_CLASSES}
+
+
+def mismatch_class(profile, fingerprint, final):
+    """The key of the class a mismatch falls in, else None; `final` is the archive of its final case."""
+    for key, paths, shares, _ in MISMATCH_CLASSES:
+        if profile != key["profile"] or any(fingerprint.get(name) != key[name] for name in ("backend", "category", "stage")) \
+                or any(fingerprint.get(name) != value for name, value in paths.items()):
+            continue
+        # An unreadable or malformed case stays outside every class.
+        with contextlib.suppress(OSError, ValueError, AttributeError, TypeError):
+            if final and shares(json.loads((final / "case.json").read_text())):
+                return key
+    return None
 
 
 def normalize(text):
@@ -229,12 +277,14 @@ def crash_site(record, timeout=180):
     return call_site(result.stderr + result.stdout, symptom(detail).get("panic"))
 
 
-def signature_key(profile, fingerprint, detail, program, site=None):
+def signature_key(profile, fingerprint, detail, program, site=None, final=None):
     key = {"backend": fingerprint.get("backend"), "category": fingerprint.get("category"), "stage": fingerprint.get("stage")}
     if key["category"] in SYMPTOM_CATEGORIES:
         key["symptom"] = symptom(detail)
         if site:
             key["symptom"]["site"] = site
+    elif known := mismatch_class(profile, fingerprint, final):
+        return dict(known)
     else:
         # Coarse mismatch fingerprints are shared by unrelated miscompilations;
         # only the same reduced program counts as the same finding.
@@ -546,17 +596,19 @@ def finding_records(output, row):
             if kind == "primary":
                 archive = (folder / finding["history"]).parent if finding.get("history") else None
                 analysis = folder / finding.get("originalArchive", "missing") / "analysis.json"
+                final = folder / (finding.get("finalArchive") or finding.get("originalArchive") or "missing")
                 ident = f"case-{finding.get('caseIndex')}"
             else:
                 archive = folder / finding["archive"] if finding.get("archive") else None
                 analysis = archive / "analysis.json" if archive else folder / "missing"
+                final = archive
                 ident = "secondary-" + finding.get("archive", "unknown").replace("/", "-")
             detail = ""
             with contextlib.suppress(OSError, ValueError, AttributeError):
                 detail = json.loads(analysis.read_text()).get("comparison", {}).get("detail", "")
             program = next((finding[name] for name in PROGRAM_KEYS if finding.get(name)), None)
             records.append({"kind": kind, "ident": ident, "finding": finding, "archive": archive, "detail": detail,
-                            "program": program})
+                            "program": program, "final": final})
     return records
 
 
@@ -608,7 +660,7 @@ def register(state, config, epoch, iteration, backend, output, summary, sites=No
     for row in summary.get("profiles", []):
         for record in finding_records(output, row):
             key = signature_key(row["profile"], record["finding"]["fingerprint"], record["detail"], record["program"],
-                                sites.get((row["profile"], record["ident"])))
+                                sites.get((row["profile"], record["ident"])), record["final"])
             sid = canonical_id(key)
             brief = {"iteration": iteration, "backend": backend, "rootSeed": str(root_seed(config, iteration)),
                      "profile": row["profile"], "profileSeed": row.get("seed"), "kind": record["kind"],
@@ -888,7 +940,8 @@ def report(state):
         text = labels.get(sid, {}).get("label") or KNOWN.get(sid)
         signatures.append({**{key: entry.get(key) for key in ("id", "kind", "category", "stage", "symptom", "count",
                                                                 "backends", "profiles", "firstSeen", "lastSeen", "examples")},
-                           "label": text, "triage": "known" if text else "untriaged", "newInLatestIteration": sid in newest})
+                           "class": (entry.get("key") or {}).get("class"), "label": text,
+                           "triage": "known" if text else "untriaged", "newInLatestIteration": sid in newest})
     signatures.sort(key=lambda entry: (entry["triage"] == "known", entry["kind"] != "failure",
                                        -entry["lastSeen"]["iteration"], entry["id"]))
     problems = [{"iteration": row["iteration"], "backend": row["backend"], **problem}
@@ -942,7 +995,8 @@ def markdown(data):
               "| Signature | Triage | Category | Stage | Symptom or program | Count | Backends | Profiles | First seen | Last seen | Kept |",
               "| --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- | ---: |"]
     for entry in data["signatures"]:
-        described = " ".join(str(value) for value in (entry["symptom"] or {}).values()) or str(entry["firstSeen"].get("program"))
+        described = " ".join(str(value) for value in (entry["symptom"] or {}).values()) or \
+            (f"class {entry['class']}" if entry.get("class") else str(entry["firstSeen"].get("program")))
         triage = ("known: " + entry["label"]) if entry["label"] else "untriaged"
         triage += " (new)" if entry["newInLatestIteration"] else ""
         lines.append("| `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
