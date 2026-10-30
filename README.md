@@ -172,7 +172,7 @@ gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
 available for the twenty-five pure profiles with `--backend yul`, and for the
-twenty-six storage-family profiles when they are selected. Its EVM bytes are
+twenty-seven storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
 child contract, are outside this comparison.
@@ -183,11 +183,13 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-three-profile suite runs locally with shared time and disk limits.
+The same fifty-four-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
 suites with advancing seeds and counts their findings in a signature registry.
+Upstream findings already recorded whose signatures are stable symptoms, such
+as known compiler crashes and rejections, count as known rather than new.
 An opt-in run kind also runs the pinned fixture comparison in mutation mode,
 a slice of the fixtures per iteration within per-fixture and per-run budgets.
 
@@ -633,15 +635,31 @@ loops. Original Core builds every Word itself and returns them through
 each of two node budgets match on both Sonatina levels and on Yul. See
 [returned arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-returned-arrays).
 
-All twenty-eight stateful profiles also compare the installed contracts' whole
+The constructor-argument profile deploys a contract whose constructor takes
+none, one or two Words, a Word and a `bytes` value of up to 64 bytes, or a Word
+and a user-defined enum. The init code carries the arguments' ABI encoding,
+canonical or with one malformation such as truncation, an offset or length
+beyond the end, an unknown or cut tag, trailing bytes or a static enum cut to a
+narrower head. The compiler's derived deployment code decodes them with std's
+memory reader, with no up-front head check. Original Core runs an initializer
+over the argument bytes as the deployment phase and installs the runtime with
+its storage on return, nothing on a revert. All three paths compare the
+deployment row, its status, revert data and whole storage, before the runtime
+transactions, and a failed deployment ends the scenario. The 40 fixed scenarios
+and sixteen random scenarios at each of two node budgets match on both Sonatina
+levels and on Yul. See
+[constructor arguments](scripts/SEMANTIC_DIFFERENTIAL.md#compare-constructor-arguments).
+
+All twenty-nine stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
 Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
-Deployment must leave the storage empty, and a revert must leave each path's
-whole storage unchanged. The latest fixed run of all twenty-eight profiles,
-404 scenarios and 1,097 transaction prefixes, matched on Sonatina O0, and every
+Deployment must leave the storage empty, or exactly the decoded record for the
+constructor-argument profile, and a revert must leave each path's whole storage
+unchanged. The latest fixed run of all twenty-nine profiles, 444 scenarios and
+1,150 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
