@@ -5683,6 +5683,14 @@ Anvil, and the Rust driver and code-image exporter frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+The mixed streams' random O2 suite (root seed `20261113`) later left three of
+this profile's sixteen cases unexecuted. The sixteen shrink candidates of its
+crash case, the recorded Sonatina O2 signextend-folding crash, passed the
+campaign's 4 MiB bound on tool output. With at most eight candidates, the same
+campaign on `9ce37afeb` executed all sixteen cases and matched fifteen. It
+reduced the crash case from eight transactions to one within the suite's
+sixteen shrink attempts.
+
 ## Compare ABI-encoded tuple returns
 
 Every other stateful profile returns one Word. The `stateful-tuple-returns`

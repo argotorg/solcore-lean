@@ -8822,6 +8822,43 @@ class, Sonatina O0's on `runtime-memory-values`
 The report names the class in place of a first program. No new epoch is
 needed for the classes.
 
+**Shrink batches of the largest storage-family cases.** The ADT-storage
+reduction of the mixed streams' random O2 suite above stopped on the
+campaign's 4 MiB bound on tool output. A shrink candidate also carries its
+parent's plan, program and transactions, so the sixteen candidates of that
+eight-transaction crash case took 5,139,389 bytes. A survey measured each
+storage-family profile's largest case at its effective batch, the profile's
+`shrinkBatch` at most the suite's sixteen shrink attempts:
+- **Survey:** the largest of sixteen cases from root seed `20261114`, at the
+  default node budget and at the doubled one capped at 512.
+  - Three profiles exceeded the bound: `stateful-adt-storage` (5.76 and
+    5.96 MB), `stateful-keccak-loops` (5.20 and 5.28 MB) and
+    `stateful-assembly-keccak-loops` (5.21 and 5.29 MB).
+  - Every other profile stayed under 3.14 MB.
+- **Tails:** over 1,152 ADT cases the largest is 210,415 bytes, and over 768
+  cases of each Keccak-loop profile 201,115 and 202,148 bytes. Their eight
+  candidates take 3,059,106, 2,937,306 and 2,945,579 bytes.
+
+The three profiles now bound a response at eight candidates. The runs below
+used the suite's budgets, before the change and then on `9ce37afeb` with
+scripts and tools frozen:
+- **Before:** each reduction stopped on its first shrink request with an
+  `inconclusive-resource` `output-limit` at `shrink-candidates`, after no
+  attempt:
+  - the archived ADT crash case, replayed through `--case` on O2;
+  - each Keccak-loop profile's largest case on O0, with a synthetic mismatch
+    from the campaign's test adapter.
+- **After:** every campaign completed without a stop:
+  - the archived ADT crash case reduced from eight transactions to one in the
+    suite's sixteen shrink attempts, thirteen accepted;
+  - the whole ADT campaign of that suite, campaign seed
+    `16645338212027485126`, executed all sixteen cases. Fifteen matched with 120 of 128 prefixes, and
+    the same crash case reduced the same way, where three cases had been left
+    unexecuted;
+  - each Keccak-loop profile's largest case reduced its synthetic mismatch
+    from eight transactions to one, all thirteen attempts accepted, until no
+    candidate was left.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
