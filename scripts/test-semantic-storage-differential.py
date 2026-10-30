@@ -3480,7 +3480,7 @@ class KeccakLoopTests(unittest.TestCase):
         self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
                           selected["logs"], selected["selector"], selected["shrinkBatch"]),
                          ("semantic-keccak-loop-tool", "rust-hull-keyed-storage-scenario", True, "keccak-loops", True,
-                          "0x7357f5d2", 16))
+                          "0x7357f5d2", 8))
         self.assertTrue(runner.has_keccak_loops(value) and runner.has_logs(value))
         self.assertFalse(runner.has_loops(value) or runner.has_keccak_loops(loop_case()))
         self.assertEqual([runner.loop_iterations(value, tx) for tx in value["transactions"]], [7, 3, 2])
@@ -3768,7 +3768,7 @@ class AdtStorageTests(unittest.TestCase):
         selected = runner.profile(value)
         self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"],
                           selected["selector"], selected["shrinkBatch"], selected["contract"]),
-                         ("semantic-adt-storage-tool", "rust-hull-keyed-storage-scenario", True, "adts", None, 16,
+                         ("semantic-adt-storage-tool", "rust-hull-keyed-storage-scenario", True, "adts", None, 8,
                           "SynthesizedAdtStorage"))
         self.assertTrue(runner.has_adts(value))
         self.assertFalse(runner.has_adts(keccak_loop_case()) or runner.has_methods(value))

@@ -231,15 +231,17 @@ PROFILES = {
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "loops", "shrinkBatch": 32},
     # The storage-loop protocol over Keccak-addressed std mapping entries, with
-    # one log2 per iteration. A case embeds the mapping's Keccak closure, so a
-    # native shrink response carries at most 16 candidates.
+    # one log2 per iteration. A case embeds the mapping's Keccak closure, about
+    # 200 KB, and a shrink candidate also carries its parent's plan, program and
+    # transactions, about 370 KB, so a native shrink response carries at most 8
+    # candidates within the 4 MiB bound on tool output.
     "stateful-keccak-loops": {"caseSchema": KECCAK_LOOP_CASE_SCHEMA, "planSchema": "solcore-lean.keccak-loop-plan.v1",
         "planKey": "keccakLoopPlan", "corpusSchema": "solcore-lean.semantic-keccak-loop-corpus.v1",
         "originKind": "keccak-loop-generated", "contract": "SynthesizedKeccakLoops",
         "caseTool": "semantic-keccak-loop-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
-        "declared": True, "abi": "keccak-loops", "logs": True, "shrinkBatch": 16},
+        "declared": True, "abi": "keccak-loops", "logs": True, "shrinkBatch": 8},
     # The storage-loop plan with every storage access in inline Yul blocks around
     # the Solcore step call, in the plan's form. Its Core reference, history and
     # protocol are the storage-loop profile's.
@@ -262,18 +264,20 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": KECCAK_LOOP_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
         "declared": True, "abi": "keccak-loops", "logs": True, "forms": ("split", "carried", "pipelined"),
-        "shrinkBatch": 16},
+        "shrinkBatch": 8},
     # User-defined enum and struct values in contract fields and behind mapping
     # keys through std.StorageGeneric. Each case records its type shape, methods
     # and keys, and its observed slots follow from the layout. A case reaches
-    # about 200 KB, so a native shrink response carries at most 16 candidates.
+    # about 210 KB and a shrink candidate, which also carries its parent's plan,
+    # program and transactions, about 380 KB, so a native shrink response
+    # carries at most 8 candidates within the 4 MiB bound on tool output.
     "stateful-adt-storage": {"caseSchema": ADT_CASE_SCHEMA, "planSchema": "solcore-lean.adt-storage-plan.v1",
         "planKey": "adtStoragePlan", "corpusSchema": "solcore-lean.semantic-adt-storage-corpus.v1",
         "originKind": "adt-storage-generated", "contract": "SynthesizedAdtStorage",
         "caseTool": "semantic-adt-storage-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ADT_HISTORY_SCHEMA,
         "signature": None, "selector": None, "rollback": True, "keyed": False,
-        "declared": True, "abi": "adts", "shrinkBatch": 16},
+        "declared": True, "abi": "adts", "shrinkBatch": 8},
     # One method that returns a static tuple of two to four Words; every path's
     # whole return data is compared. A case reaches about 60 KB, so a native
     # shrink response carries at most 32 candidates.

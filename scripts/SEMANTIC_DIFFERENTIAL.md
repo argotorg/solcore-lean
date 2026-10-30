@@ -5328,8 +5328,9 @@ framing `core-word-log-framing-v1`. The 38-node shell lies inside the node
 budget. The 2,654-node Keccak closure and the guards, 69 nodes each and 483
 for seven, lie outside it. The suite's default of 384 nodes leaves 346 for the
 step, and a contract has at most 512 + 2,654 + 483 nodes. A case reaches about
-210 KB, so a native shrink response carries at most 16 candidates, within the
-campaign's 4 MiB bound on a tool response.
+210 KB. A shrink candidate also carries its parent's plan, program and
+transactions, about 370 KB in all, so a native shrink response carries at
+most 8 candidates, within the campaign's 4 MiB bound on a tool response.
 
 Every path's ordered committed logs are compared, together with the EVM
 chain's complete log list. A returned row commits two topics and 32 data bytes
@@ -5469,7 +5470,7 @@ parent plan's fields and `form`. Cases use
 parents' `solcore-lean.storage-loop-history.v1` and
 `solcore-lean.keccak-loop-history.v1`, since the Core reference is unchanged,
 and the provenance records the parent profile's version as
-`loopProfileVersion`. A native shrink response carries at most 32 and 16
+`loopProfileVersion`. A native shrink response carries at most 32 and 8
 candidates, as for the parents.
 
 Six Lean tests check the profiles:
@@ -5614,8 +5615,10 @@ shape, the declared methods, the key base and the step. Cases use
 `solcore-lean.semantic-adt-storage-case.v1`, and each records the contract's
 methods with their signatures, selectors and parameters and the layout, which
 the adapter recomputes. Histories use `solcore-lean.adt-storage-history.v1`.
-A case reaches about 200 KB, so a native shrink response carries at most 16
-candidates.
+A case reaches about 210 KB. A shrink candidate also carries its parent's
+plan, program and transactions, about 380 KB in all, so a native shrink
+response carries at most 8 candidates, within the campaign's 4 MiB bound on
+tool output.
 
 Three Lean tests check the profile:
 - `Solcore/Test/SourceAdtStorageGolden.lean` compares the emitted contracts
