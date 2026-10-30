@@ -35,16 +35,81 @@ assert os.path.exists(os.path.join(root, "case.sol")), root
 sys.stderr.write("thread '<unnamed>' (5) panicked at /x/index.crates.io-1949cf8c6b5b557f/primitive-types-0.14.0/src/lib.rs:43:1:\\n"
                  "Integer overflow when casting to usize\\n")
 if os.environ.get("RUST_BACKTRACE") == "1":
-    frame = sys.argv[sys.argv.index("--frame") + 1]
+    frames = sys.argv[sys.argv.index("--frame") + 1:]
     sys.stderr.write("stack backtrace:\\n   0: __rustc::rust_begin_unwind\\n   1: core::panicking::panic_fmt\\n"
-                     "   2: primitive_types::U256::as_usize::h0123456789abcdef\\n   3: " + frame + "::h0123456789abcdef\\n"
-                     "             at /x/crates/codegen/src/a.rs:1:2\\n   4: sonatina_codegen::driver::run\\n")
+                     "   2: primitive_types::U256::as_usize::h0123456789abcdef\\n"
+                     + "".join(f"   {3 + index}: {frame}::h0123456789abcdef\\n             at /x/crates/codegen/src/a.rs:1:2\\n"
+                               for index, frame in enumerate(frames))
+                     + f"   {3 + len(frames)}: sonatina_codegen::driver::run\\n")
 sys.exit(101)
 """
 
 
 def mismatch(program):
     return ("semantic-mismatch", "", program)
+
+
+# Real occurrences of the upstream findings in questions.md, as (source, profile,
+# backend, category, stage, detail, crash site): one fuzz-driver run from root
+# seed 1 with eight functions per profile, the retained suite runs of the
+# recorded observations replayed through the driver's signature code, and the
+# two O2 crashes of the mixed streams' random matrix. Home
+# directories are shortened, and each detail ends at the line its symptom reads.
+def panic(thread, message):
+    return (f"\nthread '<unnamed>' ({thread}) panicked at /Users/u/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/"
+            f"primitive-types-0.14.0/src/lib.rs:43:1:\n{message}\n")
+
+
+NOT_CONCRETE = "error[SC0401]: cannot specialize expression: type is not concrete\n"
+STACK_TOO_DEEP = ("export-rust-yul: Yul compilation rejected: Uncaught exception:\n/solidity/libyul/backends/evm/"
+                  "EVMObjectCompiler.cpp(133): Throw in function void solidity::yul::EVMObjectCompiler::run(const Object &, "
+                  "bool, bool)\nDynamic exception type: boost::wrapexcept<solidity::yul::StackTooDeepError>\n")
+DEMANDED_BITS = ["<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_binary",
+                 "<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_from_value"]
+SIGNEXTEND_FOLD = ["sonatina_codegen::optim::simplify_expr::fold_evm_signextend_raw",
+                   "sonatina_codegen::optim::simplify_expr::fold_evm_signextend"]
+UPSTREAM_OCCURRENCES = [
+    ("fuzz-driver", "runtime-assembly-loops", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(44674409, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("fuzz-driver", "runtime-trait-hierarchies", "yul", "source-rejected", "rust-checked-source",
+     NOT_CONCRETE, None),
+    ("fuzz-driver", "runtime-assembly", "yul", "compiler-crash", "rust-code-images",
+     panic(44931323, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("fuzz-driver", "runtime-traits", "yul", "compilation-rejected", "rust-yul-evm",
+     STACK_TOO_DEEP, None),
+    ("fuzz-driver", "runtime-trait-hierarchies", "sonatina-o2", "source-rejected", "rust-checked-source",
+     NOT_CONCRETE, None),
+    ("fuzz-driver", "runtime-comptime", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(44552049, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("fuzz-driver", "runtime-assembly", "sonatina-o0", "compiler-crash", "rust-code-images",
+     panic(44575855, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("fuzz-driver", "runtime-trait-hierarchies", "sonatina-o0", "source-rejected", "rust-checked-source",
+     NOT_CONCRETE, None),
+    ("semantic-log-sonatina-o2-random", "stateful-logs", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(10515142, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("semantic-dynamic-array-sonatina-o2-random-8tx", "stateful-dynamic-array", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(17103123, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("semantic-forward-sonatina-o2-random", "stateful-forwarded-value", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(12156346, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("semantic-primitive-sonatina-o2-random", "runtime-primitives", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(5298705, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("semantic-call-graph-sonatina-o2-random", "runtime-call-graphs", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(5864229, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("semantic-aggregate-call-graph-sonatina-o2-random", "runtime-aggregate-call-graphs", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(7454700, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("semantic-dynamic-array-sonatina-o2-random", "stateful-dynamic-array", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(9974443, "Integer overflow when casting to usize"), DEMANDED_BITS),
+    ("semantic-comptime-sonatina-o2-random-g0v3", "runtime-comptime", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(17285329, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("unit-13-random-o2", "stateful-keyed-storage", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(52219250, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("unit-13-random-o2", "stateful-adt-storage", "sonatina-o2", "compiler-crash", "rust-code-images",
+     panic(53252371, "arithmetic operation overflow"), SIGNEXTEND_FOLD),
+    ("semantic-unit13-traits/fixed-yul", "runtime-traits", "yul", "compilation-rejected", "rust-yul-evm",
+     STACK_TOO_DEEP, None),
+    ("semantic-unit14-hierarchies/fixed-yul", "runtime-trait-hierarchies", "yul", "compilation-rejected", "rust-yul-evm",
+     STACK_TOO_DEEP, None),
+]
 
 
 class FakeSuite:
@@ -85,7 +150,8 @@ class FakeSuite:
                     (location / "original/report.json").write_text(json.dumps({"processes": [
                         {"stage": "rust-checked-source", "returncode": 0, "command": ["true"]},
                         {"stage": "rust-code-images", "returncode": 2, "command": [
-                            sys.executable, str(self.stage), f"{work}/case.sol", "--root", str(work), "--frame", site[0]]}]}))
+                            sys.executable, str(self.stage), f"{work}/case.sol", "--root", str(work), "--frame",
+                            *(site[0] if isinstance(site[0], list) else [site[0]])]}]}))
                 (location / "shrink.json").write_text("{}")
                 entries.append({"caseIndex": case, "synthetic": False, "finalCaseSha256": program,
                                 "fingerprint": {"backend": backend, "category": category, "stage": "rust-code-images",
@@ -276,6 +342,43 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual(self.main("label", "--state", str(self.state), sid, "--clear")[0], 0)
         self.assertEqual(json.loads((self.state / "report.json").read_text())["signatures"][0]["triage"], "untriaged")
         self.assertEqual(self.main("label", "--state", str(self.state), "missing", "text")[0], 2)
+
+    def test_upstream_findings_of_questions_md_are_known_by_their_real_occurrences(self):
+        keys = set()
+        for source, profile, backend, category, stage, detail, site in UPSTREAM_OCCURRENCES:
+            fingerprint = {"backend": backend, "category": category, "stage": stage}
+            sid = fuzz.canonical_id(fuzz.signature_key(profile, fingerprint, detail, "a" * 64, site))
+            self.assertIn(sid, fuzz.KNOWN, (source, profile, backend))
+            keys.add(sid)
+        # Every listed suite signature has an occurrence; each is a symptom, never a reduced program.
+        self.assertEqual(set(fuzz.KNOWN) - keys, {fuzz.canonical_id(fuzz.KNOWN_FINDINGS[0][0])})
+        self.assertTrue(all("symptom" in key and "program" not in key for key, _ in fuzz.KNOWN_FINDINGS))
+        _, profile, backend, category, stage, detail, _ = UPSTREAM_OCCURRENCES[0]
+        fingerprint = {"backend": backend, "category": category, "stage": stage}
+        for site in (["sonatina_codegen::optim::a", "sonatina_codegen::optim::b"], ["not reproduced"], None):
+            self.assertNotIn(fuzz.canonical_id(fuzz.signature_key(profile, fingerprint, detail, None, site)), fuzz.KNOWN)
+        mismatched = {**fingerprint, "category": "semantic-mismatch", "stage": "comparison", "disagreeingPairs": ["a/b"]}
+        self.assertNotIn(fuzz.canonical_id(fuzz.signature_key(profile, mismatched, "", "a" * 64)), fuzz.KNOWN)
+
+    def test_runs_count_known_upstream_findings_but_never_as_new(self):
+        def scenario(seed, backend):
+            if backend == "sonatina-o0":
+                return [("runtime-primitives", [])]
+            return [("runtime-assembly-loops", [crash(site=DEMANDED_BITS), crash(site=SIGNEXTEND_FOLD),
+                                                crash("arithmetic operation overflow", site=SIGNEXTEND_FOLD),
+                                                mismatch("b" * 64)])]
+        code, _ = self.start("--iterations", "1", scenario=scenario)
+        self.assertEqual(code, 0)
+        row, = [row for row in self.ledger() if row["backend"] == "sonatina-o2"]
+        self.assertEqual([occurrence["new"] for occurrence in row["occurrences"]], [False, True, False, True])
+        signatures = self.registry()["signatures"]
+        known = [sid for sid in signatures if sid in fuzz.KNOWN]
+        self.assertEqual(sorted(signatures[sid]["key"]["symptom"]["message"] for sid in known),
+                         ["Integer overflow when casting to usize", "arithmetic operation overflow"])
+        self.assertTrue(all(signatures[sid]["count"] == 1 for sid in signatures))
+        report = (self.state / "report.md").read_text()
+        self.assertIn("known: Sonatina O2 demanded-bits overflow", report)
+        self.assertIn("known: Sonatina O2 signextend folding overflow", report)
 
     def test_stop_file_lock_and_disk_limit_prevent_runs(self):
         self.start("--iterations", "1")

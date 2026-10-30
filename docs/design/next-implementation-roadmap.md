@@ -8040,6 +8040,47 @@ difference.
 There was no mismatch. The crashes are recorded in `questions.md` as seen
 again. An existing fuzz state needs `--accept-new-epoch`.
 
+**Known upstream findings in the fuzz registry.** A fresh fuzz state reported
+every upstream finding of `questions.md` as new. The driver now lists, besides
+the fixtures' O2 crash, the suite signatures whose keys are stable symptoms: a
+crash by its panic location, message and call site, a rejection by its first
+error line. Each key was taken from a real occurrence, never written by hand:
+- one driver iteration from root seed 1 with eight whole functions per profile
+  over `runtime-primitives`, `runtime-comptime`, the three inline Yul profiles,
+  `runtime-traits` and `runtime-trait-hierarchies` on O0, O2 and Yul, on main
+  `5f8bfe113`: 158 occurrences of eight signatures in 43 minutes, every one
+  recorded in `questions.md`, and no problem;
+- the retained suite runs of the recorded observations whose seeds the current
+  generators no longer reach, replayed through the driver's own
+  `finding_records`, `crash_site` and `signature_key` with the current
+  exporter (their commands named session worktrees that are gone).
+
+Every retained archive mapped to one of the eight signatures, so none needed
+a key of its own:
+- `Integer overflow when casting to usize` in Sonatina's demanded-bits
+  analysis (`DemandedBitsQuery::propagate_binary` from
+  `propagate_from_value`): on O2, Q013's primitive, call-graph and aggregate
+  call-graph runs, the dynamic-array shift, the forwarded-value run and the
+  inline Yul loops and memory; on O0 and on Yul, whose runs export O0 images,
+  the inline Yul and Yul loop profiles;
+- `arithmetic operation overflow` in O2's signextend folding
+  (`fold_evm_signextend_raw` from `fold_evm_signextend`): the log,
+  eight-transaction dynamic-array and comptime runs, and the keyed-storage and
+  ADT-storage crashes of the mixed streams' random O2 suite above;
+- solc's `StackTooDeepError` on Yul, whose first error line is the exception
+  type: the trait profile's fixed and random runs and the trait hierarchies'
+  fixed run;
+- the checked frontend's rejection of a base method reached through two
+  superclass bounds, on each backend, whose first error line is `SC0401` "type
+  is not concrete", before the `SC0406` lines.
+
+They count, but never as new, as for the fixture crash. Mismatches stay
+unregistered: their keys are reduced programs. The same panic at another call
+site, or one whose replay does not panic again, is new. The driver's tests map
+twenty real occurrences, at least one per signature, to the list, and run a
+fake suite in which a known crash counts but is not new while a crash at
+another call site and a mismatch are new.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

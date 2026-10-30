@@ -112,11 +112,38 @@ def canonical_id(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:12]
 
 
-# Findings recorded in questions.md before the fixtures run kind existed: they count, but never as new.
+# Upstream findings recorded in questions.md: they count, but never as new. Each
+# key is a stable symptom taken from a real occurrence through the driver, a crash
+# by its panic and call site and a rejection by its first error line; mismatches,
+# whose keys are reduced programs, are never listed.
+PRIMITIVE_TYPES = "primitive-types-0.14.0/src/lib.rs:43:1"
+DEMANDED_BITS = ["<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_binary",
+                 "<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_from_value"]
+SIGNEXTEND_FOLD = ["sonatina_codegen::optim::simplify_expr::fold_evm_signextend_raw",
+                   "sonatina_codegen::optim::simplify_expr::fold_evm_signextend"]
+NOT_CONCRETE = "error[SC0401]: cannot specialize expression: type is not concrete"
 KNOWN_FINDINGS = (
     ({"backend": FIXTURES, "category": "compiler-crash", "stage": "rust-code-images-O2", "paths": ["sonatina-o2"],
       "symptom": {"panic": "crates/ir/src/dfg.rs:354:9", "message": "assertion failed: self.has_inst(inst_id)"}},
      "Sonatina O2 has_inst assertion on ignored-builtin-effects (questions.md, 2026-10-29)"),
+    *(({"backend": backend, "category": "compiler-crash", "stage": "rust-code-images",
+        "symptom": {"panic": PRIMITIVE_TYPES, "message": "Integer overflow when casting to usize", "site": DEMANDED_BITS}}, label)
+      for backend, label in (
+          ("sonatina-o2", "Sonatina O2 demanded-bits overflow on a constant shift count, Q013 (questions.md, 2026-10-26 to "
+                          "2026-10-28)"),
+          ("sonatina-o0", "Sonatina O0 demanded-bits overflow on a constant shift count in inline Yul (questions.md, "
+                          "2026-10-28)"),
+          ("yul", "Sonatina O0 demanded-bits overflow in the Yul runs' code images (questions.md, 2026-10-28)"))),
+    ({"backend": "sonatina-o2", "category": "compiler-crash", "stage": "rust-code-images",
+      "symptom": {"panic": PRIMITIVE_TYPES, "message": "arithmetic operation overflow", "site": SIGNEXTEND_FOLD}},
+     "Sonatina O2 signextend folding overflow (questions.md, 2026-10-27)"),
+    *(({"backend": backend, "category": "source-rejected", "stage": "rust-checked-source",
+        "symptom": {"message": NOT_CONCRETE}},
+       "checked frontend SC0406 for a base method through two superclass bounds (questions.md, 2026-10-29)")
+      for backend in BACKENDS),
+    ({"backend": "yul", "category": "compilation-rejected", "stage": "rust-yul-evm",
+      "symptom": {"message": "Dynamic exception type: boost::wrapexcept<solidity::yul::StackTooDeepError>"}},
+     "solc StackTooDeepError on specialized trait methods (questions.md, 2026-10-29)"),
 )
 KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS}
 

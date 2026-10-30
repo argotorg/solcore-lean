@@ -268,6 +268,18 @@ the latest problems. `--notify-command CMD` runs CMD after a run with a new
 signature or a missing suite summary, with `SEMANTIC_FUZZ_REPORT`,
 `SEMANTIC_FUZZ_NEW` and related variables set; outcomes go to `notify.log`.
 
+The driver itself lists the upstream findings recorded in `questions.md` whose
+signatures are stable symptoms, each taken from a real occurrence: Sonatina's
+demanded-bits overflow (`Integer overflow when casting to usize`) on O0, on O2
+and in the Yul runs' O0 code images, its O2 signextend-folding overflow
+(`arithmetic operation overflow`), solc's `StackTooDeepError` on Yul, the
+checked frontend's `SC0401` and `SC0406` rejection of a base method reached
+through two superclass bounds on each backend, and the fixtures' O2 crash.
+Their occurrences count and are shown as known, but never as new, so a fresh
+state reports only what `questions.md` does not record. A mismatch is never
+listed, since its signature is a reduced program, and the same panic at
+another call site is new.
+
 The driver exits with status 2 when the tools are not ready or another driver
 holds the state, 3 on an epoch change, 4 when the state reaches
 `--max-state-bytes` (50 GiB by default) and 5 after three consecutive runs
