@@ -120,6 +120,10 @@ lean_exe semanticArrayReturnTool where
   root := `Tests.SemanticArrayReturnTool
   exeName := "semantic-array-return-tool"
 
+lean_exe semanticConstructorArgumentTool where
+  root := `Tests.SemanticConstructorArgumentTool
+  exeName := "semantic-constructor-argument-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

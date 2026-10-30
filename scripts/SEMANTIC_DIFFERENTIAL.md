@@ -6460,6 +6460,148 @@ the Rust driver, code-image exporter and directive tools frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare constructor arguments
+
+The `stateful-constructor-arguments` profile deploys a contract whose
+constructor takes parameters, sends their ABI encoding after the init code,
+canonical or with one malformation, and compares the deployment row on all
+three paths before the runtime transactions.
+- **Inside the compiler's boundary:** the compiler's derived deployment code
+  copies `codesize() - datasize("<C>Deploy")` bytes, the arguments, into a
+  `memory<bytes>` and decodes them with std's derived decoders through a
+  `MemoryWordReader`. Unlike a method there is no up-front head check, so
+  arguments fail only where a read runs past their end.
+- **Original Core** has an initializer contract that takes std's decision on
+  its input data, the argument bytes, and a runtime contract. The case module
+  runs the initializer as the deployment phase through the public
+  `ContractRuntime` API and on return installs the runtime with
+  `Account.withCode`, which keeps the storage. A revert installs nothing.
+- **A failed deployment ends the scenario** on every path, so a rejected
+  deployment keeps no transactions.
+
+The [roadmap](../docs/design/next-implementation-roadmap.md) records the
+feasibility probe and the definitions.
+
+### Definitions
+
+- **Contract:** `SynthesizedConstructorArguments` with one constructor and
+  `run(uint256 flags, uint256 input) returns (uint256)`, selector
+  `0x7357f5d2`, zero value. Slot 0 is the accumulator and slots 1 to 5 the
+  record the constructor writes.
+- **Parameters,** one of:
+  - `none`, which writes 1 to slot 1;
+  - `uint256`, which writes `a`;
+  - `uint256,uint256`, which writes `a` and `b`;
+  - `uint256,bytes` with a payload of at most 64 bytes, which writes `a`, the
+    length and the payload's first and second Words when they exist;
+  - `uint256,enum` with a user enum as for `stateful-enum-arguments`, which
+    writes `a`, the one-based constructor index and the decoded Words.
+- **Deployment record:** `{a, choice, first, second, length, malformation}`,
+  where `first` is `b` or the first field Word and a payload is the first
+  `length` bytes of `first·K ‖ second·K`.
+- **Arguments:** empty, `a`, `a b`, or `a`, the offset 64 and the `bytes`
+  value or a dynamic enum's body; a static enum's body is inline at 32. One
+  malformation may apply:
+  - `truncate`, `trailing` (also the junk after a parameterless
+    constructor);
+  - `offset`, the Word at 32, including 0 and 32 into the head;
+  - `length`, including a length into the padding;
+  - `tag` and `tagCut`, unknown tags whole or with the arguments cut right
+    after them;
+  - `tail`, a dynamic enum's `bytes` tail offset;
+  - `narrow`, a static enum cut to the chosen constructor's head, which for
+    a constructor without fields is its tag alone.
+- **std's decision:** reading starts at 0; each Word read needs its 32 bytes
+  and each advance must stay inside the arguments, else `ABIInputTruncated()`
+  (`0x08638556`); an unknown tag, compared before any field, reverts with
+  empty data. Trailing and unread bytes are ignored. Each case records the
+  prescribed `stdRejection`, computed by a Lean byte-level model, and the
+  adapter recomputes it with its own Python model.
+- **Runtime transactions:** `r = step(slot 0 + input + slot 1 + ... + slot 5)`
+  is written to slot 0; odd flags revert with the one Word `r`.
+- **Generation:** a shape stream and a sequence stream from SplitMix64's
+  finalizer of the seed xor their domains. The parameters are `none`,
+  `uint256` and `uint256,uint256` with probability 1/8 each, `uint256,bytes`
+  with 2/8 and an enum with 3/8. The arguments are canonical with
+  probability one third, otherwise a kind uniformly among those that apply,
+  then an entry of its bank uniformly.
+
+### Running and validation
+
+```sh
+lake build semanticConstructorArgumentTool rustHullKeyedStorageScenario
+python3 scripts/semantic-storage-campaign.py \
+  --corpus scripts/semantic-constructor-argument-corpus.json \
+  --output .upstream/semantic-constructor-argument-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-constructor-arguments \
+  --cases 16 --output .upstream/semantic-constructor-argument-random
+```
+
+- **Schemas:** plans use `solcore-lean.constructor-argument-plan.v1` under
+  `constructorArgumentsPlan`, with `parameters`, `constructors` and
+  `stepProgram`. Cases use `solcore-lean.semantic-constructor-argument-case.v1`
+  and carry `initializerProgram` and `deployment`; histories use
+  `solcore-lean.constructor-argument-history.v1` with a `deployment` row.
+- **Node budget:** the runtime shell takes 69 nodes inside the node budget,
+  so the default of 384 leaves 315 for the step. The initializer, 76 to 611
+  nodes, lies outside it. Runtimes are bounded by 512 nodes and initializers
+  by 1,024.
+- **Paths:**
+  - **EVM:** the creation transaction's data are the init code followed by
+    the arguments. A failed creation has no receipt address, so the path
+    binds the would-be CREATE address of the sender and its nonce, where
+    nothing is installed, and submits no transaction.
+  - **Hull:** the arguments are the runner's constructor calldata, which
+    `LinkedContract.prepareDeployment` appends to the init image. The
+    keyed-storage runner requires a call, so a scenario without transactions
+    sends one placeholder call. A rejected deployment never reaches it, and
+    after an accepted deployment its row is dropped.
+  - **Original Core** runs the deployment phase described above.
+- **Shrinking:** the campaign's case identity adds the parameters, the
+  initializer and the deployment record to the program and the transactions.
+  A case reaches about 80 KB, so a native shrink response carries at most 32
+  candidates.
+
+The deployment row is compared before any transaction:
+- every path deploys exactly when std accepts the arguments;
+- a rejection reverts with std's revert data on Hull and EVM, and original
+  Core's Word maps to it under the selector and empty-revert rules only when
+  the prescribed rejection says so;
+- every path commits exactly the record the adapter decodes to slots 1 to 5,
+  or nothing, and no other slot.
+
+A deployment's returned data are not compared: the EVM path checks its
+installed runtime against the exported image. A completed runtime row must
+keep the record in slots 1 to 5, and a returned row must return the committed
+slot 0. A revert is checked by rollback and its one-Word length.
+
+Reductions, each sealed and strictly smaller:
+- remove transactions;
+- drop the malformation or take an earlier entry of its bank;
+- shorten a `bytes` length to zero or half;
+- simplify the parameters: a static enum, `uint256,bytes` and
+  `uint256,uint256` become `uint256`, which becomes `none`. A malformation
+  that no longer applies is dropped, and a rejected deployment keeps no
+  transactions;
+- drop unused enum constructors and narrow fields;
+- reduce the step, zero the record Words, then clear flags to their parity
+  bit and inputs to their low byte.
+
+Three Lean tests check the profile:
+- `SourceConstructorArgumentGolden` checks 71 deployments over every
+  parameter kind, static, dynamic and struct enums, `bytes` lengths 0 to 64
+  and every malformation kind, and five raw-argument rows for the order of
+  std's checks. The rows are written out as hexadecimal text by an
+  independent Python model of std's memory reader, with tags from
+  `cast keccak`. Original Core and the Lean model must give each exactly.
+- `SourceConstructorArgumentCases` checks generated scenarios at both budgets
+  against the model, the deployment row first. It also checks replay, the
+  node counts, the draws over 256 seeds (every malformation that applies to
+  each parameter kind and every std outcome of each), the reductions, and the
+  refusal of records and malformations that do not fit.
+- `SourceConstructorArgumentCorpus` checks the corpus histories against the
+  model, its coverage, and its refusal of tampered entries.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-four

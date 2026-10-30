@@ -88,6 +88,8 @@ ENUM_ARRAY_CASE_SCHEMA = "solcore-lean.semantic-enum-array-case.v1"
 ENUM_ARRAY_HISTORY_SCHEMA = "solcore-lean.enum-array-history.v1"
 ARRAY_RETURN_CASE_SCHEMA = "solcore-lean.semantic-array-return-case.v1"
 ARRAY_RETURN_HISTORY_SCHEMA = "solcore-lean.array-return-history.v1"
+CONSTRUCTOR_ARGUMENT_CASE_SCHEMA = "solcore-lean.semantic-constructor-argument-case.v1"
+CONSTRUCTOR_ARGUMENT_HISTORY_SCHEMA = "solcore-lean.constructor-argument-history.v1"
 # `declared`: per-case observed slots plus Hull/EVM containment; `abi`: calldata form;
 # `logs`: ordered committed logs are part of every observation; `balances`: transactions
 # carry call value and the contract's committed balance is observed; `deploymentLogs`:
@@ -344,6 +346,21 @@ PROFILES = {
         "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": ARRAY_RETURN_HISTORY_SCHEMA,
         "signature": "run(uint256,uint256,uint256,uint256)", "selector": "0x15509d2b", "rollback": True, "keyed": False,
         "declared": True, "abi": "array-returns", "shrinkBatch": 32},
+    # One constructor whose parameters std decodes from the argument bytes the
+    # deployment appends to the init code, canonical or with one malformation,
+    # and one method over the record it writes. The deployment row is compared:
+    # its status, std's revert data, which original Core gives as a Word under
+    # the selector and empty-revert rules, and the whole committed storage. A
+    # failed deployment ends the scenario on every path, the EVM path bound to
+    # the would-be creation address.
+    "stateful-constructor-arguments": {"caseSchema": CONSTRUCTOR_ARGUMENT_CASE_SCHEMA,
+        "planSchema": "solcore-lean.constructor-argument-plan.v1", "planKey": "constructorArgumentsPlan",
+        "corpusSchema": "solcore-lean.semantic-constructor-argument-corpus.v1",
+        "originKind": "constructor-argument-generated", "contract": "SynthesizedConstructorArguments",
+        "caseTool": "semantic-constructor-argument-tool", "coreRunner": "rust-hull-keyed-storage-scenario",
+        "scenarioSchema": "solcore-lean.keyed-storage-contract-scenario.v1", "historySchema": CONSTRUCTOR_ARGUMENT_HISTORY_SCHEMA,
+        "signature": "run(uint256,uint256)", "selector": "0x7357f5d2", "rollback": True, "keyed": False,
+        "declared": True, "abi": "constructor-arguments", "shrinkBatch": 32},
 }
 HISTORY_SCHEMAS = {value["historySchema"] for value in PROFILES.values()}
 REPORT_SCHEMA = "solcore-lean.semantic-storage-differential.v2"
@@ -473,6 +490,13 @@ MAX_ARRAY_ELEMENTS = 3
 ARRAY_RETURN_SLOTS = [str(slot) for slot in range(3)]
 ARRAY_RETURN_ELEMENTS = {"uint256": (1, 0), "bytes4": (1, 0), "bytes": (65, 64), "uint256[]": (3, 2)}
 MAX_ARRAY_RETURN_COUNT = 3
+# The constructor-argument profile: slots 0 to 5, the accumulator and the record
+# the constructor writes. A plan's parameters are one of these kinds, an enum's
+# constructors as for the enum-argument profile. The arguments are canonical or
+# carry one of these malformations.
+CONSTRUCTOR_ARGUMENT_SLOTS = [str(slot) for slot in range(6)]
+CONSTRUCTOR_PARAMETERS = ("none", "uint256", "uint256,uint256", "uint256,bytes", "uint256,enum")
+CONSTRUCTOR_KINDS = ("none", "truncate", "trailing", "offset", "length", "tag", "tagCut", "tail", "narrow")
 # std's bound on a decoded `bytes` length, ~0 - 63.
 MAX_DECODED_LENGTH = 2**256 - 64
 # The ledger's fixed senders: Anvil's first three default accounts, in order; the first deploys.
@@ -535,6 +559,9 @@ def expected_status(case: dict, transaction: dict) -> str | None:
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     if profile(case)["abi"] == "array-returns":
         # Odd flags revert after the writes.
+        return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
+    if profile(case)["abi"] == "constructor-arguments":
+        # Odd flags revert after the write.
         return "reverted" if int(common.word(transaction["flags"])) % 2 else "returned"
     parity = transaction["flags" if profile(case)["abi"] in ("array", "nested", "flags", "value", "bytes", "mapping", "ledger",
                                                              "malformed", "loops", "tuples") else "input"]
@@ -1515,6 +1542,262 @@ def array_return_fields(case: dict, transaction: dict, row: dict, prior: list[di
     return fields
 
 
+def has_constructor_arguments(case: dict) -> bool:
+    return profile(case)["abi"] == "constructor-arguments"
+
+
+def valid_constructor_argument_plan(plan: dict) -> bool:
+    """One parameter kind; an enum's constructors as for the enum arguments,
+    and none for every other kind."""
+    kind = plan.get("parameters")
+    if kind not in CONSTRUCTOR_PARAMETERS:
+        return False
+    return valid_enum_argument_plan(plan) if kind == "uint256,enum" else plan.get("constructors") == []
+
+
+def constructor_argument_record(case: dict) -> tuple:
+    """The deployment record's Words `a`, `first` and `second`, its choice and
+    `bytes` length, and its malformation, type-checked."""
+    deployment = case.get("deployment")
+    if not isinstance(deployment, dict) or set(deployment) != {"a", "choice", "first", "second", "length", "malformation",
+                                                                "arguments", "stdRejection"}:
+        raise ValueError("a constructor-argument case records its deployment")
+    choice, length = deployment["choice"], deployment["length"]
+    if type(choice) is not int or type(length) is not int or not 0 <= choice < 4 or not 0 <= length <= MAX_RETURN_LENGTH:
+        raise ValueError("a constructor-argument deployment records a constructor index and a length of at most 64")
+    return (int(common.word(deployment["a"], "deployment a")), choice,
+            int(common.word(deployment["first"], "deployment first Word")),
+            int(common.word(deployment["second"], "deployment second Word")), length, deployment["malformation"])
+
+
+def constructor_argument_layout(case: dict) -> tuple:
+    """The parameter kind, the enum's constructors, whether the enum is static,
+    the body's head and where the body starts: inline at 32 for a static enum,
+    behind the offset 64 for a dynamic one."""
+    kind = case[profile(case)["planKey"]]["parameters"]
+    if kind != "uint256,enum":
+        return kind, [], True, 0, 32
+    constructors = enum_constructors(case)
+    fields = [fields for _, fields in constructors]
+    static = "bytes" not in fields
+    return kind, constructors, static, 32 + max(ENUM_ARGUMENT_FIELDS[field][1] for field in fields), 32 if static else 64
+
+
+def constructor_argument_bytes(case: dict) -> bytes:
+    """The argument bytes the deployment appends to the init code: the
+    canonical encoding of the record, then its one malformation, which must
+    apply. A `bytes` value is `a`, the offset 64, its length and the first
+    `length` bytes of `first · K` and `second · K` zero-padded to whole Words;
+    an enum's body is as for the enum arguments."""
+    kind, constructors, static, head, start = constructor_argument_layout(case)
+    a, choice, first, second, length, malformation = constructor_argument_record(case)
+    word = lambda value: (value % 2**256).to_bytes(32, "big")
+    padded = (word(first * RETURN_MULTIPLIER) + word(second * RETURN_MULTIPLIER))[:length] + bytes(-length % 32)
+    if kind == "uint256,enum":
+        if choice >= len(constructors):
+            raise ValueError("a constructor-argument deployment encodes a constructor of its enum")
+        name, fields = constructors[choice]
+    else:
+        name, fields = None, {"none": None, "uint256": "", "uint256,uint256": "uint256", "uint256,bytes": "bytes"}[kind]
+    carries = fields == "bytes"
+    sends = {None: (False, False), "": (False, False), "uint256": (True, False), "uint256,uint256": (True, True),
+             "ScPair": (True, True), "bytes": (True, True)}[fields]
+    if (kind == "none" and a) or (kind != "uint256,enum" and choice) or (length and not carries) or \
+            (first and not sends[0]) or (second and not sends[1]):
+        raise ValueError("a constructor-argument record sends only the Words of its parameters")
+    if kind == "none":
+        data = b""
+    elif kind == "uint256":
+        data = word(a)
+    elif kind == "uint256,uint256":
+        data = word(a) + word(first)
+    elif kind == "uint256,bytes":
+        data = word(a) + word(64) + word(length) + padded
+    else:
+        field_head = {"": b"", "uint256": word(first), "uint256,uint256": word(first) + word(second),
+                      "ScPair": word(first) + word(second), "bytes": word(head)}[fields]
+        tail = word(length) + padded if carries else b""
+        body = word(enum_argument_tag(name, fields)) + field_head + bytes(head - 32 - len(field_head)) + tail
+        data = word(a) + (body if static else word(64) + body)
+    size = len(data)
+    kind_name = malformation.get("kind") if isinstance(malformation, dict) else None
+    keys = {"none": set(), "truncate": {"kept"}, "trailing": {"count", "pattern"}, "narrow": set()}.get(kind_name, {"value"})
+    if kind_name not in CONSTRUCTOR_KINDS or set(malformation) != {"kind"} | keys:
+        raise ValueError("a constructor-argument deployment carries one known malformation")
+    value = int(common.word(malformation["value"], "malformation value")) if keys == {"value"} else None
+    put = lambda bytes_, position, replaced: bytes_[:position] + word(replaced) + bytes_[position + 32:]
+    tags = [enum_argument_tag(*constructor) for constructor in constructors]
+    length_at = start + head if kind == "uint256,enum" else 64
+    if kind_name == "none":
+        return data
+    if kind_name == "truncate" and type(malformation["kept"]) is int and 0 <= malformation["kept"] < size:
+        return data[:malformation["kept"]]
+    if kind_name == "trailing" and type(malformation["count"]) is int and 1 <= malformation["count"] <= 64 and \
+            malformation["pattern"] in TRAILING_PATTERNS:
+        count = malformation["count"]
+        return data + {"zeros": bytes(count), "ones": b"\xff" * count,
+                       "ramp": bytes((index + 1) % 256 for index in range(count))}[malformation["pattern"]]
+    if kind_name == "offset" and (kind == "uint256,bytes" or not static) and value != 64:
+        return put(data, 32, value)
+    if kind_name == "length" and carries and value != length:
+        return put(data, length_at, value)
+    if kind_name in ("tag", "tagCut") and kind == "uint256,enum" and value not in tags:
+        changed = put(data, start, value)
+        return changed if kind_name == "tag" else changed[:start + 32]
+    if kind_name == "tail" and kind == "uint256,enum" and not static and carries and value != head:
+        return put(data, start + 32, value)
+    if kind_name == "narrow" and kind == "uint256,enum" and static and 64 + ENUM_ARGUMENT_FIELDS[fields][1] < size:
+        return data[:64 + ENUM_ARGUMENT_FIELDS[fields][1]]
+    raise ValueError("a constructor-argument malformation must apply to its deployment")
+
+
+def constructor_argument_decide(case: dict, data: bytes) -> tuple:
+    """std's decision on the argument bytes, as the compiler's generated copy and
+    std's `MemoryWordReader` take them: reading from 0 with no up-front head
+    check, every Word read and every advance inside the arguments, else
+    `ABIInputTruncated()`. `a` comes first, then the second Word, the `bytes`
+    offset, length and data, or the enum's tag, compared before any field,
+    and its fields; an unknown tag reverts with empty data. Returns the
+    rejection or None, and the record written to slots 1 to 5."""
+    kind, constructors, static, _, _ = constructor_argument_layout(case)
+    if kind == "none":
+        return None, [1, 0, 0, 0, 0]
+    end = len(data)
+
+    class Truncated(Exception):
+        pass
+
+    def advance(position: int, count: int) -> int:
+        if not (position <= end and count <= end - position):
+            raise Truncated()
+        return position + count
+
+    def read(position: int) -> tuple:
+        advance(position, 32)
+        return int.from_bytes(data[position:position + 32], "big"), position + 32
+
+    def chunk(start: int, length: int, index: int) -> int:
+        piece = data[start + index:start + length][:32]
+        return int.from_bytes(piece + bytes(32 - len(piece)), "big")
+
+    def bytes_value(base: int, position: int) -> list:
+        offset, _ = read(position)
+        length, start = read(advance(base, offset))
+        advance(start, length)
+        return [length, chunk(start, length, 0) if length > 0 else 0, chunk(start, length, 32) if length > 32 else 0]
+    try:
+        a, position = read(0)
+        if kind == "uint256":
+            return None, [a, 0, 0, 0, 0]
+        if kind == "uint256,uint256":
+            return None, [a, read(position)[0], 0, 0, 0]
+        if kind == "uint256,bytes":
+            return None, [a, *bytes_value(0, position), 0]
+        body = position if static else advance(0, read(position)[0])
+        found, position = read(body)
+        index = next((index for index, constructor in enumerate(constructors)
+                      if enum_argument_tag(*constructor) == found), None)
+        if index is None:
+            return STD_EMPTY_REVERT, [0, 0, 0, 0, 0]
+        fields = constructors[index][1]
+        if fields == "":
+            values = [0, 0, 0]
+        elif fields == "uint256":
+            values = [read(position)[0], 0, 0]
+        elif fields in ("uint256,uint256", "ScPair"):
+            first, position = read(position)
+            values = [first, read(position)[0], 0]
+        else:
+            values = bytes_value(body, position)
+        return None, [a, index + 1, *values]
+    except Truncated:
+        return STD_TRUNCATED, [0, 0, 0, 0, 0]
+
+
+def constructor_argument_contract(case: dict) -> None:
+    """The deployment record's arguments and std's decision on them, and the
+    contract metadata, whose constructor calldata is the arguments."""
+    data = constructor_argument_bytes(case)
+    rejection, _ = constructor_argument_decide(case, data)
+    deployment = case["deployment"]
+    if deployment["arguments"] != "0x" + data.hex() or deployment["stdRejection"] != rejection:
+        raise ValueError("deployment arguments or std outcome differ from the record and std's decision on it")
+    name = profile(case)["contract"]
+    expected = {"name": name, "method": "run", "signature": profile(case)["signature"],
+                "selector": profile(case)["selector"], "deployPath": [name + "Deploy"],
+                "runtimePath": [name + "Deploy", name], "constructorCalldata": "0x" + data.hex()}
+    if case.get("contract") != expected:
+        raise Finding("unsupported-scope", "input", "constructor-argument contract metadata differs from its deployment")
+
+
+def constructor_argument_expected(case: dict) -> tuple:
+    """The prescribed deployment: std's rejection or None, and the committed
+    slots 0 to 5, the record behind a zero accumulator or nothing."""
+    rejection, record = constructor_argument_decide(case, constructor_argument_bytes(case))
+    values = [0] * 6 if rejection is not None else [0, *record]
+    return rejection, [{"slot": str(slot), "value": str(value % 2**256)} for slot, value in enumerate(values)]
+
+
+def constructor_argument_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) -> list[str]:
+    """Fields of a completed runtime row that break the protocol: slots 1 to 5
+    keep the record std decoded at deployment, and a returned row returns the
+    committed slot zero. A revert is checked by rollback."""
+    _, expected = constructor_argument_expected(case)
+    fields = []
+    if row["committedStorage"][1:] != expected[1:]:
+        fields.append("committedStorage")
+    after = {entry["slot"]: int(entry["value"]) for entry in row["committedStorage"]}
+    if row["status"] == "returned" and common.hex_bytes(row["output"], "output") != after["0"].to_bytes(32, "big"):
+        fields.append("output")
+    return fields
+
+
+def constructor_deployment_mismatch(values: dict, case: dict, selector_rows: list) -> dict | None:
+    """The deployment row. Every path deploys exactly when std accepts the
+    arguments and commits the record the adapter decodes, and nothing else; a
+    rejection reverts with std's revert data, which original Core gives as its
+    Word under the selector and empty-revert rules, and commits nothing. A
+    deployment's returned data are not compared: the EVM path checks its
+    installed runtime against the exported image."""
+    rejection, expected = constructor_argument_expected(case)
+    rows = {name: values[name]["deployment"] for name in PATHS}
+    where = {"stage": "deployment", "transactionId": None, "index": None}
+    if any(row["status"] in RESOURCE_STATUSES for row in rows.values()):
+        return {"category": "inconclusive-resource", **where, "pairs": {}}
+    if any(row["status"] not in {"returned", "reverted"} for row in rows.values()):
+        return {"category": "execution-error", **where, "pairs": {}}
+    outputs = {name: row["output"] if row["status"] == "reverted" else None for name, row in rows.items()}
+    core = outputs["directCore"]
+    word = bytes(32) if rejection == STD_EMPTY_REVERT else int(rejection, 16).to_bytes(32, "big") if rejection else None
+    if rejection is not None and core == "0x" + word.hex():
+        outputs["directCore"] = rejection
+        selector_rows.append({"id": "deployment", "index": None, "selector": rejection})
+    status = "reverted" if rejection is not None else "returned"
+    whole = [entry for entry in expected if entry["value"] != "0"]
+    fields = [field for field, broken in (
+        ("status", any(row["status"] != status for row in rows.values())),
+        ("output", any(output != rejection for output in outputs.values())),
+        ("committedStorage", any(values[name]["initialStorage"] != expected for name in PATHS)),
+        ("accountStorage", any([account["storage"] for account in values[name]["initialAccountStorage"]] != [whole]
+                               for name in PATHS)),
+        ("undeclaredStorage", any(values[name].get("initialUndeclaredStorage") for name in PATHS))) if broken]
+    if not fields:
+        return None
+    return {"category": "semantic-mismatch", **where, "fields": fields, "pairs": pairwise(
+        {name: [rows[name]["status"], outputs[name], values[name]["initialStorage"], values[name]["initialAccountStorage"]]
+         for name in PATHS})}
+
+
+def creation_address(sender: str, nonce: int) -> str:
+    """The CREATE address of a sender's creation at a nonce: the last 20 bytes
+    of `keccak256(rlp([sender, nonce]))`. Anvil reports none for a failed
+    creation."""
+    raw = nonce.to_bytes((nonce.bit_length() + 7) // 8, "big")
+    encoded = b"\x80" if nonce == 0 else raw if nonce < 0x80 else bytes([0x80 + len(raw)]) + raw
+    payload = b"\x94" + bytes.fromhex(sender[2:]) + encoded
+    return "0x" + keccak256(bytes([0xc0 + len(payload)]) + payload)[12:].hex()
+
+
 def has_logs(case: dict) -> bool:
     return profile(case).get("logs", False)
 
@@ -1807,6 +2090,15 @@ def declared_scope(case: dict) -> str:
                 "decoder accept or reject; a body writes the step result, the one-based index and three decoded Words; "
                 "initially empty storage; the whole return data, std's error selector or empty revert data, and "
                 "committed values at slots 0..4 on all paths and no nonzero undeclared slot on Hull/EVM; no "
+                "gas/balance/nonce or memory equivalence")
+    if has_constructor_arguments(case):
+        return ("a zero-value deployment whose constructor takes none, one or two Words, a Word and bytes of up to 64 "
+                "bytes, or a Word and a user enum of two to four constructors, decoded by std from the argument bytes "
+                "appended to the init code, canonical or with one malformation, and writing the record to slots 1..5, "
+                "then ordered zero-value run(uint256,uint256) transactions over those slots, none after a rejected "
+                "deployment; the deployment's status, std's error selector or empty revert data, original Core's Word "
+                "under the selector and empty-revert rules, and committed values at slots 0..5, then the whole return "
+                "data and committed values at slots 0..5, on all paths and no nonzero undeclared slot on Hull/EVM; no "
                 "gas/balance/nonce or memory equivalence")
     if has_array_returns(case):
         return ("ordered zero-value run(uint256,uint256,uint256,uint256) transactions that carry the plan's array "
@@ -2260,9 +2552,11 @@ def methods_fields(case: dict, transaction: dict, row: dict, prior: list[dict]) 
 
 
 def uses_selector_rule(case: dict) -> bool:
-    """Profiles whose original Core contract reverts with std's error selectors as a Word."""
+    """Profiles whose original Core contract reverts with std's error selectors
+    as a Word; the constructor arguments' initializer does so at deployment."""
     return isinstance(case, dict) and any(case.get("schema") == value["caseSchema"] and
-                                          value["abi"] in ("malformed", "methods", "enum-arguments", "enum-arrays")
+                                          value["abi"] in ("malformed", "methods", "enum-arguments", "enum-arrays",
+                                                           "constructor-arguments")
                                           for value in PROFILES.values())
 
 
@@ -2314,7 +2608,14 @@ def observed_slots(case: dict) -> tuple:
 
 def validate_transactions(case: dict, selected: dict) -> None:
     transactions = case.get("transactions")
-    if not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
+    if selected["abi"] == "constructor-arguments":
+        # A failed deployment ends the scenario, so a rejected one keeps no
+        # transactions; an accepted one keeps up to eight.
+        if not isinstance(transactions, list) or len(transactions) > MAX_TRANSACTIONS or \
+                (transactions and case["deployment"]["stdRejection"] is not None):
+            raise ValueError(f"constructor-argument case requires up to {MAX_TRANSACTIONS} ordered transactions, "
+                             "none after a rejected deployment")
+    elif not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
         raise ValueError(f"storage case requires 1 to {MAX_TRANSACTIONS} ordered transactions")
     ids = set()
     for tx in transactions:
@@ -2411,6 +2712,11 @@ def validate_transactions(case: dict, selected: dict) -> None:
             if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
                 raise ValueError("transaction calldata/value differs from its four original Words")
             continue
+        if selected["abi"] == "constructor-arguments":
+            words = [int(common.word(tx.get(field), "transaction " + field)) for field in ("flags", "input")]
+            if tx.get("calldata") != selected["selector"] + "".join(f"{word:064x}" for word in words) or tx.get("value") != "0":
+                raise ValueError("transaction calldata/value differs from its two original Words")
+            continue
         if selected["abi"] == "bytes-returns":
             if int(common.word(tx.get("length"), "transaction length")) > MAX_RETURN_LENGTH:
                 raise ValueError("a bytes-return transaction requests at most 64 bytes")
@@ -2472,6 +2778,10 @@ def validate_case(case) -> None:
     if selected["abi"] == "array-returns" and not valid_array_return_plan(plan):
         raise ValueError("array-return plan requires an element type of uint256, bytes4, bytes or uint256[], at most "
                          "three elements and one inner length within its bound per bytes or uint256[] element")
+    if selected["abi"] == "constructor-arguments" and not valid_constructor_argument_plan(plan):
+        raise ValueError("constructor-argument plan requires a parameter kind of none, uint256, uint256,uint256, "
+                         "uint256,bytes or uint256,enum, an enum's two to four constructors with distinct bank names "
+                         "and known field types, at most two with bytes, and no constructors otherwise")
     if selected["abi"] == "enum-returns" and not valid_enum_plan(plan):
         raise ValueError("enum-return plan requires two to four constructors with distinct bank names and known fields, "
                          "at most two with bytes")
@@ -2505,6 +2815,9 @@ def validate_case(case) -> None:
     elif selected["abi"] == "array-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != ARRAY_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "array-return profile starts empty and observes slots zero through two")
+    elif selected["abi"] == "constructor-arguments":
+        if case.get("initialState") != {"storage": []} or case.get("observedSlots") != CONSTRUCTOR_ARGUMENT_SLOTS:
+            raise Finding("unsupported-scope", "input", "constructor-argument profile starts empty and observes slots zero through five")
     elif selected["abi"] == "bytes-returns":
         if case.get("initialState") != {"storage": []} or case.get("observedSlots") != BYTES_RETURN_SLOTS:
             raise Finding("unsupported-scope", "input", "bytes-return profile starts empty and observes slots zero through two")
@@ -2565,6 +2878,8 @@ def validate_case(case) -> None:
         enum_argument_contract(case)
     elif selected["abi"] == "enum-arrays":
         enum_array_contract(case)
+    elif selected["abi"] == "constructor-arguments":
+        constructor_argument_contract(case)
     elif contract != expected:
         raise Finding("unsupported-scope", "input", "storage wrapper differs from the fixed profile")
     provenance = case.get("provenance")
@@ -2687,6 +3002,17 @@ def normalize_history(history, case: dict, path=None) -> dict:
     rows = history.get("transactions")
     if not isinstance(rows, list) or len(rows) > len(case["transactions"]):
         raise ValueError("invalid storage transaction history length")
+    if has_constructor_arguments(case):
+        # The deployment's status and, for a revert, its whole revert data; a
+        # failed deployment ends the history.
+        deployment = history.get("deployment")
+        if not isinstance(deployment, dict) or not isinstance(deployment.get("status"), str):
+            raise ValueError("a constructor-argument history records its deployment")
+        extra["deployment"] = {"status": deployment["status"], "output":
+            "0x" + common.hex_bytes(deployment.get("output"), "deployment output").hex()
+            if deployment["status"] == "reverted" else None}
+        if deployment["status"] != "returned" and rows:
+            raise ValueError("transactions ran after a failed deployment")
     result = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("id") != case["transactions"][index]["id"] or type(row.get("index")) is not int or row["index"] != index:
@@ -2800,6 +3126,8 @@ def conforms(case: dict, tx: dict, row: dict, prior: list[dict], address=None, p
         return False
     if has_array_returns(case) and array_return_fields(case, tx, row, prior):
         return False
+    if has_constructor_arguments(case) and constructor_argument_fields(case, tx, row, prior):
+        return False
     if has_enum_arguments(case) and enum_argument_fields(case, tx, row, prior):
         return False
     if has_enum_arrays(case) and enum_array_fields(case, tx, row, prior):
@@ -2865,6 +3193,13 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {name: values[name]["initialStorage"] for name in PATHS}
     whole = {name: values[name]["initialAccountStorage"] for name in PATHS}
+    if has_constructor_arguments(case):
+        try:
+            mismatch = constructor_deployment_mismatch(values, case, selector_rows)
+        except (ValueError, KeyError, TypeError) as error:
+            return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
+        if mismatch is not None:
+            return mismatch
     # The empty constructor leaves the whole storage empty on every path.
     differences = account_storage_differences(whole, observed_slots(case), deployment=True)
     pairs = pairwise(initial)
@@ -2874,7 +3209,8 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
     deployed_logs = sorted(name for name in PATHS if values[name].get("initialLogs")) if deployment_logs(case) else []
     # The funded deployment holds exactly its recorded value on every path.
     funded = not has_balances(case) or all(values[name]["initialBalance"] == str(deployment_value(case)) for name in PATHS)
-    if declared or outside or deployed_logs or not funded or differences:
+    # The constructor arguments' deployment row is compared above.
+    if (declared or outside or deployed_logs or not funded or differences) and not has_constructor_arguments(case):
         fields = (["committedStorage"] if declared else []) + (["undeclaredStorage"] if outside else []) + (
             ["initialLogs"] if deployed_logs else []) + ([] if funded else ["committedBalance"]) + (
             ["accountStorage"] if differences else [])
@@ -2993,6 +3329,12 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
                 values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
             fields += [field for field in broken if field not in fields]
             normal = normal and not broken
+        if has_constructor_arguments(case):
+            # A completed row keeps the decoded record; a revert is already covered by rollback.
+            broken = sorted({field for name, row in rows.items() for field in constructor_argument_fields(case, tx, row,
+                values[name]["transactions"][index - 1]["committedStorage"] if index else values[name]["initialStorage"])})
+            fields += [field for field in broken if field not in fields]
+            normal = normal and not broken
         if has_enum_arguments(case):
             # A returned row follows the protocol on the value std decodes; a
             # body revert and a rejection are already covered by rollback.
@@ -3059,7 +3401,8 @@ def compare_rows(histories: dict, case: dict, selector_rows: list) -> dict:
         if evm["chainLogs"] != evm["initialLogs"] + [log for row in evm["transactions"] for log in row["logs"]]:
             return {"category": "semantic-mismatch", "stage": "committed-log-history", "pairs": {}, "fields": ["chainLogs"], "logPaths": ["rustEvm"]}
     return {"category": "matched", "stage": "completed-history", "pairs": pairwise(
-        {name: {key: value for key, value in values[name].items() if key not in ("initialUndeclaredStorage", "chainLogs")} | {
+        {name: {key: value for key, value in values[name].items() if key not in ("initialUndeclaredStorage", "chainLogs",
+                                                                                 "deployment")} | {
             "transactions": [without_containment(row) for row in values[name]["transactions"]]} for name in PATHS})}
 
 
@@ -3071,13 +3414,22 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
         detail = str(rows[-1].get("detail", "preparation rejected"))
         raise Finding("inconclusive-resource" if common.RESOURCE.search(detail) else "compilation-rejected", "core-preparation", detail)
     deployment = rows[0]
-    if deployment.get("stage") != "deployment" or deployment.get("status") != "returned":
+    # A constructor-argument deployment that std rejects reverts, and the
+    # runner stops after reporting it.
+    rejected = has_constructor_arguments(case) and deployment.get("stage") == "deployment" and \
+        deployment.get("status") == "reverted" and len(rows) == 1 and exit_code == 1
+    if (deployment.get("stage") != "deployment" or deployment.get("status") != "returned") and not rejected:
         raise Finding("inconclusive-resource" if deployment.get("status") == "out-of-fuel" else "execution-error", "core-deployment", json.dumps(deployment))
     calls = rows[1:]
     if any(row.get("stage") != "execution" for row in calls):
         raise ValueError("unexpected Hull storage output stage")
+    if has_constructor_arguments(case) and not case["transactions"]:
+        # The runner requires a call, so a scenario without transactions sends
+        # one placeholder; it runs only after an accepted deployment, and its
+        # row is no part of the case.
+        calls, exit_code = [], 1 if rejected else 0
     complete = len(calls) == len(case["transactions"]) and all(row.get("status") in {"returned", "reverted"} for row in calls)
-    if complete and exit_code:
+    if complete and exit_code and not rejected:
         raise ValueError("unexplained Hull process failure after completed history")
     selected = profile(case)
     history = {"schema": selected["historySchema"], "initialStorage": deployment.get("committedStorage"),
@@ -3089,6 +3441,8 @@ def hull_history(stdout: str, exit_code: int, case: dict) -> dict:
         history.update(observedSlots=list(observed_slots(case)), initialUndeclaredStorage=deployment.get("undeclaredStorage"))
     if deployment_logs(case):
         history["initialLogs"] = deployment.get("logs")
+    if has_constructor_arguments(case):
+        history["deployment"] = {"status": deployment.get("status"), "output": deployment.get("output")}
     if selected.get("balances"):
         history.update(initialBalance=deployment.get("committedBalance"),
                        finalBalance=calls[-1].get("committedBalance") if calls else deployment.get("committedBalance"))
@@ -3333,7 +3687,9 @@ def execute(args, report: dict) -> None:
     fresh = json.loads(replay["stdout"])
     selected = profile(case)
     slots = observed_slots(case)
-    for key in ("program", "source", "provenance", "contract", "transactions", selected["planKey"], "initialState", "observedSlots"):
+    # A constructor-argument case also keeps its initializer and deployment record.
+    for key in ("program", "source", "provenance", "contract", "transactions", selected["planKey"], "initialState", "observedSlots",
+                *(("initializerProgram", "deployment") if has_constructor_arguments(case) else ())):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"native storage replay changed {key}")
     save(args.output / "replayed-case.json", fresh)
@@ -3367,20 +3723,32 @@ def execute(args, report: dict) -> None:
             if sender.lower() != f"0x{int(LEDGER_SENDERS[0]):040x}" or any(f"0x{int(value):040x}" not in unlocked for value in LEDGER_SENDERS):
                 raise Finding("adapter-error", "evm-senders", "local Anvil does not unlock the fixed ledger senders, the first one deploying")
         report["evmDeployment"] = {}
-        tx_hash = submit(rpc, {"from": sender, "data": "0x" + init.hex(), "value": hex(deployment_value(case)), "gas": gas}, report["evmDeployment"])
+        arguments = common.hex_bytes(case["contract"]["constructorCalldata"], "constructor arguments") \
+            if has_constructor_arguments(case) else b""
+        tx_hash = submit(rpc, {"from": sender, "data": "0x" + (init + arguments).hex(), "value": hex(deployment_value(case)), "gas": gas}, report["evmDeployment"])
         deployed = receipt(rpc, tx_hash, runner)
         report["evmDeployment"]["receipt"] = deployed
+        evm_deployment = {"status": "returned", "output": None}
         if deployed["status"] != "0x1":
             trace = rpc.call("debug_traceTransaction", [tx_hash, {"disableStorage": True, "disableStack": True, "enableMemory": False}])
             report["evmDeployment"]["trace"] = trace
             outcome = trace_result(deployed, trace)
-            raise Finding("inconclusive-resource" if outcome["status"] in RESOURCE_STATUSES else "execution-error", "evm-deployment", json.dumps(outcome))
-        address = deployed.get("contractAddress")
-        if not isinstance(address, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", address):
-            raise ValueError("invalid deployed contract address")
-        if common.hex_bytes(rpc.call("eth_getCode", [address, deployed["blockNumber"]]), "deployed runtime") != runtime:
-            raise Finding("adapter-error", "evm-deployment", "installed runtime differs from the exported " +
-                          ("Yul runtime bytes" if args.backend == "yul" else "code image"))
+            if not has_constructor_arguments(case) or outcome["status"] != "reverted":
+                raise Finding("inconclusive-resource" if outcome["status"] in RESOURCE_STATUSES else "execution-error", "evm-deployment", json.dumps(outcome))
+            # A failed deployment ends the scenario at the would-be creation
+            # address, where nothing is installed.
+            evm_deployment = {"status": "reverted", "output": outcome["output"]}
+            created = rpc.call("eth_getTransactionByHash", [tx_hash])
+            address = creation_address(sender, quantity(created.get("nonce") if isinstance(created, dict) else None, "deployment nonce"))
+            if common.hex_bytes(rpc.call("eth_getCode", [address, deployed["blockNumber"]]), "failed deployment code"):
+                raise Finding("adapter-error", "evm-deployment", "a reverted deployment installed code")
+        else:
+            address = deployed.get("contractAddress")
+            if not isinstance(address, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", address):
+                raise ValueError("invalid deployed contract address")
+            if common.hex_bytes(rpc.call("eth_getCode", [address, deployed["blockNumber"]]), "deployed runtime") != runtime:
+                raise Finding("adapter-error", "evm-deployment", "installed runtime differs from the exported " +
+                              ("Yul runtime bytes" if args.backend == "yul" else "code image"))
         # Every slot a prestate diff reports from the deployment on; the whole
         # storage rereads them all at each receipt block.
         diff = rpc.call("debug_traceTransaction", [tx_hash, PRESTATE_DIFF])
@@ -3402,8 +3770,12 @@ def execute(args, report: dict) -> None:
         base = {"caller": bindings["caller"], "address": bindings["address"], "value": "0", "availableGas": str(args.gas)}
         scenario = {"schema": selected["scenarioSchema"], "hull": str(hull), "images": str(images_path),
             "deployPath": case["contract"]["deployPath"], "runtimePath": case["contract"]["runtimePath"], "fuel": args.core_fuel,
-            "observedSlots": list(slots), "constructor": {**base, "calldata": "0x"},
+            "observedSlots": list(slots), "constructor": {**base, "calldata": case["contract"]["constructorCalldata"]
+                                                          if has_constructor_arguments(case) else "0x"},
             "calls": [{"id": tx["id"], "context": {**base, "calldata": tx["calldata"]}, "persist": True} for tx in case["transactions"]]}
+        if has_constructor_arguments(case) and not case["transactions"]:
+            # The runner requires a call; a rejected deployment never reaches it.
+            scenario["calls"] = [{"id": "placeholder", "persist": True, "context": {**base, "calldata": selected["selector"] + "00" * 64}}]
         if has_senders(case):
             scenario["senders"] = list(LEDGER_SENDERS)
             for call, tx in zip(scenario["calls"], case["transactions"]):
@@ -3425,6 +3797,8 @@ def execute(args, report: dict) -> None:
                                                              deployed["blockNumber"])
         if deployment_logs(case):
             keyed["initialLogs"] = evm_logs(deployed)
+        if has_constructor_arguments(case):
+            keyed["deployment"] = evm_deployment
         if selected.get("logs"):
             keyed["chainLogs"] = None
         if selected.get("balances"):
@@ -3442,7 +3816,8 @@ def execute(args, report: dict) -> None:
                 "status": "complete" if complete else "incomplete", "unobserved": [pending] if pending else [],
                 "unexecuted": remaining[1:] if pending else remaining}
         checkpoint()
-        for index, tx in enumerate(case["transactions"]):
+        # A failed deployment ends the scenario before any transaction.
+        for index, tx in enumerate(case["transactions"] if evm_deployment["status"] == "returned" else []):
             record = {"id": tx["id"], "index": index}
             records.append(record)
             checkpoint(tx["id"])

@@ -197,6 +197,20 @@ ARRAY_RETURN_EXTRA = {"ArrayReturnShapes": tuple(f"{element}:{count}" for elemen
                       "ArrayReturnInnerLengths": tuple(range(adapter.ARRAY_RETURN_ELEMENTS["uint256[]"][1] + 1)),
                       "ArrayReturnCarries": ("committed", "rollback"), "ArrayReturnNodeBudgets": (384, 512)}
 ARRAY_RETURN_DIMENSIONS = DIMENSIONS + tuple(ARRAY_RETURN_EXTRA)
+# Constructor arguments: the parameter kinds, an enum as `static` or `dynamic`,
+# the malformation kinds, std's prescribed deployment outcome, the
+# malformations std accepted, the `bytes` lengths and enum fields of accepted
+# deployments, the carries `committed` and `rollback` into a returned
+# transaction, and the node budgets of generated cases.
+CONSTRUCTOR_PARAMETER_CLASSES = ("none", "uint256", "uint256,uint256", "uint256,bytes", "static", "dynamic")
+CONSTRUCTOR_EXTRA = {"ConstructorParameters": CONSTRUCTOR_PARAMETER_CLASSES,
+                     "ConstructorMalformations": adapter.CONSTRUCTOR_KINDS,
+                     "ConstructorOutcomes": ("deployed", adapter.STD_TRUNCATED, adapter.STD_EMPTY_REVERT),
+                     "ConstructorAccepted": ("truncate", "trailing", "offset", "length", "tail", "narrow"),
+                     "ConstructorBytesLengths": tuple(range(adapter.MAX_RETURN_LENGTH + 1)),
+                     "ConstructorEnumFields": ENUM_ARGUMENT_EXTRA["ArgumentFields"],
+                     "ConstructorCarries": ("committed", "rollback"), "ConstructorNodeBudgets": (384, 512)}
+CONSTRUCTOR_DIMENSIONS = DIMENSIONS + tuple(CONSTRUCTOR_EXTRA)
 ARRAY_LENGTHS = (0, 1, 2, 3)
 NUMERIC_DIMENSIONS = ("Inputs", "Keys") + VALUE_EXTRA + ("Senders", "Recipients", "Amounts")
 ALIASES = ("key-counter", "successor-counter", "repeated-key", "successor-key")
@@ -237,6 +251,8 @@ def dimensions(profile_name):
         return ENUM_ARRAY_DIMENSIONS
     if adapter.PROFILES[profile_name]["abi"] == "array-returns":
         return ARRAY_RETURN_DIMENSIONS
+    if adapter.PROFILES[profile_name]["abi"] == "constructor-arguments":
+        return CONSTRUCTOR_DIMENSIONS
     return {"keyed": KEYED_DIMENSIONS, "mapping": KEYED_DIMENSIONS, "array": ARRAY_DIMENSIONS, "flags": LOG_DIMENSIONS,
             "value": VALUE_DIMENSIONS, "bytes": BYTES_DIMENSIONS, "ledger": LEDGER_DIMENSIONS, "nested": NESTED_DIMENSIONS,
             "malformed": MALFORMED_DIMENSIONS}.get(
@@ -470,6 +486,32 @@ def array_returns_coverage(case, statuses):
             "ArrayReturnCarries": carries, "ArrayReturnNodeBudgets": budgets}
 
 
+def constructor_arguments_coverage(case, statuses):
+    """The deployment's parameters, malformation and std's prescribed outcome,
+    an accepted malformation, the `bytes` length and enum field an accepted
+    deployment decodes, the carries into a returned transaction from an earlier
+    committed transaction and past an earlier revert, and a generated case's
+    node budget."""
+    kind, constructors, static, _, _ = adapter.constructor_argument_layout(case)
+    parameters = ("static" if static else "dynamic") if kind == "uint256,enum" else kind
+    deployment = case["deployment"]
+    malformation = deployment["malformation"]["kind"]
+    accepted = deployment["stdRejection"] is None
+    fields = constructors[deployment["choice"]][1] if kind == "uint256,enum" else None
+    carries_bytes = kind == "uint256,bytes" or fields == "bytes"
+    returned = [index for index, status in enumerate(statuses) if status == "returned"]
+    carries = ({"committed"} if any("returned" in statuses[:index] for index in returned) else set()) | (
+        {"rollback"} if any("reverted" in statuses[:index] for index in returned) else set())
+    origin = case["provenance"]["origin"]
+    budgets = {origin["maxProgramNodes"]} if origin.get("kind") == adapter.profile(case)["originKind"] else set()
+    return {"ConstructorParameters": {parameters}, "ConstructorMalformations": {malformation},
+            "ConstructorOutcomes": {"deployed" if accepted else deployment["stdRejection"]},
+            "ConstructorAccepted": {malformation} if accepted and malformation != "none" else set(),
+            "ConstructorBytesLengths": {deployment["length"]} if accepted and carries_bytes else set(),
+            "ConstructorEnumFields": {f"{parameters}:{ENUM_ARGUMENT_FIELD_KINDS[fields]}"} if accepted and fields is not None else set(),
+            "ConstructorCarries": carries, "ConstructorNodeBudgets": budgets}
+
+
 def enum_arguments_coverage(case):
     """Each transaction's decision on its calldata: the decoded constructors'
     positions and fields, decoded `bytes` lengths and the malformations std
@@ -555,6 +597,9 @@ def nested_coverage(case):
 
 
 def versions(profile_name):
+    if adapter.PROFILES[profile_name]["abi"] == "constructor-arguments":
+        # The deployment phase runs its own original Core initializer.
+        return VERSIONS + ("initializerVersion",)
     return LOG_VERSIONS if adapter.PROFILES[profile_name].get("logs") else VERSIONS
 
 
@@ -646,6 +691,11 @@ def case_hash(case):
         # An empty array's Core program is the same for every element type,
         # whose emitted source differs.
         identity["arrayShape"] = {key: case[adapter.profile(case)["planKey"]][key] for key in ("elements", "count", "lengths")}
+    if adapter.has_constructor_arguments(case):
+        # The runtime is the same for every constructor; its parameters, its
+        # initializer and the arguments the deployment sends are not.
+        identity.update(initializerProgram=case["initializerProgram"], deployment=case["deployment"],
+                        parameters={key: case[adapter.profile(case)["planKey"]][key] for key in ("parameters", "constructors")})
     return common.digest(common.json_bytes(identity))
 
 
@@ -708,7 +758,9 @@ def validate_manifest(manifest):
         common.word(value)
     for key in ("requiredHelperCounts", "requiredTransactionCounts"):
         values = manifest.get(key)
-        if not isinstance(values, list) or any(type(v) is not int or v not in (1, 2, 3) for v in values) or len(set(values)) != len(values):
+        # A rejected deployment ends its scenario with no transaction.
+        allowed = (0, 1, 2, 3) if key == "requiredTransactionCounts" and selected["abi"] == "constructor-arguments" else (1, 2, 3)
+        if not isinstance(values, list) or any(type(v) is not int or v not in allowed for v in values) or len(set(values)) != len(values):
             raise ValueError(f"invalid {key}")
     requirements = manifest.get("generationRecipeRequirements")
     if not isinstance(requirements, dict) or set(requirements) != {"templates"}:
@@ -846,6 +898,13 @@ def validate_manifest(manifest):
                 raise ValueError(f"array-return coverage requires unique required{dimension} from {list(allowed)}")
     elif any("required" + dimension in manifest for dimension in ARRAY_RETURN_EXTRA):
         raise ValueError("array-return coverage belongs to the array-return profile")
+    if selected["abi"] == "constructor-arguments":
+        for dimension, allowed in CONSTRUCTOR_EXTRA.items():
+            values = manifest.get("required" + dimension)
+            if not isinstance(values, list) or not values or any(v not in allowed or type(v) is bool for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"constructor-argument coverage requires unique required{dimension} from {list(allowed)}")
+    elif any("required" + dimension in manifest for dimension in CONSTRUCTOR_EXTRA):
+        raise ValueError("constructor-argument coverage belongs to the constructor-argument profile")
     if selected["abi"] != "keccak-loops" and "requiredKeyMasks" in manifest:
         raise ValueError("key-mask coverage belongs to the Keccak-loop profile")
     if selected.get("forms"):
@@ -910,6 +969,9 @@ def validate_manifest(manifest):
         generated = "generation" in entry
         if generated == (selected["planKey"] in entry) or ("transactions" in entry) == generated:
             raise ValueError(f"corpus entry requires generation XOR {selected['planKey']}+transactions")
+        constructor = selected["abi"] == "constructor-arguments"
+        if constructor and ("deployment" in entry) == generated:
+            raise ValueError("an imported constructor-argument entry also records its deployment")
         if "expectedHistory" in entry and (not selected["declared"] or not isinstance(entry["expectedHistory"], list)):
             raise ValueError("independent expected histories are declared-slot transaction lists")
         if any(key in entry for key in ("program", "loopPlan", "input")):
@@ -929,7 +991,8 @@ def validate_manifest(manifest):
             if not isinstance(entry[selected["planKey"]], dict) or entry[selected["planKey"]].get("schema") != selected["planSchema"]:
                 raise ValueError("invalid imported storage plan")
             # Full source/host checking and canonical ABI validation are native.
-            if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3:
+            # A rejected deployment keeps no transactions; the native tool checks which.
+            if not isinstance(entry["transactions"], list) or not (0 if constructor else 1) <= len(entry["transactions"]) <= 3:
                 raise ValueError("invalid imported transaction count")
     return manifest
 
@@ -938,7 +1001,8 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
     actual = copy.deepcopy(report.get("comparison", {"category": "adapter-error", "stage": "missing-report", "pairs": {}}))
     histories = copy.deepcopy(report.get("histories", {}))
     synthetic = False
-    selected = transaction_id or case["transactions"][0]["id"]
+    # A constructor-argument case may have no transaction; its findings sit at deployment.
+    selected = transaction_id or (case["transactions"][0]["id"] if case["transactions"] else None)
     if path is not None:
         if path not in PATHS or not TEST_FIELD.fullmatch(field) or (
                 not adapter.profile(case)["declared"] and field not in ("output", "stray", "storage:0", "storage:1")) or (
@@ -1066,7 +1130,7 @@ def keyed_analysis(analysis):
                                                 adapter.KECCAK_LOOP_HISTORY_SCHEMA, adapter.TUPLE_HISTORY_SCHEMA,
                                                 adapter.BYTES_RETURN_HISTORY_SCHEMA, adapter.ENUM_RETURN_HISTORY_SCHEMA,
                                                 adapter.ENUM_ARGUMENT_HISTORY_SCHEMA, adapter.ENUM_ARRAY_HISTORY_SCHEMA,
-                                                adapter.ARRAY_RETURN_HISTORY_SCHEMA)
+                                                adapter.ARRAY_RETURN_HISTORY_SCHEMA, adapter.CONSTRUCTOR_ARGUMENT_HISTORY_SCHEMA)
                                                for history in histories.values())
 
 
@@ -1093,6 +1157,13 @@ def transaction_counts(histories, case):
                                       not any(account["storage"] for account in value["initialAccountStorage"]) and
                                       not value.get("initialUndeclaredStorage") and not value.get("initialLogs") and
                                       value.get("initialBalance", "0") == str(adapter.deployment_value(case)) for value in values.values())
+    if adapter.has_constructor_arguments(case):
+        # The deployment row writes the record: a prefix starts from a deployment
+        # every path made as std prescribes.
+        try:
+            prefix = len(values) == 3 and adapter.constructor_deployment_mismatch(values, case, []) is None
+        except (ValueError, TypeError, KeyError):
+            prefix = False
     for index, tx in enumerate(case["transactions"]):
         by_path = {path: value["transactions"][index] for path, value in values.items() if index < len(value["transactions"])}
         rows = list(by_path.values())
@@ -1254,6 +1325,8 @@ class Campaign:
             values.update(enum_arrays_coverage(case))
         elif self.specification["abi"] == "array-returns":
             values.update(array_returns_coverage(case, statuses))
+        elif self.specification["abi"] == "constructor-arguments":
+            values.update(constructor_arguments_coverage(case, statuses))
         if self.specification.get("forms"):
             values.update(forms_coverage(case, values))
         for dimension, observed in values.items():
@@ -1326,6 +1399,7 @@ class Campaign:
                           "enum-arguments": tuple(ENUM_ARGUMENT_EXTRA),
                           "enum-arrays": tuple(ENUM_ARRAY_EXTRA),
                           "array-returns": tuple(ARRAY_RETURN_EXTRA),
+                          "constructor-arguments": tuple(CONSTRUCTOR_EXTRA),
                           "malformed": {"nested": tuple(MALFORMED_NESTED_EXTRA) + MALFORMED_EXTRA[1:],
                                         "bytes": ("PayloadLengths",) + MALFORMED_EXTRA[1:]}.get(
                                             adapter.encoding(self.specification), MALFORMED_EXTRA)}.get(
@@ -1358,11 +1432,18 @@ class Campaign:
                 plan_path, tx_path = self.work / "plan.json", self.work / "transactions.json"
                 save_json(plan_path, entry[self.specification["planKey"]])
                 save_json(tx_path, entry["transactions"])
+                # A constructor-argument entry's deployment record comes between them.
+                deployment_path = self.work / "deployment.json" if "deployment" in entry else None
+                if deployment_path:
+                    save_json(deployment_path, entry["deployment"])
                 try:
-                    case = self.tool(["emit", plan_path, tx_path, self.args.direct_fuel], "corpus-emission")
+                    case = self.tool(["emit", plan_path, *([deployment_path] if deployment_path else []), tx_path,
+                                      self.args.direct_fuel], "corpus-emission")
                 finally:
                     plan_path.unlink(missing_ok=True)
                     tx_path.unlink(missing_ok=True)
+                    if deployment_path:
+                        deployment_path.unlink(missing_ok=True)
             if any(case["provenance"].get(key) != manifest[key] for key in versions(self.profile)) or set(case["provenance"]["features"]) != set(entry["expectedFeatures"]):
                 raise ValueError("native corpus features/versions differ from manifest")
             self.add_case(case, entry["id"])

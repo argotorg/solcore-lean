@@ -2548,5 +2548,123 @@ class ArrayReturnCampaignTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "array-return coverage belongs to the array-return profile"):
             campaign.validate_manifest({**other, "requiredArrayReturnShapes": ["uint256:0"]})
 
+
+def constructor_case(origin=None, **options):
+    value = fixtures.constructor_case(**options)
+    value["constructorArgumentsPlan"]["stepProgram"] = case()["storagePlan"]["stepProgram"]
+    value["provenance"].update({key: "policy-test" for key in campaign.versions("stateful-constructor-arguments")})
+    value["provenance"].update(features=["local"], origin=origin or {"kind": "imported"})
+    return value
+
+
+class ConstructorArgumentCampaignTests(unittest.TestCase):
+    def test_coverage_names_parameters_malformations_outcomes_acceptance_lengths_fields_carries_and_budgets(self):
+        self.assertEqual(campaign.dimensions("stateful-constructor-arguments"),
+                         campaign.DIMENSIONS + ("ConstructorParameters", "ConstructorMalformations", "ConstructorOutcomes",
+                                                "ConstructorAccepted", "ConstructorBytesLengths", "ConstructorEnumFields",
+                                                "ConstructorCarries", "ConstructorNodeBudgets"))
+        self.assertEqual(campaign.versions("stateful-constructor-arguments"), campaign.VERSIONS + ("initializerVersion",))
+        # A deployed bytes value of 33 bytes; tx-2 returns after the committed
+        # tx-0 and past the revert of tx-1; an imported case has no node budget.
+        value = constructor_case()
+        self.assertEqual(campaign.constructor_arguments_coverage(value, ["returned", "reverted", "returned"]),
+                         {"ConstructorParameters": {"uint256,bytes"}, "ConstructorMalformations": {"none"},
+                          "ConstructorOutcomes": {"deployed"}, "ConstructorAccepted": set(),
+                          "ConstructorBytesLengths": {33}, "ConstructorEnumFields": set(),
+                          "ConstructorCarries": {"committed", "rollback"}, "ConstructorNodeBudgets": set()})
+        # A rejection decodes nothing and runs nothing.
+        rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+        self.assertEqual(campaign.constructor_arguments_coverage(rejected, []),
+                         {"ConstructorParameters": {"uint256,bytes"}, "ConstructorMalformations": {"truncate"},
+                          "ConstructorOutcomes": {"0x08638556"}, "ConstructorAccepted": set(),
+                          "ConstructorBytesLengths": set(), "ConstructorEnumFields": set(),
+                          "ConstructorCarries": set(), "ConstructorNodeBudgets": set()})
+        # A static enum cut to Idle's tag deploys; a generated case records its budget.
+        narrowed = constructor_case(parameters="uint256,enum", constructors=fixtures.STATIC_ENUM, a=4, choice=1, first=0,
+                                    second=0, length=0, malformation={"kind": "narrow"}, rows=((1, 1),),
+                                    origin={"kind": "constructor-argument-generated", "maxProgramNodes": 512})
+        self.assertEqual(campaign.constructor_arguments_coverage(narrowed, ["reverted"]),
+                         {"ConstructorParameters": {"static"}, "ConstructorMalformations": {"narrow"},
+                          "ConstructorOutcomes": {"deployed"}, "ConstructorAccepted": {"narrow"},
+                          "ConstructorBytesLengths": set(), "ConstructorEnumFields": {"static:none"},
+                          "ConstructorCarries": set(), "ConstructorNodeBudgets": {512}})
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-constructor-arguments"))
+            instance.summary["coverage"].update(requiredConstructorBytesLengths=[0, 1, 31, 32, 33, 63, 64],
+                                                requiredConstructorOutcomes=list(campaign.CONSTRUCTOR_EXTRA["ConstructorOutcomes"]))
+            instance.record_coverage(value, "matched", fixtures.constructor_histories(value))
+            instance.record_coverage(rejected, "matched", fixtures.constructor_histories(rejected))
+            instance.checkpoint()
+            coverage = instance.summary["coverage"]
+            self.assertEqual((coverage["matchedConstructorOutcomes"], coverage["matchedConstructorBytesLengths"],
+                              coverage["matchedTransactionCounts"]), (["0x08638556", "deployed"], [33], [0, 3]))
+            self.assertEqual((coverage["missingConstructorOutcomes"], coverage["missingConstructorBytesLengths"]),
+                             (["0x"], [0, 1, 31, 32, 63, 64]))
+
+    def test_a_case_s_identity_includes_its_parameters_initializer_and_arguments(self):
+        value = constructor_case()
+        self.assertEqual(campaign.case_hash(value), campaign.case_hash(constructor_case()))
+        for options in ({"a": 6}, {"malformation": {"kind": "trailing", "count": 1, "pattern": "zeros"}},
+                        {"parameters": "uint256", "first": 0, "second": 0, "length": 0}):
+            with self.subTest(options=options):
+                self.assertNotEqual(campaign.case_hash(constructor_case(**options)), campaign.case_hash(value))
+        changed = copy.deepcopy(value)
+        changed["initializerProgram"] = {"changed": True}
+        self.assertNotEqual(campaign.case_hash(changed), campaign.case_hash(value))
+
+    def test_a_prefix_starts_from_the_prescribed_deployment(self):
+        value = constructor_case()
+        self.assertEqual(campaign.transaction_counts(fixtures.constructor_histories(value), value),
+                         {"executed": 3, "completed": 3, "matched": 3})
+        histories = fixtures.constructor_histories(value, record=[5, 33, 0, 0, 0])
+        self.assertEqual(campaign.transaction_counts(histories, value), {"executed": 3, "completed": 3, "matched": 0})
+        rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+        self.assertEqual(campaign.transaction_counts(fixtures.constructor_histories(rejected), rejected),
+                         {"executed": 0, "completed": 0, "matched": 0})
+        # A case without transactions still names no synthetic row.
+        analysis = campaign.analyze({"comparison": runner_compare(rejected), "histories": fixtures.constructor_histories(rejected)},
+                                    rejected)
+        self.assertEqual((analysis["synthetic"], analysis["comparison"]["category"]), (False, "matched"))
+
+    def test_the_fixed_corpus_validates_and_its_constructor_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-constructor-argument-corpus.json").read_text())
+        self.assertEqual(campaign.validate_manifest(manifest)["profile"], "stateful-constructor-arguments")
+        for dimension in ("ConstructorParameters", "ConstructorMalformations", "ConstructorOutcomes", "ConstructorAccepted",
+                          "ConstructorEnumFields", "ConstructorCarries", "ConstructorNodeBudgets"):
+            self.assertEqual(manifest["required" + dimension], list(campaign.CONSTRUCTOR_EXTRA[dimension]))
+        self.assertEqual((manifest["requiredConstructorBytesLengths"], manifest["requiredTransactionCounts"]),
+                         ([0, 1, 31, 32, 33, 63, 64], [0, 1, 2, 3]))
+        for key, changed in (("requiredConstructorParameters", ["enum"]), ("requiredConstructorMalformations", ["short"]),
+                             ("requiredConstructorOutcomes", ["0x4924aef0"]), ("requiredConstructorAccepted", ["tag"]),
+                             ("requiredConstructorBytesLengths", [65]), ("requiredConstructorBytesLengths", [True]),
+                             ("requiredConstructorEnumFields", ["static:bytes"]), ("requiredConstructorCarries", ["rejection"]),
+                             ("requiredConstructorNodeBudgets", [448]), ("requiredConstructorNodeBudgets", [384, 384]),
+                             ("requiredTransactionCounts", [4]), ("requiredConstructorParameters", [])):
+            with self.subTest(key=key, changed=changed), self.assertRaises(ValueError):
+                campaign.validate_manifest({**manifest, key: changed})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({key: value for key, value in manifest.items() if key != "requiredConstructorCarries"})
+        # An imported entry records its deployment; a rejected one keeps no transactions.
+        imported = next(index for index, entry in enumerate(manifest["cases"]) if "deployment" in entry and not entry["transactions"])
+        changed = copy.deepcopy(manifest)
+        del changed["cases"][imported]["deployment"]
+        with self.assertRaisesRegex(ValueError, "records its deployment"):
+            campaign.validate_manifest(changed)
+        generated = next(index for index, entry in enumerate(manifest["cases"]) if "generation" in entry)
+        changed = copy.deepcopy(manifest)
+        changed["cases"][generated]["deployment"] = manifest["cases"][imported]["deployment"]
+        with self.assertRaisesRegex(ValueError, "records its deployment"):
+            campaign.validate_manifest(changed)
+        # Other profiles keep at least one imported transaction and no zero count.
+        other = json.loads((ROOT / "scripts/semantic-array-return-corpus.json").read_text())
+        with self.assertRaisesRegex(ValueError, "constructor-argument coverage belongs to the constructor-argument profile"):
+            campaign.validate_manifest({**other, "requiredConstructorParameters": ["none"]})
+        with self.assertRaises(ValueError):
+            campaign.validate_manifest({**other, "requiredTransactionCounts": [0, 1]})
+
+
+def runner_compare(value):
+    return fixtures.runner.compare(fixtures.constructor_histories(value), value)
+
 if __name__ == "__main__":
     unittest.main()

@@ -5080,5 +5080,297 @@ class ArrayReturnTests(unittest.TestCase):
         self.assertFalse(result["pairs"]["directCore/rustEvm"])
         self.assertIn("committedStorage", result["fields"])
 
+
+CONSTRUCTOR_SELECTOR = "0x7357f5d2"
+STATIC_ENUM = (("Pair", "uint256,uint256"), ("Idle", ""), ("Q", "uint256"))
+DYNAMIC_ENUM = (("Blob", "bytes"), ("Ready", "uint256"), ("Settled", "uint256,uint256"), ("Rejected", ""))
+
+
+def constructor_case(parameters="uint256,bytes", constructors=(), a=5, choice=0, first=4, second=5, length=33,
+                     malformation=None, rows=((0, 3), (1, 5), (0, 7))):
+    """Envelope fixture only: native replay checks the actual contracts. The
+    arguments and std's decision are the adapter's own, which
+    `test_std_s_decision_follows_the_memory_reader_rules` pins; a rejected
+    deployment keeps no transactions."""
+    value = {"schema": runner.CONSTRUCTOR_ARGUMENT_CASE_SCHEMA, "program": {}, "initializerProgram": {},
+        "source": "protocol fixture only",
+        "constructorArgumentsPlan": {"schema": "solcore-lean.constructor-argument-plan.v1", "parameters": parameters,
+                                     "constructors": [{"name": name, "fields": fields} for name, fields in constructors],
+                                     "stepProgram": {}},
+        "deployment": {"a": str(a), "choice": choice, "first": str(first), "second": str(second), "length": length,
+                       "malformation": malformation or {"kind": "none"}, "arguments": None, "stdRejection": None},
+        "initialState": {"storage": []}, "observedSlots": [str(slot) for slot in range(6)],
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "contract": {"name": "SynthesizedConstructorArguments", "method": "run", "signature": "run(uint256,uint256)",
+            "selector": CONSTRUCTOR_SELECTOR, "deployPath": ["SynthesizedConstructorArgumentsDeploy"],
+            "runtimePath": ["SynthesizedConstructorArgumentsDeploy", "SynthesizedConstructorArguments"],
+            "constructorCalldata": None}}
+    data = runner.constructor_argument_bytes(value)
+    value["deployment"].update(arguments="0x" + data.hex(), stdRejection=runner.constructor_argument_decide(value, data)[0])
+    value["contract"]["constructorCalldata"] = "0x" + data.hex()
+    value["transactions"] = [] if value["deployment"]["stdRejection"] is not None else [
+        {"id": f"tx-{index}", "flags": str(flags), "input": str(input_), "value": "0",
+         "calldata": CONSTRUCTOR_SELECTOR + f"{flags:064x}" + f"{input_:064x}"} for index, (flags, input_) in enumerate(rows)]
+    return value
+
+
+def payload_word(first, second, length, index):
+    """The zero-padded payload Word at `index`, from the first `length` bytes of
+    first * K and second * K."""
+    data = ((first * MULTIPLIER) % 2**256).to_bytes(32, "big") + ((second * MULTIPLIER) % 2**256).to_bytes(32, "big")
+    piece = data[:length][index:index + 32]
+    return int.from_bytes(piece + bytes(32 - len(piece)), "big")
+
+
+def constructor_history(value, path, step=lambda x: x + 1, record=None, core_word=None, status=None):
+    """Rows of the protocol with a known step: the deployment commits the record
+    std decodes, or nothing; each transaction computes r = step(slot 0 + input
+    + slots 1..5), writes r to slot 0 and returns it, and odd flags revert with
+    r. Original Core reverts with std's selector as a Word, or the Word zero
+    for empty data; Hull and EVM give the revert bytes."""
+    rejection, decoded = runner.constructor_argument_decide(value, runner.constructor_argument_bytes(value))
+    initial = [0] * 6 if rejection is not None else [0, *(decoded if record is None else record)]
+    rows, prior = [], list(initial)
+    for index, tx in enumerate(value["transactions"]):
+        result = step((sum(prior) + int(tx["input"])) % 2**256) % 2**256
+        reverted = int(tx["flags"]) % 2 == 1
+        committed = list(prior) if reverted else [result, *prior[1:]]
+        row = {"id": tx["id"], "index": index, "status": "reverted" if reverted else "returned",
+               "output": "0x" + result.to_bytes(32, "big").hex(), "committedStorage": methods_slots(committed)}
+        if path != "directCore":
+            row["undeclaredStorage"] = []
+        rows.append(row)
+        prior = committed
+    if rejection is None:
+        deployment = {"status": "returned", "output": {"directCore": "0x" + "00" * 32, "importedHull": "0x6080"}.get(path)}
+    else:
+        word = bytes(32) if rejection == "0x" else int(rejection, 16).to_bytes(32, "big")
+        deployment = {"status": "reverted", "output": ("0x" + word.hex() if core_word is None else core_word)
+                      if path == "directCore" else rejection}
+    if status is not None:
+        deployment = {"status": status, "output": deployment["output"] or "0x"}
+    result = {"schema": runner.CONSTRUCTOR_ARGUMENT_HISTORY_SCHEMA, "observedSlots": value["observedSlots"],
+        "deployment": deployment, "initialStorage": methods_slots(initial), "transactions": rows,
+        "finalStorage": copy.deepcopy(rows[-1]["committedStorage"] if rows else methods_slots(initial)),
+        "status": "complete", "unexecuted": []}
+    if path != "directCore":
+        result["initialUndeclaredStorage"] = []
+    return with_whole(result)
+
+
+def constructor_histories(value=None, **options):
+    value = constructor_case() if value is None else value
+    return {path: constructor_history(value, path, **options) for path in runner.PATHS}
+
+
+class ConstructorArgumentTests(unittest.TestCase):
+    def test_a_case_carries_its_arguments_and_std_s_decision_and_no_transaction_after_a_rejection(self):
+        value = constructor_case()
+        runner.validate_case(value)
+        selected = runner.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"], selected["declared"], selected["abi"], selected["selector"]),
+                         ("semantic-constructor-argument-tool", "rust-hull-keyed-storage-scenario", True,
+                          "constructor-arguments", CONSTRUCTOR_SELECTOR))
+        self.assertTrue(runner.has_constructor_arguments(value) and runner.uses_selector_rule(value))
+        self.assertFalse(runner.has_constructor_arguments(array_return_case()) or runner.has_enum_arguments(value))
+        self.assertEqual([runner.expected_status(value, tx) for tx in value["transactions"]], ["returned", "reverted", "returned"])
+        self.assertEqual(runner.observed_slots(value), tuple(str(slot) for slot in range(6)))
+        self.assertIn("appended to the init code", runner.scope(value))
+        # a, the offset 64, the length 33 and 33 payload bytes padded to two Words.
+        data = runner.common.hex_bytes(value["deployment"]["arguments"], "arguments")
+        self.assertEqual(data[:96], b"".join(word.to_bytes(32, "big") for word in (5, 64, 33)))
+        self.assertEqual(data[96:], payload_word(4, 5, 33, 0).to_bytes(32, "big") + payload_word(4, 5, 33, 32).to_bytes(32, "big"))
+        rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+        runner.validate_case(rejected)
+        self.assertEqual((rejected["deployment"]["stdRejection"], rejected["transactions"]), ("0x08638556", []))
+        with_transaction = copy.deepcopy(rejected)
+        with_transaction["transactions"] = copy.deepcopy(value["transactions"][:1])
+        with self.assertRaises(ValueError):
+            runner.validate_case(with_transaction)
+        # The record, its arguments, std's decision and the contract's calldata are each checked.
+        for key, changed in (("arguments", value["deployment"]["arguments"] + "00"), ("stdRejection", "0x08638556"),
+                             ("length", 65), ("choice", 1), ("malformation", {"kind": "offset", "value": "64"}),
+                             ("malformation", {"kind": "length", "value": "33"}), ("malformation", {"kind": "narrow"}),
+                             ("malformation", {"kind": "tag", "value": "0"}), ("malformation", {"kind": "truncate", "kept": 160}),
+                             ("malformation", {"kind": "trailing", "count": 65, "pattern": "zeros"}),
+                             ("malformation", {"kind": "trailing", "count": 1, "pattern": "last-byte"})):
+            invalid = copy.deepcopy(value)
+            invalid["deployment"][key] = changed
+            with self.subTest(key=key, changed=changed), self.assertRaises((ValueError, runner.Finding)):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["contract"]["constructorCalldata"] = "0x"
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+        for key, changed in (("calldata", CONSTRUCTOR_SELECTOR + "00" * 64), ("value", "1"), ("input", "4")):
+            invalid = copy.deepcopy(value)
+            invalid["transactions"][0][key] = changed
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        # Words the parameters do not send, and plans outside the grammar, are refused.
+        for options in ({"parameters": "uint256", "second": 1, "length": 0, "first": 0},
+                        {"parameters": "none", "a": 1, "first": 0, "second": 0, "length": 0},
+                        {"parameters": "uint256,uint256", "second": 1, "length": 0}):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                constructor_case(**options)
+        for plan in ({"parameters": "bytes"}, {"parameters": "uint256", "constructors": [{"name": "Idle", "fields": ""}]},
+                     {"parameters": "uint256,enum", "constructors": [{"name": "Idle", "fields": ""}]}):
+            invalid = copy.deepcopy(value)
+            invalid["constructorArgumentsPlan"].update(plan)
+            with self.subTest(plan=plan), self.assertRaises(ValueError):
+                runner.validate_case(invalid)
+        invalid = copy.deepcopy(value)
+        invalid["observedSlots"] = invalid["observedSlots"][:5]
+        with self.assertRaises(runner.Finding):
+            runner.validate_case(invalid)
+
+    def test_std_s_decision_follows_the_memory_reader_rules(self):
+        tag = lambda name, fields: runner.enum_argument_tag(name, fields)
+        k = lambda first, second, length, index: payload_word(first, second, length, index)
+        for options, rejection, record in (
+                # Junk after a parameterless constructor is never read.
+                ({"parameters": "none", "a": 0, "first": 0, "second": 0, "length": 0,
+                  "malformation": {"kind": "trailing", "count": 33, "pattern": "ramp"}}, None, [1, 0, 0, 0, 0]),
+                ({"parameters": "uint256", "a": 7, "first": 0, "second": 0, "length": 0,
+                  "malformation": {"kind": "truncate", "kept": 31}}, "0x08638556", [0] * 5),
+                ({"parameters": "uint256,uint256", "a": 4, "first": 6, "second": 0, "length": 0,
+                  "malformation": {"kind": "truncate", "kept": 32}}, "0x08638556", [0] * 5),
+                # An offset of 32 reads the offset Word as the length and the length Word as data.
+                ({"a": 7, "first": 7, "second": 8, "length": 33, "malformation": {"kind": "offset", "value": "32"}},
+                 None, [7, 32, 33, 0, 0]),
+                # A length into the padding decodes the zero padding.
+                ({"a": 5, "first": 5, "second": 5, "length": 17, "malformation": {"kind": "length", "value": "32"}},
+                 None, [5, 32, k(5, 5, 17, 0), 0, 0]),
+                ({"a": 5, "first": 5, "second": 5, "length": 17, "malformation": {"kind": "length", "value": "33"}},
+                 "0x08638556", [0] * 5),
+                # A cut of the padding alone deploys.
+                ({"a": 1, "first": 2, "second": 3, "length": 33, "malformation": {"kind": "truncate", "kept": 159}},
+                 None, [1, 33, k(2, 3, 33, 0), k(2, 3, 33, 32), 0]),
+                ({"a": 1, "first": 1, "second": 1, "length": 1,
+                  "malformation": {"kind": "offset", "value": str(2**255)}}, "0x08638556", [0] * 5),
+                # A static enum cut to its tag deploys; an unknown tag, whole or cut, is empty data.
+                ({"parameters": "uint256,enum", "constructors": STATIC_ENUM, "a": 4, "choice": 1, "first": 0, "second": 0,
+                  "length": 0, "malformation": {"kind": "narrow"}}, None, [4, 2, 0, 0, 0]),
+                ({"parameters": "uint256,enum", "constructors": STATIC_ENUM, "a": 6, "choice": 0, "first": 1, "second": 2,
+                  "length": 0, "malformation": {"kind": "tag", "value": "0"}}, "0x", [0] * 5),
+                ({"parameters": "uint256,enum", "constructors": DYNAMIC_ENUM, "a": 9, "choice": 1, "first": 3, "second": 0,
+                  "length": 0, "malformation": {"kind": "tagCut", "value": "0"}}, "0x", [0] * 5),
+                # An offset of zero reads `a` as the tag, here Rejected's.
+                ({"parameters": "uint256,enum", "constructors": DYNAMIC_ENUM, "a": tag("Rejected", ""), "choice": 3,
+                  "first": 0, "second": 0, "length": 0, "malformation": {"kind": "offset", "value": "0"}},
+                 None, [tag("Rejected", ""), 4, 0, 0, 0]),
+                # A tail offset of 32 reads the tail Word itself as the length.
+                ({"parameters": "uint256,enum", "constructors": DYNAMIC_ENUM, "a": 2, "choice": 0, "first": 2, "second": 2,
+                  "length": 33, "malformation": {"kind": "tail", "value": "32"}}, None, [2, 1, 32, 0, 0]),
+                ({"parameters": "uint256,enum", "constructors": DYNAMIC_ENUM, "a": 7, "choice": 1, "first": 9, "second": 0,
+                  "length": 0, "malformation": {"kind": "truncate", "kept": 127}}, "0x08638556", [0] * 5),
+                ({"parameters": "uint256,enum", "constructors": DYNAMIC_ENUM, "a": 1, "choice": 0, "first": 1, "second": 2,
+                  "length": 33}, None, [1, 1, 33, k(1, 2, 33, 0), k(1, 2, 33, 32)])):
+            value = constructor_case(**options)
+            with self.subTest(options=options):
+                self.assertEqual(runner.constructor_argument_decide(value, runner.constructor_argument_bytes(value)),
+                                 (rejection, record))
+        # The tags are std's keccak256 of the constructor signatures, as `cast keccak` gives them.
+        self.assertEqual(f"{tag('Rejected', ''):064x}", "efde6dcf3c2196c5705e848c09f0659d33de3ca0248be3ab40852d1bafc0f1e3")
+        self.assertEqual(f"{tag('Blob', 'bytes'):064x}", "d05ce3dc4caf4a4b252e3323bde615dc3b9d54623e1859c892f0b4ecf5e45164")
+
+    def test_the_deployment_row_is_compared_under_the_selector_and_empty_revert_rules(self):
+        value = constructor_case()
+        result = runner.compare(constructor_histories(value), value)
+        self.assertEqual((result["category"], result["selectorRows"]), ("matched", []))
+        for index, tx in enumerate(value["transactions"]):
+            rows = constructor_histories(value)["directCore"]["transactions"]
+            prior = rows[index - 1]["committedStorage"] if index else constructor_histories(value)["directCore"]["initialStorage"]
+            self.assertTrue(runner.conforms(value, tx, rows[index], prior))
+        for malformation, selector in (({"kind": "truncate", "kept": 64}, "0x08638556"),):
+            rejected = constructor_case(malformation=malformation)
+            result = runner.compare(constructor_histories(rejected), rejected)
+            self.assertEqual((result["category"], result["selectorRows"]),
+                             ("matched", [{"id": "deployment", "index": None, "selector": selector}]))
+        tagged = constructor_case(parameters="uint256,enum", constructors=STATIC_ENUM, a=6, choice=0, first=1, second=2,
+                                  length=0, malformation={"kind": "tag", "value": "0"})
+        result = runner.compare(constructor_histories(tagged), tagged)
+        self.assertEqual((result["category"], result["selectorRows"]),
+                         ("matched", [{"id": "deployment", "index": None, "selector": "0x"}]))
+        # The rules hold only for the prescribed rejection: another selector Word,
+        # or the Word zero for a truncation, is a difference.
+        for core_word in ("0x" + "00" * 32, "0x" + int("4924aef0", 16).to_bytes(32, "big").hex()):
+            rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+            histories = constructor_histories(rejected)
+            histories["directCore"] = constructor_history(rejected, "directCore", core_word=core_word)
+            result = runner.compare(histories, rejected)
+            with self.subTest(core_word=core_word):
+                self.assertEqual((result["category"], result["stage"], result["fields"]),
+                                 ("semantic-mismatch", "deployment", ["output"]))
+        # A deployment against std's rejection, a rejection against its
+        # acceptance, and another record are differences, even on every path.
+        rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+        histories = constructor_histories(rejected)
+        histories["rustEvm"] = constructor_history(rejected, "rustEvm", status="returned")
+        result = runner.compare(histories, rejected)
+        self.assertEqual((result["category"], result["stage"]), ("semantic-mismatch", "deployment"))
+        self.assertIn("status", result["fields"])
+        refused = constructor_histories(value)
+        refused["importedHull"] = {**constructor_history(value, "importedHull"), "deployment": {"status": "reverted", "output": "0x"},
+                                   "transactions": [], "status": "incomplete", "unexecuted": ["tx-0", "tx-1", "tx-2"],
+                                   "finalStorage": None, "unobserved": []}
+        refused["importedHull"]["finalStorage"] = copy.deepcopy(refused["importedHull"]["initialStorage"])
+        refused["importedHull"]["finalAccountStorage"] = copy.deepcopy(refused["importedHull"]["initialAccountStorage"])
+        result = runner.compare(refused, value)
+        self.assertEqual((result["category"], result["stage"]), ("semantic-mismatch", "deployment"))
+        self.assertEqual(result["fields"], ["status", "output"])
+        record = [5, 33, payload_word(4, 5, 33, 0), payload_word(4, 5, 33, 32) ^ 1, 0]
+        result = runner.compare(constructor_histories(value, record=record), value)
+        self.assertEqual((result["category"], result["stage"]), ("semantic-mismatch", "deployment"))
+        self.assertEqual(result["fields"], ["committedStorage", "accountStorage"])
+        self.assertTrue(all(result["pairs"].values()))
+
+    def test_a_completed_runtime_row_keeps_the_record_and_returns_slot_zero(self):
+        value = constructor_case()
+        history = constructor_history(value, "directCore")
+        rows, initial = history["transactions"], history["initialStorage"]
+        self.assertEqual(runner.constructor_argument_fields(value, value["transactions"][0], rows[0], initial), [])
+        changed = copy.deepcopy(rows[0])
+        changed["committedStorage"][3]["value"] = "1"
+        self.assertEqual(runner.constructor_argument_fields(value, value["transactions"][0], changed, initial), ["committedStorage"])
+        changed = {**rows[0], "output": "0x" + (int(rows[0]["output"], 16) ^ 1).to_bytes(32, "big").hex()}
+        self.assertEqual(runner.constructor_argument_fields(value, value["transactions"][0], changed, initial), ["output"])
+        self.assertFalse(runner.conforms(value, value["transactions"][0], changed, initial))
+        # A step that breaks no record is an ordinary difference on one path.
+        histories = constructor_histories(value)
+        histories["rustEvm"] = constructor_history(value, "rustEvm", step=lambda x: x + 2)
+        result = runner.compare(histories, value)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+
+    def test_hull_ends_at_a_reverted_deployment_and_drops_the_placeholder_call(self):
+        zeros = [{"slot": str(slot), "value": "0"} for slot in range(6)]
+        empty = [{"role": "contract", "address": ADDRESS, "storage": []}]
+        rejected = constructor_case(malformation={"kind": "truncate", "kept": 64})
+        line = json.dumps({"stage": "deployment", "status": "reverted", "output": "0x08638556", "committedStorage": zeros,
+                           "accountStorage": empty, "undeclaredStorage": []})
+        history = runner.hull_history(line + "\n", 1, rejected)
+        self.assertEqual((history["deployment"], history["transactions"], history["status"]),
+                         ({"status": "reverted", "output": "0x08638556"}, [], "complete"))
+        # An accepted deployment without transactions runs the placeholder, whose row is dropped.
+        accepted = constructor_case(rows=())
+        storage = methods_slots([0, *runner.constructor_argument_decide(accepted, runner.constructor_argument_bytes(accepted))[1]])
+        whole_storage = whole(storage)
+        deployed = json.dumps({"stage": "deployment", "status": "returned", "output": "0x6080", "committedStorage": storage,
+                               "accountStorage": whole_storage, "undeclaredStorage": []})
+        call = json.dumps({"stage": "execution", "index": 0, "id": "placeholder", "status": "returned", "output": "0x" + "00" * 32,
+                           "committedStorage": storage, "accountStorage": whole_storage, "undeclaredStorage": []})
+        history = runner.hull_history(deployed + "\n" + call + "\n", 0, accepted)
+        self.assertEqual((history["deployment"]["status"], history["transactions"], history["status"]), ("returned", [], "complete"))
+        # Any other deployment failure stays an execution error.
+        with self.assertRaises(runner.Finding):
+            runner.hull_history(json.dumps({"stage": "deployment", "status": "invalid", "committedStorage": zeros,
+                                            "accountStorage": empty, "undeclaredStorage": []}) + "\n", 1, rejected)
+
+    def test_the_would_be_creation_address_is_the_create_address(self):
+        sender = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+        self.assertEqual(runner.creation_address(sender, 0), "0x5fbdb2315678afecb367f032d93f642f64180aa3")
+        self.assertEqual(runner.creation_address(sender, 1), "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512")
+
 if __name__ == "__main__":
     unittest.main()
