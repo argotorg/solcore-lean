@@ -176,10 +176,12 @@ SHRINKABLE = {"semantic-mismatch", "source-rejected", "compilation-rejected", "c
 
 
 # Saved cases of these profiles carry Core references of thousands of nodes,
-# about ten times larger indented than compact; their retained case files are
-# compact JSON, so that the fixed corpus fits one profile's disk budget. Digests
-# and replay are unchanged.
-COMPACT_CASE_PROFILES = ("runtime-memory-calls",)
+# 185 to 660 KB a case indented and four to ten times smaller compact; their
+# retained case files are compact JSON, so that their fixed corpora fit one
+# profile's disk budget and leave the suite's to the others. Digests and replay
+# are unchanged; the other pure profiles' cases stay below 85 KB indented.
+COMPACT_CASE_PROFILES = ("runtime-assembly-memory", "runtime-traits", "runtime-trait-hierarchies",
+                         "runtime-memory-values", "runtime-memory-calls")
 
 
 def save_json(path: Path, value, *, compact: bool = False) -> None:

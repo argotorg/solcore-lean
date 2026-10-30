@@ -1738,6 +1738,8 @@ class EnumCoverageTests(unittest.TestCase):
                 instance.run()
             self.assertEqual(calls, [('enum-emit', value['cases'][0]['enumPlan'], ['255', '1000'], 'corpus-emission')])
             self.assertEqual(instance.summary['counts']['generated'], 1)
+            # Enum cases stay below the compact profiles' sizes and keep the indented bytes.
+            self.assertEqual((Path(directory) / 'cases' / '0000.json').read_bytes(), campaign.m2.json_bytes(enum_policy_case()))
             coverage = instance.summary['enumCoverage']
             self.assertEqual((coverage['requiredViews'], coverage['generatedViews'], coverage['matchedViews']),
                              (['single'], ['single'], ['single']))
@@ -2250,6 +2252,10 @@ class MemoryCoverageTests(unittest.TestCase):
                 instance.run()
             self.assertEqual(calls, [('memory-values-emit', value['cases'][0]['memoryValuePlan'], ['255', '1000'],
                                       'corpus-emission')])
+            # The retained case is compact JSON of the same case.
+            retained = (Path(directory) / 'cases' / '0000.json').read_bytes()
+            self.assertEqual(json.loads(retained), memory_policy_case())
+            self.assertEqual(retained.count(b'\n'), 1)
             coverage = instance.summary['memoryValueCoverage']
             self.assertEqual((coverage['requiredIndices'], coverage['generatedIndices'], coverage['matchedIndices']),
                              (['word:input'], ['word:input'], ['word:input']))
@@ -2452,8 +2458,10 @@ class MemoryCallCoverageTests(unittest.TestCase):
             self.assertEqual((coverage['missingIndices'], coverage['missingPasses']), (['word:literal'], ['pair']))
             self.assertTrue(campaign.missing_coverage(instance.summary))
 
-    def test_only_this_profile_retains_compact_cases(self):
-        self.assertEqual(campaign.COMPACT_CASE_PROFILES, (self.PROFILE,))
+    def test_only_the_large_pure_profiles_retain_compact_cases(self):
+        self.assertEqual(campaign.COMPACT_CASE_PROFILES, ('runtime-assembly-memory', 'runtime-traits',
+            'runtime-trait-hierarchies', 'runtime-memory-values', self.PROFILE))
+        self.assertTrue(set(campaign.COMPACT_CASE_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = memory_call_policy_case()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'case.json'
