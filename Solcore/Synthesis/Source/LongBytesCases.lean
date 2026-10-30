@@ -18,7 +18,7 @@ open Solcore.ContractRuntime (encodeBytesText decodeBytesText? encodeWordBytesBE
 
 def caseSchema : String := "solcore-lean.semantic-long-bytes-case.v1"
 def planSchema : String := "solcore-lean.long-bytes-plan.v1"
-def profileVersion : String := "stateful-long-bytes-v1/long-bytes-sequence-seed-v1"
+def profileVersion : String := "stateful-long-bytes-v1/long-bytes-sequence-seed-v2"
 def templateVersion : String := "bytes-eight-chunks-tail-size-revert-odd-flags-v1"
 def longBytesCorpusSchema : String := "solcore-lean.semantic-long-bytes-corpus.v1"
 
@@ -162,11 +162,13 @@ def parityPatterns : List (List Bool) :=
 
 /-- Three lengths, three byte patterns, then the completion pattern. Each
 choice uses the high half of one draw from a separate stream: the low bits of a
-power-of-two LCG have short periods. -/
+power-of-two LCG have short periods. The stream starts at SplitMix64's finalizer
+of the seed xor its domain, so that consecutive seeds' choices do not step by a
+fixed residue. -/
 def sequenceBounds : List Nat := [12, 12, 12, 4, 4, 4, 4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c6f6e672d747874)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6c6f6e672d747874))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw
@@ -175,9 +177,11 @@ def sequenceChoices (seed : Seed) : List Nat := Id.run do
   return values.toList
 
 /-- 256 seeded bytes for each of three transactions from a further stream; each
-draw contributes the four bytes of its high half. -/
+draw contributes the four bytes of its high half. The stream starts at
+SplitMix64's finalizer of the seed xor its domain, so that consecutive seeds'
+bytes are not affine in the seed. -/
 def seededPayloads (seed : Seed) : List (List UInt8) := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c6f6e672d646174)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6c6f6e672d646174))
   let mut payloads : Array (List UInt8) := #[]
   for _ in List.range 3 do
     let mut bytes : Array UInt8 := #[]

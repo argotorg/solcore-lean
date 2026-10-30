@@ -17,7 +17,7 @@ open Solcore.Synthesis.Stateful.StorageMappingExecution (Transaction Bindings en
 
 def caseSchema : String := "solcore-lean.semantic-mapping-case.v1"
 def planSchema : String := "solcore-lean.mapping-plan.v1"
-def profileVersion : String := "stateful-mapping-v1/mapping-sequence-seed-v1"
+def profileVersion : String := "stateful-mapping-v1/mapping-sequence-seed-v2"
 def templateVersion : String := "keccak-entry-successor-counter-revert-odd-flags-v1"
 def mappingCorpusSchema : String := "solcore-lean.semantic-mapping-corpus.v1"
 
@@ -177,9 +177,11 @@ def parityPatterns : List (List Bool) :=
 
 /-- Three keys, three inputs, then the completion pattern. Each choice uses the
 high half of one draw from a separate stream: the low bits of a power-of-two
-LCG have short periods. -/
+LCG have short periods. The stream starts at SplitMix64's finalizer of the seed
+xor its domain, so that consecutive seeds' choices do not step by a fixed
+residue. -/
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d617070696e672d)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6d617070696e672d))
   let mut values : Array Nat := #[]
   for bound in [6, 6, 6, 6, 6, 6, 4] do
     let (value, next) := state.draw

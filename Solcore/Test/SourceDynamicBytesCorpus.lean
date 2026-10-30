@@ -186,8 +186,10 @@ def testSourceDynamicBytesCorpus : IO Unit := do
     (.arr (revertedStorage.set! 3 (revertedStorage[3]!.setObjVal! "value" (toJson "49"))))))) "a reverted length committed"
   rejects (validateManifest (replace first (first.setObjVal! "expectedHistory" (.arr history.pop)))) "popped history"
   let generatedHistory ← checked (generatedEntry.getObjValAs? (Array Json) "expectedHistory")
+  let generatedStatus ← checked (generatedHistory[0]!.getObjValAs? String "status")
   rejects (validateManifest (replace generatedEntry (generatedEntry.setObjVal! "expectedHistory"
-    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status" (toJson "reverted"))))))) "flipped status"
+    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status"
+      (toJson (if generatedStatus == "returned" then "reverted" else "returned")))))))) "flipped status"
   -- A consistently re-encoded payload with one changed byte no longer matches its history.
   let transactions ← checked (DynamicBytes.decodeTransactions (← checked (first.getObjVal? "transactions")))
   let some tx := transactions[0]? | throw (IO.userError "missing first bytes transaction")

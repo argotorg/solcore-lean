@@ -20,7 +20,7 @@ open Solcore.Synthesis.Stateful.MethodsExecution (Method Transaction Bindings st
 
 def caseSchema : String := "solcore-lean.semantic-methods-case.v1"
 def planSchema : String := "solcore-lean.methods-plan.v1"
-def profileVersion : String := "stateful-methods-v1/methods-sequence-seed-v1"
+def profileVersion : String := "stateful-methods-v1/methods-sequence-seed-v2"
 def templateVersion : String := "std-dispatch-methods-shared-slots-revert-odd-input-v1"
 def corpusSchema : String := "solcore-lean.semantic-methods-corpus.v1"
 
@@ -241,9 +241,10 @@ def reverts (tx : Transaction) : Bool := inputSum tx % 2 == 1
 
 /-- The method count, then each of four methods' name and arity, then the
 missing method's name; each the high half of one draw from one stream of the
-scenario seed. -/
+scenario seed. The stream starts at SplitMix64's finalizer of the seed xor its
+domain, so that consecutive seeds' choices do not step by a fixed residue. -/
 def shapeChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d6574686f64732d)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6d6574686f64732d))
   let mut values : Array Nat := #[]
   for bound in [3] ++ (List.replicate maxMethods [2 ^ 32, 3]).flatten ++ [2 ^ 32] do
     let (value, next) := state.draw
@@ -260,21 +261,27 @@ def drawnShape (seed : Seed) : List Method × Nat :=
   let missing := (⟨nameOf (choices.getD (1 + 2 * maxMethods) 0), 1⟩ : Method).selector
   (methods, missing)
 
-/-- Eight candidate step seeds for method `position`, each a whole draw from
-the method's own stream; its step comes from the first that fits the budget. -/
+/-- Eight candidate step seeds for method `position`, each the finalizer of one
+draw from the method's own stream; its step comes from the first that fits the
+budget. The stream starts at the finalizer of the seed xor the domain
+`"methstep" + position`, which no position below four carries out of its last
+byte, so it meets neither the shape nor the sequence domain, and the
+candidates' helper counts and templates are not affine in the seed. -/
 def stepSeeds (seed : Seed) (position : Nat) : List Seed := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ (0x6d6574686f642d73 + position))
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ (0x6d65746873746570 + position.toUInt64)))
   let mut values : Array Seed := #[]
   for _ in List.range 8 do
-    let (value, next) := state.draw
-    values := values.push (Seed.ofNat value.toNat)
+    let (value, next) := GeneratorV2.draw state
+    values := values.push (Seed.ofUInt64 value)
     state := next
   return values.toList
 
 /-- A target below `2n + 1` for `n` methods and two inputs for each of three
-transactions, each the high half of one draw from a separate stream. -/
+transactions, each the high half of one draw from a separate stream. The stream
+starts at SplitMix64's finalizer of the seed xor its domain, so that consecutive
+seeds' choices do not step by a fixed residue. -/
 def sequenceChoices (count : Nat) (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d6574686f642d74)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6d6574686f642d74))
   let mut values : Array Nat := #[]
   for bound in List.replicate 3 [2 * count + 1, 6, 6] |>.flatten do
     let (value, next) := state.draw

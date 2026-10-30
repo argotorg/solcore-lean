@@ -2,7 +2,7 @@
   "schema": "solcore-lean.semantic-call-corpus-manifest.v1",
   "profile": "stateful-calls",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "profileVersion": "stateful-calls-v2/sequence-seed-v1",
+  "profileVersion": "stateful-calls-v2/sequence-seed-v2",
   "functionVersion": "core-nested-word-call-v1",
   "templateVersion": "two-account-word-call-v1",
   "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",

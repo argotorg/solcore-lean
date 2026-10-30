@@ -16,7 +16,7 @@ open Solcore.Synthesis.Stateful.KeyedStorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-keyed-storage-case.v1"
 def planSchema : String := "solcore-lean.keyed-storage-plan.v1"
-def profileVersion : String := "stateful-keyed-storage-v2/keyed-sequence-seed-v1"
+def profileVersion : String := "stateful-keyed-storage-v2/keyed-sequence-seed-v2"
 def templateVersion : String := "keyed-slot-successor-counter-revert-odd-v1"
 def keyedCorpusSchema : String := "solcore-lean.semantic-keyed-storage-corpus.v1"
 
@@ -174,9 +174,11 @@ def parityPatterns : List (List Bool) :=
 
 /-- A separate stream keeps sequence choices independent of the step seed's
 helper-count and template digits. Each choice uses the high half of one draw:
-the low bits of a power-of-two LCG have short periods. -/
+the low bits of a power-of-two LCG have short periods. The stream starts at
+SplitMix64's finalizer of the seed xor its domain, so that consecutive seeds'
+choices do not step by a fixed residue. -/
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6b657965642d7378)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6b657965642d7378))
   let mut values : Array Nat := #[]
   for bound in [6, 6, 6, 6, 6, 6, 4] do
     let (value, next) := state.draw

@@ -2,7 +2,7 @@
   "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
   "profile": "stateful-malformed-calldata",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "profileVersion": "stateful-malformed-calldata-v1/malformation-sequence-seed-v1",
+  "profileVersion": "stateful-malformed-calldata-v1/malformation-sequence-seed-v2",
   "functionVersion": "core-malformed-calldata-contract-v1",
   "templateVersion": "std-dispatch-array-fold-slots-count-revert-odd-flags-v1",
   "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
@@ -1765,8 +1765,123 @@
             }
           ],
           "id": "tx-0",
-          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
           "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ],
+          "id": "tx-1",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "status": "reverted"
+        },
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ],
+          "id": "tx-2",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "status": "returned"
+        }
+      ],
+      "generation": {
+        "maxProgramNodes": 448,
+        "seed": "0"
+      },
+      "id": "generated-0"
+    },
+    {
+      "expectedFeatures": [
+        "let",
+        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "wordLiteral",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "if",
+        "boolLiteral",
+        "local",
+        "newCell",
+        "pair",
+        "loadCell",
+        "storeCell",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "first",
+        "second",
+        "functionCall",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
+        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
+        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSmod"
+      ],
+      "expectedHistory": [
+        {
+          "committedStorage": [
+            {
+              "slot": "0",
+              "value": "0"
+            },
+            {
+              "slot": "1",
+              "value": "0"
+            },
+            {
+              "slot": "2",
+              "value": "0"
+            },
+            {
+              "slot": "3",
+              "value": "0"
+            },
+            {
+              "slot": "4",
+              "value": "0"
+            }
+          ],
+          "id": "tx-0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "status": "returned"
         },
         {
           "committedStorage": [
@@ -1821,121 +1936,6 @@
           "id": "tx-2",
           "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
           "status": "reverted"
-        }
-      ],
-      "generation": {
-        "maxProgramNodes": 448,
-        "seed": "0"
-      },
-      "id": "generated-0"
-    },
-    {
-      "expectedFeatures": [
-        "let",
-        "binary:Solcore.Core.Wire.BinaryOp.wordOr",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
-        "wordLiteral",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
-        "if",
-        "boolLiteral",
-        "local",
-        "newCell",
-        "pair",
-        "loadCell",
-        "storeCell",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "first",
-        "second",
-        "functionCall",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordMulMod",
-        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
-        "binary:Solcore.Core.Wire.BinaryOp.wordMul",
-        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
-        "binary:Solcore.Core.Wire.BinaryOp.wordShr",
-        "binary:Solcore.Core.Wire.BinaryOp.wordAnd",
-        "binary:Solcore.Core.Wire.BinaryOp.wordSmod"
-      ],
-      "expectedHistory": [
-        {
-          "committedStorage": [
-            {
-              "slot": "0",
-              "value": "25047742096046607320810124568186863199338466485819063499738235720282059675504"
-            },
-            {
-              "slot": "1",
-              "value": "25047742096046607320810124568186863199338466485819063499738235720282059675504"
-            },
-            {
-              "slot": "2",
-              "value": "0"
-            },
-            {
-              "slot": "3",
-              "value": "0"
-            },
-            {
-              "slot": "4",
-              "value": "1"
-            }
-          ],
-          "id": "tx-0",
-          "output": "0x376085066f548167aed5d9bfb82dd5f8c1a4a68b9bbaa27540051fe695ad9771",
-          "status": "returned"
-        },
-        {
-          "committedStorage": [
-            {
-              "slot": "0",
-              "value": "25047742096046607320810124568186863199338466485819063499738235720282059675504"
-            },
-            {
-              "slot": "1",
-              "value": "25047742096046607320810124568186863199338466485819063499738235720282059675504"
-            },
-            {
-              "slot": "2",
-              "value": "0"
-            },
-            {
-              "slot": "3",
-              "value": "0"
-            },
-            {
-              "slot": "4",
-              "value": "1"
-            }
-          ],
-          "id": "tx-1",
-          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
-          "status": "reverted"
-        },
-        {
-          "committedStorage": [
-            {
-              "slot": "0",
-              "value": "50095484192093214641620249136373726398676932971638126999476471440564119351012"
-            },
-            {
-              "slot": "1",
-              "value": "50095484192093214641620249136373726398676932971638126999476471440564119351012"
-            },
-            {
-              "slot": "2",
-              "value": "0"
-            },
-            {
-              "slot": "3",
-              "value": "0"
-            },
-            {
-              "slot": "4",
-              "value": "2"
-            }
-          ],
-          "id": "tx-2",
-          "output": "0x6ec10a0cdea902cf5dabb37f705babf183494d17377544ea800a3fcd2b5b2ee6",
-          "status": "returned"
         }
       ],
       "generation": {
@@ -1994,7 +1994,7 @@
             }
           ],
           "id": "tx-0",
-          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
+          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
           "status": "reverted"
         },
         {
@@ -2021,35 +2021,35 @@
             }
           ],
           "id": "tx-1",
-          "output": "0xf807690e09c3f7f0b13b97286cf1a7cf3cf994d2ca6eb3d4c2770e8e09decae9",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
           "status": "reverted"
         },
         {
           "committedStorage": [
             {
               "slot": "0",
-              "value": "85041362029297852232358556015442766523422911204091455390475467821709142222200"
+              "value": "0"
             },
             {
               "slot": "1",
-              "value": "85041362029297852232358556015442766523422911204091455390475467821709142222199"
+              "value": "0"
             },
             {
               "slot": "2",
-              "value": "8"
+              "value": "0"
             },
             {
               "slot": "3",
-              "value": "85041362029297852232358556015442766523422911204091455390475467821709142222200"
+              "value": "0"
             },
             {
               "slot": "4",
-              "value": "3"
+              "value": "0"
             }
           ],
           "id": "tx-2",
-          "output": "0xbc03b48704e1fbf8589dcb943678d3e79e7cca69653759ea613b874704ef657b",
-          "status": "returned"
+          "output": "0x3c03b48704e1fbf8589dcb943678d3e79e7cca69653759ea613b874704ef6571",
+          "status": "reverted"
         }
       ],
       "generation": {
@@ -2091,50 +2091,50 @@
           "committedStorage": [
             {
               "slot": "0",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "1",
-              "value": "0"
+              "value": "69193616157492623893476076302890616362142481264517691533945416277748407334744"
             },
             {
               "slot": "2",
-              "value": "0"
+              "value": "91788759235161676256857243899983941233157459127912510562378664825332092364294"
             },
             {
               "slot": "3",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "4",
-              "value": "0"
+              "value": "3"
             }
           ],
           "id": "tx-0",
-          "output": "0x0000000000000000000000000000000000000000000000000000000008638556",
-          "status": "reverted"
+          "output": "0xfce2fe93fbdae89f6463a2adffdccc53b8bcea674f569fc9801579021febd4b8",
+          "status": "returned"
         },
         {
           "committedStorage": [
             {
               "slot": "0",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "1",
-              "value": "0"
+              "value": "69193616157492623893476076302890616362142481264517691533945416277748407334744"
             },
             {
               "slot": "2",
-              "value": "0"
+              "value": "91788759235161676256857243899983941233157459127912510562378664825332092364294"
             },
             {
               "slot": "3",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "4",
-              "value": "0"
+              "value": "3"
             }
           ],
           "id": "tx-1",
@@ -2145,28 +2145,28 @@
           "committedStorage": [
             {
               "slot": "0",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "1",
-              "value": "0"
+              "value": "69193616157492623893476076302890616362142481264517691533945416277748407334744"
             },
             {
               "slot": "2",
-              "value": "0"
+              "value": "91788759235161676256857243899983941233157459127912510562378664825332092364294"
             },
             {
               "slot": "3",
-              "value": "0"
+              "value": "114383902312830728620238411497077266104172436991307329590811913372915777393845"
             },
             {
               "slot": "4",
-              "value": "0"
+              "value": "3"
             }
           ],
           "id": "tx-2",
-          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
-          "status": "reverted"
+          "output": "0xfce2fe93fbdae89f6463a2adffdccc53b8bcea674f569fc9801579021febd4b8",
+          "status": "returned"
         }
       ],
       "generation": {
@@ -2228,8 +2228,8 @@
             }
           ],
           "id": "tx-0",
-          "output": "0x0000000000000000000000000000000000000000000000000000000000000000",
-          "status": "returned"
+          "output": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff09",
+          "status": "reverted"
         },
         {
           "committedStorage": [
@@ -2282,7 +2282,7 @@
             }
           ],
           "id": "tx-2",
-          "output": "0x0000000000000000000000000000000000000000000000000000000000000303",
+          "output": "0x000000000000000000000000000000000000000000000000000000004924aef0",
           "status": "reverted"
         }
       ],

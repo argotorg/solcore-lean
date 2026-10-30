@@ -156,8 +156,10 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
     rejected (ForwardedCall.replayCase (withOrigin (origin.setObjVal! name bad)) 100000)
       "tampered generated forwarded-value recipe accepted"
   let generatedRows ← rows generated
+  let generatedAmount := (generatedRows[0]!.getObjValAs? String "amount").toOption.getD ""
   rejected (ForwardedCall.replayCase (generated.setObjVal! "transactions"
-      (.arr (generatedRows.set! 0 (generatedRows[0]!.setObjVal! "amount" (toJson "0"))))) 100000)
+      (.arr (generatedRows.set! 0 (generatedRows[0]!.setObjVal! "amount"
+        (toJson (if generatedAmount == "0" then "1" else "0")))))) 100000)
     "generated amount replaced without its seed"
   let plan ← field saved "forwardPlan"
   rejected (ForwardedCall.checkedPlan (plan.setObjVal! "extra" Json.null)) "noncanonical forwarded-value plan accepted"

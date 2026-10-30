@@ -20,7 +20,7 @@ open Solcore.Synthesis.Stateful.StorageMappingExecution (entrySlot)
 
 def caseSchema : String := "solcore-lean.semantic-ledger-case.v1"
 def planSchema : String := "solcore-lean.ledger-plan.v1"
-def profileVersion : String := "stateful-ledger-v1/ledger-sequence-seed-v1"
+def profileVersion : String := "stateful-ledger-v1/ledger-sequence-seed-v2"
 def templateVersion : String := "sender-credit-bounded-transfer-revert-odd-flags-v1"
 def ledgerCorpusSchema : String := "solcore-lean.semantic-ledger-corpus.v1"
 
@@ -199,9 +199,11 @@ def parityPatterns : List (List Bool) :=
 
 /-- Three senders, recipients, amounts and inputs, then the flags pattern. Each
 choice uses the high half of one draw from a separate stream: the low bits of a
-power-of-two LCG have short periods. -/
+power-of-two LCG have short periods. The stream starts at SplitMix64's finalizer
+of the seed xor its domain, so that consecutive seeds' choices do not step by a
+fixed residue. -/
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c65646765722d76)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6c65646765722d76))
   let mut values : Array Nat := #[]
   for bound in [3, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4] do
     let (value, next) := state.draw

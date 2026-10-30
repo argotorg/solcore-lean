@@ -161,8 +161,10 @@ def testSourceKeyedStorageCorpus : IO Unit := do
   rejects (validateManifest (replace first (first.setObjVal! "expectedHistory" (.arr (history.set! 0 changedSlot)))))
   rejects (validateManifest (replace first (first.setObjVal! "expectedHistory" (.arr (history.pop)))))
   let generatedHistory ← checked (generatedEntry.getObjValAs? (Array Json) "expectedHistory")
+  let generatedStatus ← checked (generatedHistory[0]!.getObjValAs? String "status")
   rejects (validateManifest (replace generatedEntry (generatedEntry.setObjVal! "expectedHistory"
-    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status" (toJson "reverted")))))))
+    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status"
+      (toJson (if generatedStatus == "returned" then "reverted" else "returned"))))))))
   let transactions ← checked (first.getObjValAs? (Array Json) "transactions")
   rejects (validateManifest (replace first (first.setObjVal! "transactions"
     (.arr (transactions.set! 0 (transactions[0]!.setObjVal! "key" (toJson "4")))))))

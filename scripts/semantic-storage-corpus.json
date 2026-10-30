@@ -2,7 +2,7 @@
   "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
   "profile": "stateful-storage",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "profileVersion": "stateful-storage-v2/sequence-seed-v1",
+  "profileVersion": "stateful-storage-v2/sequence-seed-v2",
   "functionVersion": "core-storage-contract-v1",
   "templateVersion": "two-slot-feedback-v1",
   "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",

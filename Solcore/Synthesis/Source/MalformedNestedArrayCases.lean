@@ -21,7 +21,7 @@ open Solcore.Synthesis.Stateful.MalformedNestedArrayExecution
 
 def caseSchema : String := "solcore-lean.semantic-malformed-nested-array-case.v1"
 def planSchema : String := "solcore-lean.malformed-nested-array-plan.v1"
-def profileVersion : String := "stateful-malformed-nested-array-v1/malformation-sequence-seed-v1"
+def profileVersion : String := "stateful-malformed-nested-array-v1/malformation-sequence-seed-v2"
 def templateVersion : String := "std-dispatch-lazy-nested-fold-slots-counts-revert-odd-flags-v1"
 def corpusSchema : String := "solcore-lean.semantic-malformed-nested-array-corpus.v1"
 
@@ -282,11 +282,13 @@ def reverts (tx : Transaction) : Bool := tx.flags.val % 2 == 1
 
 /-- Three outer lengths, four row lengths per transaction, three elements per
 row, then the completion pattern. Each choice uses the high half of one draw
-from a separate stream: the low bits of a power-of-two LCG have short periods. -/
+from a separate stream: the low bits of a power-of-two LCG have short periods.
+The stream starts at SplitMix64's finalizer of the seed xor its domain, so that
+consecutive seeds' choices do not step by a fixed residue. -/
 def sequenceBounds : List Nat := [5, 5, 5] ++ List.replicate 12 4 ++ List.replicate 36 6 ++ [4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d616c2d6e657374)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6d616c2d6e657374))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw
@@ -295,9 +297,11 @@ def sequenceChoices (seed : Seed) : List Nat := Id.run do
   return values.toList
 
 /-- A kind, a parameter and a row for each of three transactions, each the high
-half of one draw from a separate stream. -/
+half of one draw from a separate stream. The stream starts at SplitMix64's
+finalizer of the seed xor its domain, so that consecutive seeds' choices do not
+step by a fixed residue. -/
 def malformationChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6e6573742d6d616c)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6e6573742d6d616c))
   let mut values : Array Nat := #[]
   for bound in [9, 9, 4, 9, 9, 4, 9, 9, 4] do
     let (value, next) := state.draw

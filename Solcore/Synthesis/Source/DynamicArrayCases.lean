@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.DynamicArrayExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-dynamic-array-case.v1"
 def planSchema : String := "solcore-lean.dynamic-array-plan.v1"
-def profileVersion : String := "stateful-dynamic-array-v2/array-sequence-seed-v1"
+def profileVersion : String := "stateful-dynamic-array-v2/array-sequence-seed-v2"
 def templateVersion : String := "array-fold-slots-count-revert-odd-flags-v1"
 def arrayCorpusSchema : String := "solcore-lean.semantic-dynamic-array-corpus.v1"
 
@@ -150,11 +150,13 @@ def parityPatterns : List (List Bool) :=
   [[false, false, false], [false, true, false], [true, false, false], [false, false, true]]
 
 /-- Three lengths, three flags, nine elements, then the completion pattern.
-Each choice uses the high half of one draw from a separate stream. -/
+Each choice uses the high half of one draw from a separate stream. The stream
+starts at SplitMix64's finalizer of the seed xor its domain, so that consecutive
+seeds' choices do not step by a fixed residue. -/
 def sequenceBounds : List Nat := [4, 4, 4] ++ List.replicate 12 6 ++ [4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x64796e2d61727279)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x64796e2d61727279))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

@@ -2738,6 +2738,22 @@ eight-transaction cases per profile at the 512-node budget matched on O0 and
 O2 (208 scenarios and 1,664 prefixes per level); the slowest profile,
 nested-array, used 153 of its 900 suite seconds.
 
+Each block's choices come from their own lcg64-v1 streams, and since the
+`...-sequence-seed-v2` versions every stream of a stateful case module starts
+at SplitMix64's finalizer of the block or scenario seed xor its domain: the
+sequence choices, the malformation choices, the seeded payloads, the method
+shapes and the methods' step seeds, which also take the finalizer of each
+draw. Before, a raw stream started at the seed xor its domain, so consecutive
+seeds' first-block choices lost values or stepped by a fixed residue. The
+two-slot storage, rollback and parent/child call profiles drew their three
+inputs from the block seed's digits instead (`[s % 6, s / 6 % 6, s % 6]` and
+`[s % 10, s / 10 % 10, s / 100 % 10]`, so the third storage input repeated the
+first); they now draw them from mixed streams too. Generated corpus entries
+keep their seeds where coverage allows, and their histories are recomputed
+without the profiles' Core contracts; the
+[roadmap](../docs/design/next-implementation-roadmap.md) has the
+measurements and the replaced entries.
+
 The summary counts scenarios separately from transactions observed on any path,
 completed on all three paths, and matched ordered prefixes. Shrink executions
 are excluded from these transaction counts. The campaign enforces generation,
@@ -3075,16 +3091,19 @@ ordinary, non-preserving analysis. Fingerprints name differing slots and, for
 this profile, the paths with undeclared storage.
 
 The fixed corpus has twelve scenarios and 33 transactions: eight imported plans
-and four generated seeds. Its expected histories were computed outside Lean by
-a separate evaluator of the step programs and a direct model of the protocol;
-`Tests/Main.lean` registers a validator that compares every status, payload
-and declared committed slot with original Core and rejects tampered entries.
-Required coverage is all 21 step AST features in the corpus, the six inputs,
-the six bank keys, one to three helpers and transactions, all four generator
-templates, both outcomes, six completion patterns and four static alias kinds:
-`key-counter`, `successor-counter`, `repeated-key` and `successor-key`. Alias
-kinds describe the transaction keys; they do not claim an aliasing write was
-committed or that a particular opcode was executed.
+and four generated seeds. Its expected histories were computed outside Lean by a
+separate evaluator of the step programs and a direct model of the protocol.
+Since the mixed sequence seeds, the generated entries' histories come from a
+direct Lean model of the protocol with the step run alone in Core, which first
+reproduced every recorded history. `Tests/Main.lean` registers a validator that
+compares every status, payload and declared committed slot with original Core
+and rejects tampered entries. Required coverage is all 21 step AST features in
+the corpus, the six inputs, the six bank keys, one to three helpers and
+transactions, all four generator templates, both outcomes, six completion
+patterns and four static alias kinds: `key-counter`, `successor-counter`,
+`repeated-key` and `successor-key`. Alias kinds describe the transaction keys;
+they do not claim an aliasing write was committed or that a particular opcode
+was executed.
 
 Local validation used committed code with frozen scripts and native tools.
 The fixed suite matched all twelve scenarios and 33 transaction prefixes on
@@ -3326,18 +3345,20 @@ topic, in a copied history. A transaction without such a log cannot carry the
 synthetic finding. Fingerprints name `logPaths` for deployment and chain-log
 differences.
 
-The fixed corpus has twelve scenarios and 33 transactions that commit 27 logs:
+The fixed corpus has twelve scenarios and 33 transactions that commit 29 logs:
 eight imported plans, which reuse the dynamic-array corpus steps with new site
 layouts and flags, and four generated seeds. Its expected histories, including
-every topic and data byte, were computed outside Lean by a separate evaluator
-of the step programs and a direct model of the protocol. `Tests/Main.lean`
-registers a validator that compares every status, payload, slot and log with
-original Core and rejects tampered topics, data, emitters and log order.
-Required coverage is all 39 step AST features in the corpus, the six inputs,
-one to three helpers and transactions, all four templates, both outcomes, six
-completion patterns, committed log counts zero to three, topic arities zero to
-four, data lengths of 0, 32 and 64 bytes, and reverted transactions with zero
-to three guarded sites.
+every topic and data byte, were computed outside Lean by a separate evaluator of
+the step programs and a direct model of the protocol. Since the mixed sequence
+seeds, the generated entries' histories come from a direct Lean model of the
+protocol with the step run alone in Core, which first reproduced every recorded
+history. `Tests/Main.lean` registers a validator that compares every status,
+payload, slot and log with original Core and rejects tampered topics, data,
+emitters and log order. Required coverage is all 39 step AST features in the
+corpus, the six inputs, one to three helpers and transactions, all four
+templates, both outcomes, six completion patterns, committed log counts zero to
+three, topic arities zero to four, data lengths of 0, 32 and 64 bytes, and
+reverted transactions with zero to three guarded sites.
 
 Local validation used committed code with frozen scripts and native tools; the
 eleven existing native tools kept their hashes. The fixed suite matched all
@@ -3483,17 +3504,19 @@ so a candidate that only lowers it is executed rather than skipped.
 The synthetic adapter accepts `--test-field balance`: it flips the low bit of
 the selected transaction's committed balance in a copied history.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with new values, flags and
-deployment values, and four generated seeds. Its expected histories, including
-every committed balance, were computed outside Lean by a separate evaluator of
-the step programs and a direct model of the protocol. `Tests/Main.lean`
-registers a validator that compares every status, payload, slot and balance
-with original Core and rejects tampered balances, values, deployment values and
-committed refunds. Required coverage is all 39 step AST features in the
-corpus, the six inputs, one to three helpers and transactions, all four
-templates, both outcomes, six completion patterns, all six bank values, refunds
-of 0, 1, 2^64 and 2^70, and both deployment values.
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with new values, flags and deployment
+values, and four generated seeds. Its expected histories, including every
+committed balance, were computed outside Lean by a separate evaluator of the
+step programs and a direct model of the protocol. Since the mixed sequence
+seeds, the generated entries' histories come from a direct Lean model of the
+protocol with the step run alone in Core, which first reproduced every recorded
+history. `Tests/Main.lean` registers a validator that compares every status,
+payload, slot and balance with original Core and rejects tampered balances,
+values, deployment values and committed refunds. Required coverage is all 39
+step AST features in the corpus, the six inputs, one to three helpers and
+transactions, all four templates, both outcomes, six completion patterns, all
+six bank values, refunds of 0, 1, 2^64 and 2^70, and both deployment values.
 
 Local validation used committed code with frozen scripts and native tools; the
 twelve existing native tools kept their hashes. The fixed suite matched all
@@ -3631,18 +3654,20 @@ were accepted; the others drew a step template that does not fit. Generated
 scenarios must complete with the prescribed outcomes and follow the length,
 last-byte and sum protocol under original Core.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with new payloads and flags,
-and four generated seeds. Its expected histories were computed outside Lean by
-a separate evaluator of the step programs and a direct model of the protocol.
-`Tests/Main.lean` registers a validator that compares every status, payload
-and slot with original Core. It rejects tampered outputs, byte counts and last
-bytes, committed writes of a reverted transaction, and consistently re-encoded
-payloads with a changed or appended byte. Required coverage is all 39 step AST
-features in the corpus, the six storage boundary Words as chunks, one to three
-helpers and transactions, all four templates, both outcomes, six completion
-patterns, all nine bank lengths and reverted payloads of 0, 17, 32, 33 and 64
-bytes.
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with new payloads and flags, and four
+generated seeds. Its expected histories were computed outside Lean by a separate
+evaluator of the step programs and a direct model of the protocol. Since the
+mixed sequence seeds, the generated entries' histories come from a direct Lean
+model of the protocol with the step run alone in Core, which first reproduced
+every recorded history. `Tests/Main.lean` registers a validator that compares
+every status, payload and slot with original Core. It rejects tampered outputs,
+byte counts and last bytes, committed writes of a reverted transaction, and
+consistently re-encoded payloads with a changed or appended byte. Required
+coverage is all 39 step AST features in the corpus, the six storage boundary
+Words as chunks, one to three helpers and transactions, all four templates, both
+outcomes, six completion patterns, all nine bank lengths and reverted payloads
+of 0, 17, 32, 33 and 64 bytes.
 
 Local validation used committed code with frozen scripts and native tools; the
 fourteen existing native tools kept their hashes. The fixed suite matched all
@@ -3784,19 +3809,22 @@ were accepted; the others drew a step template that does not fit. Generated
 scenarios must complete with the prescribed root outcomes and satisfy the
 refund and balance rules under original Core.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with new inputs, call values
-and amounts, and four generated seeds. Its expected histories, including both
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with new inputs, call values and
+amounts, and four generated seeds. Its expected histories, including both
 accounts after every transaction, were computed outside Lean by a separate
-evaluator of the step programs and a direct model of the protocol.
-`Tests/Main.lean` registers a validator that compares every status, payload,
-account and empty log list with original Core. It rejects tampered outputs,
-balances and logs, a forward committed after a child revert, and changed call
-values and amounts. Required coverage is all 39 step AST features in the
-corpus, the ten boundary inputs, the four call modes, one to three helpers
-and transactions, all four templates, both outcomes, every bank value as a
-call value and as an amount, forwards of 1, 2^64 and 2^70 kept by child
-reverts, and call values of 0, 7, 2^64 - 1 and 2^70 returned by root reverts.
+evaluator of the step programs and a direct model of the protocol. Since the
+mixed sequence seeds, the generated entries' histories come from a direct Lean
+model of the protocol with the step run alone in Core, which first reproduced
+every recorded history. `Tests/Main.lean` registers a validator that compares
+every status, payload, account and empty log list with original Core. It rejects
+tampered outputs, balances and logs, a forward committed after a child revert,
+and changed call values and amounts. Required coverage is all 39 step AST
+features in the corpus, the ten boundary inputs, the four call modes, one to
+three helpers and transactions, all four templates, both outcomes, every bank
+value as a call value and as an amount, forwards of 1, 2^64 and 2^70 kept by
+child reverts, and call values of 0, 7, 2^64 - 1 and 2^70 returned by root
+reverts.
 
 Local validation used committed code with frozen scripts and native tools; the
 fifteen existing native tools kept their hashes. The fixed suite matched all
@@ -3950,18 +3978,21 @@ profile carries at most 16 candidates, the profile's `shrinkBatch`, to stay
 within the campaign's 4 MiB bound on tool output. Other profiles keep
 `--shrink-candidates`.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with new keys, inputs and
-flags, and four generated seeds. Its expected slots and histories were
-computed outside Lean, with slots from `cast keccak`, by a separate evaluator
-of the step programs and a direct model of the protocol. `Tests/Main.lean`
-registers a validator that compares every status, payload and declared slot
-with original Core and every declared slot list with the independent one. It
-rejects tampered outputs, counters and entries, a declared or committed slot
-in Solidity's order, a missing or extra declared slot, and a consistently
-re-encoded key change. Required coverage is all 39 step AST features in the
-corpus, the six storage boundary inputs, the whole key bank (0, 1, 6, 7,
-2^255 and 2^256 - 1), the three alias kinds, one to three helpers and
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with new keys, inputs and flags, and
+four generated seeds. Its expected slots and histories were computed outside
+Lean, with slots from `cast keccak`, by a separate evaluator of the step
+programs and a direct model of the protocol. Since the mixed sequence seeds, the
+generated entries' histories come from a direct Lean model of the protocol with
+the step run alone in Core, which first reproduced every recorded history, and
+their slots from the separate ABI Keccak, which `cast keccak` confirmed.
+`Tests/Main.lean` registers a validator that compares every status, payload and
+declared slot with original Core and every declared slot list with the
+independent one. It rejects tampered outputs, counters and entries, a declared
+or committed slot in Solidity's order, a missing or extra declared slot, and a
+consistently re-encoded key change. Required coverage is all 39 step AST
+features in the corpus, the six storage boundary inputs, the whole key bank (0,
+1, 6, 7, 2^255 and 2^256 - 1), the three alias kinds, one to three helpers and
 transactions, all four templates, both outcomes and six completion patterns.
 
 Local validation used committed code with frozen scripts and native tools; the
@@ -4137,21 +4168,24 @@ insufficient balance 71 times. Generated scenarios must complete and follow
 the ledger protocol under original Core. As for the mapping, a native shrink
 response carries at most 16 candidates.
 
-The fixed corpus has twelve scenarios and 32 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with new senders,
-recipients, amounts, inputs and flags, and four generated seeds. Its expected
-slots and histories were computed outside Lean, with slots from `cast
-keccak`, by a separate evaluator of the step programs and a direct model of
-the protocol. `Tests/Main.lean` registers a validator that compares every
-status, payload and declared slot with original Core and every declared slot
-list with the independent one. It rejects tampered outputs, counters and
-entries, a sender slot in Solidity's order, a missing or extra declared slot,
-another sender and a consistently re-encoded recipient change. Required
-coverage is all 33 step AST features in the corpus, the six storage boundary
-inputs, all three senders, the whole recipient and amount banks, one to three
-distinct senders, both revert causes, the three alias kinds, one to three
-helpers and transactions, all four templates, both outcomes and seven
-completion patterns.
+The fixed corpus has twelve scenarios and 32 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with new senders, recipients,
+amounts, inputs and flags, and four generated seeds. Its expected slots and
+histories were computed outside Lean, with slots from `cast keccak`, by a
+separate evaluator of the step programs and a direct model of the protocol.
+Since the mixed sequence seeds, the generated entries' histories come from a
+direct Lean model of the protocol with the step run alone in Core, which first
+reproduced every recorded history, and their slots from the separate ABI Keccak,
+which `cast keccak` confirmed. `Tests/Main.lean` registers a validator that
+compares every status, payload and declared slot with original Core and every
+declared slot list with the independent one. It rejects tampered outputs,
+counters and entries, a sender slot in Solidity's order, a missing or extra
+declared slot, another sender and a consistently re-encoded recipient change.
+Required coverage is all 33 step AST features in the corpus, the six storage
+boundary inputs, all three senders, the whole recipient and amount banks, one to
+three distinct senders, both revert causes, the three alias kinds, one to three
+helpers and transactions, all four templates, both outcomes and seven completion
+patterns.
 
 Local validation used committed code with frozen scripts and native tools; the
 eighteen existing native tools are byte-identical to main's. The fixed suite
@@ -4313,18 +4347,20 @@ the 512-node budget, 32 candidates of an eight-transaction case reached
 4.13 MB, so a native shrink response carries at most 16 candidates, the
 profile's `shrinkBatch`, within the campaign's 4 MiB bound on tool output.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with payloads of 0 to 256
-bytes, and four generated seeds. Its expected histories were computed outside
-Lean by a separate evaluator of the step programs and a direct model of the
-protocol. `Tests/Main.lean` registers a validator that compares every status,
-payload and slot with original Core. It rejects tampered outputs, byte counts,
-last bytes and chunk results, committed writes of a reverted transaction, and
-consistently re-encoded payloads with a changed or appended byte. Required
-coverage is all 31 step AST features in the corpus, the six storage boundary
-Words as chunks, one to three helpers and transactions, all four templates,
-both outcomes, six completion patterns, all twelve bank lengths and reverted
-payloads of 0, 65, 97, 128, 223, 255 and 256 bytes.
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with payloads of 0 to 256 bytes, and
+four generated seeds. Its expected histories were computed outside Lean by a
+separate evaluator of the step programs and a direct model of the protocol.
+Since the mixed sequence seeds, the generated entries' histories come from a
+direct Lean model of the protocol with the step run alone in Core, which first
+reproduced every recorded history. `Tests/Main.lean` registers a validator that
+compares every status, payload and slot with original Core. It rejects tampered
+outputs, byte counts, last bytes and chunk results, committed writes of a
+reverted transaction, and consistently re-encoded payloads with a changed or
+appended byte. Required coverage is all 31 step AST features in the corpus, the
+six storage boundary Words as chunks, one to three helpers and transactions, all
+four templates, both outcomes, six completion patterns, all twelve bank lengths
+and reverted payloads of 0, 65, 97, 128, 223, 255 and 256 bytes.
 
 Local validation used committed code with frozen scripts and native tools; the
 twenty existing native tools are byte-identical to main's. The fixed suite
@@ -4468,20 +4504,22 @@ KB. At the 512-node budget, 32 candidates of an eight-transaction case reached
 3.35 MB, so a native shrink response carries at most 16 candidates, the
 profile's `shrinkBatch`, within the campaign's 4 MiB bound on tool output.
 
-The fixed corpus has twelve scenarios and 33 transactions: eight imported
-plans, which reuse the dynamic-array corpus steps with values of up to three
-rows of two elements, and four generated seeds. Its expected histories were
-computed outside Lean by a separate evaluator of the step programs and a
-direct model of the protocol. `Tests/Main.lean` registers a validator that
-compares every status, payload and slot with original Core. It rejects
-tampered outputs, row counts, element counts and element results, a written
-slot of an absent element, committed writes of a reverted transaction, and
-consistently re-encoded values with a changed element, an empty row in place
-of a row or a dropped row. Required coverage is all 32 step AST features in
-the corpus, the six storage boundary Words as elements, one to three helpers
-and transactions, all four templates, both outcomes, six completion patterns,
-outer lengths 0 to 3 and row lengths 0 to 2. Its reverted transactions have
-outer lengths 0 to 3.
+The fixed corpus has twelve scenarios and 33 transactions: eight imported plans,
+which reuse the dynamic-array corpus steps with values of up to three rows of
+two elements, and four generated seeds. Its expected histories were computed
+outside Lean by a separate evaluator of the step programs and a direct model of
+the protocol. Since the mixed sequence seeds, the generated entries' histories
+come from a direct Lean model of the protocol with the step run alone in Core,
+which first reproduced every recorded history. `Tests/Main.lean` registers a
+validator that compares every status, payload and slot with original Core. It
+rejects tampered outputs, row counts, element counts and element results, a
+written slot of an absent element, committed writes of a reverted transaction,
+and consistently re-encoded values with a changed element, an empty row in place
+of a row or a dropped row. Required coverage is all 32 step AST features in the
+corpus, the six storage boundary Words as elements, one to three helpers and
+transactions, all four templates, both outcomes, six completion patterns, outer
+lengths 0 to 3 and row lengths 0 to 2. Its reverted transactions have outer
+lengths 0 to 3.
 
 Local validation used committed code with frozen scripts and native tools; the
 twenty-one existing native tools are byte-identical to main's. The fixed suite

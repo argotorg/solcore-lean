@@ -254,7 +254,7 @@ def testSourceStorageLedgerCorpus : IO Unit := do
       ("requiredRevertCauses", toJson (["odd-flags"] : List String)), ("requiredHelperCounts", toJson [1, 2]),
       ("requiredAliases", toJson StorageLedger.aliasCatalog.reverse),
       ("requiredAliases", toJson (["self-transfer"] : List String)),
-      ("requiredCompletionPatterns", toJson (["returned,returned,returned"] : List String))] do
+      ("requiredCompletionPatterns", toJson (["returned,returned,returned,returned"] : List String))] do
     rejects (validateManifest (manifest.setObjVal! key value)) key
   rejects (validateManifest manifest 0) "zero fuel"
   IO.println summary.compress

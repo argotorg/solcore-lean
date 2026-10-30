@@ -16,7 +16,7 @@ open Solcore.Synthesis.Stateful.EventLogExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-log-case.v1"
 def planSchema : String := "solcore-lean.log-plan.v1"
-def profileVersion : String := "stateful-logs-v1/log-sequence-seed-v1"
+def profileVersion : String := "stateful-logs-v1/log-sequence-seed-v2"
 def templateVersion : String := "slot-counter-guarded-log-sites-revert-odd-flags-v1"
 def logCorpusSchema : String := "solcore-lean.semantic-log-corpus.v1"
 
@@ -195,9 +195,11 @@ private def guardChoices : Nat → List (List Nat)
 seed's helper-count and template digits. Each choice uses the high half of one
 draw: the low bits of a power-of-two LCG have short periods. The draws are the
 site count, three topic counts and data lengths, the guard set, three inputs,
-three guard masks, three noise choices and the completion pattern. -/
+three guard masks, three noise choices and the completion pattern. The stream
+starts at SplitMix64's finalizer of the seed xor its domain, so that consecutive
+seeds' choices do not step by a fixed residue. -/
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6c6f672d73697465)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6c6f672d73697465))
   let mut values : Array Nat := #[]
   for bound in [3, 5, 3, 5, 3, 5, 3, 3, 6, 6, 6, 8, 8, 8, 2, 2, 2, 4] do
     let (value, next) := state.draw

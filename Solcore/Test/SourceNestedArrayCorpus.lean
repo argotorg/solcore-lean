@@ -181,8 +181,10 @@ def testSourceNestedArrayCorpus : IO Unit := do
     (.arr (revertedStorage.set! 7 (revertedStorage[7]!.setObjVal! "value" (toJson "5"))))))) "a reverted row count committed"
   rejects (validateManifest (replace first (first.setObjVal! "expectedHistory" (.arr history.pop)))) "popped history"
   let generatedHistory ← checked (generatedEntry.getObjValAs? (Array Json) "expectedHistory")
+  let generatedStatus ← checked (generatedHistory[0]!.getObjValAs? String "status")
   rejects (validateManifest (replace generatedEntry (generatedEntry.setObjVal! "expectedHistory"
-    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status" (toJson "reverted"))))))) "flipped status"
+    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status"
+      (toJson (if generatedStatus == "returned" then "reverted" else "returned")))))))) "flipped status"
   -- Consistently re-encoded values with one changed element, one more empty
   -- row or one row fewer no longer match their history.
   let transactions ← checked (NestedArray.decodeTransactions (← checked (first.getObjVal? "transactions")))

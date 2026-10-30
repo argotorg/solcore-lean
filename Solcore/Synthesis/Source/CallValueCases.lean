@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.CallValueExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-call-value-case.v1"
 def planSchema : String := "solcore-lean.call-value-plan.v1"
-def profileVersion : String := "stateful-call-value-v1/value-sequence-seed-v1"
+def profileVersion : String := "stateful-call-value-v1/value-sequence-seed-v2"
 def templateVersion : String := "slot-step-value-total-revert-odd-flags-v1"
 def valueCorpusSchema : String := "solcore-lean.semantic-call-value-corpus.v1"
 
@@ -171,9 +171,11 @@ def parityPatterns : List (List Bool) :=
 /-- A separate stream keeps sequence choices independent of the step seed's
 helper-count and template digits. Each choice uses the high half of one draw:
 the low bits of a power-of-two LCG have short periods. The draws are three
-inputs, three values, the deployment value and the completion pattern. -/
+inputs, three values, the deployment value and the completion pattern. The
+stream starts at SplitMix64's finalizer of the seed xor its domain, so that
+consecutive seeds' choices do not step by a fixed residue. -/
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x76616c75652d7478)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x76616c75652d7478))
   let mut values : Array Nat := #[]
   for bound in [6, 6, 6, 6, 6, 6, 2, 4] do
     let (value, next) := state.draw

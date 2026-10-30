@@ -2,7 +2,7 @@
  "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
  "profile": "stateful-call-value",
  "generatorVersion": "core-g0-v1/lcg64-v1",
- "profileVersion": "stateful-call-value-v1/value-sequence-seed-v1",
+ "profileVersion": "stateful-call-value-v1/value-sequence-seed-v2",
  "functionVersion": "core-call-value-contract-v1",
  "templateVersion": "slot-step-value-total-revert-odd-flags-v1",
  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
@@ -1371,51 +1371,51 @@
    "expectedHistory": [
     {
      "id": "tx-0",
-     "status": "returned",
-     "output": "0x9fbf200c5256e6db4bb647ab66bca3b243824bf2c68e4ef043600c41ea492a33",
+     "status": "reverted",
+     "output": "0x9fbf200c5256e6db4bb647ab66bca3b243824bf2c68e4ef043600c41ea492a31",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "72255431902185841699253835198228978737173722422959387177589130988178371062323"
+       "value": "0"
       },
       {
        "slot": "1",
-       "value": "1"
+       "value": "0"
       }
      ],
-     "committedBalance": "1"
+     "committedBalance": "5"
     },
     {
      "id": "tx-1",
      "status": "returned",
-     "output": "0xde2c8be4de5ca88c101ed6d922ede086c672e356d20a5cd1ca1ec3192c7af50b",
+     "output": "0x9fbf200c5256e6db4bb647ab66bca3b243824bf2c68e4ef043600c41ea492a3f",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "100492159169362877328110989589659250725007640732611836685288696149643944981771"
+       "value": "72255431902185841699253835198228978737173722422959387177589130988178371062335"
       },
       {
        "slot": "1",
-       "value": "18446744073709551617"
+       "value": "7"
       }
      ],
-     "committedBalance": "18446744073709551617"
+     "committedBalance": "12"
     },
     {
      "id": "tx-2",
-     "status": "reverted",
-     "output": "0x5a137415de5f376c0fdff555230e607ec854129ee9fa588dd61d40e72c7f0af3",
+     "status": "returned",
+     "output": "0xdf3d6024f704b491e322d7023435eb16ca86e3d853aaed50ca2024c5bedb7eaf",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "100492159169362877328110989589659250725007640732611836685288696149643944981771"
+       "value": "100974206469241329674190520585999028358251182603237597495670992198056806153903"
       },
       {
        "slot": "1",
-       "value": "18446744073709551617"
+       "value": "1180591620717411303431"
       }
      ],
-     "committedBalance": "18446744073709551617"
+     "committedBalance": "1180591620717411303436"
     }
    ]
   },
@@ -1474,39 +1474,39 @@
        "value": "0"
       }
      ],
-     "committedBalance": "5"
+     "committedBalance": "0"
     },
     {
      "id": "tx-1",
-     "status": "reverted",
-     "output": "0xd1774a4abd8136d2f3173cba0399be3828a61ea97a5cdb054eb29fb0751a4b9d",
+     "status": "returned",
+     "output": "0xd1774a4abd8136d2f3173cba0399be3828a61ea97a5cdafb4eb29fb0751a4b9d",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "112395391169026502413947979171875018799022646152875026198186564751857851184479"
+       "value": "94744152898834197522250016802825869272893199500660034819753612959630742932381"
       },
       {
        "slot": "1",
-       "value": "0"
+       "value": "18446744073709551616"
       }
      ],
-     "committedBalance": "5"
+     "committedBalance": "18446744073709551616"
     },
     {
      "id": "tx-2",
-     "status": "returned",
-     "output": "0xd1774a4abd8136d2f3173cba0399be3828a61ea97a5cdb054eb29fb0751a4bad",
+     "status": "reverted",
+     "output": "0x9b6c1e0fcfac5aecb76104bd6491715109df4cf633e4e476b85377469c12cc97",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "94744152898834197522250016802825869272893199500660034819938080400367838448557"
+       "value": "94744152898834197522250016802825869272893199500660034819753612959630742932381"
       },
       {
        "slot": "1",
-       "value": "7"
+       "value": "18446744073709551616"
       }
      ],
-     "committedBalance": "12"
+     "committedBalance": "18446744073709551616"
     }
    ]
   },
@@ -1554,50 +1554,50 @@
     {
      "id": "tx-0",
      "status": "returned",
-     "output": "0x0000000000000000000000000000000000000000000000000000000000000008",
+     "output": "0x0000000000000000000000000000000000000000000000010000000000000000",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "8"
+       "value": "18446744073709551616"
       },
       {
        "slot": "1",
-       "value": "7"
+       "value": "18446744073709551615"
       }
      ],
-     "committedBalance": "7"
+     "committedBalance": "18446744073709551620"
     },
     {
      "id": "tx-1",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000010000000000000001",
+     "committedStorage": [
+      {
+       "slot": "0",
+       "value": "18446744073709551617"
+      },
+      {
+       "slot": "1",
+       "value": "18446744073709551616"
+      }
+     ],
+     "committedBalance": "18446744073709551621"
+    },
+    {
+     "id": "tx-2",
      "status": "reverted",
      "output": "0x0000000000000000000000000000000000000000000000010000000000000007",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "8"
+       "value": "18446744073709551617"
       },
       {
        "slot": "1",
-       "value": "7"
+       "value": "18446744073709551616"
       }
      ],
-     "committedBalance": "7"
-    },
-    {
-     "id": "tx-2",
-     "status": "returned",
-     "output": "0x000000000000000000000000000000000000000000000001000000000000000a",
-     "committedStorage": [
-      {
-       "slot": "0",
-       "value": "18446744073709551626"
-      },
-      {
-       "slot": "1",
-       "value": "18446744073709551622"
-      }
-     ],
-     "committedBalance": "18446744073709551622"
+     "committedBalance": "18446744073709551621"
     }
    ]
   },
@@ -1642,51 +1642,51 @@
    "expectedHistory": [
     {
      "id": "tx-0",
-     "status": "returned",
+     "status": "reverted",
      "output": "0x8000000000000000000000000000000000000000000000000000000000000000",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "57896044618658097711785492504343953926634992332820282019728792003956564819968"
+       "value": "0"
       },
       {
        "slot": "1",
        "value": "0"
       }
      ],
-     "committedBalance": "0"
+     "committedBalance": "5"
     },
     {
      "id": "tx-1",
      "status": "returned",
-     "output": "0x8000000000000000000000000000000000000000000000000000000000000007",
+     "output": "0x0000000000000000000000000000000000000000000000010000000000000000",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "57896044618658097711785492504343953926634992332820282019728792003956564819975"
+       "value": "18446744073709551616"
       },
       {
        "slot": "1",
-       "value": "7"
+       "value": "18446744073709551616"
       }
      ],
-     "committedBalance": "7"
+     "committedBalance": "18446744073709551621"
     },
     {
      "id": "tx-2",
      "status": "returned",
-     "output": "0x800000000000000000000000000000000000000000000001000000000000000a",
+     "output": "0x800000000000000000000000000000000000000000000001ffffffffffffffff",
      "committedStorage": [
       {
        "slot": "0",
-       "value": "57896044618658097711785492504343953926634992332820282019747238748030274371594"
+       "value": "57896044618658097711785492504343953926634992332820282019765685492103983923199"
       },
       {
        "slot": "1",
-       "value": "18446744073709551623"
+       "value": "36893488147419103231"
       }
      ],
-     "committedBalance": "18446744073709551623"
+     "committedBalance": "36893488147419103236"
     }
    ]
   }

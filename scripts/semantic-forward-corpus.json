@@ -2,7 +2,7 @@
  "schema": "solcore-lean.semantic-call-corpus-manifest.v1",
  "profile": "stateful-forwarded-value",
  "generatorVersion": "core-g0-v1/lcg64-v1",
- "profileVersion": "stateful-forwarded-value-v1/forward-sequence-seed-v1",
+ "profileVersion": "stateful-forwarded-value-v1/forward-sequence-seed-v2",
  "functionVersion": "core-forwarded-value-call-v1",
  "templateVersion": "forward-value-two-account-call-v1",
  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
@@ -1849,7 +1849,7 @@
     {
      "id": "tx-0",
      "status": "reverted",
-     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c613a58792b5602f5d",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c713a58792b5602f60",
      "committedAccounts": [
       {
        "role": "parent",
@@ -1887,7 +1887,7 @@
     {
      "id": "tx-1",
      "status": "reverted",
-     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c713a58792b5602f60",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db6110713a58792b5602f62",
      "committedAccounts": [
       {
        "role": "parent",
@@ -1924,21 +1924,21 @@
     },
     {
      "id": "tx-2",
-     "status": "reverted",
-     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c613a58792b5602f68",
+     "status": "returned",
+     "output": "0xd086a301cba59c1339a3cb3911d25fc978b649e68db610c713a58792b5602f6e",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "4722366482869645213696",
+       "balance": "4722366482869645213703",
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "12"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "94318955045060708885583349134593901977214845842103822533782107760884357017442"
         }
        ]
       },
@@ -1998,8 +1998,8 @@
    "expectedHistory": [
     {
      "id": "tx-0",
-     "status": "reverted",
-     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728292064db4cee4f023d3",
+     "status": "returned",
+     "output": "0xcfe67828f086941481a688084d39e5e649b336719f7282d2064db4cee4f023d1",
      "committedAccounts": [
       {
        "role": "parent",
@@ -2008,11 +2008,11 @@
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "1"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "94035963794924964701437935123488179642838357455191985211524975169586336900048"
         }
        ]
       },
@@ -2037,7 +2037,7 @@
     {
      "id": "tx-1",
      "status": "returned",
-     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728293064db4cee4f023df",
+     "output": "0xafe17726ef4563e4719577e020b9c219354aa6615f0c714cc429aac0e4efdb37",
      "committedAccounts": [
       {
        "role": "parent",
@@ -2046,11 +2046,11 @@
        "storage": [
         {
          "slot": "0",
-         "value": "12"
+         "value": "57896044618658097711785492504343953926634992332820282019728792003956564819977"
         },
         {
          "slot": "1",
-         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148243"
+         "value": "21657066830480081339747098286489128472419320310420983071880176992326949788462"
         }
        ]
       },
@@ -2074,36 +2074,36 @@
     },
     {
      "id": "tx-2",
-     "status": "reverted",
-     "output": "0xcfe67828f086941481a688084d39e5e649b336719f728294064db4cee4f023dd",
+     "status": "returned",
+     "output": "0x4fe67828f086941481a688084d39e5e649b336719f728294064db4cee4f023d6",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "4722366482869645213703",
+       "balance": "4722366482869645213702",
        "storage": [
         {
          "slot": "0",
-         "value": "12"
+         "value": "57896044618658097711785492504343953926634992332820282019747238748030274371592"
         },
         {
          "slot": "1",
-         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148243"
+         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148238"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "0",
+       "balance": "18446744073709551616",
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "94035963794924964701437935123488179642838357455191985210362830292942635148238"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "18446744073709551616"
         }
        ]
       }
@@ -2151,35 +2151,35 @@
     {
      "id": "tx-0",
      "status": "returned",
-     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfc1dbafefaa36387b9",
+     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbbe1dbafefaa36387b8",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "5902958103587056517120",
+       "balance": "4703919738795935662088",
        "storage": [
         {
          "slot": "0",
-         "value": "1180591620717411303429"
+         "value": "11"
         },
         {
          "slot": "1",
-         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "0",
+       "balance": "18446744073709551615",
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "18446744073709551615"
         }
        ]
       }
@@ -2189,35 +2189,35 @@
     {
      "id": "tx-1",
      "status": "reverted",
-     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfc1dbafefaa36387d0",
+     "output": "0xe08767d2d7e5c119918005d7f84cb378bb2bacb5a720b335568ce06da92a43ee",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "5902958103587056517120",
+       "balance": "4703919738795935662088",
        "storage": [
         {
          "slot": "0",
-         "value": "1180591620717411303429"
+         "value": "11"
         },
         {
          "slot": "1",
-         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "0",
+       "balance": "18446744073709551615",
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "18446744073709551615"
         }
        ]
       }
@@ -2227,35 +2227,35 @@
     {
      "id": "tx-2",
      "status": "reverted",
-     "output": "0x4b8d31a14a4ceb6e0c2937f7d519912a69964ef4a273bbfd1dbafefaa36387b7",
+     "output": "0xe08767d2d7e5c119918005d7f84cb378bb2bacb5a720b335568ce06da92a43f5",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "5902958103587056517120",
+       "balance": "4703919738795935662088",
        "storage": [
         {
          "slot": "0",
-         "value": "1180591620717411303429"
+         "value": "11"
         },
         {
          "slot": "1",
-         "value": "34172931613825889958631261795812245184495377969953043412356205871146821978036"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "0",
+       "balance": "18446744073709551615",
        "storage": [
         {
          "slot": "0",
-         "value": "0"
+         "value": "34172931613825889958631261795812245184495377969953043412393099359294241081261"
         },
         {
          "slot": "1",
-         "value": "0"
+         "value": "18446744073709551615"
         }
        ]
       }
@@ -2300,35 +2300,35 @@
     {
      "id": "tx-0",
      "status": "returned",
-     "output": "0x000000000000000000000000000000000000000000000001000000000000000e",
+     "output": "0x000000000000000000000000000000000000000000000001000000000000000c",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "4740813226943354765304",
+       "balance": "4740813226943354765312",
        "storage": [
         {
          "slot": "0",
-         "value": "18446744073709551619"
+         "value": "18446744073709551621"
         },
         {
          "slot": "1",
-         "value": "11"
+         "value": "7"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "7",
+       "balance": "0",
        "storage": [
         {
          "slot": "0",
-         "value": "11"
+         "value": "0"
         },
         {
          "slot": "1",
-         "value": "7"
+         "value": "0"
         }
        ]
       }
@@ -2338,35 +2338,35 @@
     {
      "id": "tx-1",
      "status": "reverted",
-     "output": "0x0000000000000000000000000000000000000000000000420000000000000015",
+     "output": "0x0000000000000000000000000000000000000000000000410000000000000001",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "4740813226943354765304",
+       "balance": "4740813226943354765312",
        "storage": [
         {
          "slot": "0",
-         "value": "18446744073709551619"
+         "value": "18446744073709551621"
         },
         {
          "slot": "1",
-         "value": "11"
+         "value": "7"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "7",
+       "balance": "0",
        "storage": [
         {
          "slot": "0",
-         "value": "11"
+         "value": "0"
         },
         {
          "slot": "1",
-         "value": "7"
+         "value": "0"
         }
        ]
       }
@@ -2375,36 +2375,36 @@
     },
     {
      "id": "tx-2",
-     "status": "reverted",
-     "output": "0x000000000000000000000000000000000000000000000041000000000000000b",
+     "status": "returned",
+     "output": "0x0000000000000000000000000000000000000000000000420000000000000008",
      "committedAccounts": [
       {
        "role": "parent",
        "address": "101",
-       "balance": "4740813226943354765304",
+       "balance": "5921404847660766068736",
        "storage": [
         {
          "slot": "0",
-         "value": "18446744073709551619"
+         "value": "1199038364791120855046"
         },
         {
          "slot": "1",
-         "value": "11"
+         "value": "18446744073709551618"
         }
        ]
       },
       {
        "role": "child",
        "address": "102",
-       "balance": "7",
+       "balance": "0",
        "storage": [
         {
          "slot": "0",
-         "value": "11"
+         "value": "0"
         },
         {
          "slot": "1",
-         "value": "7"
+         "value": "0"
         }
        ]
       }

@@ -19,7 +19,7 @@ open Solcore.Synthesis.Stateful.KeccakLoopExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-keccak-loop-case.v1"
 def planSchema : String := "solcore-lean.keccak-loop-plan.v1"
-def profileVersion : String := "stateful-keccak-loops-v1/keccak-loop-sequence-seed-v1"
+def profileVersion : String := "stateful-keccak-loops-v1/keccak-loop-sequence-seed-v2"
 def templateVersion : String := "keccak-entries-log2-accumulator-revert-odd-flags-v1"
 def corpusSchema : String := "solcore-lean.semantic-keccak-loop-corpus.v1"
 
@@ -175,11 +175,13 @@ def parityPatterns : List (List Bool) :=
   [[false, false, false], [false, true, false], [true, false, false], [false, false, true]]
 
 /-- Three flags, three input high parts, three low parts, then the completion
-pattern. Each choice uses the high half of one draw from a separate stream. -/
+pattern. Each choice uses the high half of one draw from a separate stream. The
+stream starts at SplitMix64's finalizer of the seed xor its domain, so that
+consecutive seeds' choices do not step by a fixed residue. -/
 def sequenceBounds : List Nat := [6, 6, 6, 6, 6, 6, 8, 8, 8, 4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6b65636c6f6f7071)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6b65636c6f6f7071))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

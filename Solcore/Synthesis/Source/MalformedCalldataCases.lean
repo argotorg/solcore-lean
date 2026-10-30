@@ -19,7 +19,7 @@ open Solcore.Synthesis.Stateful.MalformedCalldataExecution (Malformation Transac
 
 def caseSchema : String := "solcore-lean.semantic-malformed-calldata-case.v1"
 def planSchema : String := "solcore-lean.malformed-calldata-plan.v1"
-def profileVersion : String := "stateful-malformed-calldata-v1/malformation-sequence-seed-v1"
+def profileVersion : String := "stateful-malformed-calldata-v1/malformation-sequence-seed-v2"
 def templateVersion : String := "std-dispatch-array-fold-slots-count-revert-odd-flags-v1"
 def corpusSchema : String := "solcore-lean.semantic-malformed-calldata-corpus.v1"
 
@@ -238,9 +238,11 @@ def malformationBank (length size : Nat) : List (List Malformation) := [
     .length (Word.ofNatModulo (length - 1)), .length Word.zero]]
 
 /-- A kind and a parameter for each of three transactions, each the high half of
-one draw from a separate stream. -/
+one draw from a separate stream. The stream starts at SplitMix64's finalizer of
+the seed xor its domain, so that consecutive seeds' choices do not step by a
+fixed residue. -/
 def malformationChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6d616c666f726d2d)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6d616c666f726d2d))
   let mut values : Array Nat := #[]
   for bound in [7, 8, 7, 8, 7, 8] do
     let (value, next) := state.draw

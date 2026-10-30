@@ -2,7 +2,7 @@
   "schema": "solcore-lean.semantic-storage-corpus-manifest.v1",
   "profile": "stateful-storage-rollback",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "profileVersion": "stateful-storage-rollback-v2/parity-sequence-v1",
+  "profileVersion": "stateful-storage-rollback-v2/parity-sequence-v2",
   "functionVersion": "core-storage-rollback-contract-v1",
   "templateVersion": "two-slot-feedback-revert-odd-v1",
   "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
@@ -986,24 +986,30 @@
       ]
     },
     {
-      "id": "generated-1",
+      "id": "generated-12",
       "generation": {
-        "seed": "1",
+        "seed": "12",
         "maxProgramNodes": 126
       },
       "expectedFeatures": [
-        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
-        "first",
-        "functionCall",
         "let",
-        "loadCell",
+        "ternary:Solcore.Core.Wire.TernaryOp.wordAddMod",
+        "if",
+        "binary:Solcore.Core.Wire.BinaryOp.wordSar",
+        "wordLiteral",
         "local",
+        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
+        "unary:Solcore.Core.Wire.UnaryOp.boolNot",
+        "boolLiteral",
+        "unary:Solcore.Core.Wire.UnaryOp.wordClz",
         "newCell",
         "pair",
-        "second",
+        "loadCell",
         "storeCell",
-        "unary:Solcore.Core.Wire.UnaryOp.wordNot",
-        "wordLiteral"
+        "binary:Solcore.Core.Wire.BinaryOp.wordAdd",
+        "first",
+        "second",
+        "functionCall"
       ]
     },
     {

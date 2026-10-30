@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.StorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-storage-rollback-case.v1"
 def planSchema : String := "solcore-lean.storage-rollback-plan.v1"
-def profileVersion : String := "stateful-storage-rollback-v2/parity-sequence-v1"
+def profileVersion : String := "stateful-storage-rollback-v2/parity-sequence-v2"
 def templateVersion : String := "two-slot-feedback-revert-odd-v1"
 def storageCorpusSchema : String := "solcore-lean.semantic-storage-rollback-corpus.v1"
 

@@ -179,8 +179,11 @@ private def tamperingChecks (saved generated : Json) : IO Unit := do
     rejected (LongBytes.replayCase (withOrigin (origin.setObjVal! name bad)) 1000000)
       "tampered generated long-bytes recipe accepted"
   let generatedRows ← rows generated
+  -- Any other payload than the seed's: the empty one, or one byte when the seed's is empty.
+  let generatedPayload := (generatedRows[0]!.getObjValAs? String "payload").toOption.getD ""
   rejected (LongBytes.replayCase (generated.setObjVal! "transactions"
-      (.arr (generatedRows.set! 0 (generatedRows[0]!.setObjVal! "payload" (toJson "0x"))))) 1000000)
+      (.arr (generatedRows.set! 0 (generatedRows[0]!.setObjVal! "payload"
+        (toJson (if generatedPayload == "0x" then "0x00" else "0x")))))) 1000000)
     "generated payload replaced without its seed"
   let plan ← field saved "longBytesPlan"
   rejected (LongBytes.checkedPlan (plan.setObjVal! "extra" Json.null)) "noncanonical long-bytes plan accepted"

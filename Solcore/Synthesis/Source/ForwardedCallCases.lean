@@ -18,7 +18,7 @@ open Solcore.Synthesis.Source.NestedCall (EmittedContracts)
 
 def caseSchema : String := "solcore-lean.semantic-forward-case.v1"
 def planSchema : String := "solcore-lean.forward-plan.v1"
-def profileVersion : String := "stateful-forwarded-value-v1/forward-sequence-seed-v1"
+def profileVersion : String := "stateful-forwarded-value-v1/forward-sequence-seed-v2"
 def templateVersion : String := "forward-value-two-account-call-v1"
 def forwardCorpusSchema : String := "solcore-lean.semantic-forward-corpus.v1"
 
@@ -174,11 +174,13 @@ def rootReverts (tx : Transaction) : Bool := tx.input.val / 2 % 2 == 1
 
 /-- Three inputs, three call modes, three call values and three amounts. Each
 choice uses the high half of one draw from a separate stream: the low bits of a
-power-of-two LCG have short periods. -/
+power-of-two LCG have short periods. The stream starts at SplitMix64's finalizer
+of the seed xor its domain, so that consecutive seeds' choices do not step by a
+fixed residue. -/
 def sequenceBounds : List Nat := [10, 10, 10, 4, 4, 4, 6, 6, 6, 6, 6, 6]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x666f72776172642d)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x666f72776172642d))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

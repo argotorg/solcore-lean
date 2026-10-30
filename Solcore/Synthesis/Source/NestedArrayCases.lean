@@ -17,7 +17,7 @@ open Solcore.ContractRuntime (encodeBytesText encodeWordBytesBE)
 
 def caseSchema : String := "solcore-lean.semantic-nested-array-case.v1"
 def planSchema : String := "solcore-lean.nested-array-plan.v1"
-def profileVersion : String := "stateful-nested-array-v1/nested-array-sequence-seed-v1"
+def profileVersion : String := "stateful-nested-array-v1/nested-array-sequence-seed-v2"
 def templateVersion : String := "nested-fold-slots-counts-revert-odd-flags-v1"
 def nestedCorpusSchema : String := "solcore-lean.semantic-nested-array-corpus.v1"
 
@@ -160,11 +160,13 @@ def parityPatterns : List (List Bool) :=
 
 /-- Three outer lengths, three row lengths per transaction, two elements per
 row, then the completion pattern. Each choice uses the high half of one draw
-from a separate stream: the low bits of a power-of-two LCG have short periods. -/
+from a separate stream: the low bits of a power-of-two LCG have short periods.
+The stream starts at SplitMix64's finalizer of the seed xor its domain, so that
+consecutive seeds' choices do not step by a fixed residue. -/
 def sequenceBounds : List Nat := [4, 4, 4] ++ List.replicate 9 3 ++ List.replicate 18 6 ++ [4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6e6573742d617272)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6e6573742d617272))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

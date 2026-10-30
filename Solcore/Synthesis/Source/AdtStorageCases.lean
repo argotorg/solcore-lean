@@ -20,7 +20,7 @@ open Solcore.Synthesis.Stateful.AdtStorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-adt-storage-case.v1"
 def planSchema : String := "solcore-lean.adt-storage-plan.v1"
-def profileVersion : String := "stateful-adt-storage-v1/adt-storage-sequence-seed-v1"
+def profileVersion : String := "stateful-adt-storage-v1/adt-storage-sequence-seed-v2"
 def templateVersion : String := "std-storage-generic-enum-record-fields-mappings-revert-odd-flags-v1"
 def corpusSchema : String := "solcore-lean.semantic-adt-storage-corpus.v1"
 
@@ -230,11 +230,12 @@ def parityPatterns : List (List Bool) :=
 /-- Per transaction a method, a variant (taken modulo the variant count), a
 record field, a key, a flags bank index and an input bank index, then the
 completion pattern. Each choice uses the high half of one draw from a
-separate stream. -/
+separate stream. The stream starts at SplitMix64's finalizer of the seed xor its
+domain, so that consecutive seeds' choices do not step by a fixed residue. -/
 def sequenceBounds : List Nat := (List.replicate 3 [12, 12, 3, 2, 6, 6]).flatten ++ [4]
 
 def sequenceChoices (seed : Seed) : List Nat := Id.run do
-  let mut state := Seed.ofNat (seed.toNat ^^^ 0x6164747374727371)
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x6164747374727371))
   let mut values : Array Nat := #[]
   for bound in sequenceBounds do
     let (value, next) := state.draw

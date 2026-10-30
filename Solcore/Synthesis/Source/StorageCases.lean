@@ -15,7 +15,7 @@ open Solcore.Synthesis.Stateful.StorageExecution (Transaction Bindings)
 
 def caseSchema : String := "solcore-lean.semantic-storage-case.v1"
 def planSchema : String := "solcore-lean.storage-plan.v1"
-def profileVersion : String := "stateful-storage-v2/sequence-seed-v1"
+def profileVersion : String := "stateful-storage-v2/sequence-seed-v2"
 def templateVersion : String := "two-slot-feedback-v1"
 def storageCorpusSchema : String := "solcore-lean.semantic-storage-corpus.v1"
 
@@ -139,8 +139,18 @@ def caseProgram (json : Json) : Except String CheckedScenario := do
 def observe (scenario : CheckedScenario) (bindings : Bindings) (fuel : Nat) : Json :=
   Solcore.Synthesis.Stateful.StorageExecution.observe scenario.plan scenario.transactions bindings fuel
 
-def sequenceIndices (seed : Seed) : List Nat :=
-  [seed.toNat % 6, seed.toNat / 6 % 6, seed.toNat % 6]
+/-- Three boundary-input indices, each the high half of one draw from a separate
+stream. The stream starts at SplitMix64's finalizer of the seed xor its domain,
+so that consecutive seeds' indices do not step by a fixed residue, and the
+indices do not share the step seed's helper-count and template digits. -/
+def sequenceIndices (seed : Seed) : List Nat := Id.run do
+  let mut state := Seed.ofUInt64 (GeneratorV2.mix (seed.toUInt64 ^^^ 0x73746f72652d7371))
+  let mut values : Array Nat := #[]
+  for _ in List.range 3 do
+    let (value, next) := state.draw
+    values := values.push (value.toNat / 2 ^ 32 % 6)
+    state := next
+  return values.toList
 
 def blockTransactions (seed : Seed) (first : Nat) : List Transaction :=
   (sequenceIndices seed).zipIdx.map fun (inputIndex, index) =>

@@ -189,8 +189,10 @@ def testSourceEventLogCorpus : IO Unit := do
     rejects (validateManifest (withRow (row.setObjVal! "logs" (.arr changed)))) reason
   rejects (validateManifest (replace first (first.setObjVal! "expectedHistory" (.arr history.pop)))) "popped history"
   let generatedHistory ← checked (generatedEntry.getObjValAs? (Array Json) "expectedHistory")
+  let generatedStatus ← checked (generatedHistory[0]!.getObjValAs? String "status")
   rejects (validateManifest (replace generatedEntry (generatedEntry.setObjVal! "expectedHistory"
-    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status" (toJson "reverted"))))))) "flipped status"
+    (.arr (generatedHistory.set! 0 (generatedHistory[0]!.setObjVal! "status"
+      (toJson (if generatedStatus == "returned" then "reverted" else "returned")))))))) "flipped status"
   let transactions ← checked (first.getObjValAs? (Array Json) "transactions")
   rejects (validateManifest (replace first (first.setObjVal! "transactions"
     (.arr (transactions.set! 0 (transactions[0]!.setObjVal! "flags" (toJson "4"))))))) "changed flags"
