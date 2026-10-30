@@ -274,7 +274,7 @@ times are approximate; source and attempt counts do not depend on load.
 
 ## Seeded runtime inputs
 
-Random campaigns of the twenty-three runtime-input pure profiles, every pure
+Random campaigns of the twenty-four runtime-input pure profiles, every pure
 profile except `closed-g0`, run each accepted function at its boundary inputs
 and then at four inputs derived from the case seed. Fixed corpora keep the
 boundary inputs alone. The four come from a SplitMix64 stream that starts at
@@ -390,7 +390,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
@@ -401,11 +401,13 @@ None occurred in the measurements below, but the generators allow them, so
 both profiles apply the filter. An enum arm can return a leaf whose constant
 cancels the arm's own, so `runtime-enums` applies it too, and a trait use at a
 Word whose arm multiplies by 1 returns its input, so `runtime-traits` and
-`runtime-trait-hierarchies` do as well. `closed-g0` has no runtime input.
+`runtime-trait-hierarchies` do as well, and a memory value plan whose only
+observation reads `sc_x` back returns its input, so `runtime-memory-values`
+does too. `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-five of the fifteen profiles do not use G0. Only generated cases pass filters:
+six of the sixteen profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -418,7 +420,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the fifteen
+acceptance. Reductions record no filter. The generation commands of the sixteen
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -580,7 +582,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twenty-four pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twenty-five pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -2388,6 +2390,136 @@ whose `Sc_Fold.sc_both` at `Sc_T0<word>` solc rejects, as in one of the
 `runtime-traits` reductions, and, for one frontend rejection, one unary `top`
 use at `sum<word, word>`. Neither the fixed Yul gate nor the
 random gates passed; no mismatch was found.
+
+## Compare Solcore memory values
+
+The earlier pure profiles keep every intermediate value in Words, tuples, sums
+and enums and reach memory only through inline Yul. The pinned fixtures
+`concat`, `slices`, `zeroize-memory-range`, `loop-value-copies`,
+`abi-byte-memory` and `abi-codec-memory` use std's memory values directly.
+`runtime-memory-values` generates std's `memory<bytes>`, `memory_ref` and
+`memory<DynArray<uint256>>` values in pure functions, in straight-line code
+and inside the bounded `while` forms, against a Core reference that models
+every value as its byte list.
+
+`run(uint256)` of `SynthesizedMemoryValues` binds `sc_x` to the input and
+`sc_r` to 0, runs one to ten steps and returns `sc_r`:
+- `let sc_b<n>: memory<bytes> = to_bytes(P);` or `concat(P, Q)`, each part
+  `bytes32(W)`, `empty(k)` or a bytes value or slice in scope, at most 128
+  bytes; `let sc_s<n>: memory_ref = slice_(V, a);`, `truncate(V, b)` or both;
+  a second variable of a bytes value or an array; an array literal of one to
+  four elements, or `allocateDynamicArray(@uint256, k)` and `IndexAccess.set`
+  of every element;
+- writes of a Word or a byte into a bytes value or slice, inline through
+  `mstore` or `mstore8` at `MemoryPointer.ptr(truncate(slice_(V, I), n))` or
+  through the helpers `sc_put` and `sc_put8`, and of an element by
+  `IndexAccess.set` or the helper `sc_aput`;
+- observations `sc_r = ((sc_r * c) op O);` of `MemorySize.len(V)`, Word and
+  byte reads `sc_word(V, I)` and `sc_byte(V, I)` through std's range checks,
+  `Typedef.rep(keccak256_(V))`, `a[i]` and `IndexAccess.get`;
+- at most one loop: `while (sc_limit > sc_counter)` with
+  `sc_limit = (sc_x & m)`, `m` in 1, 3 and 7, or the nested form of
+  `runtime-nested-loops`, of one to three actions.
+
+Words are `sc_x`, `sc_x` with a constant, `sc_r` or the loop's position;
+indices are literals in range, `mod(shr(s, sc_x), m)` or, in a loop,
+`((P * a) + b)`, so input and position indices can fall out of range. At most
+seven hashes run on any input.
+
+The Core reference never reads the source. A value is its byte list: a static
+length and its bytes packed big-endian into at most four Words, zero past the
+length; a slice is a start and a length over its value, a second variable is
+its value, and an array is its elements. Writes rebind the value's Words, so
+every variable and slice of the value sees them and no copy does. An access
+at an input or position index first returns the right injection when it is
+out of range. One closure computes Keccak-256 of every length up to 128 bytes
+from the Core permutation and digest of the Hull import path. A loop is a
+closure over its position and state, chained over the ordinals below its mask
+behind guards. The result is the left injection of `sc_r`, or the right
+injection, which a case observes as std's `OutOfBounds()` revert data
+`0xb4120f14`.
+
+For this profile alone, `semantic-differential.py` matches three paths that
+reverted with the same data; every other profile still needs three returned
+Words. The campaign's perturbation test adapter flips the low bit of a
+matched revert's last byte.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-memory-values --functions 8 --output .upstream/semantic-memory-values
+python3 Tests/scripts/test-semantic-memory-value-corpus.py
+```
+
+Native commands are `memory-values-generate SEED NODES COUNT ATTEMPTS FUEL
+[seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]` and
+`memory-values-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`memoryValuePlan` and the whole Core reference, whose exact correspondence
+native admission checks for every origin, and `memoryValueShapes`, which
+replay recomputes. Replay requires a generated plan to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profile records no G0 step features.
+- The node budget bounds the applied reference without the hash closure
+  (2,723 nodes): default 1,024, minimum 256, at most 2,048. Steps are dropped
+  from the end while a reference exceeds it. A case's reference has at most
+  5,120 nodes.
+- Exclusions, under `memory-profile`, are a plan still over the budget, then
+  a plan with the same outcome for all eight boundary inputs, or one that
+  exhausts fuel. A plan whose only observation reads `sc_x` back returns its
+  input, so random campaigns apply the identity filter.
+- Sonatina O0 returns other Words for loops that write a bytes value or slice
+  through a helper, or inline beside an allocation in the same body. Plans
+  keep generating such loops, so random campaigns report them on O0 as
+  `semantic-mismatch`; only the fixed corpus skips them. A loop that declares
+  a slice beside a memory read, with no write, also mismatched on O0 in the
+  fixed corpus (below).
+- Reductions remove a step or a loop's action, lower or simplify a loop,
+  replace a Word by `sc_x`, an index by 0, a concatenation by a copy of either
+  part, a window by its drop or take, an allocated array by a literal, a
+  helper write by the inline one or an access by the length, drop an array
+  element, or simplify a fold; then they reduce the input. Each is strictly
+  smaller in plan size, then input. A shrink response stops before its cases
+  would exceed 1.5 MB.
+- `memoryValueRequirements` declares `values`, `parts`, `cuts`, `writes`,
+  `observations`, `indices` (`<access>:<literal, input or counter>`),
+  `hazards` (`alias`, `view`, `copy` and `helper` write-then-read orders),
+  `loops`, `body` and `hashes` (hashed length classes), all specified by the
+  plan.
+
+The fixed corpus takes, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing required value, until nothing is
+missing, each at the eight boundary inputs, except a plan whose loop writes a
+bytes value or slice; every value is required but the indices `put:counter`
+and `put8:counter`, which only such loops have. Seeds 1, 2, 4, 5, 7, 8, 10,
+11, 13, 16, 20, 23, 24, 26, 31, 42, 53, 57, 62, 72, 75, 92, 98, 113, 128,
+193, 425, 429 and 548 cover every required value: 232 cases from 29 sources.
+`Tests/scripts/test-semantic-memory-value-corpus.py` rebuilds that selection,
+admits every plan with its own scope walk, recomputes every shape and the
+shrink measure from the plan, re-emits the source and compares it exactly,
+evaluates every case's plan with its own byte-list model and Keccak-256
+against the recorded outcome, and checks replay, reductions and tampering
+natively.
+
+The gate passed before the profile was committed: the kernel check, 865
+Python tests, `lake build` (10,301 jobs), 37 native tools, `lake test`,
+twenty-one corpus validators and the chunked-generation check over the
+twenty-five pure profiles. Frozen matrices at `35925b5f8`, with the freeze
+digest unchanged, under load averages of 7 to 22 from other work:
+- The fixed corpus matched all 232 cases on O2 and Yul with complete shape and
+  input coverage, compiling 29 sources, in 429 and 609 seconds. On O0, 228
+  matched and the four cases of seed 113's plan whose loop runs mismatched, in
+  548 seconds. Automatic reduction kept a loop that declares a slice beside a
+  length read, with no write, which O0 returns as 588 where Core and Hull
+  return 32. The matched cases still cover every required value and input.
+- Random suites from root seed 1 with eight whole functions took eight
+  attempts without an exclusion and drew 96 cases from 8 sources, 11 of them
+  out of range, and 43 of the 82 shape values. O2 and Yul matched all 96, in
+  127 and 172 seconds. On O0, 88 matched and the eight cases of one function
+  whose loop writes a bytes value through `sc_put8` mismatched, in 229
+  seconds; reduction kept a length read and the helper's byte write in a
+  one-iteration loop.
+- Both O0 results are recorded locally without investigation, so the fixed
+  and random O0 gates did not pass; O2 and Yul found no mismatch.
 
 ## Compare aggregate compositions with call graphs
 
@@ -6544,7 +6676,7 @@ boundary; this section describes how to run it.
 - **No layout dependence:** the wrappers' runtime code reads no code, and
   their creation code reads only its own runtime object. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the twenty-four pure and the
+- **Admission:** `export-rust-yul.py` admits the twenty-five pure and the
   twenty-three storage-family wrappers, taken from the adapters' profile tables;
   the three malformed profiles reuse wrappers. Each must compile to one
   creation object with one runtime sub-object and no link or immutable
@@ -6576,7 +6708,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the twenty-four pure profiles. `--backend yul`
+Its default Yul selection stays the twenty-five pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
