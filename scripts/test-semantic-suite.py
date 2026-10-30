@@ -43,9 +43,9 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_fifty_five_profiles_match_real_manifests_and_campaign_families(self):
+    def test_fifty_six_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 55)
+        self.assertEqual(len(args.profile), 56)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
@@ -57,7 +57,7 @@ class SuiteTests(unittest.TestCase):
                          "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
                          "stateful-tuple-returns", "stateful-bytes-returns", "stateful-adt-storage",
                          "stateful-enum-returns", "stateful-enum-arguments", "stateful-enum-array-arguments",
-                         "stateful-array-returns", "stateful-constructor-arguments")), 1641)
+                         "stateful-array-returns", "stateful-constructor-arguments", "stateful-call-returns")), 1641)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -89,6 +89,12 @@ class SuiteTests(unittest.TestCase):
                          len(json.loads(suite.manifest("stateful-bytes").read_text())["cases"]))
         self.assertIn("stateful-bytes", suite.DECLARED_SLOT_PROFILES)
         self.assertEqual(suite.PROFILES["stateful-forwarded-value"], ("semantic-forward", "call", 384))
+        self.assertEqual(suite.PROFILES["stateful-call-returns"], ("semantic-call-return", "call", 384))
+        self.assertEqual(suite.requested(args, "stateful-call-returns"),
+                         len(json.loads(suite.manifest("stateful-call-returns").read_text())["cases"]))
+        command = suite.command(args, "stateful-call-returns", self.directory / "returns", 30, 64 * 1024**2)
+        self.assertTrue(command[command.index("--case-tool") + 1].endswith("semantic-call-return-tool"))
+        self.assertTrue(command[command.index("--core-runner") + 1].endswith("rust-hull-call-return-scenario"))
         self.assertEqual(suite.requested(args, "stateful-forwarded-value"),
                          len(json.loads(suite.manifest("stateful-forwarded-value").read_text())["cases"]))
         self.assertEqual(suite.PROFILES["stateful-mapping"], ("semantic-mapping", "storage", 384))
@@ -173,7 +179,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 1722, 55), ('sonatina-o2', 1722, 55), ('yul', 1680, 26)):
+        for backend, old_count, profile_count in (('sonatina-o0', 1722, 56), ('sonatina-o2', 1722, 56), ('yul', 1680, 26)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -199,6 +205,7 @@ class SuiteTests(unittest.TestCase):
                      + suite.requested(args, 'stateful-enum-array-arguments')
                      + suite.requested(args, 'stateful-array-returns')
                      + suite.requested(args, 'stateful-constructor-arguments')
+                     + suite.requested(args, 'stateful-call-returns')
                      if backend != 'yul' else 0)
             self.assertEqual(sum(suite.requested(args, p) for p in args.profile),
                 old_count + count + suite.requested(args, 'runtime-call-graph-loops')
@@ -475,7 +482,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 55)
+            self.assertEqual(len(sonatina.profile), 56)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -694,7 +701,7 @@ class SuiteTests(unittest.TestCase):
                          ["stateful-constructor-arguments"])
 
     def test_explicit_yul_call_profiles_are_errors_instead_of_silent_omissions(self):
-        for profile in ('stateful-calls', 'stateful-forwarded-value'):
+        for profile in ('stateful-calls', 'stateful-forwarded-value', 'stateful-call-returns'):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -702,7 +709,7 @@ class SuiteTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 suite.command(self.args('--backend', 'yul'), profile, self.directory / profile, 30, 64 * 1024**2)
         self.assertEqual([profile for profile, (_, family, _) in suite.PROFILES.items() if family == 'call'],
-                         ['stateful-calls', 'stateful-forwarded-value'])
+                         ['stateful-calls', 'stateful-forwarded-value', 'stateful-call-returns'])
         selected = self.args('--backend', 'yul', '--profile', 'runtime-modules')
         self.assertEqual(selected.profile, ['runtime-modules'])
 
@@ -765,7 +772,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 55)
+        self.assertEqual(len(set(seeds.values())), 56)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)

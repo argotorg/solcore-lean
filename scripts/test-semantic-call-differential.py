@@ -10,6 +10,7 @@ import io
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -540,6 +541,233 @@ class WholeStorageTests(unittest.TestCase):
             data = histories()
             change(data["importedHull"])
             self.assertEqual(adapter.compare(data, case(), BINDINGS)["category"], "adapter-error")
+
+
+WORD = 2**256
+RETURN_STATIC = [{"name": "Idle", "fields": ""}, {"name": "Ready", "fields": "uint256"}, {"name": "Pair", "fields": "uint256,uint256"}]
+RETURN_DYNAMIC = [{"name": "Idle", "fields": ""}, {"name": "Blob", "fields": "bytes"}, {"name": "Ready", "fields": "uint256"}]
+
+
+def return_plan(kind="bytes", delivery=None, length=3, choice=0, arity=None, constructors=None):
+    plan = {"schema": "solcore-lean.call-return-plan.v1", "kind": kind}
+    if kind == "tuple":
+        plan["arity"] = arity or 2
+    if kind.endswith("enum"):
+        plan["constructors"] = constructors or (RETURN_DYNAMIC if kind == "dynamic-enum" else RETURN_STATIC)
+    plan.update(length=length, choice=choice, delivery=delivery or {"kind": "typed"}, stepProgram={})
+    return plan
+
+
+def return_case(plan=None, inputs=(4, 5, 6, 0)):
+    """Envelope fixture only: native replay checks the actual programs; each
+    transaction's prescribed rejection is the adapter's own decision."""
+    plan = plan or return_plan(delivery={"kind": "raw", "malformation": {"kind": "length", "value": "100"}})
+    transactions = [{"id": f"tx-{index}", "input": str(value), "value": "0", "target": "parent", "callee": "child"}
+                    for index, value in enumerate(inputs)]
+    for tx in transactions:
+        tx["stdRejection"] = adapter.return_prescribed(plan, tx)
+    return {"schema": adapter.RETURN_CASE_SCHEMA, "callReturnPlan": plan,
+        "programs": {role: {} for role in adapter.RETURN_PROGRAMS},
+        "sources": {"parent": "protocol fixture only", "child": "protocol fixture only"},
+        "contracts": adapter.return_contract_metadata(),
+        "observedSlots": {"parent": list(adapter.RETURN_PARENT_SLOTS), "child": list(adapter.RETURN_CHILD_SLOTS)},
+        "initialState": {"accounts": [{"role": "parent", "balance": "0", "storage": []},
+            {"role": "child", "balance": "0", "storage": []}], "callerBalance": "0"},
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": transactions}
+
+
+def return_accounts(parent, child):
+    return [{"role": role, "address": BINDINGS[role], "balance": "0",
+             "storage": [{"slot": str(index), "value": str(value)} for index, value in enumerate(slots)]}
+            for role, slots in (("parent", parent), ("child", child))]
+
+
+def return_history(value, core=False):
+    """Rows that follow the protocol with the step `v + 7`: the pre-call write,
+    the child's writes and odd-input revert, std's decision on its bytes, the
+    parent's writes and sum, and bit 1's revert. Original Core reverts a
+    rejection with its Word; Hull and the EVM with std's revert data."""
+    plan = value["callReturnPlan"]
+    parent, child = [0] * 7, [0, 0]
+    rows = []
+    for index, tx in enumerate(value["transactions"]):
+        x = int(tx["input"])
+        o, c = child[0], (child[1] + 1) % WORD
+        r = (x + o + 7) % WORD
+        if x & 1:
+            data, record, ok = r.to_bytes(32, "big"), [0, r, 0, 0, 0], 0
+        else:
+            data = adapter.return_bytes(plan, adapter.return_values(r, c, x, o))
+            record, ok = adapter.return_decide(plan, data), 1
+        if isinstance(record, str):
+            output = word(0 if record == "0x" else int(record, 16)) if core else record
+            status = "reverted"
+        else:
+            written = [(parent[0] + x) % WORD, ok + 2 * len(data)] + record
+            output = word(sum(written[:1] + written[2:]) % WORD)
+            status = "reverted" if x & 2 else "returned"
+            if status == "returned":
+                parent = written
+                if not x & 1:
+                    child = [r, c]
+        rows.append({"id": tx["id"], "index": index, "status": status, "output": output,
+                     "committedAccounts": return_accounts(parent, child), "logs": []})
+    return with_whole({"schema": adapter.RETURN_HISTORY_SCHEMA, "initialAccounts": adapter.return_initial_accounts(BINDINGS),
+        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete",
+        "unexecuted": []})
+
+
+def return_histories(value):
+    return {path: return_history(value, core=path == "directCore") for path in adapter.PATHS}
+
+
+def golden_rows():
+    """The rows of `SourceCallReturnGolden`, written by the probe's independent
+    model of std's decision."""
+    text = (ROOT / "Solcore/Test/SourceCallReturnGolden.lean").read_text()
+    return re.findall(r'\("([^"]+)", "([^"]+)", "(0x[0-9a-f]*)", "([^"]+)"\)', text)
+
+
+class CallReturnTests(unittest.TestCase):
+    def test_the_case_carries_its_roles_sources_and_prescribed_rejections(self):
+        value = return_case()
+        adapter.validate_case(value)
+        self.assertTrue(adapter.returns(value))
+        self.assertFalse(adapter.returns(case()))
+        selected = adapter.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"]), ("semantic-call-return-tool", "rust-hull-call-return-scenario"))
+        self.assertEqual([tx["stdRejection"] for tx in value["transactions"]], ["0x08638556", None, "0x08638556", "0x08638556"])
+        self.assertEqual(adapter.calldata(BINDINGS, value["transactions"][0]), "0x7357f5d2" + f"{102:064x}{4:064x}")
+        for field, changed in (("stdRejection", None), ("stdRejection", "0x"), ("value", "1"), ("callee", "parent"),
+                               ("input", "01")):
+            invalid = return_case()
+            invalid["transactions"][0][field] = changed
+            with self.subTest(field=field, changed=changed), self.assertRaises((ValueError, adapter.Finding)):
+                adapter.validate_case(invalid)
+        for change in (lambda v: v.update(sources={"parent": "x"}), lambda v: v.update(contracts=adapter.contract_metadata()),
+                       lambda v: v["programs"].pop("child"), lambda v: v["callReturnPlan"].update(kind="array"),
+                       lambda v: v["callReturnPlan"].update(length=65), lambda v: v["callReturnPlan"].update(
+                           delivery={"kind": "raw", "malformation": {"kind": "shuffle"}}),
+                       lambda v: v.update(transactions=v["transactions"] * 3)):
+            invalid = return_case()
+            change(invalid)
+            with self.assertRaises((ValueError, adapter.Finding)):
+                adapter.validate_case(invalid)
+        invalid = return_case()
+        invalid["observedSlots"] = {"parent": ["0", "1"], "child": ["0", "1"]}
+        with self.assertRaises(adapter.Finding):
+            adapter.validate_case(invalid)
+
+    def test_the_adapter_model_gives_every_golden_decision(self):
+        rows = golden_rows()
+        self.assertEqual(len(rows), 58)
+        plans = {"pair": return_plan("tuple", arity=2, length=0), "triple": return_plan("tuple", arity=3, length=0),
+                 "bytes": return_plan("bytes"), "static": return_plan("static-enum", length=0),
+                 "dynamic": return_plan("dynamic-enum", length=0)}
+        for name, kind, data, expected in rows:
+            decision = adapter.return_decide(plans[kind], bytes.fromhex(data[2:]))
+            text = "reject:" + decision if isinstance(decision, str) else "record:" + "".join(f"{value:064x}" for value in decision)
+            with self.subTest(name=name):
+                self.assertEqual(text, expected)
+
+    def test_the_child_bytes_follow_std_and_each_malformation(self):
+        values = adapter.return_values(3, 5, 8, 13)
+        pair = adapter.return_bytes(return_plan("tuple", arity=2, length=0), values)
+        self.assertEqual(pair, (3).to_bytes(32, "big") + (5).to_bytes(32, "big"))
+        typed = adapter.return_bytes(return_plan("bytes", length=33), values)
+        self.assertEqual((len(typed), typed[:64]), (128, (32).to_bytes(32, "big") + (33).to_bytes(32, "big")))
+        self.assertEqual(typed[64 + 33:], bytes(31))
+        static = adapter.return_bytes(return_plan("static-enum", length=0, choice=1), values)
+        self.assertEqual(static[:32], adapter.storage.keccak256(b"Ready(uint256)"))
+        self.assertEqual(len(static), 96)
+        dynamic = adapter.return_bytes(return_plan("dynamic-enum", length=2, choice=1), values)
+        self.assertEqual((dynamic[:32], dynamic[32:64], dynamic[64:96]), ((32).to_bytes(32, "big"),
+            adapter.storage.keccak256(b"Blob(bytes)"), (64).to_bytes(32, "big")))
+        for malformation, size in (({"kind": "truncate", "kept": 31}, 31), ({"kind": "trailing", "count": 33, "pattern": "ramp"}, 129),
+                                   ({"kind": "narrow"}, 64)):
+            data = adapter.return_bytes(return_plan("static-enum", length=0, choice=1,
+                                                    delivery={"kind": "raw", "malformation": malformation}), values)
+            with self.subTest(malformation=malformation["kind"]):
+                self.assertEqual(len(data), size)
+        cut = adapter.return_bytes(return_plan("dynamic-enum", length=2, choice=1,
+            delivery={"kind": "raw", "malformation": {"kind": "tagCut", "value": "0"}}), values)
+        self.assertEqual(cut, (32).to_bytes(32, "big") + bytes(32))
+        self.assertEqual(adapter.return_decide(return_plan("dynamic-enum", length=2, choice=1), cut), "0x")
+
+    def test_matched_histories_take_the_selector_and_empty_revert_rules_only_when_prescribed(self):
+        value = return_case()
+        result = adapter.compare(return_histories(value), value, BINDINGS)
+        self.assertEqual(result["category"], "matched", result)
+        self.assertEqual(result["selectorRows"], ["tx-0", "tx-2", "tx-3"])
+        empty = return_case(return_plan("static-enum", length=0, choice=1,
+            delivery={"kind": "raw", "malformation": {"kind": "tag", "value": "0"}}), inputs=(2, 5))
+        self.assertEqual([tx["stdRejection"] for tx in empty["transactions"]], ["0x", None])
+        self.assertEqual(adapter.compare(return_histories(empty), empty, BINDINGS)["category"], "matched")
+        typed = return_case(return_plan("dynamic-enum", length=33, choice=1), inputs=(4, 5, 6, 0, 2))
+        self.assertEqual(adapter.compare(return_histories(typed), typed, BINDINGS)["category"], "matched")
+        # A Core revert Word that is not the prescribed rejection is compared exactly.
+        observed = return_histories(value)
+        observed["directCore"]["transactions"][0]["output"] = word(0)
+        result = adapter.compare(observed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"], result["fields"]),
+                         ("semantic-mismatch", "tx-0", ["output", "status"]))
+        # An EVM rejection with the Core Word is a difference too.
+        observed = return_histories(value)
+        observed["rustEvm"]["transactions"][0]["output"] = word(0x08638556)
+        result = adapter.compare(observed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertIn("output", result["fields"])
+
+    def test_the_protocol_and_rollback_hold_on_every_path(self):
+        value = return_case(return_plan("tuple", arity=3, length=0), inputs=(4, 5, 6, 0))
+        self.assertEqual(adapter.compare(return_histories(value), value, BINDINGS)["category"], "matched")
+        # All paths agreeing on a decoded Word other than the adapter's own decoding fail.
+        agreed = return_histories(value)
+        for history in agreed.values():
+            history["transactions"][0]["committedAccounts"][0]["storage"][5]["value"] = "9"
+            with_whole(history)
+        result = adapter.compare(agreed, value, BINDINGS)
+        self.assertTrue(all(result["pairs"].values()))
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertIn("committedAccounts", result["fields"])
+        # A child revert under a returned parent that kept the child's writes fails.
+        kept = return_histories(value)
+        for history in kept.values():
+            history["transactions"][1]["committedAccounts"][1]["storage"][1]["value"] = "2"
+            for row in history["transactions"][2:]:
+                row["committedAccounts"][1]["storage"][1]["value"] = str(int(row["committedAccounts"][1]["storage"][1]["value"]) + 1)
+            history["finalAccounts"] = copy.deepcopy(history["transactions"][-1]["committedAccounts"])
+            with_whole(history)
+        result = adapter.compare(kept, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        # One path whose parent revert kept the call phase's write differs.
+        observed = return_histories(value)
+        observed["importedHull"]["transactions"][2]["committedAccounts"][0]["storage"][0]["value"] = "15"
+        with_whole(observed["importedHull"])
+        result = adapter.compare(observed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-2"))
+        self.assertFalse(all(result["pairs"].values()))
+        # A committed log breaks the protocol, and an unprescribed status too.
+        logged = return_histories(value)
+        for history in logged.values():
+            history["transactions"][0]["logs"] = [event("parent", 1, 4)]
+        self.assertEqual(adapter.compare(logged, value, BINDINGS)["fields"], ["status"])
+
+    def test_the_hull_history_uses_its_schema_and_both_contracts(self):
+        value = return_case()
+        runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
+        rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
+                 "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.return_initial_accounts(BINDINGS),
+                  "accountStorage": whole(adapter.return_initial_accounts(BINDINGS))}]
+        rows += [{**row, "stage": "execution"} for row in return_history(value)["transactions"]]
+        encode = lambda values: "\n".join(json.dumps(row) for row in values)
+        history = adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+        self.assertEqual((history["schema"], history["status"]), (adapter.RETURN_HISTORY_SCHEMA, "complete"))
+        self.assertEqual(adapter.compare({**return_histories(value), "importedHull": history}, value, BINDINGS)["category"], "matched")
+        with self.assertRaises(ValueError):
+            adapter.hull_history(encode(rows[:2] + rows[3:]), 0, value, BINDINGS, runtimes)
 
 
 if __name__ == "__main__":

@@ -795,5 +795,80 @@ class TransactionCountTests(unittest.TestCase):
             self.assertIn(message, errors.getvalue())
 
 
+def return_case(plan=None, inputs=(4, 5, 6, 0), budget=None):
+    value = fixtures.return_case(plan, inputs)
+    function = lambda body: {"tag": "lambda", "parameterType": "word", "resultType": "word", "body": body}
+    body = {"tag": "let", "initializer": function({"tag": "var", "index": 0}), "body": function({"tag": "var", "index": 0})}
+    value["callReturnPlan"]["stepProgram"] = {"dataDefinitions": [], "resultType": {
+        "tag": "function", "parameter": "word", "result": "word"}, "body": body}
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    origin = {"kind": "imported"} if budget is None else {"kind": "call-return-generated", "maxProgramNodes": budget,
+        "stepOrigin": {"kind": "aggregate-generated", "helpers": [{"template": 2}]}}
+    value["provenance"].update(features=["local"], origin=origin)
+    return value
+
+
+class CallReturnCampaignTests(unittest.TestCase):
+    def test_the_fixed_corpus_validates_and_its_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-call-return-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(campaign.PROFILES["stateful-call-returns"]["dimensions"][-len(campaign.RETURN_EXTRA):],
+                         campaign.RETURN_EXTRA)
+        self.assertNotIn("LogPatterns", campaign.PROFILES["stateful-call-returns"]["dimensions"])
+        changes = [lambda m: m.update(requiredLogPatterns=[""]), lambda m: m.update(requiredReturnKinds=["array"]),
+                   lambda m: m.update(requiredReturnDecisions=[]), lambda m: m.update(requiredReturnBytesLengths=[65]),
+                   lambda m: m.update(requiredReturnNodeBudgets=[513]), lambda m: m.update(requiredCallModes=[4]),
+                   lambda m: m["cases"][0].update(callPlan={}),
+                   lambda m: m["cases"][0].update(transactions=[{"id": "tx-0", "input": "4", "value": "0"}]),
+                   lambda m: m["cases"][0].pop("callReturnPlan")]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_coverage_follows_prescribed_decisions_and_matched_outcomes(self):
+        value = return_case(fixtures.return_plan("static-enum", length=0, choice=0,
+            delivery={"kind": "raw", "malformation": {"kind": "truncate", "kept": 32}}), inputs=(4, 5, 7, 6), budget=384)
+        coverage = campaign.return_coverage(value)
+        self.assertEqual(coverage["ReturnKinds"], {"static-enum"})
+        self.assertEqual(coverage["ReturnMalformations"], {"truncate"})
+        self.assertEqual(coverage["ReturnDecisions"], {"accepted"})
+        self.assertEqual(coverage["ReturnAccepted"], {"truncate"})
+        self.assertEqual(coverage["ReturnEnumFields"], {"none"})
+        self.assertEqual(coverage["ReturnRollbacks"], {"child-reverted-parent-returned", "child-reverted-parent-reverted",
+                                                       "child-returned-parent-reverted"})
+        self.assertEqual(coverage["ReturnNodeBudgets"], {384})
+        self.assertEqual(campaign.recipes(value), {2})
+        rejected = return_case()
+        coverage = campaign.return_coverage(rejected)
+        self.assertEqual((coverage["ReturnDecisions"], coverage["ReturnAccepted"], coverage["ReturnBytesLengths"]),
+                         ({"0x08638556"}, set(), set()))
+        self.assertIn("rejected", coverage["ReturnRollbacks"])
+        # Only the transactions whose matched outcome is the prescribed one count.
+        matched = campaign.return_coverage(rejected, ["returned", "returned", "returned", "returned"])
+        self.assertEqual((matched["ReturnDecisions"], matched["ReturnRollbacks"]), (set(), {"child-reverted-parent-returned"}))
+
+    def test_a_campaign_records_generated_and_matched_return_coverage(self):
+        value = return_case()
+        raw = {"schema": campaign.adapter.REPORT_SCHEMA, "histories": fixtures.return_histories(value),
+               "bindings": copy.deepcopy(fixtures.BINDINGS)}
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-call-returns"))
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", raw["histories"], raw["bindings"])
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedReturnDecisions"], ["0x08638556"])
+            self.assertEqual(coverage["generatedReturnKinds"], ["bytes"])
+            self.assertEqual(coverage["matchedOutcomes"], ["returned", "reverted"])
+            self.assertNotIn("matchedLogPatterns", coverage)
+            counts = campaign.transaction_counts(raw["histories"], value, raw["bindings"])
+            self.assertEqual(counts, {"executed": 4, "completed": 4, "matched": 4})
+            fingerprint = campaign.fingerprint(campaign.analyze(raw, value))
+            self.assertEqual(fingerprint["category"], "matched")
+
+
 if __name__ == "__main__":
     unittest.main()

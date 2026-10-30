@@ -124,6 +124,14 @@ lean_exe semanticConstructorArgumentTool where
   root := `Tests.SemanticConstructorArgumentTool
   exeName := "semantic-constructor-argument-tool"
 
+lean_exe semanticCallReturnTool where
+  root := `Tests.SemanticCallReturnTool
+  exeName := "semantic-call-return-tool"
+
+lean_exe rustHullCallReturnScenario where
+  root := `Tests.RustHullCallReturnScenarioRun
+  exeName := "rust-hull-call-return-scenario"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

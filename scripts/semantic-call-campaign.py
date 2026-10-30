@@ -56,12 +56,25 @@ TEST_FIELDS = ("output", "parent:balance", "child:balance", "parent:storage:0", 
 STRAY_SLOT = str(2**256 - 2)
 LOG_PATTERNS = ("", "parent:1,parent:3", "parent:1,child:2,parent:3")
 FORWARD_CORPUS_SCHEMA = "solcore-lean.semantic-forward-corpus.v1"
+# The call-return profile's own dimensions, beside the call family's but its
+# log patterns: the kind and delivery, the malformation, std's decisions, the
+# malformations std accepted, the `bytes` lengths, the decoded enum fields,
+# the rollback patterns and the node budgets.
+RETURN_EXTRA = ("ReturnKinds", "ReturnDeliveries", "ReturnMalformations", "ReturnDecisions", "ReturnAccepted",
+                "ReturnBytesLengths", "ReturnEnumFields", "ReturnRollbacks", "ReturnNodeBudgets")
+RETURN_DIMENSIONS = DIMENSIONS[:-1] + RETURN_EXTRA
+RETURN_CORPUS_SCHEMA = "solcore-lean.semantic-call-return-corpus.v1"
+RETURN_ROLLBACKS = ("child-reverted-parent-returned", "child-reverted-parent-reverted",
+                    "child-returned-parent-reverted", "rejected")
 # Profile rules; the adapter selects schemas, programs and protocols by case schema.
 PROFILES = {
     "stateful-calls": {"dimensions": DIMENSIONS, "modeMask": 7, "corpusSchema": CORPUS_SCHEMA, "originKind": "call-generated",
         "scope": "one child call; fixed parent8/child0; committed slots0/1, both contracts' whole committed storage, contract balances and ordered logs; zero root value; no gas/nonce or arbitrary-world equivalence"},
     "stateful-forwarded-value": {"dimensions": FORWARD_DIMENSIONS, "modeMask": 3, "corpusSchema": FORWARD_CORPUS_SCHEMA, "originKind": "forward-generated",
         "scope": "one value-forwarding child call; parent endowment 2^72/child0; committed slots0/1, both contracts' whole committed storage, contract balances and empty logs; payable root values; no sender-balance, gas/nonce or arbitrary-world equivalence"},
+    "stateful-call-returns": {"dimensions": RETURN_DIMENSIONS, "modeMask": 3, "corpusSchema": RETURN_CORPUS_SCHEMA,
+        "originKind": "call-return-generated",
+        "scope": "one child method call through std's raw_call; its tuple, bytes or enum return data, typed or raw with one malformation, decoded by std's MemoryWordReader; unfunded accounts; the parent's slots0-6 and the child's slots0/1, both contracts' whole committed storage, balances and empty logs; zero value; no gas/nonce or arbitrary-world equivalence"},
 }
 
 
@@ -77,9 +90,16 @@ def helper_count(case):
     return legacy.bound_helper_count(step.get("body"))
 
 
+def generated_kind(case):
+    """The origin kind of a profile's generated cases."""
+    if adapter.returns(case):
+        return "call-return-generated"
+    return "forward-generated" if adapter.forwarding(case) else "call-generated"
+
+
 def recipes(case):
     origin = case["provenance"].get("origin", {})
-    if origin.get("kind") != ("forward-generated" if adapter.forwarding(case) else "call-generated"):
+    if origin.get("kind") != generated_kind(case):
         return set()
     step = origin.get("stepOrigin")
     if not isinstance(step, dict) or step.get("kind") != "aggregate-generated":
@@ -105,10 +125,50 @@ def value_coverage(case, statuses):
             "RevertedValues": {tx["value"] for tx, status in zip(transactions, statuses) if status == "reverted"}}
 
 
+def return_coverage(case, statuses=None):
+    """The call-return dimensions of a case. Decisions, accepted malformations,
+    the `bytes` lengths and enum fields std decoded, and rollback patterns
+    follow each transaction's prescribed rejection and inputs; with statuses,
+    only the matched outcomes count."""
+    plan = case["callReturnPlan"]
+    kind, delivery = plan["kind"], plan["delivery"]
+    raw = delivery["kind"] == "raw"
+    chosen = plan["constructors"][plan["choice"]]["fields"] if kind.endswith("enum") else None
+    carries = kind == "bytes" or chosen == "bytes"
+    values = {"ReturnKinds": {kind + (f"-{plan['arity']}" if kind == "tuple" else "")}, "ReturnDeliveries": {delivery["kind"]},
+              "ReturnMalformations": {delivery["malformation"]["kind"]} if raw else set(), "ReturnDecisions": set(),
+              "ReturnAccepted": set(), "ReturnBytesLengths": set(),
+              "ReturnEnumFields": set(), "ReturnRollbacks": set(),
+              "ReturnNodeBudgets": {case["provenance"]["origin"]["maxProgramNodes"]}
+              if case["provenance"]["origin"].get("kind") == "call-return-generated" else set()}
+    for index, tx in enumerate(case["transactions"]):
+        given, rejection = int(tx["input"]), tx["stdRejection"]
+        if statuses is not None and statuses[index] != adapter.return_expected_status(tx):
+            continue
+        if given & 1:
+            values["ReturnRollbacks"].add("child-reverted-parent-reverted" if given & 2 else "child-reverted-parent-returned")
+            continue
+        values["ReturnDecisions"].add("accepted" if rejection is None else rejection)
+        if rejection is not None:
+            values["ReturnRollbacks"].add("rejected")
+            continue
+        if raw:
+            values["ReturnAccepted"].add(delivery["malformation"]["kind"])
+        if carries:
+            values["ReturnBytesLengths"].add(plan["length"])
+        if chosen is not None:
+            values["ReturnEnumFields"].add(chosen or "none")
+        if given & 2:
+            values["ReturnRollbacks"].add("child-returned-parent-reverted")
+    return values
+
+
 def validate_manifest(manifest):
     if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") not in PROFILES:
         raise ValueError("unsupported call corpus manifest")
     forwards = manifest["profile"] == "stateful-forwarded-value"
+    if manifest["profile"] == "stateful-call-returns":
+        return validate_return_manifest(manifest)
     plan_key, plan_schema = ("forwardPlan", "solcore-lean.forward-plan.v1") if forwards else ("callPlan", "solcore-lean.call-plan.v1")
     if manifest.get("coverageKind") != "step-core-ast-features":
         raise ValueError("call corpus coverage must name the step AST")
@@ -183,6 +243,85 @@ def validate_manifest(manifest):
             # Full source/host checking and canonical ABI validation are native.
             if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3:
                 raise ValueError("invalid imported transaction count")
+    return manifest
+
+
+def validate_return_manifest(manifest):
+    """The call-return corpus: the call family's requirements but its log
+    patterns, and its own dimensions."""
+    if manifest.get("coverageKind") != "step-core-ast-features":
+        raise ValueError("call corpus coverage must name the step AST")
+    for key in VERSIONS:
+        if not isinstance(manifest.get(key), str) or not manifest[key]:
+            raise ValueError(f"missing corpus {key}")
+    for key in ("requiredFeatures", "requiredInputs"):
+        values = manifest.get(key)
+        if not isinstance(values, list) or any(not isinstance(value, str) for value in values) or len(set(values)) != len(values):
+            raise ValueError(f"{key} must contain unique strings")
+    for value in manifest["requiredInputs"]:
+        common.word(value)
+    for key in ("requiredHelperCounts", "requiredTransactionCounts"):
+        values = manifest.get(key)
+        if not isinstance(values, list) or any(type(v) is not int or v not in (1, 2, 3) for v in values) or len(set(values)) != len(values):
+            raise ValueError(f"invalid {key}")
+    requirements = manifest.get("generationRecipeRequirements")
+    if not isinstance(requirements, dict) or set(requirements) != {"templates"}:
+        raise ValueError("call recipe requirements must contain templates only")
+    values = requirements["templates"]
+    if not isinstance(values, list) or any(type(v) is not int or v not in range(4) for v in values) or len(set(values)) != len(values):
+        raise ValueError("invalid call template requirements")
+    modes = manifest.get("requiredCallModes")
+    if not isinstance(modes, list) or any(type(v) is not int or v not in range(4) for v in modes) or len(set(modes)) != len(modes):
+        raise ValueError("requiredCallModes must name unique prescribed input-bit combinations")
+    if manifest.get("requiredOutcomes") is None or sorted(manifest["requiredOutcomes"]) != ["returned", "reverted"]:
+        raise ValueError("call coverage requires returned and reverted root outcomes")
+    if "requiredLogPatterns" in manifest or any("required" + dimension in manifest for dimension in VALUE_DIMENSIONS):
+        raise ValueError("the call-return profile commits no logs and forwards no value")
+    allowed = {"ReturnKinds": {"tuple-2", "tuple-3", "tuple-4", "bytes", "static-enum", "dynamic-enum"},
+               "ReturnDeliveries": {"typed", "raw"}, "ReturnMalformations": set(adapter.RETURN_MALFORMATIONS),
+               "ReturnDecisions": {"accepted", adapter.RETURN_TRUNCATED, adapter.RETURN_EMPTY},
+               "ReturnAccepted": set(adapter.RETURN_MALFORMATIONS),
+               "ReturnEnumFields": {"none", "uint256", "uint256,uint256", "bytes"}, "ReturnRollbacks": set(RETURN_ROLLBACKS)}
+    for dimension in RETURN_EXTRA:
+        values = manifest.get("required" + dimension)
+        if not isinstance(values, list) or not values or len({json.dumps(v) for v in values}) != len(values):
+            raise ValueError(f"call-return coverage requires unique required{dimension}")
+        if dimension in allowed and any(v not in allowed[dimension] for v in values):
+            raise ValueError(f"invalid required{dimension}")
+        if dimension == "ReturnBytesLengths" and any(type(v) is not int or not 0 <= v <= 64 for v in values):
+            raise ValueError("required bytes lengths lie in 0 to 64")
+        if dimension == "ReturnNodeBudgets" and any(type(v) is not int or not 1 <= v <= 512 for v in values):
+            raise ValueError("required node budgets lie in 1 to 512")
+    if not isinstance(manifest.get("cases"), list):
+        raise ValueError("corpus cases must be an array")
+    ids = set()
+    for entry in manifest["cases"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", entry["id"]) or entry["id"] in ids:
+            raise ValueError("corpus IDs must be unique bounded identifiers")
+        ids.add(entry["id"])
+        generated = "generation" in entry
+        if generated == ("callReturnPlan" in entry) or ("transactions" in entry) == generated:
+            raise ValueError("corpus entry requires generation XOR callReturnPlan+transactions")
+        if any(key in entry for key in ("program", "programs", "storagePlan", "loopPlan", "input", "callPlan", "forwardPlan")):
+            raise ValueError("call-return corpus uses a plan and transaction sequence")
+        expected = entry.get("expectedFeatures")
+        if not isinstance(expected, list) or any(not isinstance(v, str) for v in expected) or len(set(expected)) != len(expected):
+            raise ValueError("expectedFeatures must contain unique strings")
+        if generated:
+            request = entry["generation"]
+            if not isinstance(request, dict) or set(request) != {"seed", "maxProgramNodes"}:
+                raise ValueError("invalid call generation request")
+            seed = common.word(request["seed"], "seed")
+            nodes = request["maxProgramNodes"]
+            if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
+                raise ValueError("call generation request exceeds bounds")
+        else:
+            if not isinstance(entry["callReturnPlan"], dict) or entry["callReturnPlan"].get("schema") != "solcore-lean.call-return-plan.v1":
+                raise ValueError("invalid imported call-return plan")
+            # Full source/host checking and canonical ABI validation are native.
+            if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3 or \
+                    any(not isinstance(tx, dict) or set(tx) != {"id", "input"} for tx in entry["transactions"]):
+                raise ValueError("invalid imported transaction count or fields")
     return manifest
 
 
@@ -275,6 +414,7 @@ def fingerprint(analysis):
         storage = account.get("storage", [])
         return next((slot.get("value") for slot in storage if isinstance(slot, dict) and slot.get("slot") == field), None) if isinstance(storage, list) else None
     forwards = any(isinstance(history, dict) and history.get("schema") == adapter.FORWARD_HISTORY_SCHEMA for history in histories.values())
+    returning = any(isinstance(history, dict) and history.get("schema") == adapter.RETURN_HISTORY_SCHEMA for history in histories.values())
     differences = set()
     for role in adapter.ROLES:
         for field in ("balance", *adapter.SLOTS):
@@ -284,7 +424,7 @@ def fingerprint(analysis):
                 if comparison.get("stage") == "initial-accounts" and isinstance(bindings, dict):
                     try:
                         adapter.validate_bindings(bindings)
-                        expected = adapter.initial_accounts(bindings, forwards)
+                        expected = adapter.return_initial_accounts(bindings) if returning else adapter.initial_accounts(bindings, forwards)
                     except ValueError:
                         continue
                 elif rows[path].get("status") == "reverted":
@@ -447,20 +587,23 @@ class Campaign:
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case),
                   "CallModes": {int(tx["input"]) & self.specification["modeMask"] for tx in case["transactions"]}, "Outcomes": set()}
         forwards = self.profile == "stateful-forwarded-value"
-        if not forwards:
+        returning = self.profile == "stateful-call-returns"
+        if not forwards and not returning:
             values["LogPatterns"] = set()
         if prefix == "matched":
             if histories is None or adapter.compare(histories, case, bindings)["category"] != "matched":
                 raise ValueError("coverage requires actual matched histories")
             for row in histories["directCore"]["transactions"]:
                 values["Outcomes"].add(row["status"])
-                if not forwards:
+                if not forwards and not returning:
                     values["LogPatterns"].add(",".join(next(role for role in adapter.ROLES if bindings[role] == event["address"]) + ":" + event["topics"][0] for event in row["logs"]))
             statuses = [row["status"] for row in histories["directCore"]["transactions"]]
         else:
             statuses = [adapter.expected_status(tx) for tx in case["transactions"]]
         if forwards:
             values.update(value_coverage(case, statuses))
+        if returning:
+            values.update(return_coverage(case, statuses if prefix == "matched" else None))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -518,7 +661,9 @@ class Campaign:
         for dimension in ("Features", "Inputs", "HelperCounts", "TransactionCounts"):
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
-        for dimension in ("CallModes", "Outcomes") + (VALUE_DIMENSIONS if self.profile == "stateful-forwarded-value" else ("LogPatterns",)):
+        extra = VALUE_DIMENSIONS if self.profile == "stateful-forwarded-value" else RETURN_EXTRA \
+            if self.profile == "stateful-call-returns" else ("LogPatterns",)
+        for dimension in ("CallModes", "Outcomes") + extra:
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         self.checkpoint()
         exclusions = []
@@ -543,7 +688,7 @@ class Campaign:
                     raise ValueError("native generation differs from requested seed/budget")
             else:
                 plan_path, tx_path = self.work / "plan.json", self.work / "transactions.json"
-                save_json(plan_path, entry["forwardPlan" if self.profile == "stateful-forwarded-value" else "callPlan"])
+                save_json(plan_path, entry[adapter.PROFILES[self.profile]["planKey"]])
                 save_json(tx_path, entry["transactions"])
                 try:
                     case = self.tool(["emit", plan_path, tx_path, self.args.direct_fuel], "corpus-emission")

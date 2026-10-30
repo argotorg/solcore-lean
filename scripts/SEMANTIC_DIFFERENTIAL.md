@@ -6795,6 +6795,117 @@ the Rust driver, code-image exporter and directive tools frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare call returns
+
+The `stateful-call-returns` profile compares a parent that calls a child
+method and decodes its multi-Word return data with std.
+- **Inside the compiler's boundary:** std's one call wrapper,
+  `raw_call(target, value, payload)`, returns the success flag and the whole
+  return data, which `returndatasize` and `returndatacopy` copy into a
+  `memory<bytes>`. `abi_decode(ret, @T, @MemoryWordReader)` decodes them with
+  the constructor arguments' reader: from 0, with no up-front size check. A
+  read past the end is `ABIInputTruncated()`, and an unknown tag empty revert
+  data.
+- **Original Core** cannot read return data, since no Core host function
+  does. The parent's reference is in continuation-passing form: a call phase
+  and a resume phase that the call-and-resume convention in
+  `Solcore/ContractRuntime/CallResumeExecution.lean` runs around the child,
+  each through the public top-level runner and committing as one
+  transaction. The resume phase reads the kept input, the child's status
+  Word and its returned or reverted bytes through the input-data requests.
+- **Each contract compiles from its own source** on every path, so a later
+  Yul path needs only the exporter's admission of the two wrapper names.
+
+The [roadmap](../docs/design/next-implementation-roadmap.md) records the
+probe and the definitions.
+
+### Definitions
+
+- **Boundary:** one call per transaction, at depth one, with zero value and
+  no logs; the target is the bound child.
+- **Contracts:** the child `SynthesizedReturnCallee` with `get(uint256 x)`
+  (`0x9507d39a`), and the parent `SynthesizedReturnCaller` with
+  `run(uint256 target, uint256 input) returns (uint256)` (`0x7357f5d2`). Both
+  have empty constructors and no value.
+- **Child:** `o = slot 0`, `c = slot 1 + 1` and `r = step(x + o)`; it writes
+  `r` and `c`, reverts with the 32 bytes of `r` for an odd `x`, and otherwise
+  returns its value from `d0 = r·K` and `d1 = (c·K) xor x`:
+  - a tuple of the first two to four of `(r, c, x, o)`;
+  - `bytes` of up to 64 bytes of `d0 ‖ d1`;
+  - an enum's chosen constructor, as for `stateful-enum-returns`.
+- **Delivery:** typed through std's encoder, or raw with one malformation
+  through `return_`: `truncate`, `trailing`, `offset`, `length`, `tag`,
+  `tagCut`, `tail` or `narrow`, as for the constructor arguments but on the
+  return data.
+- **Parent:** writes `slot 0 + input` to slot 0, calls the child with
+  `0x9507d39a ‖ input`, and when the call succeeds decodes the return data as
+  the plan's type; otherwise it keeps the revert data's first Word. It writes
+  the flag plus twice the size to slot 1, the constructor index plus one or 0
+  to slot 2 and four Words to slots 3 to 6: the tuple's Words, or a `bytes`
+  value's length and first two Words. It then reverts with their sum with
+  slot 0 under bit 1 of the input, or returns it. A rejection reverts with
+  std's data before those writes.
+- **Original Core:**
+  - the child's conventions are `wordTupleOutcomeV1`,
+    `boundedBytesOutcomeV1` or `enumOutcomeV1` when typed, and the new
+    `rawBytesOutcomeV1` when raw;
+  - the parent's call phase is `wordTupleOutcomeV1` and its resume phase
+    `wordOutcomeV1`.
+- **std's prescribed rejection:** each transaction records it, computed by a
+  Lean byte-level model of the child's bytes and std's decision. The adapter
+  recomputes it with its own Python model.
+
+### Running and validation
+
+```sh
+lake build semanticCallReturnTool rustHullCallReturnScenario
+python3 scripts/semantic-call-campaign.py --profile stateful-call-returns \
+  --corpus scripts/semantic-call-return-corpus.json \
+  --output .upstream/semantic-call-return-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random --profile stateful-call-returns \
+  --cases 16 --output .upstream/semantic-call-return-random
+```
+
+- **Schemas:**
+  - plans: `solcore-lean.call-return-plan.v1` under `callReturnPlan`, with
+    `kind`, `arity` or `constructors`, `length`, `choice`, `delivery` and
+    `stepProgram`;
+  - cases: `solcore-lean.semantic-call-return-case.v1`, carrying `sources`
+    for both roles, the three programs and each transaction's
+    `stdRejection`;
+  - histories: `solcore-lean.call-return-history.v1`;
+  - the Hull scenario: `solcore-lean.call-return-scenario.v1`.
+- **Node budget:** the child's shell takes 58 to 114 nodes inside the node
+  budget. The value it returns and the parent's two phases lie outside it,
+  and every contract is bounded by 1,024 nodes.
+- **Paths:**
+  - **EVM:** both images deploy with zero value, the child first.
+  - **Hull:** `rust-hull-call-return-scenario` deploys both from their own
+    checked Hull and images. It links the parent with the child's linked
+    runtime added to the code catalog its calls resolve, as one compilation
+    of both would supply.
+  - **Original Core** runs through the convention.
+- **Comparison:**
+  - every row's status and whole return data, the parent's slots 0 to 6,
+    the child's slots 0 and 1, both balances, both contracts' whole
+    committed storage and empty logs;
+  - original Core's revert Word maps to std's selector or `0x` only when the
+    prescribed rejection says so;
+  - a returned parent's slots must equal the adapter's own decoding of the
+    child's bytes, rebuilt from the child's committed slots and the input;
+  - a child revert under a returned parent keeps the child's prior storage,
+    and a parent revert keeps both.
+- **Campaign dimensions:** `ReturnKinds`, `ReturnDeliveries`,
+  `ReturnMalformations`, `ReturnDecisions`, `ReturnAccepted`,
+  `ReturnBytesLengths`, `ReturnEnumFields`, `ReturnRollbacks` and
+  `ReturnNodeBudgets`, beside the call family's without log patterns.
+- **Corpus:** `scripts/semantic-call-return-corpus.json` holds 45 scenarios
+  and 89 transactions. 39 are imported plans over the steps of four
+  `stateful-calls` corpus entries, and 6 are generated at 384 and 512 nodes.
+  Each entry records its expected history, computed from the child's bytes,
+  std's decision and the source model, in which each step runs alone in
+  Core. The corpus check compares it with the convention's actual history.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-five

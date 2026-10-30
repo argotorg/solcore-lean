@@ -114,6 +114,9 @@ PROFILES = {
     # The constructor-argument runtime shell takes 69 nodes of 384; the
     # initializer, 76 to 611 nodes, lies outside the budget.
     "stateful-constructor-arguments": ("semantic-constructor-argument", "storage", 384),
+    # The call-return child's shell takes 58 to 114 nodes of 384; the value it
+    # returns and the parent's two phases lie outside the budget.
+    "stateful-call-returns": ("semantic-call-return", "call", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
@@ -233,12 +236,15 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-array-returns": args.array_return_case_tool,
                      "stateful-constructor-arguments": args.constructor_argument_case_tool}
     forwarded = profile == "stateful-forwarded-value"
+    returning = profile == "stateful-call-returns"
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
-            storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else args.call_case_tool}[family]
+            storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else
+            args.call_return_case_tool if returning else args.call_case_tool}[family]
     runner = {"pure": args.core_runner, "storage": args.value_core_runner if profile == "stateful-call-value" else
               args.ledger_core_runner if profile == "stateful-ledger" else
               args.keyed_core_runner if profile in DECLARED_SLOT_PROFILES else args.storage_core_runner,
-              "call": args.forward_core_runner if forwarded else args.call_core_runner}[family]
+              "call": args.forward_core_runner if forwarded else args.call_return_core_runner if returning else
+              args.call_core_runner}[family]
     result = [sys.executable, str(ROOT / "scripts" / CAMPAIGNS[family]), "--output", str(output), "--profile", profile,
               "--seconds", str(seconds), "--disk-bytes", str(disk_bytes), "--case-tool", str(tool), "--core-runner", str(runner)]
     for key in ("backend", "anvil", "upstream", "target_dir", "direct_fuel", "core_fuel", "gas", "case_timeout", "shrink_attempts", "shrink_candidates"):
@@ -541,7 +547,9 @@ def parse_args(argv=None):
                 "enum_argument_case_tool": "semantic-enum-argument-tool",
                 "enum_array_case_tool": "semantic-enum-array-tool",
                 "array_return_case_tool": "semantic-array-return-tool",
-                "constructor_argument_case_tool": "semantic-constructor-argument-tool"}
+                "constructor_argument_case_tool": "semantic-constructor-argument-tool",
+                "call_return_case_tool": "semantic-call-return-tool",
+                "call_return_core_runner": "rust-hull-call-return-scenario"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))

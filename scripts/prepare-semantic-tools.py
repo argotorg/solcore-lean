@@ -61,6 +61,8 @@ TARGETS = {
     "semanticEnumArrayTool": "semantic-enum-array-tool",
     "semanticArrayReturnTool": "semantic-array-return-tool",
     "semanticConstructorArgumentTool": "semantic-constructor-argument-tool",
+    "semanticCallReturnTool": "semantic-call-return-tool",
+    "rustHullCallReturnScenario": "rust-hull-call-return-scenario",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",
