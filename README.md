@@ -171,7 +171,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-four pure profiles with `--backend yul`, and for the
+available for the twenty-five pure profiles with `--backend yul`, and for the
 twenty-six storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the two call profiles, whose sources compile a parent and a
@@ -183,7 +183,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-two-profile suite runs locally with shared time and disk limits.
+The same fifty-three-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -259,6 +259,16 @@ through two superclass bounds at tuples, sums and generic enums, which the
 checked frontend rejects on every backend, a recorded finding; the other 72
 of 96 random cases match on all three backends
 ([trait hierarchies and method-level generics](scripts/SEMANTIC_DIFFERENTIAL.md#compare-trait-hierarchies-and-method-level-generics)).
+The `runtime-memory-values` profile builds std's memory values in pure code:
+`memory<bytes>` values from Words, concatenations and slices, `memory_ref`
+views, second variables and Word arrays, written inline or through helpers and
+read through std's range checks, `keccak256_` and array access, in straight-line
+code and bounded loops. Its original Core models the values as byte lists with
+slices as views and computes the returned Word itself; an out-of-range access
+is std's `OutOfBounds()` revert, compared exactly. All 232 fixed cases and 96
+random cases of eight functions match on O2 and Yul. Sonatina O0 returns other
+Words for 4 fixed and 8 random cases whose loops use memory values, a recorded
+finding ([Solcore memory values](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-values)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -280,7 +290,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the fifteen profiles whose functions can be identities they
+inputs, and in the sixteen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
