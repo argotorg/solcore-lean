@@ -278,18 +278,27 @@ and in the Yul runs' O0 code images, its O2 signextend-folding overflow
 checked frontend's `SC0401` and `SC0406` rejection of a base method reached
 through two superclass bounds on each backend, and the fixtures' O2 crash.
 Their occurrences count and are shown as known, but never as new, so a fresh
-state reports only what `questions.md` does not record. A mismatch is never
-listed, since its signature is a reduced program, and the same panic at
-another call site is new.
+state reports only what `questions.md` does not record. The same panic at
+another call site is new. A mismatch's signature is its reduced program, so a
+recorded semantic defect is listed as a class instead. A class names its
+backend, profile and stage, which paths disagree with which and their shapes,
+and a structural property of the final plan that the recorded reductions
+share. The first is Sonatina O0's on `runtime-memory-values`: the EVM path
+returns another Word than original Core and Hull, which agree, and the final
+plan has a single loop that observes a bytes value or slice and later slices
+or writes one. Its occurrences count under the class and are shown as known.
+Every other mismatch keeps its program signature and is new, including the
+same pattern on O2 or Yul.
 
 The driver exits with status 2 when the tools are not ready or another driver
 holds the state, 3 on an epoch change, 4 when the state reaches
 `--max-state-bytes` (50 GiB by default) and 5 after three consecutive runs
 without a suite summary. Signatures are conservative for mismatches: unrelated
-miscompilations share coarse fingerprints, so only the same reduced program
-counts as the same finding. A crash whose replay does not panic again records
-`not reproduced` as its call site. A signature need not survive an epoch
-change: when a comparison gains observations, as the stateful profiles did with
+miscompilations share coarse fingerprints, so outside the recorded classes only
+the same reduced program counts as the same finding. A crash whose replay does
+not panic again records `not reproduced` as its call site. A signature need
+not survive an epoch change: when a comparison gains observations, as the
+stateful profiles did with
 [whole committed storage](SEMANTIC_DIFFERENTIAL.md#compare-whole-committed-storage),
 its mismatch fingerprints change and the same difference gets a new signature.
 

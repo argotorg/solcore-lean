@@ -8797,6 +8797,31 @@ Registration:
 - The epoch hashes the readiness receipt and the harness scripts other than
   the driver and its tests, so the classes alone need no new epoch.
 
+**Known mismatch classes in the fuzz registry: results.** The driver lists one
+class, Sonatina O0's on `runtime-memory-values`
+(`loop-observes-then-slices-or-writes`, signature `30a48ef2ac77`):
+- **The real occurrences.** All 37 map to the class, replayed through the
+  driver's `finding_records` and `signature_key`: lane A's twelve and the
+  live run's 25. They share one fingerprint and twelve distinct final plans.
+  Before the classes they had 28 program signatures, since the live run's
+  iteration 0 repeats lane A's random suite program for program. The
+  signatures that run registered equal the program keys recomputed now.
+- **A live run with the classes.** The same settings on `325b5c397`, for eight
+  iterations from root seed 1 with scripts and tools frozen. Root seeds 1, 2
+  and 4 gave the run before's 25 occurrences, one for one. They counted under
+  the class, none as new, with three examples kept. Root seeds 3 and 5 to 8
+  gave none. The run executed 768 cases in 12 minutes with two jobs.
+- **Tests.** The driver's tests map the twelve plans of the 37 occurrences.
+  They keep near misses new: six plans without the property (a write alone,
+  a write before the observation, an array write or observation, no loop, a
+  nested loop), O2, Yul, Core and Hull disagreeing, a revert, a synthetic
+  mismatch, another profile on O0 and an unreadable final case. A fake suite
+  counts three class occurrences on O0 as known, while a slice alone in the
+  loop and the same three on O2 are new.
+
+The report names the class in place of a first program. No new epoch is
+needed for the classes.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
