@@ -2754,6 +2754,267 @@ averages of 7 to 22 from other work on the machine:
 - Both O0 results are recorded locally without investigation, so the fixed
   and random O0 gates did not pass; O2 and Yul found no mismatch.
 
+**Memory values across calls.** `runtime-memory-values` keeps every memory
+value inside `run`: its helpers `sc_word`, `sc_byte`, `sc_put`, `sc_put8` and
+`sc_aput` take a value and return a Word or nothing. Values that cross
+function and type boundaries, returned by helpers, held in tuples, sums and
+enums, captured by closures, taken by function values and passed to helpers
+generic over std's memory traits, are where a backend must keep a returned
+pointer, a view and a copy apart. One new pure profile,
+`runtime-memory-calls`, generates them in straight-line code only:
+`runtime-memory-values` covers loops, where Sonatina O0's recorded loop
+mismatches would dominate. It keeps that profile's values, actions and
+byte-list reference.
+
+Before any code, a probe compiled hand-written sources through checked Hull
+export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner,
+against a Python model at twelve inputs:
+- Helpers that take and return `memory<bytes>`, `memory_ref` and
+  `memory<DynArray<uint256>>` values with Words: a helper that returns its
+  argument returns the same value, its `MemoryPointer.ptr` the argument's, a
+  returned `slice_` is a view of the caller's value, and `concat` and array
+  literals make new values; a write through an argument is the caller's, seen
+  through every variable, slice and data value of the value, and so is a
+  write through one parameter seen through another bound to the same array;
+  helpers call earlier helpers, and a returned `(memory_ref, word)` tuple is
+  matched.
+- Generic helpers: `where a: MemorySize, a: MemoryPointer, a: MemoryEncode`
+  over a parameter of type `a`, instantiated in one program at
+  `memory<bytes>`, `memory_ref`, `bytes32` and `empty(n)` and called from
+  other generic helpers; `where c: IndexAccess<t>` at
+  `memory<DynArray<uint256>>` and `memory<DynArray<byte>>`, inferred at each
+  call.
+- Memory values inside data: tuples `(memory<bytes>, word)`, std's
+  `sum<memory<bytes>, word>` with `inl` and `inr`, and a user enum
+  `Sc_E { Sc_E0(memory<bytes>, word), Sc_E1(word) }`, built, passed,
+  returned and matched; a write through a matched value is the caller's.
+- Closures and function values: `lam (sc_j: word) -> word { … }` of type
+  `function (word) returns (word)` captures a memory value, sees writes made
+  after it was built and keeps the value after its variable is reassigned; a
+  helper is a function value of its own type, and a generic higher-order
+  helper applies one.
+- Out-of-range accesses inside a helper, one and two calls deep, revert with
+  std's `OutOfBounds()` data `0xb4120f14` on every path.
+- Every source matched the model on every path, and so did the plans of the
+  generator below: seeds 1 to 12 of an early draft, 41 seeds of a later
+  draft, and the 41 seeds that cover every shape value below within its
+  first 400. A separate Python model of the plans agreed with the Lean
+  reference on those 400 seeds at 13 inputs, 5,200 outcomes, and on the 53
+  of the first 3,000 seeds that take a packed pair apart, 424 outcomes, once
+  the reference no longer dropped the pack's constant from the pair's Word,
+  which a review found before these definitions.
+
+`IndexAccess`-bounded helpers stay out of the plans, whose arrays are Word
+arrays only, so they would have one instance. Core, the Hull importer and
+runner, both EVM backends and `export-rust-yul.py` need no change, and no
+shared runtime code or proof changes. The reference needs no Core support
+beyond `runtime-memory-values`': every call is inlined where it is made. The
+pure adapter `semantic-differential.py` adds this profile's cases to the
+revert matching of `runtime-memory-values`. The existing profiles, corpora,
+emitters and emitter proofs stay unchanged, and this emitter has no proof
+yet. The definitions were fixed before execution:
+
+- Plans (`core-memory-calls-v1`): one to three helpers
+  `sc_h<k>(sc_v: P, sc_i: word, sc_w: word)` before the contract
+  `SynthesizedMemoryCalls`, whose `run(uint256)` binds `sc_x` and `sc_r` as
+  `runtime-memory-values` does, runs one to twelve steps and returns `sc_r`.
+  - Parameters `P`: `memory<bytes>`, `memory_ref`, a type `a` with
+    `where a: MemorySize, a: MemoryPointer, a: MemoryEncode` (generic),
+    `memory<DynArray<uint256>>`, `(memory<bytes>, word)`,
+    `sum<memory<bytes>, word>`, or `Sc_E`, the enum above, emitted when a plan
+    uses it.
+  - Helper kinds:
+    - `read`: `return (O op sc_w);`, `O` being `MemorySize.len(sc_v)`,
+      `sc_word(sc_v, sc_i)`, `sc_byte(sc_v, sc_i)` or
+      `Typedef.rep(keccak256_(sc_v))` of a bytes value, slice or generic
+      value, or `Typedef.rep(sc_v[uint256(sc_i)])` of an array, and `op`
+      being `+` or `^`;
+    - `write`: `sc_put(sc_v, sc_i, sc_w);` or `sc_put8(sc_v, sc_i, sc_w);`
+      into a bytes value, slice or generic value, or
+      `IndexAccess.set(sc_v, uint256(sc_i), uint256(sc_w));` into an array,
+      then `return sc_v;`;
+    - `view`: `return slice_(sc_v, s);` of a bytes value, slice or generic
+      value, `s` at most 32;
+    - `copy`: `return concat(sc_v, bytes32(sc_w));` of the same;
+    - `pack`: `return (sc_v, (sc_w + c));` of a bytes value, `c` from 1 to
+      255;
+    - `take`: `match (sc_v)` over a pair, sum or enum; an arm holding a bytes
+      value `sc_p` optionally writes a byte, `sc_put8(sc_p, sc_i, sc_q)` for a
+      pair or `Sc_E0` and `sc_put8(sc_p, sc_i, sc_w)` for `inl`, then returns
+      `(O op sc_w)` with `O` a length, Word, byte or hash of `sc_p`; an arm
+      holding a Word `sc_q` returns `(sc_q op sc_w)`;
+    - `call`: `return sc_h<j>(sc_v, sc_i, (sc_w + c));` of an earlier helper
+      whose parameter is this one's, or generic when this one's is a bytes
+      value, slice or generic value, `c` from 1 to 255.
+
+    A helper returns what its base kind, reached through `call` helpers,
+    returns: a Word, its parameter's type for `write` (`a` when generic),
+    `memory_ref`, `memory<bytes>` or the pair.
+  - Steps:
+    - `runtime-memory-values`' actions, without positions;
+    - `call`: `sc_h<k>(A, I, W)`, or `sc_f<n>(A, I, W)` through a function
+      value `let sc_f<n>: function (T, word, word) returns (R) = sc_h<k>;`
+      declared just before it, of a memory or data variable `A` the parameter
+      takes, a generic parameter a bytes value or slice; a Word result is
+      folded, `sc_r = ((sc_r * c) op CALL);`, and a value declared,
+      `let sc_b<n>: memory<bytes> = CALL;`, `sc_s<n>`, `sc_a<n>` or
+      `let sc_t<n>: (memory<bytes>, word) = CALL;`; an index the base kind
+      does not use is the literal 0;
+    - `data`: `let sc_t<n>: (memory<bytes>, word) = (sc_b<m>, W);`,
+      `let sc_u<n>: sum<memory<bytes>, word> = inl(sc_b<m>);` or `inr(W)`, and
+      `let sc_e<n>: Sc_E = Sc_E.Sc_E0(sc_b<m>, W);` or `Sc_E.Sc_E1(W)`;
+    - `closure`: `let sc_c<n>: function (word) returns (word) = lam (sc_j:
+      word) -> word { return O; };` with `O` the length, Word, byte or hash of
+      a bytes value or slice at `sc_j`, or an array's element;
+    - `apply`: `sc_r = ((sc_r * c) op sc_c<n>(I));`.
+
+    Words `W`, indices `I` and fold constants `c` are
+    `runtime-memory-values`' without positions. A plan has at least one call
+    and one observation; at most four bytes variables, three slices and two
+    arrays, as in `runtime-memory-values`, call results counted, two pairs,
+    two sums, two enums, two closures and three function values; values of at
+    most 128 bytes, so a copied value has at most 96; and at most seven hashes
+    on any input, a hashing call or application counting one.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x6d656d63616c0001`), in plan order:
+  - one to three helpers; a parameter is an earlier helper's a third of the
+    time, so that it may call that helper, what an earlier helper returns
+    another third of the time when one returns a value, and otherwise
+    weighted `memory<bytes>` 3, `memory_ref` 2, generic 3, array 1, pair 1,
+    sum 1 and enum 1; a kind among those the parameter takes, weighted read
+    3, write 3, view 2, copy 2, call 3 when an earlier helper can be called,
+    pack 2 and take 4; an observation of a bytes value weighs length 1, Word
+    3, byte 2 and hash 2; a byte or Word write equally; a take writes half the
+    time; starts, callees and constants are uniform;
+  - then, for each helper in order, one or two calls, each after up to two
+    steps that make an argument its base kind can take when none is in
+    scope: a bytes value built as `runtime-memory-values` builds one, or
+    `concat(bytes32(W), bytes32(W))` when that one is too short; a cut of a
+    value that fits, or `slice_(V, 0)` when the cut is too short; an array of
+    one to four Words; or a pair of a bytes value that fits, or a sum or enum
+    holding one two thirds of the time and a Word otherwise; and half the
+    time one follow-up, weighted observation 5, write 2, closure 1,
+    application 3 when a closure exists, second variable 1 and bytes value 2;
+  - a call's argument is a value an earlier call returned half the time when
+    one fits, otherwise uniform among those that fit; its index is a literal
+    or the input's equally, its Word one of `runtime-memory-values`'
+    straight-line Words, its form a function value a third of the time, and a
+    Word result's fold and constant uniform; half the time one follow-up comes
+    after it;
+  - a plan without an observation ends with the length of its first
+    variable, or element 0 of an array.
+- Core reference, with no source text and no data definitions:
+  `fun input => …` of type `sum word unit` over `runtime-memory-values`'
+  byte-list model, with every call inlined where it is made:
+  - the call's Word, with the constants of the `call` helpers on its way, is
+    bound once, and the base kind acts on the value the argument reaches: a
+    read or take observes it with std's range checks, a write rebinds the
+    value's Words, so every variable, slice, data value and closure holding
+    it sees the write; a written argument is returned as the same value, a
+    view as a slice of it, a copy as a new value of its bytes and the Word's,
+    and a pack as a pair of the value and its Word plus the constant;
+  - a pair and `Sc_E0` hold the value their variable names and a bound Word,
+    `inl` the value, and `inr` and `Sc_E1` a bound Word; a take writes the
+    pair's or `Sc_E0`'s Word, or for `inl` its own, and folds a Word arm's;
+    a closure holds its value, which an application observes then; a
+    function value calls its helper;
+  - the result is the left injection of `sc_r`, or the right injection, which
+    a case observes as the revert data `0xb4120f14`.
+
+  Admission checks every helper against its kind and parameter, its callee
+  and constants, and every step against the scope it is drawn in: arguments
+  in scope that the parameter takes, indices against what the base kind
+  reaches, an unused index 0, Words and constants, a value result's fold `+`
+  with constant 3, which the source does not print, and the counts; then at
+  least one call and one observation and the hash bound. A registered Lean
+  test compares the reference with a direct interpreter that runs each helper
+  as a function over byte lists.
+- Bounds: the node budget, default 1,024, minimum 256 and at most 2,048,
+  bounds the applied reference without the hash closure; steps are dropped
+  from the end while it exceeds the budget, more than one step remains and
+  the rest is still admitted. A case's whole reference is at most 5,120
+  nodes. Of the first 1,000 seeds at the default budget, the budgeted
+  reference had a median of 151 and at most 673 nodes, the whole reference at
+  most 3,373, and none dropped a step; at 256 nodes, 91 of 500 dropped steps
+  and 7 stayed over it.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Observations: the returned Word, or a revert compared exactly by its data,
+  as for `runtime-memory-values`: three reverts with the same data match.
+- Exclusions, under the stage `memory-call-profile`: a plan still over the
+  budget or not admitted; then, at the eight boundary inputs, fuel
+  exhaustion (an inconclusive resource exclusion), a result other than a Word
+  or the right injection, or the same outcome for all eight, as for 162 of
+  the first 1,000 seeds. None exhausted 1,000,000 fuel; 17 needed more than
+  300,000. Of the 838 accepted, 251 have an out-of-range boundary input.
+- Identity filter: a plan whose only nonzero Word is a helper's read of a zero
+  byte of `empty(n)` added to or xored with `sc_x` returns its input, so
+  random campaigns apply `exclude-boundary-identity-v1`; 8 of the first 1,000
+  seeds are identities.
+- Reductions:
+  - remove a step, renumbering the later variables, data values and
+    closures of a removed declaration's kind, never removing one still used
+    or the last call; remove a helper that nothing calls, renumbering the
+    later helpers and their callers;
+  - inline a call into the `runtime-memory-values` actions its base kind
+    amounts to when its argument is a memory variable: a read into an
+    observation with the call's fold and constant, a view into `slice_`, a
+    copy into `concat(V, bytes32(W))`, a write into the inline write and a
+    second variable or `slice_(V, 0)` for its result, and a pack into a pair;
+  - replace the value a writing call returns by its argument: the write stays
+    inline and every later use of the result names the argument; call a
+    `call` helper's callee directly;
+  - make a generic helper's parameter `memory<bytes>` or `memory_ref`; lower a
+    helper's kind: `^` to `+`, an observation of a bytes value to its length,
+    a byte write to a Word write, a view's start to 0, a constant to 1, a take
+    without its write; call a function value's helper directly; replace
+    `inl` by `inr(sc_x)` and `Sc_E0` by `Sc_E1` of its Word; observe a
+    closure's length;
+  - replace a Word by `sc_x`, an index by the literal 0, `^` by `+` or a fold
+    constant by 3, and `runtime-memory-values`' action reductions;
+  - then the inputs 0, 1 and half the input, with the plan unchanged.
+
+  Every candidate is admitted and sealed by the full checker, and strictly
+  smaller lexicographically in plan size, its constructors, a call weighing
+  more than the actions it amounts to, then the sum of its numeric literals,
+  then input. A reduced origin records the parent plan and input. A shrink
+  response stops before its cases would exceed 1.5 MB. Of 100 seeds' accepted
+  plans, a plan had a median of 22 and at most 48 candidates, all sealed.
+- Specified memory call shapes, from the plan, never measured:
+  - helpers: `<kind>:<parameter>` of every helper, 25 values;
+  - calls: `<direct or value>:<word, bytes, slice, array or pair>`, the
+    form and result of every call;
+  - passes: `bytes`, `slice`, `array` and `pair` for a call whose argument an
+    earlier call returned;
+  - instances: the argument kinds `bytes` and `slice` of every generic helper
+    a call runs, directly or through `call` helpers, and `several` when one
+    generic helper runs at both;
+  - data: `pair`, `inl`, `inr`, `enum0` and `enum1`;
+  - closures: `<length, word, byte or hash>:<bytes or slice>` and
+    `element:array`;
+  - observations: `<length, word, byte or hash>:<bytes, slice, pair, sum or
+    enum>` of what a read or take observes, at its argument's kind,
+    `element:array`, and `carried:sum` and `carried:enum` for a take of a
+    Word arm;
+  - indices: `<word, byte, element, put, put8 or set>:<literal or input>`
+    for every indexed access and write in a helper or closure;
+  - ranges: `call` and `apply` for an input index of a call or application
+    that can leave the in-range positions;
+  - hazards, in plan order: `alias` for a value written through one name and
+    observed through another, `helper` for a value observed after a helper
+    wrote it, `copy` for a copy observed after its source was written, and
+    `closure` for an application that sees a write made after its closure;
+  - steps: `action:<kind>` of every `runtime-memory-values` action, `call`,
+    `data`, `closure` and `apply`.
+
+  Generation draws all 107 values within the first 1,000 seeds, the last at
+  seed 395. Hashed lengths are not a dimension: `runtime-memory-values`'
+  corpus covers the hash closure's length classes.
+- Fixed corpus coverage: every value above and the eight boundary inputs. The
+  corpus is generated with the default budget: from seed 1 upwards, every
+  seed whose plan is accepted and covers a missing value is taken, until
+  nothing is missing, each plan at all eight inputs. No plan is skipped.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
