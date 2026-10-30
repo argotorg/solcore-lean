@@ -19,6 +19,9 @@ namespace CoreContractEntryProfile
   | boundedBytesOutcomeV1 => rfl
   | enumOutcomeV1 first second rest =>
       simp [resultType, ofResultType?, enumType, ofWordTupleType?, ofEnumType?, boundedBytesType]
+      cases first <;> rfl
+  | rawBytesOutcomeV1 extraWords =>
+      simp [resultType, ofResultType?, rawBytesType, ofRawBytesType?, ofWordTupleType?, boundedBytesType]
 
 theorem resultType_injective :
     Function.Injective CoreContractEntryProfile.resultType := by
@@ -351,6 +354,64 @@ theorem decodeEnum?_size
       some (.trapped reason) := by
   simp [decode?]
 
+/-- Every length Word names a length up to the capacity. -/
+theorem rawBytesLength_le (extraWords : Nat) (length : Core.Word) :
+    rawBytesLength extraWords length ≤ rawBytesCapacity extraWords := by
+  have bound := Nat.mod_lt length.val (show 0 < rawBytesCapacity extraWords + 1 by omega)
+  simp only [rawBytesLength]
+  omega
+
+/-- The length Word `length` names each length up to the capacity. -/
+theorem rawBytesLength_ofNatModulo
+    {extraWords length : Nat} (bounded : length ≤ rawBytesCapacity extraWords)
+    (small : length < Core.wordModulus) :
+    rawBytesLength extraWords (Core.Word.ofNatModulo length) = length := by
+  simp only [rawBytesLength, Core.Word.ofNatModulo, Nat.mod_eq_of_lt small]
+  exact Nat.mod_eq_of_lt (by omega)
+
+@[simp] theorem decodeRawBytes?_data
+    (extraWords : Nat) (length : Core.Word) (words : Core.Value) :
+    decodeRawBytes? extraWords (.pair .unit (.pair (.word length) words)) =
+      (decodeWordTuple? extraWords words).map (·.extract 0 (rawBytesLength extraWords length)) :=
+  rfl
+
+/-- The returned bytes are exactly the named length. -/
+theorem decodeRawBytes?_size
+    {extraWords : Nat} {value : Core.Value} {bytes : Bytes}
+    (decoded : decodeRawBytes? extraWords value = some bytes) :
+    ∃ length : Core.Word, bytes.size = rawBytesLength extraWords length := by
+  match value, decoded with
+  | .pair .unit (.pair (.word length) words), decoded =>
+      simp only [decodeRawBytes?_data] at decoded
+      cases wordsEq : decodeWordTuple? extraWords words with
+      | none => simp [wordsEq] at decoded
+      | some data =>
+          simp only [wordsEq, Option.map_some, Option.some.injEq] at decoded
+          subst decoded
+          have size := decodeWordTuple?_size wordsEq
+          have bounded := rawBytesLength_le extraWords length
+          simp only [rawBytesCapacity] at bounded
+          refine ⟨length, ?_⟩
+          simp only [ByteArray.size_extract, size]
+          omega
+
+@[simp] theorem decode?_rawBytesOutcomeV1_returned (extraWords : Nat) (payload : Core.Value) :
+    decode? (.rawBytesOutcomeV1 extraWords) (.inLeft (.sum .word .word) payload) =
+      (decodeRawBytes? extraWords payload).map .returned := by
+  rfl
+
+@[simp] theorem decode?_rawBytesOutcomeV1_reverted (extraWords : Nat) (word : Core.Word) :
+    decode? (.rawBytesOutcomeV1 extraWords)
+        (.inRight (rawBytesType extraWords) (.inLeft .word (.word word))) =
+      some (.reverted (encodeWordBytesBE word)) := by
+  simp [decode?]
+
+@[simp] theorem decode?_rawBytesOutcomeV1_trapped (extraWords : Nat) (reason : Core.Word) :
+    decode? (.rawBytesOutcomeV1 extraWords)
+        (.inRight (rawBytesType extraWords) (.inRight .word (.word reason))) =
+      some (.trapped reason) := by
+  simp [decode?]
+
 @[simp] theorem returnsOneWord_returnWord :
     returnsOneWord .returnWord = true :=
   rfl
@@ -370,6 +431,10 @@ theorem decodeEnum?_size
 @[simp] theorem returnsOneWord_enumOutcomeV1
     (first second : EnumPayload) (rest : List EnumPayload) :
     returnsOneWord (.enumOutcomeV1 first second rest) = false :=
+  rfl
+
+@[simp] theorem returnsOneWord_rawBytesOutcomeV1 (extraWords : Nat) :
+    returnsOneWord (.rawBytesOutcomeV1 extraWords) = false :=
   rfl
 
 end CoreContractEntryProfile

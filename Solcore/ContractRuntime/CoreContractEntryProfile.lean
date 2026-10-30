@@ -31,6 +31,9 @@ inductive CoreContractEntryProfile where
   have the fields `first`, `second`, then `rest`, or a reverted Word, or a
   trap reason. Each constructor's value carries its own tag Word. -/
   | enumOutcomeV1 (first second : EnumPayload) (rest : List EnumPayload)
+  /-- Returned raw bytes, the first ones of `extraWords + 1` data Words up to a
+  length the length Word names, or a reverted Word, or a trap reason. -/
+  | rawBytesOutcomeV1 (extraWords : Nat)
   deriving Repr, BEq, DecidableEq
 
 namespace CoreContractEntryProfile
@@ -162,6 +165,29 @@ def enumBodyHeadSize (payloads : List EnumPayload) : Nat :=
 def enumIsStatic (payloads : List EnumPayload) : Bool :=
   payloads.all (· != .boundedBytes)
 
+/-- The returned side of the raw-bytes convention: a unit marker, which no
+other convention's returned side starts with, a length Word and
+`extraWords + 1` data Words. -/
+def rawBytesType (extraWords : Nat) : Core.Ty :=
+  .product .unit (.product .word (wordTupleType extraWords))
+
+/-- Recognize the raw-bytes returned side, returning its `extraWords`. -/
+def ofRawBytesType? : Core.Ty → Option Nat
+  | .product .unit (.product .word words) => ofWordTupleType? words
+  | _ => none
+
+@[simp] theorem ofRawBytesType?_rawBytesType (extraWords : Nat) :
+    ofRawBytesType? (rawBytesType extraWords) = some extraWords := by
+  simp [rawBytesType, ofRawBytesType?]
+
+/-- The data bytes of `extraWords + 1` Words. -/
+def rawBytesCapacity (extraWords : Nat) : Nat := 32 * (extraWords + 1)
+
+/-- The length a length Word names, `ℓ mod (capacity + 1)`: every Word names
+one of the lengths 0 to the capacity. -/
+def rawBytesLength (extraWords : Nat) (length : Core.Word) : Nat :=
+  length.val % (rawBytesCapacity extraWords + 1)
+
 /-- The Core result type required by one entry convention. -/
 def resultType : CoreContractEntryProfile → Core.Ty
   | .returnWord => .word
@@ -170,6 +196,7 @@ def resultType : CoreContractEntryProfile → Core.Ty
       .sum (wordTupleType (extraWords + 1)) (.sum .word .word)
   | .boundedBytesOutcomeV1 => .sum boundedBytesType (.sum .word .word)
   | .enumOutcomeV1 first second rest => .sum (enumType first (second :: rest)) (.sum .word .word)
+  | .rawBytesOutcomeV1 extraWords => .sum (rawBytesType extraWords) (.sum .word .word)
 
 /-- Recognize exactly the result types supported by the contract ABI. -/
 def ofResultType? : Core.Ty → Option CoreContractEntryProfile
@@ -180,9 +207,11 @@ def ofResultType? : Core.Ty → Option CoreContractEntryProfile
       | some (extraWords + 1) => some (.wordTupleOutcomeV1 extraWords)
       | none =>
           if returned = boundedBytesType then some .boundedBytesOutcomeV1
-          else match ofEnumType? returned with
-            | some (first, second :: rest) => some (.enumOutcomeV1 first second rest)
-            | _ => none
+          else match ofRawBytesType? returned with
+            | some extraWords => some (.rawBytesOutcomeV1 extraWords)
+            | none => match ofEnumType? returned with
+              | some (first, second :: rest) => some (.enumOutcomeV1 first second rest)
+              | _ => none
   | _ => none
 
 /--
@@ -195,6 +224,7 @@ def returnsOneWord : CoreContractEntryProfile → Bool
   | .wordTupleOutcomeV1 _ => false
   | .boundedBytesOutcomeV1 => false
   | .enumOutcomeV1 _ _ _ => false
+  | .rawBytesOutcomeV1 _ => false
 
 /-- The concatenated big-endian Words of a right-nested tuple of `count + 1`
 Words: the static ABI encoding of the tuple. -/
@@ -269,6 +299,13 @@ def decodeEnum? (first : EnumPayload) (rest : List EnumPayload) (value : Core.Va
   return if enumIsStatic (first :: rest) then body
     else encodeWordBytesBE (Core.Word.ofNatModulo 32) ++ body
 
+/-- The returned bytes of the raw convention: the first `rawBytesLength`
+bytes of the data Words, exactly as the length Word names them. -/
+def decodeRawBytes? (extraWords : Nat) : Core.Value → Option Bytes
+  | .pair .unit (.pair (.word length) words) =>
+      (decodeWordTuple? extraWords words).map (·.extract 0 (rawBytesLength extraWords length))
+  | _ => none
+
 /-- Decode one runtime value according to its contract-owned entry convention. -/
 def decode?
     (profile : CoreContractEntryProfile)
@@ -312,6 +349,16 @@ def decode?
       else none
   | .enumOutcomeV1 first second rest, .inRight returned (.inRight .word (.word reason)) =>
       if returned = enumType first (second :: rest) then
+        some (.trapped reason)
+      else none
+  | .rawBytesOutcomeV1 extraWords, .inLeft (.sum .word .word) payload =>
+      (decodeRawBytes? extraWords payload).map .returned
+  | .rawBytesOutcomeV1 extraWords, .inRight returned (.inLeft .word (.word word)) =>
+      if returned = rawBytesType extraWords then
+        some (.reverted (encodeWordBytesBE word))
+      else none
+  | .rawBytesOutcomeV1 extraWords, .inRight returned (.inRight .word (.word reason)) =>
+      if returned = rawBytesType extraWords then
         some (.trapped reason)
       else none
   | _, _ => none
@@ -436,6 +483,24 @@ theorem decodeEnum?_ne_none_of_hasType
       obtain ⟨tag, head, tail⟩ := triple
       simp [decodeEnum?, selected, decoded]
 
+/-- A host-runtime value of the raw-bytes type always decodes. -/
+theorem decodeRawBytes?_ne_none_of_hasType
+    (extraWords : Nat)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing : Core.HostRuntimeValueHasType world value (rawBytesType extraWords) definitions) :
+    decodeRawBytes? extraWords value ≠ none := by
+  cases typing with
+  | pair markerTyping dataTyping =>
+      cases markerTyping
+      cases dataTyping with
+      | pair lengthTyping wordsTyping =>
+          cases lengthTyping
+          have words := decodeWordTuple?_ne_none_of_hasType extraWords wordsTyping
+          simp only [decodeRawBytes?, ne_eq, Option.map_eq_none_iff]
+          exact words
+
 /-- A host-runtime value of the profile's result type always decodes. -/
 theorem decode?_ne_none_of_hasType
     (profile : CoreContractEntryProfile)
@@ -505,6 +570,20 @@ theorem decode?_ne_none_of_hasType
       cases typing with
       | inLeft payloadTyping =>
           have decoded := decodeEnum?_ne_none_of_hasType first (second :: rest) payloadTyping
+          simp only [decode?, ne_eq, Option.map_eq_none_iff]
+          exact decoded
+      | inRight payloadTyping =>
+          cases payloadTyping with
+          | inLeft innerTyping =>
+              cases innerTyping with
+              | word => simp [decode?]
+          | inRight innerTyping =>
+              cases innerTyping with
+              | word => simp [decode?]
+  | rawBytesOutcomeV1 extraWords =>
+      cases typing with
+      | inLeft payloadTyping =>
+          have decoded := decodeRawBytes?_ne_none_of_hasType extraWords payloadTyping
           simp only [decode?, ne_eq, Option.map_eq_none_iff]
           exact decoded
       | inRight payloadTyping =>

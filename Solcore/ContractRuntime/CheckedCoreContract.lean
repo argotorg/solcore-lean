@@ -61,6 +61,16 @@ def enumOutcomeV1
     CheckedCoreContract :=
   ⟨code, .enumOutcomeV1 first second rest, resultType_eq⟩
 
+/-- Bind checked code with the raw-bytes convention of `extraWords + 1` data Words. -/
+def rawBytesOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.rawBytesOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .rawBytesOutcomeV1 extraWords, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
@@ -150,6 +160,7 @@ theorem CoreContractEntryProfile.eq_of_resultType_eq
     simp_all [CoreContractEntryProfile.resultType,
       CoreContractEntryProfile.wordTupleType,
       CoreContractEntryProfile.boundedBytesType,
+      CoreContractEntryProfile.rawBytesType,
       CoreContractEntryProfile.enumType]
 
 @[ext] theorem CheckedCoreContract.ext
