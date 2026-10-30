@@ -43,9 +43,9 @@ class SuiteTests(unittest.TestCase):
     def args(self, *extra):
         return suite.parse_args(["--output", str(self.directory / "run"), *extra])
 
-    def test_fifty_two_profiles_match_real_manifests_and_campaign_families(self):
+    def test_fifty_three_profiles_match_real_manifests_and_campaign_families(self):
         args = self.args()
-        self.assertEqual(len(args.profile), 52)
+        self.assertEqual(len(args.profile), 53)
         self.assertEqual(args.profile, list(suite.PROFILES))
         self.assertEqual(sum(suite.requested(args, p) for p in args.profile
             if p not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
@@ -57,7 +57,7 @@ class SuiteTests(unittest.TestCase):
                          "stateful-assembly-storage-loops", "stateful-assembly-keccak-loops",
                          "stateful-tuple-returns", "stateful-bytes-returns", "stateful-adt-storage",
                          "stateful-enum-returns", "stateful-enum-arguments", "stateful-enum-array-arguments",
-                         "stateful-array-returns")), 1081)
+                         "stateful-array-returns")), 1313)
         self.assertGreater(suite.requested(args, "runtime-primitives"), 0)
         self.assertGreater(suite.requested(args, "runtime-call-graph-loops"), 0)
         self.assertGreater(suite.requested(args, "runtime-aggregate-call-graphs"), 0)
@@ -173,7 +173,7 @@ class SuiteTests(unittest.TestCase):
     def test_call_graph_matrix_counts_come_from_its_manifest(self):
         self.assertEqual(json.loads(suite.manifest('runtime-call-graphs').read_text())['requiredCallShapes'],
             list(suite.adapter.CALL_SHAPES))
-        for backend, old_count, profile_count in (('sonatina-o0', 1162, 52), ('sonatina-o2', 1162, 52), ('yul', 1120, 24)):
+        for backend, old_count, profile_count in (('sonatina-o0', 1394, 53), ('sonatina-o2', 1394, 53), ('yul', 1352, 25)):
             args = self.args('--backend', backend)
             count = suite.requested(args, 'runtime-call-graphs')
             self.assertGreater(count, 0)
@@ -459,12 +459,12 @@ class SuiteTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.args('--backend', 'unknown-backend')
 
-    def test_yul_defaults_to_all_twenty_four_pure_profiles_and_forwards_only_its_compiler(self):
+    def test_yul_defaults_to_all_twenty_five_pure_profiles_and_forwards_only_its_compiler(self):
         args = self.args('--backend', 'yul', '--solc', '/chosen/pinned-solc')
-        self.assertEqual(len(args.profile), 24)
+        self.assertEqual(len(args.profile), 25)
         self.assertEqual(sum(suite.requested(args, profile) for profile in args.profile
             if profile not in ("runtime-primitives", "runtime-call-graphs", "runtime-call-graph-loops",
-                               "runtime-aggregate-call-graphs")), 1039)
+                               "runtime-aggregate-call-graphs")), 1271)
         self.assertIn("runtime-primitives", args.profile)
         self.assertIn("runtime-call-graph-loops", args.profile)
         self.assertIn("runtime-aggregate-call-graphs", args.profile)
@@ -474,7 +474,7 @@ class SuiteTests(unittest.TestCase):
             self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
         for backend in suite.adapter.SONATINA_BACKENDS:
             sonatina = self.args('--backend', backend, '--solc', '/unused/solc')
-            self.assertEqual(len(sonatina.profile), 52)
+            self.assertEqual(len(sonatina.profile), 53)
             for profile in sonatina.profile:
                 self.assertNotIn('--solc', suite.command(sonatina, profile, self.directory / profile, 30, 64 * 1024**2))
 
@@ -743,7 +743,7 @@ class SuiteTests(unittest.TestCase):
         args = self.args("--mode", "random", "--seed", "123", "--shard-index", "2", "--shard-count", "4")
         seeds = {p: suite.derived_seed(args.seed, p, 2, 4, suite.profile_attempts(args, p)) for p in suite.PROFILES}
         self.assertEqual(seeds, {p: suite.derived_seed(123, p, 2, 4, 1024 if p == "runtime-call-graphs" else 512) for p in reversed(suite.PROFILES)})
-        self.assertEqual(len(set(seeds.values())), 52)
+        self.assertEqual(len(set(seeds.values())), 53)
         self.assertNotEqual(seeds["closed-g0"], suite.derived_seed(123, "closed-g0", 1, 4, 512))
         for profile, seed in seeds.items():
             self.assertLess(seed + suite.profile_attempts(args, profile) - 1, 1 << 64)
@@ -840,6 +840,23 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual((command[command.index("--nodes") + 1], command[command.index("--functions") + 1]), ("2048", "3"))
         # Scaled budgets stop at the trait hierarchy case limit, as for traits.
         for scale, nodes in (("2", 4096), ("4", 4096)):
+            scaled = self.args("--mode", "random", "--profile", profile, "--nodes-scale", scale)
+            self.assertEqual(suite.node_budget(scaled, profile), nodes)
+        self.assertIn(profile, self.args("--backend", "yul").profile)
+
+    def test_memory_value_profile_is_a_pure_profile_with_its_corpus_budget_cap_and_whole_functions(self):
+        profile = "runtime-memory-values"
+        self.assertEqual(suite.PROFILES[profile], ("semantic-memory-value", "pure", 1024))
+        fixed = self.args("--profile", profile)
+        self.assertEqual(suite.requested(fixed, profile), 232)
+        command = suite.command(fixed, profile, self.directory / "fixed", 10, 64 * 1024**2)
+        self.assertEqual(Path(command[command.index("--corpus") + 1]), suite.manifest(profile))
+        random = self.args("--mode", "random", "--profile", profile, "--functions", "3")
+        self.assertEqual((suite.inputs_per_function(profile), suite.requested(random, profile)), (12, 36))
+        command = suite.command(random, profile, self.directory / "random", 10, 64 * 1024**2)
+        self.assertEqual((command[command.index("--nodes") + 1], command[command.index("--functions") + 1]), ("1024", "3"))
+        # Scaled budgets stop at the memory value profile's 2,048 nodes without its hash closure.
+        for scale, nodes in (("1.5", 1536), ("2", 2048), ("4", 2048)):
             scaled = self.args("--mode", "random", "--profile", profile, "--nodes-scale", scale)
             self.assertEqual(suite.node_budget(scaled, profile), nodes)
         self.assertIn(profile, self.args("--backend", "yul").profile)

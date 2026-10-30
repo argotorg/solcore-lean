@@ -324,6 +324,39 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.TRAIT_CASE_SCHEMA], "SynthesizedTraits")
         self.assertEqual(runner.TRAIT_VERSIONS, ("profileVersion", "boundaryVersion"))
 
+    def test_memory_plan_envelope_and_shape_inventory(self):
+        action = {"kind": "observe", "fold": "add", "constant": 3, "value": "sc_b0", "access": {"access": "length"}}
+        build = {"kind": "bytes", "build": "to_bytes", "parts": [{"part": "word", "operand": {"operand": "input"}}]}
+        loop = {"loop": {"form": "nested", "outer": 3, "bound": "counter", "inner": 1}, "body": [action] * 3}
+        plan = {"schema": "solcore-lean.memory-value-plan.v1",
+                "steps": [{"action": build}] + [{"action": action}] * 8 + [loop]}
+        runner.validate_memory_plan(plan)
+        for kind in ("slice", "alias", "array", "write"):
+            runner.validate_memory_plan({**plan, "steps": [{"action": {**build, "kind": kind}}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.trait-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "steps": []}, {**plan, "steps": plan["steps"] + [{"action": action}]},
+                        {**plan, "steps": [{"action": {**action, "kind": "free"}}]}, {**plan, "steps": [action]},
+                        {**plan, "steps": [{"action": action, "body": []}]}, {**plan, "steps": [loop, loop]},
+                        {**plan, "steps": [{**loop, "body": []}]}, {**plan, "steps": [{**loop, "body": [action] * 4}]},
+                        {**plan, "steps": [{**loop, "loop": {"form": "triple"}}]},
+                        {**plan, "steps": [{**loop, "body": [{**action, "kind": None}]}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_memory_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.MEMORY_SHAPES.items()}
+        runner.validate_memory_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "values": ["slice", "bytes"]},
+                        {**shapes, "hashes": ["0", "0"]}, {**shapes, "hashes": ["129"]}, {**shapes, "loops": ["single:5"]},
+                        {**shapes, "indices": ["word:register"]}, {key: values for key, values in shapes.items() if key != "body"}):
+            with self.assertRaises(ValueError):
+                runner.validate_memory_shapes(invalid)
+        self.assertEqual({key: len(values) for key, values in runner.MEMORY_SHAPES.items()},
+                         {"values": 6, "parts": 8, "cuts": 6, "writes": 10, "observations": 10, "indices": 18,
+                          "hazards": 4, "loops": 6, "body": 5, "hashes": 9})
+        self.assertEqual(runner.CASE_PROFILES[runner.MEMORY_CASE_SCHEMA], "runtime-memory-values")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CASE_SCHEMA], "SynthesizedMemoryValues")
+        self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
+        self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA,))
+
     def test_hierarchy_plan_envelope_and_shape_inventory(self):
         declaration = {"generic": True, "sameName": False, "constructors": [["param"], []]}
         impl = {"head": "sum", "unary": [], "binary": [], "form": "nested", "mismatch": ["1", "2"]}
@@ -727,7 +760,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 24)
+        self.assertEqual(len(runner.CASE_PROFILES), 25)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))
@@ -986,6 +1019,24 @@ class ClassificationTests(unittest.TestCase):
                 ("evm-exceptional", "execution-error")]:
             actual = {name: {"status": status} for name in observations()}
             self.assertEqual(runner.compare(actual)["category"], category)
+
+    def test_equal_reverts_match_only_for_a_reverting_profile(self):
+        reverted = {"status": "reverted", "output": "0xb4120f14"}
+        actual = {name: dict(reverted) for name in observations()}
+        self.assertEqual(runner.compare(actual)["category"], "semantic-mismatch")
+        result = runner.compare(actual, reverts=True)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["pairs"], {"directCore/rustEvm": True, "directCore/importedHull": True,
+                                           "importedHull/rustEvm": True})
+        actual["rustEvm"] = {"status": "reverted", "output": "0xb4120f15"}
+        self.assertEqual(runner.compare(actual, reverts=True)["category"], "semantic-mismatch")
+        actual["rustEvm"] = {"status": "returned", "word": "7"}
+        self.assertEqual(runner.compare(actual, reverts=True)["category"], "semantic-mismatch")
+        self.assertEqual(runner.compare(observations(), reverts=True)["category"], "matched")
+        for status, category in (("out-of-gas", "inconclusive-resource"), ("evm-exceptional", "execution-error")):
+            actual = {name: dict(reverted) for name in observations()}
+            actual["rustEvm"] = {"status": status}
+            self.assertEqual(runner.compare(actual, reverts=True)["category"], category)
 
     def test_revert_difference_preserves_bytes(self):
         row = runner.normalize_observation({"stage": "execution", "status": "reverted", "output": "0xAB00"})

@@ -3,7 +3,8 @@
 
 Normal execution never changes observations. --test-perturb-path is an explicit
 synthetic test adapter: after all real paths match, it flips one observed Word
-bit in a separate analysis. The actual M2 report and observations are retained.
+bit, or the low bit of a matched revert's last byte, in a separate analysis. The
+actual M2 report and observations are retained.
 """
 from __future__ import annotations
 
@@ -39,6 +40,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-enums": ("enum-generate", "enum-emit", "enum-generated"),
                     "runtime-traits": ("trait-generate", "trait-emit", "trait-generated"),
                     "runtime-trait-hierarchies": ("hierarchy-generate", "hierarchy-emit", "hierarchy-generated"),
+                    "runtime-memory-values": ("memory-values-generate", "memory-values-emit", "memory-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-assembly-loops": ("assembly-loop-generate", "assembly-loop-emit", "assembly-loop-generated"),
@@ -97,6 +99,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-enums": m2.ENUM_VERSIONS,
                           "runtime-traits": m2.TRAIT_VERSIONS,
                           "runtime-trait-hierarchies": m2.HIERARCHY_VERSIONS,
+                          "runtime-memory-values": m2.MEMORY_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-assembly-loops": m2.ASSEMBLY_LOOP_VERSIONS,
@@ -155,7 +158,7 @@ IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-assem
                             "runtime-functions", "runtime-mutation",
                             "runtime-aggregates", "runtime-closures", "runtime-comptime", "runtime-modules",
                             "runtime-call-graphs", "runtime-aggregate-call-graphs", "runtime-enums",
-                            "runtime-traits", "runtime-trait-hierarchies")
+                            "runtime-traits", "runtime-trait-hierarchies", "runtime-memory-values")
 # The case tool returns at most this many cases per generation request.
 MAX_CASES = 1024
 # Default random attempts with --functions: at least this many candidates per
@@ -370,11 +373,14 @@ def aggregate_shapes(case: dict) -> set[str]:
 def minimum_nodes(profile: str) -> int:
     return {"runtime-primitives": 8, "runtime-assembly-memory": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39, "runtime-assembly-loops": 39,
             "runtime-aggregate-call-graphs": 13, "runtime-enums": 256, "runtime-traits": 256,
-            "runtime-trait-hierarchies": 256}.get(profile, 3)
+            "runtime-trait-hierarchies": 256, "runtime-memory-values": 256}.get(profile, 3)
 
 
 def maximum_nodes(profile: str) -> int:
-    """The enum, trait and trait hierarchy budgets bound the applied reference, at most its 4,096-node case limit."""
+    """The enum, trait and trait hierarchy budgets bound the applied reference, at most its 4,096-node case limit;
+    the memory value budget bounds the applied reference without its hash closure, at most 2,048 nodes."""
+    if profile == "runtime-memory-values":
+        return 2048
     return 4096 if profile in ("runtime-enums", "runtime-traits", "runtime-trait-hierarchies") else 512
 
 
@@ -641,6 +647,33 @@ def specified_hierarchies(case: dict) -> dict[str, set]:
     return {dimension: set(shapes[dimension.lower()]) for dimension in HIERARCHY_DIMENSIONS}
 
 
+MEMORY_DIMENSIONS = ("Values", "Parts", "Cuts", "Writes", "Observations", "Indices", "Hazards", "Loops", "Body", "Hashes")
+
+
+def memory_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("memoryValueRequirements", {key: [] for key in m2.MEMORY_SHAPES})
+    if not isinstance(requirements, dict) or set(requirements) != set(m2.MEMORY_SHAPES):
+        raise ValueError("memoryValueRequirements requires values, parts, cuts, writes, observations, indices, hazards, "
+                         "loops, body and hashes arrays")
+    for key, allowed in m2.MEMORY_SHAPES.items():
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid memory value {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-memory-values" and any(requirements.values()):
+        raise ValueError("only memory value corpora can require memory value shapes")
+    return requirements
+
+
+def specified_memory_values(case: dict) -> dict[str, set]:
+    """The plan's memory value shapes as native replay authenticates them in the
+    provenance; never measured memory traffic or opcode coverage."""
+    if case.get("schema") != m2.MEMORY_CASE_SCHEMA:
+        return {dimension: set() for dimension in MEMORY_DIMENSIONS}
+    shapes = m2.validate_memory_shapes(case.get("provenance", {}).get("memoryValueShapes"))
+    return {dimension: set(shapes[dimension.lower()]) for dimension in MEMORY_DIMENSIONS}
+
+
 def assembly_loop_requirements(manifest: dict) -> dict:
     requirements = manifest.get("assemblyLoopRequirements", {"shapes": [], "formIterations": []})
     if not isinstance(requirements, dict) or set(requirements) != {"shapes", "formIterations"}:
@@ -900,6 +933,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["enumCoverage"]["missing" + dimension] for dimension in ENUM_DIMENSIONS)
         or any(summary["traitCoverage"]["missing" + dimension] for dimension in TRAIT_DIMENSIONS)
         or any(summary["hierarchyCoverage"]["missing" + dimension] for dimension in HIERARCHY_DIMENSIONS)
+        or any(summary["memoryValueCoverage"]["missing" + dimension] for dimension in MEMORY_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -946,6 +980,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("trait corpus must require all eight boundary inputs")
     if profile == "runtime-trait-hierarchies" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("trait hierarchy corpus must require all eight boundary inputs")
+    if profile == "runtime-memory-values" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("memory value corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
@@ -973,6 +1009,7 @@ def validate_manifest(manifest) -> dict:
     enum_requirements(manifest)
     trait_requirements(manifest)
     hierarchy_requirements(manifest)
+    memory_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -985,9 +1022,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -1044,6 +1081,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_trait_plan(entry["traitPlan"])
         elif "hierarchyPlan" in entry:
             m2.validate_hierarchy_plan(entry["hierarchyPlan"])
+        elif "memoryValuePlan" in entry:
+            m2.validate_memory_plan(entry["memoryValuePlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -1065,7 +1104,8 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
     if profile == "runtime-recursion":
         return RECURSION_INPUTS
     if profile in ("runtime-primitives", "runtime-assembly", "runtime-assembly-memory", "runtime-call-graphs",
-                   "runtime-aggregate-call-graphs", "runtime-enums", "runtime-traits", "runtime-trait-hierarchies"):
+                   "runtime-aggregate-call-graphs", "runtime-enums", "runtime-traits", "runtime-trait-hierarchies",
+                   "runtime-memory-values"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -1094,7 +1134,8 @@ def generation_resource_exclusions(excluded: list) -> int:
     return count
 
 
-def analyze(report: dict, perturb: str | None = None) -> dict:
+def analyze(report: dict, perturb: str | None = None, *, reverts: bool = False) -> dict:
+    """`reverts` is true for a profile whose matched cases may revert alike."""
     actual = copy.deepcopy(report.get("comparison", {"category": "adapter-error", "stage": "missing-report", "pairs": {}}))
     observed = copy.deepcopy(report.get("observations", {}))
     synthetic = False
@@ -1102,13 +1143,17 @@ def analyze(report: dict, perturb: str | None = None) -> dict:
         if perturb not in PATHS:
             raise ValueError("unknown test observation path")
         if actual.get("category") == "matched":
-            # Require fresh completed Word observations even in the test adapter.
-            if m2.compare(observed).get("category") != "matched":
+            # Require fresh completed observations even in the test adapter.
+            if m2.compare(observed, reverts=reverts).get("category") != "matched":
                 raise ValueError("matched report has inconsistent observations")
-            original = int(m2.word(observed[perturb].get("word")))
-            observed[perturb]["word"] = str(original ^ 1)
+            if observed[perturb].get("status") == "reverted":
+                data = m2.hex_bytes(observed[perturb].get("output"), "revert data")
+                observed[perturb]["output"] = "0x" + (data[:-1] + bytes([data[-1] ^ 1])).hex()
+            else:
+                original = int(m2.word(observed[perturb].get("word")))
+                observed[perturb]["word"] = str(original ^ 1)
             synthetic = True
-    result = m2.compare(observed) if synthetic else actual
+    result = m2.compare(observed, reverts=reverts) if synthetic else actual
     return {"schema": ANALYSIS_SCHEMA, "backend": m2.resolve_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": perturb} if perturb else None,
             "actualComparison": actual, "comparison": result, "observations": observed}
@@ -1234,6 +1279,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in TRAIT_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "hierarchyCoverage": {"classification": "trait hierarchy plan instance kinds and methods the uses reach, call forms, receiver depths, generic declaration arguments, argument kinds of the subclass's method-level generic, binary match forms and the subclass form the plan specifies; matched plans verified by native replay; not measured specialization or opcode coverage",
                 **{prefix + dimension: [] for dimension in HIERARCHY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "memoryValueCoverage": {"classification": "memory value plan values, parts, cuts, writes, observations, index kinds per access, write-then-read hazards, loop forms, loop action kinds and hashed length classes the plan specifies; matched plans verified by native replay; not measured memory traffic or opcode coverage",
+                **{prefix + dimension: [] for dimension in MEMORY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -1305,6 +1352,9 @@ class Campaign:
         hierarchy = self.summary["hierarchyCoverage"]
         for dimension in HIERARCHY_DIMENSIONS:
             hierarchy["missing" + dimension] = sorted(set(hierarchy["required" + dimension]) - set(hierarchy["matched" + dimension]))
+        memory = self.summary["memoryValueCoverage"]
+        for dimension in MEMORY_DIMENSIONS:
+            memory["missing" + dimension] = sorted(set(memory["required" + dimension]) - set(memory["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -1379,6 +1429,11 @@ class Campaign:
         for dimension, values in specified_traits(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["traitCoverage"][key] = sorted(set(self.summary["traitCoverage"][key]) | values)
+
+    def record_memory_values(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_memory_values(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["memoryValueCoverage"][key] = sorted(set(self.summary["memoryValueCoverage"][key]) | values)
 
     def record_hierarchies(self, case: dict, *, matched: bool = False) -> None:
         for dimension, values in specified_hierarchies(case).items():
@@ -1490,7 +1545,8 @@ class Campaign:
             report["artifacts"] = {path.name: m2.file_digest(path) for path in folder.iterdir() if path.is_file()}
             save_json(folder / "report.json", report)
             input_path.unlink(missing_ok=True)
-        analysis = analyze(report, self.args.test_perturb_path)
+        analysis = analyze(report, self.args.test_perturb_path,
+                           reverts=PROFILE_SCHEMAS.get(self.args.profile) in m2.REVERTING_SCHEMAS)
         # analysis is deliberately outside the immutable actual M2 report.
         save_json(folder / "analysis.json", analysis)
         return folder, report, analysis
@@ -1708,6 +1764,9 @@ class Campaign:
         hierarchy = hierarchy_requirements(manifest)
         for dimension in HIERARCHY_DIMENSIONS:
             self.summary["hierarchyCoverage"]["required" + dimension] = sorted(hierarchy[dimension.lower()])
+        memory = memory_requirements(manifest)
+        for dimension in MEMORY_DIMENSIONS:
+            self.summary["memoryValueCoverage"]["required" + dimension] = sorted(memory[dimension.lower()])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1745,9 +1804,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1799,6 +1858,7 @@ class Campaign:
             self.record_enums(case)
             self.record_traits(case)
             self.record_hierarchies(case)
+            self.record_memory_values(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1860,6 +1920,7 @@ class Campaign:
             self.record_enums(case)
             self.record_traits(case)
             self.record_hierarchies(case)
+            self.record_memory_values(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -1895,6 +1956,7 @@ class Campaign:
                 self.record_enums(case, matched=True)
                 self.record_traits(case, matched=True)
                 self.record_hierarchies(case, matched=True)
+                self.record_memory_values(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -1928,7 +1990,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 1024 for memory values (at most 2048, without the hash closure), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     parser.add_argument("--functions", type=int,
                         help="random runtime-input profiles only: generate this many accepted functions, each "
@@ -2016,7 +2078,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-memory-values": 1024, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

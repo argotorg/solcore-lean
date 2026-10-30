@@ -16,6 +16,8 @@ import Solcore.Synthesis.Source.TraitEmitter
 import Solcore.Synthesis.Source.TraitCases
 import Solcore.Synthesis.Source.HierarchyEmitter
 import Solcore.Synthesis.Source.HierarchyCases
+import Solcore.Synthesis.Source.MemoryValuesEmitter
+import Solcore.Synthesis.Source.MemoryValuesCases
 import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter
