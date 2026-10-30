@@ -110,9 +110,34 @@ MEMORY_SHAPES = {
     "loops": ("nested:counter", "nested:input", "none", "single:1", "single:3", "single:7"),
     "body": ("array", "bytes", "observe", "slice", "write"),
     "hashes": ("0", "1-31", "128", "32", "33-63", "64", "65-95", "96", "97-127")}
+MEMORY_CALL_CASE_SCHEMA = "solcore-lean.semantic-memory-call-case.v1"
+MEMORY_CALL_VERSIONS = ("profileVersion", "boundaryVersion")
+MEMORY_CALL_PARAMETERS = ("bytes", "slice", "generic", "array", "pair", "sum", "enum")
+# The specified shape values of the memory call profile, from the plan, never measured.
+MEMORY_CALL_SHAPES = {
+    "helpers": ("call:array", "call:bytes", "call:enum", "call:generic", "call:pair", "call:slice", "call:sum",
+                "copy:bytes", "copy:generic", "copy:slice", "pack:bytes", "read:array", "read:bytes", "read:generic",
+                "read:slice", "take:enum", "take:pair", "take:sum", "view:bytes", "view:generic", "view:slice",
+                "write:array", "write:bytes", "write:generic", "write:slice"),
+    "calls": tuple(sorted(f"{form}:{result}" for form in ("direct", "value")
+                          for result in ("array", "bytes", "pair", "slice", "word"))),
+    "passes": ("array", "bytes", "pair", "slice"),
+    "instances": ("bytes", "several", "slice"),
+    "data": ("enum0", "enum1", "inl", "inr", "pair"),
+    "closures": ("byte:bytes", "byte:slice", "element:array", "hash:bytes", "hash:slice", "length:bytes",
+                 "length:slice", "word:bytes", "word:slice"),
+    "observations": tuple(sorted([f"{obs}:{kind}" for obs in ("byte", "hash", "length", "word")
+                                  for kind in ("bytes", "enum", "pair", "slice", "sum")] +
+                                 ["carried:enum", "carried:sum", "element:array"])),
+    "indices": tuple(sorted(f"{access}:{kind}" for access in ("byte", "element", "put", "put8", "set", "word")
+                            for kind in ("input", "literal"))),
+    "ranges": ("apply", "call"),
+    "hazards": ("alias", "closure", "copy", "helper"),
+    "steps": ("action:alias", "action:array", "action:bytes", "action:observe", "action:slice", "action:write",
+              "apply", "call", "closure", "data")}
 # Cases whose original Core can stop at an out-of-range access, observed as std's
 # OutOfBounds() revert; three reverts with the same data are a match only for them.
-REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA,)
+REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA)
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -141,7 +166,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  RECURSIVE_LOOP_CASE_SCHEMA: "runtime-recursive-loops", LOOP_CLOSURE_CASE_SCHEMA: "runtime-loop-closures",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules",
                  ENUM_CASE_SCHEMA: "runtime-enums", TRAIT_CASE_SCHEMA: "runtime-traits",
-                 HIERARCHY_CASE_SCHEMA: "runtime-trait-hierarchies", MEMORY_CASE_SCHEMA: "runtime-memory-values"}
+                 HIERARCHY_CASE_SCHEMA: "runtime-trait-hierarchies", MEMORY_CASE_SCHEMA: "runtime-memory-values",
+                 MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -155,7 +181,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   RECURSIVE_LOOP_CASE_SCHEMA: "SynthesizedRecursiveLoops", LOOP_CLOSURE_CASE_SCHEMA: "SynthesizedLoopClosures",
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules",
                   ENUM_CASE_SCHEMA: "SynthesizedEnums", TRAIT_CASE_SCHEMA: "SynthesizedTraits",
-                  HIERARCHY_CASE_SCHEMA: "SynthesizedTraitHierarchies", MEMORY_CASE_SCHEMA: "SynthesizedMemoryValues"}
+                  HIERARCHY_CASE_SCHEMA: "SynthesizedTraitHierarchies", MEMORY_CASE_SCHEMA: "SynthesizedMemoryValues",
+                  MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -605,6 +632,47 @@ def validate_memory_shapes(values, label="memoryValueShapes") -> dict:
     return values
 
 
+MEMORY_CALL_KINDS = ("read", "write", "view", "copy", "call", "pack", "take")
+MEMORY_CALL_STEPS = ("action", "call", "data", "closure", "apply")
+
+
+def validate_memory_call_plan(plan) -> dict:
+    """Validate the envelope, the helper and step counts and their kinds; native
+    replay checks every helper and step against its scope, the lengths, indices
+    and the seed."""
+    if (not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.memory-call-plan.v1"
+            or set(plan) != {"schema", "helpers", "steps"}):
+        raise ValueError("unsupported memory call plan schema")
+    helpers, steps = plan["helpers"], plan["steps"]
+    if not isinstance(helpers, list) or not 1 <= len(helpers) <= 3:
+        raise ValueError("memory call plan requires one to three helpers")
+    if any(not isinstance(helper, dict) or helper.get("param") not in MEMORY_CALL_PARAMETERS
+           or helper.get("kind") not in MEMORY_CALL_KINDS for helper in helpers):
+        raise ValueError("memory call helpers read, write, view, copy, call, pack or take a known parameter")
+    if not isinstance(steps, list) or not 1 <= len(steps) <= 12:
+        raise ValueError("memory call plan requires one to twelve steps")
+    if any(not isinstance(step, dict) or len(step) != 1 or next(iter(step)) not in MEMORY_CALL_STEPS for step in steps):
+        raise ValueError("a memory call step is an action, a call, a data value, a closure or an application")
+    if not any("call" in step for step in steps):
+        raise ValueError("memory call plan has at least one call")
+    for step in steps:
+        if "action" in step and (not isinstance(step["action"], dict) or step["action"].get("kind") not in MEMORY_KINDS):
+            raise ValueError("memory call actions are bytes, slice, alias, array, write or observe")
+    return plan
+
+
+def validate_memory_call_shapes(values, label="memoryCallShapes") -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    if not isinstance(values, dict) or set(values) != set(MEMORY_CALL_SHAPES):
+        raise ValueError(f"{label} must name every memory call shape dimension")
+    for key, allowed in MEMORY_CALL_SHAPES.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -713,6 +781,8 @@ def validate_case(case: dict) -> None:
         validate_hierarchy_plan(case.get("hierarchyPlan"))
     if case["schema"] == MEMORY_CASE_SCHEMA:
         validate_memory_plan(case.get("memoryValuePlan"))
+    if case["schema"] == MEMORY_CALL_CASE_SCHEMA:
+        validate_memory_call_plan(case.get("memoryCallPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -785,6 +855,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 5120:
             raise ValueError("memory value referenceNodes must be an integer from 1 to 5,120")
         validate_memory_shapes(provenance.get("memoryValueShapes"))
+    if case["schema"] == MEMORY_CALL_CASE_SCHEMA:
+        for key in MEMORY_CALL_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing memory call provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 5120:
+            raise ValueError("memory call referenceNodes must be an integer from 1 to 5,120")
+        validate_memory_call_shapes(provenance.get("memoryCallShapes"))
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -808,7 +885,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -1273,6 +1350,7 @@ def execute(args, report: dict) -> None:
         TRAIT_CASE_SCHEMA: "runtime Word input, one trait with a unary and a binary method and impls at Words, tuples, std sums and user-defined enums, called directly and through constrained generic functions at values built from the input, versus one Core closure per reached instance and method, Sonatina O0, run(uint256) ABI Word",
         HIERARCHY_CASE_SCHEMA: "runtime Word input, a subclass of the trait profile's trait with its own method-level generic or none and a chain of two bounds, called directly, through subclass-bounded helpers, method values and generic function values at values built from the input, versus one Core closure per reached instance, method and argument type, Sonatina O0, run(uint256) ABI Word",
         MEMORY_CASE_SCHEMA: "runtime Word input, std's memory<bytes>, memory_ref and memory<DynArray<uint256>> values built from the input, with lengths, Word and byte reads and writes through std's range checks, concatenation, slices, copies, keccak256_, second variables and helpers that write, in straight-line code and bounded while loops, versus a Core reference over byte lists, std's OutOfBounds() revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
+        MEMORY_CALL_CASE_SCHEMA: "runtime Word input, std's memory<bytes>, memory_ref and memory<DynArray<uint256>> values passed to and returned by helpers, generic helpers over std's memory traits, function values, tuples, std sums and a user enum holding a value and closures capturing one, in straight-line code, versus a Core reference over byte lists with every call inlined, std's OutOfBounds() revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

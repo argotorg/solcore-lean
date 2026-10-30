@@ -401,6 +401,35 @@ def reverted():
     return {"comparison": campaign.m2.compare(observed, reverts=True), "observations": observed}
 
 
+MEMORY_CALL_PLAN = {'schema': 'solcore-lean.memory-call-plan.v1',
+    'helpers': [{'param': 'generic', 'kind': 'read', 'obs': 'word', 'fold': 'add'}], 'steps': [
+    {'action': {'kind': 'bytes', 'build': 'to_bytes', 'parts': [{'part': 'word', 'operand': {'operand': 'input'}}]}},
+    {'call': {'helper': 0, 'arg': 'sc_b0', 'index': {'index': 'input', 'shift': 0, 'modulus': 9},
+              'word': {'operand': 'input'}, 'form': 'direct', 'fold': 'add', 'constant': 3}}]}
+
+
+def memory_call_shapes(**changes):
+    shapes = {key: [] for key in campaign.m2.MEMORY_CALL_SHAPES}
+    shapes.update(helpers=['read:generic'], calls=['direct:word'], instances=['bytes'], observations=['word:bytes'],
+                  indices=['word:input'], ranges=['call'], steps=['action:bytes', 'call'])
+    shapes.update(changes)
+    return shapes
+
+
+def memory_call_policy_case(value=255, shapes=None):
+    """Memory call envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(1)
+    case.update(schema=campaign.m2.MEMORY_CALL_CASE_SCHEMA, input=str(value), memoryCallPlan=copy.deepcopy(MEMORY_CALL_PLAN))
+    case['contract'].update(name='SynthesizedMemoryCalls', deployPath=['SynthesizedMemoryCallsDeploy'],
+        runtimePath=['SynthesizedMemoryCallsDeploy', 'SynthesizedMemoryCalls'],
+        calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-memory-calls'])},
+        'origin': {'kind': 'memory-call-generated', 'seed': '1', 'maxProgramNodes': 1024}, 'features': [],
+        'referenceNodes': 40, 'memoryCallShapes': shapes or memory_call_shapes()}
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1575,7 +1604,7 @@ class EnumCoverageTests(unittest.TestCase):
         # Every profile but the trait, trait hierarchy and memory value profiles keeps the 512-node maximum.
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
                           if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies',
-                                             'runtime-memory-values')}, {512})
+                                             'runtime-memory-values', 'runtime-memory-calls')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -2041,7 +2070,8 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.MEMORY_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
         self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
-        self.assertEqual(campaign.m2.REVERTING_SCHEMAS, (campaign.m2.MEMORY_CASE_SCHEMA,))
+        self.assertEqual(campaign.m2.REVERTING_SCHEMAS,
+                         (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA))
         for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
             self.assertNotIn(self.PROFILE, group)
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
@@ -2183,6 +2213,170 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
                             for entry in manifest['cases']))
         self.assertEqual(len(manifest['cases']), 232)
+
+
+class MemoryCallCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-memory-calls'
+    CORPUS = ROOT / 'scripts/semantic-memory-call-corpus.json'
+    REQUIRED = {**{key: [] for key in campaign.m2.MEMORY_CALL_SHAPES}, 'helpers': ['read:generic'],
+                'indices': ['word:input']}
+
+    def manifest(self, generated=False):
+        case = memory_call_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'memoryCallRequirements': self.REQUIRED,
+            'cases': [{'id': 'memory-call', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 1024}} if generated
+                   else {'memoryCallPlan': case['memoryCallPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('memory-calls-generate', 'memory-calls-emit', 'memory-call-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.MEMORY_CALL_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
+        self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertIn(campaign.m2.MEMORY_CALL_CASE_SCHEMA, campaign.m2.REVERTING_SCHEMAS)
+        for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 2048))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-memory-calls-v1'}))
+        self.assertEqual({key: len(values) for key, values in campaign.m2.MEMORY_CALL_SHAPES.items()},
+                         {'helpers': 25, 'calls': 10, 'passes': 4, 'instances': 3, 'data': 5, 'closures': 9,
+                          'observations': 23, 'indices': 12, 'ranges': 2, 'hazards': 4, 'steps': 10})
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['memory-calls-generate', '1', '1024', '1', '256', '1000000',
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+        _, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', '2048')
+        self.assertEqual(seen[0][2], '2048')
+        for nodes in ('255', '2049'):
+            with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['memoryCallCoverage']['requiredHelpers'], [])
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['memoryCallRequirements']
+        for invalid in (None, {}, {**base, 'helpers': ['read:heap']}, {**base, 'indices': ['word:counter']},
+                        {**base, 'passes': ['sum']}, {**base, 'hazards': ['view']}, {**base, 'data': ['pair'] * 2},
+                        {key: values for key, values in base.items() if key != 'ranges'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'memoryCallRequirements': invalid})
+        with self.assertRaises(ValueError):
+            campaign.memory_call_requirements({'profile': 'runtime-memory-values', 'memoryCallRequirements': base})
+        with self.assertRaises(ValueError):
+            campaign.memory_requirements({'profile': self.PROFILE, 'memoryValueRequirements': MemoryCoverageTests.REQUIRED})
+        plan = entry['memoryCallPlan']
+        call = plan['steps'][1]
+        campaign.validate_manifest({**value, 'cases': [{**entry, 'memoryCallPlan': {**plan, 'steps': plan['steps'] + [call]}}]})
+        for invalid in ({**plan, 'steps': []}, {**plan, 'steps': plan['steps'] * 7}, {**plan, 'extra': 1},
+                        {**plan, 'helpers': []}, {**plan, 'helpers': plan['helpers'] * 4},
+                        {**plan, 'schema': 'solcore-lean.memory-value-plan.v1'}, {**plan, 'steps': [{'step': call}]},
+                        {**plan, 'steps': plan['steps'][:1]},
+                        {**plan, 'helpers': [{**plan['helpers'][0], 'kind': 'free'}]},
+                        {**plan, 'steps': [{'action': {**plan['steps'][0]['action'], 'kind': 'free'}}, call]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'memoryCallPlan': invalid}]})
+        for changed in ({**entry, 'program': {}}, {**entry, 'memoryValuePlan': entry['memoryCallPlan']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for nodes in (256, 1024, 2048):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+        for nodes in (255, 2049):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                    'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        self.assertEqual(campaign.specified_memory_calls(memory_call_policy_case()),
+            {'Helpers': {'read:generic'}, 'Calls': {'direct:word'}, 'Passes': set(), 'Instances': {'bytes'},
+             'Data': set(), 'Closures': set(), 'Observations': {'word:bytes'}, 'Indices': {'word:input'},
+             'Ranges': {'call'}, 'Hazards': set(), 'Steps': {'action:bytes', 'call'}})
+        self.assertEqual(campaign.specified_memory_calls(memory_policy_case()),
+                         {dimension: set() for dimension in campaign.MEMORY_CALL_DIMENSIONS})
+        self.assertEqual(campaign.specified_memory_values(memory_call_policy_case()),
+                         {dimension: set() for dimension in campaign.MEMORY_DIMENSIONS})
+        for invalid in ({'helpers': ['read:generic']}, memory_call_shapes(helpers=['read:heap']),
+                        memory_call_shapes(steps=['call', 'action:bytes']), memory_call_shapes(ranges=['call', 'call']),
+                        memory_call_shapes(indices=['word:counter'])):
+            with self.assertRaises(ValueError):
+                campaign.specified_memory_calls(memory_call_policy_case(shapes=invalid))
+
+    def test_imported_plan_routes_to_memory_calls_emit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+            value = self.manifest()
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return memory_call_policy_case()
+            instance.tool = tool
+            def execute_case(case):
+                folder = instance.work / 'memory-call'
+                folder.mkdir()
+                report = reverted()
+                return folder, report, campaign.analyze(report, reverts=True)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(calls, [('memory-calls-emit', value['cases'][0]['memoryCallPlan'], ['255', '1000'],
+                                      'corpus-emission')])
+            coverage = instance.summary['memoryCallCoverage']
+            self.assertEqual((coverage['requiredIndices'], coverage['generatedIndices'], coverage['matchedIndices']),
+                             (['word:input'], ['word:input'], ['word:input']))
+            self.assertTrue(all(not coverage['missing' + dimension] for dimension in campaign.MEMORY_CALL_DIMENSIONS))
+
+    def test_nonmatching_outcomes_cannot_satisfy_memory_call_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [memory_call_policy_case(), memory_call_policy_case(shapes=memory_call_shapes(
+                indices=['word:literal'], passes=['pair']))]
+            instance.summary['memoryCallCoverage'].update(requiredIndices=['word:input', 'word:literal'],
+                                                          requiredPasses=['pair'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['provenance']['memoryCallShapes']['indices'][0].replace(':', '-')
+                folder.mkdir()
+                report = matched()
+                if case['provenance']['memoryCallShapes']['passes'] == ['pair']:
+                    report['comparison'] = {'category': 'semantic-mismatch', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['memoryCallCoverage']
+            self.assertEqual((coverage['generatedIndices'], coverage['matchedIndices']),
+                             (['word:input', 'word:literal'], ['word:input']))
+            self.assertEqual((coverage['missingIndices'], coverage['missingPasses']), (['word:literal'], ['pair']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        self.assertEqual(manifest['memoryCallRequirements'],
+                         {key: list(values) for key, values in campaign.m2.MEMORY_CALL_SHAPES.items()})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']), 328)
 
 
 class AssemblyMemoryCoverageTests(unittest.TestCase):
@@ -3953,7 +4147,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 25)
+        self.assertEqual(len(campaign.PROFILES), 26)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -4639,7 +4833,8 @@ class G0VersionTests(CommandLine, unittest.TestCase):
     def test_only_call_graph_profiles_use_their_own_grammar(self):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
-             'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values'})
+             'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values',
+             'runtime-memory-calls'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -4736,7 +4931,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
-              'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12}
+              'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))

@@ -355,7 +355,44 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.MEMORY_CASE_SCHEMA], "runtime-memory-values")
         self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CASE_SCHEMA], "SynthesizedMemoryValues")
         self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
-        self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA,))
+        self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA))
+
+    def test_memory_call_plan_envelope_and_shape_inventory(self):
+        build = {"kind": "bytes", "build": "to_bytes", "parts": [{"part": "word", "operand": {"operand": "input"}}]}
+        call = {"helper": 0, "arg": "sc_b0", "index": {"index": "literal", "value": 0}, "word": {"operand": "input"},
+                "form": "direct", "fold": "add", "constant": 3}
+        helper = {"param": "bytes", "kind": "read", "obs": "length", "fold": "add"}
+        plan = {"schema": "solcore-lean.memory-call-plan.v1", "helpers": [helper] * 3,
+                "steps": [{"action": build}, {"call": call}, {"data": {"datum": "inr", "word": {"operand": "input"}}},
+                          {"closure": {"value": "sc_b0", "obs": "length"}},
+                          {"apply": {"closure": 0, "index": {"index": "literal", "value": 0}, "fold": "add",
+                                     "constant": 3}}] + [{"call": call}] * 7}
+        runner.validate_memory_call_plan(plan)
+        for param in ("slice", "generic", "array", "pair", "sum", "enum"):
+            for kind in ("write", "view", "copy", "call", "pack", "take"):
+                runner.validate_memory_call_plan({**plan, "helpers": [{**helper, "param": param, "kind": kind}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.memory-value-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "helpers": []}, {**plan, "helpers": [helper] * 4}, {**plan, "steps": []},
+                        {**plan, "steps": plan["steps"] + [{"call": call}]},
+                        {**plan, "helpers": [{**helper, "param": "word"}]}, {**plan, "helpers": [{**helper, "kind": "free"}]},
+                        {**plan, "steps": [{"action": build}]}, {**plan, "steps": [{"loop": {}, "body": []}, {"call": call}]},
+                        {**plan, "steps": [{"action": build, "call": call}]}, {**plan, "steps": [call]},
+                        {**plan, "steps": [{"action": {**build, "kind": "free"}}, {"call": call}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_memory_call_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.MEMORY_CALL_SHAPES.items()}
+        runner.validate_memory_call_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "passes": ["slice", "bytes"]},
+                        {**shapes, "data": ["pair", "pair"]}, {**shapes, "hazards": ["view"]},
+                        {**shapes, "indices": ["word:counter"]}, {key: values for key, values in shapes.items() if key != "steps"}):
+            with self.assertRaises(ValueError):
+                runner.validate_memory_call_shapes(invalid)
+        self.assertEqual({key: len(values) for key, values in runner.MEMORY_CALL_SHAPES.items()},
+                         {"helpers": 25, "calls": 10, "passes": 4, "instances": 3, "data": 5, "closures": 9,
+                          "observations": 23, "indices": 12, "ranges": 2, "hazards": 4, "steps": 10})
+        self.assertEqual(runner.CASE_PROFILES[runner.MEMORY_CALL_CASE_SCHEMA], "runtime-memory-calls")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CALL_CASE_SCHEMA], "SynthesizedMemoryCalls")
+        self.assertEqual(runner.MEMORY_CALL_VERSIONS, ("profileVersion", "boundaryVersion"))
 
     def test_hierarchy_plan_envelope_and_shape_inventory(self):
         declaration = {"generic": True, "sameName": False, "constructors": [["param"], []]}
@@ -760,7 +797,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 25)
+        self.assertEqual(len(runner.CASE_PROFILES), 26)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))
