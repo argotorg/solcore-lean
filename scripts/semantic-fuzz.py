@@ -14,8 +14,8 @@ observations itself.
 
 The opt-in run kind `fixtures` runs scripts/semantic-fixtures.py in mutation
 mode on a seeded slice of the pinned end-to-end fixtures per iteration, within
-per-fixture mutant, sequence mutant and time budgets and an iteration time
-budget. That
+per-fixture mutant, sequence mutant, source mutant and time budgets and an
+iteration time budget. That
 harness compares compiled paths with each other and with upstream's recorded
 expectations, never with original Core.
 """
@@ -70,7 +70,7 @@ CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backe
                    "seconds": 14400.0, "profile_seconds": 900.0,
                    "disk_bytes": 1024**3, "examples": 3, "crash_replay": True, "bin_dir": None, "upstream": None,
                    "target_dir": None,
-                   "anvil": None, "solc": None, "fixture_count": 8, "fixture_mutants": 32, "fixture_sequences": 8,
+                   "anvil": None, "solc": None, "fixture_count": 8, "fixture_mutants": 32, "fixture_sequences": 8, "fixture_sources": 2,
                    "fixture_seconds": 300.0,
                    "fixture_run_seconds": 1800.0, "fixture_jobs": 2, "cast": None}
 PATH_OPTIONS = ("bin_dir", "upstream", "target_dir", "anvil", "solc")
@@ -425,6 +425,7 @@ def fixtures_command(config, iteration, output, fixtures=None):
             "--seed", str(root_seed(config, iteration)), "--output", str(output), "--reuse-exports",
             "--jobs", str(setting(config, "fixture_jobs")), "--fixture-mutants", str(setting(config, "fixture_mutants")),
             "--sequence-mutants", str(setting(config, "fixture_sequences")),
+            "--source-mutants", str(setting(config, "fixture_sources")),
             "--fixture-seconds", str(setting(config, "fixture_seconds")),
             "--seconds", str(setting(config, "fixture_run_seconds"))]
     for fixture in fixture_selection(config, iteration) if fixtures is None else fixtures:
@@ -480,6 +481,8 @@ def configure(state, args):
                 raise NotReady("fixture counts, budgets and jobs must be positive, with at most 16 jobs")
             if not 0 <= config["fixture_sequences"] <= 4096:
                 raise NotReady("--fixture-sequences must be between 0 and 4096")
+            if not 0 <= config["fixture_sources"] <= 4096:
+                raise NotReady("--fixture-sources must be between 0 and 4096")
             if not fixture_pool(config):
                 raise NotReady("no pinned fixture falls on this shard")
             continue
@@ -690,7 +693,8 @@ def register(state, config, epoch, iteration, backend, output, summary, sites=No
 def fixture_signature_key(finding):
     """A crash or path failure is its symptom on its path; a mismatch is its fixture and reduced input."""
     key = {"backend": FIXTURES, "category": finding["category"]}
-    if finding["category"] == "compiler-crash":
+    # A source mutant's refusal on some paths is, like a crash, its symptom at its stage.
+    if finding["category"] in ("compiler-crash", "compile-mismatch"):
         return {**key, "stage": finding.get("stage"), "paths": finding.get("paths"), "symptom": symptom(finding.get("detail") or "")}
     if finding["category"] == "path-failure":
         status, detail = finding["signature"][2], finding.get("detail") or ""
@@ -698,9 +702,13 @@ def fixture_signature_key(finding):
         return {**key, "stage": "execution", "path": finding.get("path"), "status": status,
                 "symptom": {"value": detail} if status == "language-failure" else symptom(detail)}
     reduction = finding.get("reduction") or {}
-    names = ("operator", "sequence") if finding.get("sequence") else ("steps", "calldata", "value")
+    names = ("operator", "sequence") if finding.get("sequence") else ("edit", "steps") if finding.get("source") else \
+        ("steps", "calldata", "value")
     if reduction.get("status") in ("reduced", "budget-exhausted"):
         reduced = {name: reduction.get(name) for name in names}
+    elif finding.get("source"):
+        # An unreduced source finding is its edit at its step.
+        reduced = {"edit": finding.get("edit"), "step": finding.get("step")}
     elif finding.get("sequence"):
         # An unreduced sequence finding is its operator at its step, with the mutant it commits.
         reduced = {"operator": finding.get("operator"), "step": finding.get("step"), "change": finding.get("change"),
@@ -869,15 +877,16 @@ def fixture_status(outcome):
 def fixture_counts(outcome):
     """A fixtures run's entries in the suite's terms, and its own counts."""
     totals = (outcome or {}).get("totals") or {}
-    # A sequence mutant's steps from its change on are compared entries too.
-    sequence = totals.get("sequence") or {}
+    # A sequence mutant's steps from its change on, and a source mutant's steps, are compared entries too.
+    sequence, source = totals.get("sequence") or {}, totals.get("source") or {}
 
     def both(key):
-        return totals.get(key, 0) + sequence.get(key, 0)
+        return totals.get(key, 0) + sequence.get(key, 0) + source.get(key, 0)
     return {"executed": sum(both(key) for key in ("agree", "disagree", "incomplete", "unobserved")),
             "matched": both("agree"), "mismatched": both("disagree"),
             "errors": len((outcome or {}).get("errors") or []),
             "inconclusive": both("incomplete") + both("unobserved"), "sequences": sequence.get("mutants", 0),
+            "sources": source.get("mutants", 0),
             **{key: totals.get(key, 0) for key in ("fixtures", "recorded", "mutants", "budgetStopped", "unexecuted")},
             "findings": len((outcome or {}).get("findings") or []), "exclusions": sum((totals.get("exclusions") or {}).values())}
 
@@ -991,7 +1000,8 @@ def markdown(data):
              f"backends {', '.join(config['backend'])}{suites}.", ""]
     if FIXTURES in config["backend"]:
         lines += [f"Fixtures: {setting(config, 'fixture_count')} pinned end-to-end fixtures per iteration, at most "
-                  f"{setting(config, 'fixture_mutants')} mutants, {setting(config, 'fixture_sequences')} sequence mutants and "
+                  f"{setting(config, 'fixture_mutants')} mutants, {setting(config, 'fixture_sequences')} sequence mutants, "
+                  f"{setting(config, 'fixture_sources')} source mutants and "
                   f"{setting(config, 'fixture_seconds'):g} seconds per fixture, "
                   f"{setting(config, 'fixture_run_seconds'):g} seconds per run, {setting(config, 'fixture_jobs')} at a time; "
                   "compiled paths compared with each other and with upstream's recorded expectations, not with original Core.", ""]
@@ -1222,6 +1232,7 @@ def parse_args(argv=None):
     for name, kind, text in (("fixture-count", int, "fixtures per iteration (default 8)"),
                              ("fixture-mutants", int, "mutants per fixture at most (default 32)"),
                              ("fixture-sequences", int, "sequence mutants per fixture at most (default 8; 0 runs none)"),
+                             ("fixture-sources", int, "source mutants per fixture at most (default 2; 0 runs none)"),
                              ("fixture-seconds", float, "wall time per fixture (default 300)"),
                              ("fixture-run-seconds", float, "wall time per fixtures run (default 1800)"),
                              ("fixture-jobs", int, "fixtures run at a time (default 2)")):

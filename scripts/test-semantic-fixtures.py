@@ -407,20 +407,24 @@ class DerivedArgumentTests(unittest.TestCase):
                     self.assertRaisesRegex(ValueError, "declaration extraction failed: parser diagnostics"):
                 exports.declarations({"build": 4}, False)
 
-    def test_the_tool_check_requires_the_declaration_extractor_receipt(self):
+    def test_the_tool_check_requires_the_declaration_and_site_extractor_receipts(self):
         version = SimpleNamespace(stdout="solc\nVersion: " + fixtures.exporter.SOLC_VERSION + "\n")
         args = SimpleNamespace(upstream=ROOT, target_dir=ROOT, solc=Path("solc"))
         with patch.object(fixtures.scenario, "identities", return_value=(1, 2, 3)), \
                 patch.object(fixtures.methods.resolver, "checked_identity", return_value=4), \
                 patch.object(fixtures.declarations, "checked_identity", return_value=5), \
+                patch.object(fixtures.sites, "checked_identity", return_value=6), \
                 patch.object(fixtures.subprocess, "run", return_value=version), \
                 patch.object(fixtures.exporter, "validate_version", return_value=None):
-            self.assertEqual(fixtures.check_tools(args)["declaration"], 5)
-        with patch.object(fixtures.scenario, "identities", return_value=(1, 2, 3)), \
-                patch.object(fixtures.methods.resolver, "checked_identity", return_value=4), \
-                patch.object(fixtures.declarations, "checked_identity", side_effect=ValueError("receipt is stale")), \
-                self.assertRaisesRegex(ValueError, "stale"):
-            fixtures.check_tools(args)
+            self.assertEqual((fixtures.check_tools(args)["declaration"], fixtures.check_tools(args)["site"]), (5, 6))
+        for module in (fixtures.declarations, fixtures.sites):
+            with patch.object(fixtures.scenario, "identities", return_value=(1, 2, 3)), \
+                    patch.object(fixtures.methods.resolver, "checked_identity", return_value=4), \
+                    patch.object(fixtures.declarations, "checked_identity", return_value=5), \
+                    patch.object(fixtures.sites, "checked_identity", return_value=6), \
+                    patch.object(module, "checked_identity", side_effect=ValueError("receipt is stale")), \
+                    self.assertRaisesRegex(ValueError, "stale"):
+                fixtures.check_tools(args)
 
     def test_records_count_the_derived_boundary_entries(self):
         run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
@@ -624,6 +628,218 @@ class SequenceTests(unittest.TestCase):
                          {"status": "not-reproduced", "runs": 1})
 
 
+class SourceTests(unittest.TestCase):
+    PATHS = ["hull", "sonatina-o0", "yul"]
+
+    def site(self, kind, text, **extra):
+        return {"kind": kind, "text": text, "span": [10, 10 + len(text)], "owner": "C.f", **extra}
+
+    def run_for(self, observe=None, **args):
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        run.args = SimpleNamespace(**{"seed": 5, "source_mutants": 8, "reduction_runs": 40, "reduction_seconds": 60,
+                                      "work": Path(self.temporary.name) / "work", "upstream": Path(self.temporary.name), **args})
+        run.fixture = {"id": "f", "mode": "raw", "contract": "C", "source": "tests/e2e/f/main.sol", "sha256": "0"}
+        run.raw, run.admitted, run.identity = True, list(self.PATHS), {}
+        run.steps = [step(kind="deploy", index=0)] + [step(index=index) for index in (1, 2, 3)]
+        run.record = {"findings": [], "statuses": {}, "counts": {}}
+        run.deadline = run.run_deadline = None
+        run.reference = {str(index): fixtures.comparable(observation(), index == 0) for index in range(4)}
+        run.programs, run.observe = {}, observe
+        return run
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        source = Path(self.temporary.name) / "tests/e2e/f"
+        source.mkdir(parents=True)
+        (source / "main.sol").write_text("contract C { function f() { return 7 + x; } }\n")
+        (source / "lib.sol").write_text("function g() {}\n")
+
+    def test_each_site_kind_has_its_operators_in_order(self):
+        def texts(site):
+            return [replacement for _, replacement in fixtures.replacements(site)]
+        self.assertEqual(texts(self.site("literal", "7", literal="number")), ["0", "1", "8", "6", str(U256 - 1), "14"])
+        self.assertEqual(texts(self.site("literal", "0", literal="number")), ["1", str(U256 - 1)])
+        # A hex literal keeps its digit count where the value fits.
+        self.assertEqual(texts(self.site("literal", "0x40", literal="hex")), ["0x00", "0x01", "0x41", "0x3f", hex(U256 - 1), "0x80"])
+        self.assertEqual(texts(self.site("literal", '"hi"', literal="string")), ['""'])
+        self.assertEqual(texts(self.site("literal", '""', literal="string")), [])
+        self.assertEqual([texts(self.site("binary", token)) for token in ("+", "/", "<", "==", "&", "&&")],
+                         [["-"], ["*", "%"], ["<=", ">"], ["!="], ["|", "^"], ["||"]])
+        self.assertEqual(texts(self.site("assign", "+=")), ["-="])
+        self.assertEqual(fixtures.replacements(self.site("unary", "!")), [("drop-unary", "")])
+        self.assertEqual(texts(self.site("condition", "i < n")), ["!(i < n)"])
+        self.assertEqual([texts(self.site("yul-call", name)) for name in ("add", "shr", "mstore")], [["sub"], ["shl", "sar"], []])
+        self.assertEqual(texts(self.site("yul-literal", "true", literal="bool")), ["false"])
+        self.assertEqual(texts(self.site("yul-condition", "lt(i, n)")), ["iszero(lt(i, n))"])
+
+    def test_candidates_are_numbered_by_file_span_and_operator(self):
+        documents = {"main.sol": {"sites": [{**self.site("binary", "+"), "span": [30, 31]},
+                                            {**self.site("literal", "7", literal="number"), "span": [28, 29]}], "unsafe": []},
+                     "lib.sol": {"sites": [{**self.site("condition", "b"), "span": [5, 6]}], "unsafe": []}}
+        candidates = fixtures.source_candidates(documents)
+        self.assertEqual([(item["id"], item["file"], item["span"][0], item["family"]) for item in candidates[:3]],
+                         [("p1", "lib.sol", 5, "condition"), ("p2", "main.sol", 28, "literal"), ("p3", "main.sol", 28, "literal")])
+        self.assertEqual([(item["id"], item["replacement"]) for item in candidates[-2:]], [("p7", "14"), ("p8", "-")])
+        self.assertEqual(fixtures.source_edit(candidates[-1]), {"file": "main.sol", "start": 30, "end": 31, "replacement": "-"})
+
+    def test_a_mutant_is_a_fresh_copy_of_the_fixture_with_one_edit(self):
+        source, directory = Path(self.temporary.name) / "tests/e2e/f", Path(self.temporary.name) / "mutant"
+        text = (source / "main.sol").read_text()
+        start = text.index("7")
+        candidate = {"file": "main.sol", "span": [start, start + 1], "text": "7", "replacement": "8"}
+        fixtures.write_mutant(source, directory, candidate)
+        self.assertEqual((directory / "src/main.sol").read_text(), text.replace("7", "8"))
+        self.assertEqual((directory / "src/lib.sol").read_text(), (source / "lib.sol").read_text())
+        self.assertEqual(json.loads((directory / "edit.json").read_text())["replacement"], "8")
+        fixtures.write_mutant(source, directory, {**candidate, "replacement": "9"})
+        self.assertEqual((directory / "src/main.sol").read_text(), text.replace("7", "9"))
+        with self.assertRaisesRegex(ValueError, "differs from its extracted text"):
+            fixtures.write_mutant(source, directory, {**candidate, "text": "x"})
+
+    def test_sites_are_extracted_per_file_and_reused_only_by_the_same_build(self):
+        root = Path(self.temporary.name)
+        exports = fixtures.Exports.__new__(fixtures.Exports)
+        exports.args = SimpleNamespace(upstream=root, target_dir=root, timeout=5)
+        exports.source, exports.directory = root / "tests/e2e/f/main.sol", root / "out"
+        exports.directory.mkdir()
+        calls = []
+
+        def extract(command, timeout, **_):
+            calls.append(command)
+            source, output = Path(command[2]), Path(command[command.index("--output") + 1])
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps({"sites": [], "unsafe": [], "file": source.name}))
+            output.with_suffix(".json.provenance.json").write_text(json.dumps({
+                "schema": fixtures.sites.SCHEMA, "toolBuild": {"build": len(calls) > 2}, "source": source.as_uri(),
+                "sourceSha256": fixtures.common.file_digest(source), "outputSha256": fixtures.common.file_digest(output)}))
+            return {"returncode": 0, "resource": None, "stdout": "", "stderr": ""}
+        with patch.object(fixtures, "run_process", side_effect=extract):
+            documents = exports.sites({"build": False}, False)
+            self.assertEqual(sorted(documents), ["lib.sol", "main.sol"])
+            self.assertEqual(exports.sites({"build": False}, True), documents)
+            self.assertEqual(len(calls), 2)
+            exports.sites({"build": True}, True)
+            self.assertEqual(len(calls), 4)
+            self.assertIn("export-rust-sites.py", calls[0][1])
+        failed = {"returncode": 2, "resource": None, "stdout": "", "stderr": "parser diagnostics"}
+        with patch.object(fixtures, "run_process", return_value=failed), \
+                self.assertRaisesRegex(ValueError, "site extraction failed: parser diagnostics"):
+            exports.sites({"build": 5}, False)
+
+    def test_lean_core_runs_a_program_in_one_invocation_and_falls_back_after_a_limit(self):
+        args, deploy, entries = SimpleNamespace(hull_entry_timeout=7), step(kind="deploy", index=0), [step()]
+        for resource, fallback in ((None, False), ("budget", False), ("timeout", True)):
+            with patch.object(fixtures, "hull_invocation", return_value=([observation()] * 2, resource, 2)) as invocation, \
+                    patch.object(fixtures, "run_hull", return_value=["fallback"]) as recorded:
+                result = fixtures.run_hull_program(args, {}, {}, {}, deploy, entries)
+            self.assertEqual(invocation.call_args.args[6], 7)
+            self.assertEqual((recorded.called, result == ["fallback"]), (fallback, fallback), resource)
+        self.assertEqual(fixtures.run_hull_program(args, {}, {}, {}, deploy, entries, time.monotonic() - 1), [fixtures.BUDGET] * 2)
+
+    def test_mutant_exports_compile_what_the_paths_need_and_a_frontend_refusal_stops_every_path(self):
+        exports = fixtures.MutantExports.__new__(fixtures.MutantExports)
+        built = []
+
+        def level(name, reuse):
+            built.append(name)
+            if name == "O2":
+                raise fixtures.Excluded("rust-code-images-O2", "compiler-crash", "panicked at dfg.rs")
+            return {"document": name}
+        with patch.object(exports, "level", side_effect=level), patch.object(exports, "yul", return_value={"init": b""}):
+            prepared, statuses, failures = exports.compile(["hull", "sonatina-o0", "sonatina-o2", "yul"])
+        self.assertEqual((built, sorted(prepared), [error.paths for error in failures]), (["O0", "O2"], ["O0", "yul"], [("sonatina-o2",)]))
+        self.assertEqual({name: value["status"] for name, value in statuses.items()}, {"O0": "compiled", "O2": "compiler-crash", "yul": "compiled"})
+        with patch.object(exports, "level", side_effect=fixtures.Excluded("rust-checked-source", "compile-failure", "SC0207")), \
+                self.assertRaises(fixtures.Excluded):
+            exports.compile(["hull", "yul"])
+
+    def candidate(self, text="7", replacement="8"):
+        start = (Path(self.temporary.name) / "tests/e2e/f/main.sol").read_text().index(text)
+        return {"id": "p3", "file": "main.sol", "span": [start, start + len(text)], "kind": "literal", "family": "literal",
+                "operator": "literal", "text": text, "replacement": replacement}
+
+    def test_a_source_mutant_compares_its_recorded_steps_across_the_paths_that_compiled(self):
+        def observe(deploy, entries, sequence=False, program=None):
+            self.assertEqual((program["paths"], len(entries)), (["hull", "sonatina-o0"], 3))
+            rows = {path: [observation()] + [observation(output="0x01")] + [observation()] * 2 for path in program["paths"]}
+            rows["sonatina-o0"][3] = observation(output="0x02")
+            return rows
+        run = self.run_for(observe)
+        refused = fixtures.Excluded("yul-export", "compile-failure", "StackTooDeepError")
+        refused.paths = ("yul",)
+        compiled = ({"O0": {"document": None}}, {"O0": {"status": "compiled", "seconds": 1}}, [refused])
+        tallies = dict.fromkeys(fixtures.SOURCE_COUNTS, 0)
+        with patch.object(fixtures.MutantExports, "compile", return_value=compiled), \
+                patch.object(fixtures.common, "image_bytes", return_value=b""):
+            row = run.source(self.candidate(), tallies)
+        self.assertEqual((row["status"], row["paths"], row["changed"], row["stop"]), ("compared", ["hull", "sonatina-o0"], 1, 3))
+        self.assertEqual([line["agreement"]["status"] for line in row["rows"]], ["agree", "agree", "agree", "disagree"])
+        self.assertEqual([item["category"] for item in run.record["findings"]], ["compile-mismatch", "path-mismatch"])
+        mismatch = run.record["findings"][1]
+        self.assertEqual((mismatch["entry"], mismatch["source"], mismatch["edit"]["replacement"], mismatch["position"]),
+                         ("p3@3", "p3", "8", 3))
+        self.assertEqual((tallies["mutants"], tallies["agree"], tallies["disagree"], tallies["changed"], tallies["reached"]), (1, 3, 1, 1, 1))
+        self.assertIn("p3", run.programs)
+        self.assertTrue((run.args.work / "f/sources/p3/edit.json").exists())
+        # A frontend refusal excludes the mutant; a frontend crash is a finding; neither runs a step.
+        for reason, findings in (("compile-failure", 2), ("compiler-crash", 3)):
+            with patch.object(fixtures.MutantExports, "compile", side_effect=fixtures.Excluded("rust-checked-source", reason, "x")):
+                row = run.source(self.candidate(), tallies)
+            self.assertEqual((row["status"], row["rejection"]["reason"], len(run.record["findings"])), ("rejected", reason, findings))
+        self.assertEqual(tallies["rejected"], 2)
+        clean = self.run_for(lambda deploy, entries, sequence=False, program=None: {path: [observation()] * 4 for path in program["paths"]})
+        compiled = ({"O0": {"document": None}, "yul": {"init": b"", "runtime": b""}}, {}, [])
+        with patch.object(fixtures.MutantExports, "compile", return_value=compiled), \
+                patch.object(fixtures.common, "image_bytes", return_value=b""), patch.object(fixtures.FixtureRun, "tally"):
+            self.assertEqual(clean.source(self.candidate(), dict.fromkeys(fixtures.SOURCE_COUNTS, 0))["changed"], 0)
+        self.assertFalse((clean.args.work / "f/sources/p3").exists())
+        clean.deadline = time.monotonic() - 1
+        tallies = dict.fromkeys(fixtures.SOURCE_COUNTS, 0)
+        self.assertEqual(clean.source(self.candidate(), tallies)["status"], "budget")
+        self.assertEqual((tallies["unrun"], tallies["budget"]), (1, 4))
+
+    def test_a_fixture_draws_its_source_mutants_by_family_in_turn_within_its_cap_and_the_runs_share(self):
+        documents = {"main.sol": {"sites": [{**self.site("literal", str(value), literal="number"), "span": [value * 4, value * 4 + 1]}
+                                            for value in range(1, 6)] +
+                                           [{**self.site("binary", "+"), "span": [40, 41]}, {**self.site("condition", "b"), "span": [50, 51]}],
+                                  "unsafe": []}}
+
+        def kept(limit, share=None):
+            run, ran = self.run_for(None, source_mutants=limit, source_share=share), []
+            run.sites = documents
+            with patch.object(fixtures.FixtureRun, "source", lambda self, candidate, tallies: ran.append(candidate) or {}):
+                run.source_mutants()
+            return ran, run.record
+        ran, record = kept(3)
+        self.assertEqual(sorted(item["family"] for item in ran), ["condition", "literal", "operator"])
+        self.assertEqual([item["id"] for item in ran], sorted((item["id"] for item in ran), key=lambda name: int(name[1:])))
+        self.assertEqual((record["sourceMutants"]["candidates"], record["sourceMutants"]["kept"], record["sourceMutants"]["sites"]), (28, 3, 7))
+        self.assertEqual(kept(3)[0], ran)
+        self.assertEqual(len(kept(4, share=2)[0]), 2)
+        self.assertEqual(kept(0), ([], {"findings": [], "statuses": {}, "counts": {}}))
+        totals = fixtures.summarize([{"id": "f", "admitted": [], "exclusions": [], "findings": [],
+                                      "counts": {"source": dict.fromkeys(fixtures.SOURCE_COUNTS, 2)}, "sourceMutants": record["sourceMutants"]}] * 2)
+        self.assertEqual((totals["source"]["reached"], totals["sourceMutants"]["candidates"]), (4, 56))
+
+    def test_a_source_step_finding_reduces_to_the_shortest_prefix_on_its_mutated_program(self):
+        def observe(deploy, entries, sequence=False, program=None):
+            self.assertIs(program, run.programs["p3"])
+            rows = {path: [observation()] * (1 + len(entries)) for path in program["paths"]}
+            # Yul differs on step 3 only after step 2.
+            if entries[-1]["index"] == 3 and any(entry["index"] == 2 for entry in entries[:-1]):
+                rows["yul"] = rows["yul"][:-1] + [observation(output="0x01")]
+            return rows
+        run = self.run_for(observe)
+        run.programs["p3"] = {"paths": ["hull", "yul"]}
+        signature = ["path-mismatch", ["output"], [["hull"], ["yul"]]]
+        finding = {"source": "p3", "edit": {"file": "main.sol"}, "position": 3, "step": 3, "category": "path-mismatch",
+                   "signature": signature}
+        reduction = run.reduce(finding)
+        self.assertEqual((reduction["status"], reduction["steps"]), ("reduced", [2]))
+        self.assertEqual(run.reduce({**finding, "signature": ["path-mismatch", ["logs"], []]}), {"status": "not-reproduced", "runs": 1})
+
+
 class ObservationTests(unittest.TestCase):
     chain = {"address": "0x" + "00" * 19 + "0a", "accounts": [("0x" + "00" * 19 + "0b", 5)]}
 
@@ -781,7 +997,8 @@ class HullRunnerTests(unittest.TestCase):
             fixture = {"mode": "methods", "contract": "C", "fuel": 10, "availableGas": None}
             entries = [step(kind="call", calldata="0x01"), step(kind="send", calldata="0x02"),
                        step(kind="call", calldata="0xdead"), step(kind="call", calldata="0x03")]
-            args.hull_entry_timeout = 1
+            # Long enough for a loaded machine to start each runner before its limit.
+            args.hull_entry_timeout = 3
             observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
             self.assertEqual([item["status"] for item in observed], ["returned", "returned", "returned", "timeout", "returned"])
             self.assertEqual([item["output"] for item in observed if item["status"] == "returned"], ["0x00", "0x01", "0x02", "0x03"])
@@ -793,7 +1010,8 @@ class HullRunnerTests(unittest.TestCase):
             args, exports = self.prepare(Path(directory), self.ECHO)
             fixture = {"mode": "raw", "contract": "C", "fuel": 10, "availableGas": None}
             entries = [step(calldata="0x01"), {**step(calldata="0xdead"), "persist": False}, step(calldata="0x02")]
-            args.hull_timeout = 1
+            # Long enough for a loaded machine to start the runner and report the rows before the stall.
+            args.hull_timeout = 3
             observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
             self.assertEqual([item["status"] for item in observed], ["returned", "returned", "timeout", "returned"])
             self.assertEqual((observed[1]["output"], observed[3]["output"]), ("0x01", "0x02"))
@@ -939,6 +1157,12 @@ class RunTests(unittest.TestCase):
         recorded = [item for item in fixtures.inventory() if item["id"].startswith("abi-") and item["calls"]]
         self.assertEqual((report["sequenceMutants"], report["runSequenceMutants"], report["sequenceShare"]),
                          (16, 40, max(1, 40 // len(recorded))))
+        self.assertEqual((report["sourceMutants"], report["runSourceMutants"], report["sourceShare"]),
+                         (fixtures.SOURCE_MUTANTS, None, None))
+        self.output = self.output.with_name("sources")
+        report = self.main("--source-mutants", "3", "--run-source-mutants", "20", "--seconds", "0.01", delay=0.05)[1]
+        self.assertEqual((report["sourceMutants"], report["runSourceMutants"], report["sourceShare"]),
+                         (3, 20, max(1, 20 // len(recorded))))
 
     def test_a_stop_signal_ends_the_run_with_its_report(self):
         def run(self):
@@ -983,7 +1207,10 @@ class CommandLineTests(unittest.TestCase):
                       ["--mode", "mutation", "--seed", "1", "--derived-mutants", "4097"],
                       ["--mode", "mutation", "--seed", "1", "--sequence-mutants", "-1"],
                       ["--mode", "mutation", "--seed", "1", "--sequence-mutants", "4097"],
-                      ["--mode", "mutation", "--seed", "1", "--run-sequence-mutants", "0"], ["--run-sequence-mutants", "4"]):
+                      ["--mode", "mutation", "--seed", "1", "--run-sequence-mutants", "0"], ["--run-sequence-mutants", "4"],
+                      ["--mode", "mutation", "--seed", "1", "--source-mutants", "-1"],
+                      ["--mode", "mutation", "--seed", "1", "--source-mutants", "4097"],
+                      ["--mode", "mutation", "--seed", "1", "--run-source-mutants", "0"], ["--run-source-mutants", "4"]):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 fixtures.main(["--output", "/nonexistent/out", *extra])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):

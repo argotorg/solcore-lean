@@ -6,8 +6,8 @@ Rust 1.97.0, elan with Lean 4.33.1, and Anvil 1.5.1. Nothing here installs
 system tools. Network access is enabled only by --prepare --allow-network.
 The exporter-owned crates and Cargo target live under this checkout's .upstream.
 The receipts also cover the directive extractor and resolver and the
-declaration extractor, which are built offline from the fetched upstream lock
-because their manifests embed this checkout's paths.
+declaration and site extractors, which are built offline from the fetched
+upstream lock because their manifests embed this checkout's paths.
 """
 from __future__ import annotations
 
@@ -88,7 +88,8 @@ DIRECTIVE_TOOLS = (("solcore-directive-export", "directive-export-build.json", "
                    ("solcore-directive-resolve", "directive-resolve-build.json", "build-rust-directive-resolver.py",
                     "rust-directive-resolve.rs"),
                    ("solcore-declaration-export", "declaration-export-build.json", "export-rust-declarations.py",
-                    "rust-declaration-export.rs"))
+                    "rust-declaration-export.rs"),
+                   ("solcore-site-export", "site-export-build.json", "export-rust-sites.py", "rust-site-export.rs"))
 
 
 class NotReady(ValueError):
@@ -134,7 +135,7 @@ def load_exporter(root: Path):
 
 
 def load_directives(root: Path):
-    """The directive extractor and resolver and the declaration extractor: each crate and the identity its
+    """The directive extractor and resolver and the declaration and site extractors: each crate and the identity its
     receipt must record."""
     spec = importlib.util.spec_from_file_location("semantic_prepare_resolver", root / "scripts/build-rust-directive-resolver.py")
     resolver = importlib.util.module_from_spec(spec)
@@ -142,6 +143,9 @@ def load_directives(root: Path):
     spec = importlib.util.spec_from_file_location("semantic_prepare_declarations", root / "scripts/export-rust-declarations.py")
     declarations = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(declarations)
+    spec = importlib.util.spec_from_file_location("semantic_prepare_sites", root / "scripts/export-rust-sites.py")
+    sites = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sites)
     extractor = resolver.export
     if extractor.hull.COMMIT != COMMIT:
         raise NotReady("bootstrap/directive tool revision mismatch")
@@ -156,13 +160,15 @@ def load_directives(root: Path):
         try:
             resolve = resolver.identity(upstream, target)
             declare = declarations.identity(upstream, target)
+            site = sites.identity(upstream, target)
         except ValueError as error:
             raise NotReady(str(error)) from error
         return {"directive-export-build.json": extract, "directive-resolve-build.json": resolve,
-                "declaration-export-build.json": declare}
+                "declaration-export-build.json": declare, "site-export-build.json": site}
     return types.SimpleNamespace(identities=identities, crates={"solcore-directive-export": extractor.TOOL,
                                                                  "solcore-directive-resolve": resolver.TOOL,
-                                                                 "solcore-declaration-export": declarations.TOOL})
+                                                                 "solcore-declaration-export": declarations.TOOL,
+                                                                 "solcore-site-export": sites.TOOL})
 
 
 def cleanup_process_group(process: subprocess.Popen) -> None:
@@ -432,12 +438,14 @@ def build(runner: Runner, root: Path, upstream: Path, target: Path, versions: di
     for script in ("export-rust-hull.py", "export-rust-code-image.py"):
         runner.run([sys.executable, root / "scripts" / script, "--build", "--upstream", upstream,
                     "--target-dir", target], root, capture=False)
-    # The directive and declaration builds stay offline; the upstream lock fetched above holds every dependency.
+    # The directive, declaration and site builds stay offline; the upstream lock fetched above holds every dependency.
     runner.run([sys.executable, root / "scripts/export-rust-directives.py", "--build", "--upstream", upstream,
                 "--target-dir", target], root, capture=False)
     runner.run([sys.executable, root / "scripts/build-rust-directive-resolver.py", "--upstream", upstream,
                 "--target-dir", target], root, capture=False)
     runner.run([sys.executable, root / "scripts/export-rust-declarations.py", "--build", "--upstream", upstream,
+                "--target-dir", target], root, capture=False)
+    runner.run([sys.executable, root / "scripts/export-rust-sites.py", "--build", "--upstream", upstream,
                 "--target-dir", target], root, capture=False)
     runner.run(["lake", "--no-cache", "--rehash", "build", *TARGETS], root, capture=False)
     actual = inventory(root, upstream, target, versions,
@@ -506,7 +514,7 @@ def main(argv=None) -> int:
                     "cargo fetch --locked (upstream)", "materialize generated exporter crate",
                     "cargo metadata --offline (normalize generated lock)", "check all dependency pins against upstream",
                     "cargo fetch --locked (generated crate)", "offline exporter builds",
-                    "offline directive extractor, resolver and declaration extractor builds", "one Lake build",
+                    "offline directive extractor, resolver, declaration and site extractor builds", "one Lake build",
                     "hash readiness receipt"]}, indent=2))
             return 0
         runner = Runner(args.timeout)

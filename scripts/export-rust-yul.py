@@ -9,7 +9,10 @@ Wrapper names and object shape do not establish scope: the differential adapter
 must replay a canonical pure, storage-family or call-return case before using this exporter
 as its EVM path. `--fixture` instead admits one pinned upstream end-to-end
 fixture's own contract from its pinned source, under the same object-shape,
-link and immutable checks; its caller compares the compiled paths.
+link and immutable checks; its caller compares the compiled paths. With
+`--fixture-edit`, the source is the fixture's main file in a copy of its
+directory that differs from the pin by exactly one recorded single-site edit,
+checked byte for byte before anything compiles.
 """
 from __future__ import annotations
 
@@ -73,6 +76,27 @@ def fixture_pins():
             require(item["id"] not in pins, "fixture pinned twice: " + item["id"])
             pins[item["id"]] = {"source": item["source"], "sha256": item["sha256"], "contract": item["contract"]}
     return pins
+
+
+def fixture_edit(path, source, pinned, pin):
+    """A single-site edit of a pinned fixture's sources: SOURCE is the fixture's main file in a copy of its
+    directory, the edited file there is its pinned file with exactly the edit, and an edit of another file leaves
+    the main file as pinned."""
+    edit = json.loads(path.read_text())
+    require(isinstance(edit, dict) and set(edit) == {"file", "start", "end", "replacement"} and
+            isinstance(edit["file"], str) and isinstance(edit["replacement"], str) and
+            all(type(edit[key]) is int for key in ("start", "end")), "invalid fixture edit")
+    name = edit["file"]
+    require(Path(name).name == name and name.endswith(".sol") and source.name == pinned.name,
+            "a fixture edit names one source file beside the fixture's main file")
+    original = (pinned.parent / name).read_bytes()
+    require(0 <= edit["start"] <= edit["end"] <= len(original), "fixture edit outside its file")
+    expected = original[:edit["start"]] + edit["replacement"].encode() + original[edit["end"]:]
+    edited = source.parent / name
+    require(edited.is_file() and edited.read_bytes() == expected and expected != original,
+            "edited fixture source differs from its pin with the edit")
+    require(name == pinned.name or common.file_digest(source) == pin["sha256"], "fixture source differs from its pin")
+    return {**edit, "editedSha256": common.file_digest(edited)}
 
 
 def validate_contract(contract, fixture=None):
@@ -272,11 +296,14 @@ def checked_build(upstream, target, args):
 def export(args):
     source, output, upstream, target = args.source, args.output, args.upstream, args.target_dir
     require(source.is_file() and source.stat().st_size <= args.output_limit, "export source size limit exceeded or source missing")
-    fixture = getattr(args, "fixture", None)
+    fixture, edit = getattr(args, "fixture", None), None
     if fixture is not None:
         pin = fixture_pins()[fixture]
-        require(source == (upstream / pin["source"]).resolve() and common.file_digest(source) == pin["sha256"],
-                "fixture source differs from its pin")
+        pinned = (upstream / pin["source"]).resolve()
+        if getattr(args, "fixture_edit", None) is None:
+            require(source == pinned and common.file_digest(source) == pin["sha256"], "fixture source differs from its pin")
+        else:
+            edit = fixture_edit(args.fixture_edit, source, pinned, pin)
     driver, build = checked_build(upstream, target, args)
     version = run_process([str(args.solc), "--version"], args).decode()
     validate_version(version)
@@ -333,7 +360,8 @@ def export(args):
         "artifacts": {key: {"file": path.name, "sha256": common.file_digest(path)} for key, path in paths.items()},
         "scope": scope(args.contract, fixture)}
     if fixture is not None:
-        record["fixture"] = {"id": fixture, "source": pin["source"], "sha256": pin["sha256"]}
+        record["fixture"] = {"id": fixture, "source": pin["source"], "sha256": pin["sha256"],
+                             **({"edit": edit} if edit is not None else {})}
     sidecar.write_bytes(common.json_bytes(record))
     return output
 
@@ -344,6 +372,8 @@ def parse_args(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--contract", choices=CONTRACTS, help="a generated wrapper; required unless --fixture is given")
     parser.add_argument("--fixture", help="a pinned end-to-end fixture id, which admits only its own contract")
+    parser.add_argument("--fixture-edit", type=Path,
+                        help="with --fixture: a JSON single-site edit of the pinned sources that SOURCE's directory holds")
     parser.add_argument("--solc", type=Path, required=True, help="preinstalled solc " + SOLC_VERSION)
     parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
@@ -359,9 +389,11 @@ def parse_args(argv=None):
         if args.fixture not in pins:
             parser.error("unknown pinned fixture: " + args.fixture)
         args.contract = pins[args.fixture]["contract"]
+    if args.fixture_edit is not None and args.fixture is None:
+        parser.error("--fixture-edit needs --fixture")
     if not math.isfinite(args.timeout) or not .001 <= args.timeout <= 3600 or not 1024 <= args.output_limit <= 64 * 1024**2:
         parser.error("invalid export resource limits")
-    for key in ("source", "output", "contract", "solc", "upstream", "target_dir", "root", "hull_output"):
+    for key in ("source", "output", "contract", "solc", "upstream", "target_dir", "root", "hull_output", "fixture_edit"):
         value = getattr(args, key)
         if isinstance(value, Path):
             setattr(args, key, value.resolve())

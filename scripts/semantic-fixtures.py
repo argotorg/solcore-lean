@@ -14,7 +14,11 @@ every tag, dynamic offset and `bytes` length of such a call gets all of its
 boundary Words. Sequence mutants then carry one change forward: a committed
 single-change mutant or directive, a dropped, duplicated or swapped step, run
 from a fresh deployment with the recorded steps after it, which are compared
-across the paths only, each path until a step it did not complete.
+across the paths only, each path until a step it did not complete. Source
+mutants change the program instead: one site that the pinned parser locates, a
+literal, an operator or a condition, is changed in a copy of the fixture's
+sources, compiled on every path the fixture admits, and the recorded steps are
+compared across the paths only.
 
 No original Core reference exists for these programs. Agreement here is
 agreement among compiled paths and with upstream's recorded expectations; it is
@@ -66,6 +70,7 @@ scenario = load("fixtures_scenario", "rust-scenario-parity.py")
 methods = load("fixtures_methods", "rust-method-parity.py")
 exporter = load("fixtures_yul", "export-rust-yul.py")
 declarations = load("fixtures_declarations", "export-rust-declarations.py")
+sites = load("fixtures_sites", "export-rust-sites.py")
 static = methods.static
 hull = scenario.hull
 
@@ -103,6 +108,9 @@ DERIVED_MUTANTS = 256
 SEQUENCE_MUTANTS = 64
 SEQUENCE_COUNTS = ("mutants", "unrun", "steps", "agree", "disagree", "incomplete", "unobserved", "budget", "stopped",
                    "changed", "prefixSteps")
+SOURCE_MUTANTS = 8
+SOURCE_COUNTS = ("mutants", "unrun", "rejected", "excluded", "steps", "agree", "disagree", "incomplete", "unobserved",
+                 "budget", "stopped", "changed", "reached")
 REDUCTION_RUNS = 48
 REDUCTION_SECONDS = 900
 MAX_ARRAY_ELEMENTS = 4096
@@ -115,11 +123,23 @@ CRASH = re.compile(r"panicked at|internal compiler error|process terminated by s
 REFUSAL = re.compile(r"Yul profile requires|solc AST|unexpected solc contract output inventory|"
                      r"unsupported solc link references|missing runtime bytes|export EVM code size limit")
 EXPORTERS = ("export-rust-hull.py", "export-rust-code-image.py", "export-rust-yul.py", "export-rust-directives.py",
-             "build-rust-directive-resolver.py", "export-rust-declarations.py", "rust-hull-export.rs",
-             "rust-code-image-export.rs", "rust-directive-export.rs", "rust-directive-resolve.rs",
-             "rust-declaration-export.rs")
+             "build-rust-directive-resolver.py", "export-rust-declarations.py", "export-rust-sites.py",
+             "rust-hull-export.rs", "rust-code-image-export.rs", "rust-directive-export.rs", "rust-directive-resolve.rs",
+             "rust-declaration-export.rs", "rust-site-export.rs")
 BINARIES = ("debug/solcore-driver", "debug/solcore-code-image-export", "debug/solcore-directive-export",
-            "debug/solcore-directive-resolve", "debug/solcore-declaration-export")
+            "debug/solcore-directive-resolve", "debug/solcore-declaration-export", "debug/solcore-site-export")
+# Source mutants: each operator's replacements of one site's text, in order.
+ARITHMETIC = {"+": ("-",), "-": ("+",), "*": ("/",), "/": ("*", "%"), "%": ("/",)}
+BITWISE = {"&": ("|", "^"), "|": ("&", "^"), "^": ("&", "|")}
+COMPARISONS = {"<": ("<=", ">"), "<=": ("<", ">="), ">": (">=", "<"), ">=": (">", "<="), "==": ("!=",), "!=": ("==",)}
+LOGICAL = {"&&": ("||",), "||": ("&&",)}
+OPERATORS = {**ARITHMETIC, **BITWISE, **COMPARISONS, **LOGICAL}
+YUL_BUILTINS = {"add": ("sub",), "sub": ("add",), "mul": ("div",), "div": ("mul", "mod"), "mod": ("div",),
+                "sdiv": ("smod",), "smod": ("sdiv",), "lt": ("gt",), "gt": ("lt",), "slt": ("sgt",), "sgt": ("slt",),
+                "and": ("or", "xor"), "or": ("and", "xor"), "xor": ("and", "or"), "shl": ("shr",), "shr": ("shl", "sar"),
+                "sar": ("shr",), "eq": ("lt", "gt")}
+FAMILIES = {"literal": "literal", "binary": "operator", "assign": "operator", "unary": "operator", "condition": "condition",
+            "yul-literal": "yul", "yul-call": "yul", "yul-condition": "yul"}
 
 
 def stopped(deadline: float | None) -> bool:
@@ -827,6 +847,7 @@ class Exports:
         self.directory = (args.work / fixture["id"]).resolve()
         self.identity = export_identity(identity)
         self.records: dict[str, dict] = {}
+        self.edit = None
 
     def receipt_valid(self) -> bool:
         receipt = self.directory / "exports.json"
@@ -845,7 +866,7 @@ class Exports:
         hull_path = self.directory / "hull-O0.json"
         return hull.source_hashes(json.loads(hull_path.read_text())) | main if hull_path.exists() else main
 
-    def prepare(self, directive_build: dict, declaration_build: dict | None = None) -> dict:
+    def prepare(self, directive_build: dict, declaration_build: dict | None = None, site_build: dict | None = None) -> dict:
         """Export everything once; an export failure excludes only the paths needing it."""
         reuse = self.receipt_valid()
         if not reuse and self.directory.exists():
@@ -860,6 +881,7 @@ class Exports:
             raise Excluded("directives", "unsupported-directive", str(error))
         # The declarations only classify words, so a failure on a source the directives parsed is a harness error.
         result["declarations"] = None if declaration_build is None else self.declarations(declaration_build, reuse)
+        result["sites"] = None if site_build is None else self.sites(site_build, reuse)
         for path, level in LEVELS.items():
             try:
                 result[level] = self.level(level, reuse)
@@ -906,6 +928,28 @@ class Exports:
                 "declaration extraction failed: " + (outcome["resource"] or (outcome["stderr"] + outcome["stdout"])[-2000:]))
         return json.loads(path.read_text())
 
+    def sites(self, build: dict, reuse: bool) -> dict[str, dict]:
+        """The pinned parser's mutation sites of each source file in the fixture's directory, by file name."""
+        result = {}
+        for source in sorted(self.source.parent.glob("*.sol")):
+            path = self.directory / "sites" / (source.name + ".json")
+            record = path.with_suffix(".json.provenance.json")
+            if reuse and path.exists() and record.exists():
+                provenance = json.loads(record.read_text())
+                if provenance.get("schema") == sites.SCHEMA and provenance.get("toolBuild") == build and \
+                        provenance.get("source") == source.as_uri() and \
+                        provenance.get("sourceSha256") == common.file_digest(source) and \
+                        provenance.get("outputSha256") == common.file_digest(path):
+                    result[source.name] = json.loads(path.read_text())
+                    continue
+            outcome = run_process([sys.executable, str(ROOT / "scripts/export-rust-sites.py"), str(source), "--output",
+                                   str(path), "--upstream", str(self.args.upstream), "--target-dir", str(self.args.target_dir)],
+                                  self.args.timeout)
+            require(not outcome["returncode"] and not outcome["resource"],
+                    "site extraction failed: " + (outcome["resource"] or (outcome["stderr"] + outcome["stdout"])[-2000:]))
+            result[source.name] = json.loads(path.read_text())
+        return result
+
     def level(self, level: str, reuse: bool) -> dict:
         hull_path, image_path = self.directory / f"hull-{level}.json", self.directory / f"images-{level}.json"
         if not (reuse and hull_path.exists() and image_path.exists()):
@@ -934,8 +978,9 @@ class Exports:
             if directory.exists():
                 shutil.rmtree(directory)
             directory.mkdir()
+            edit = [] if self.edit is None else ["--fixture-edit", str(self.directory / "edit.json")]
             outcome = run_process([sys.executable, str(ROOT / "scripts/export-rust-yul.py"), str(self.source),
-                "--fixture", self.fixture["id"], "--solc", str(self.args.solc), "--output", str(artifact),
+                "--fixture", self.fixture["id"], *edit, "--solc", str(self.args.solc), "--output", str(artifact),
                 "--upstream", str(self.args.upstream), "--target-dir", str(self.args.target_dir),
                 "--timeout", str(self.args.timeout)], self.args.timeout * 3)
             if outcome["returncode"] or outcome["resource"]:
@@ -943,9 +988,10 @@ class Exports:
         document = common.read_json(artifact, OUTPUT_LIMIT)
         exporter.validate_artifact(document, self.fixture["contract"], fixture=self.fixture["id"])
         record = common.read_json(artifact.with_suffix(".json.provenance.json"), OUTPUT_LIMIT)
-        require(record.get("outputSha256") == common.file_digest(artifact) and
-                record.get("fixture") == {"id": self.fixture["id"], "source": self.fixture["source"],
-                                          "sha256": self.fixture["sha256"]} and
+        pin = {"id": self.fixture["id"], "source": self.fixture["source"], "sha256": self.fixture["sha256"]}
+        if self.edit is not None:
+            pin["edit"] = {**self.edit, "editedSha256": common.file_digest(self.source.parent / self.edit["file"])}
+        require(record.get("outputSha256") == common.file_digest(artifact) and record.get("fixture") == pin and
                 record.get("exporterSha256") == common.file_digest(ROOT / "scripts/export-rust-yul.py"),
                 "Yul export provenance differs from its artifact, fixture or exporter")
         o0 = self.directory / "hull-O0.json"
@@ -962,6 +1008,37 @@ class Exports:
                                        self.args.timeout)
             path.write_text(json.dumps(abis, indent=2) + "\n")
         return json.loads(path.read_text())
+
+
+class MutantExports(Exports):
+    """A source mutant's compilation from a fresh copy of the fixture's directory with one edit: O0 and O2 code
+    images with their checked Hull, and Yul through the exporter's checked fixture edit."""
+
+    def __init__(self, args, fixture: dict, directory: Path, candidate: dict):
+        # A mutant compiles afresh each time, so it keeps no reuse receipt or identity.
+        self.args, self.fixture, self.identity, self.records = args, fixture, None, {}
+        self.directory = directory
+        self.source = directory / "src" / Path(fixture["source"]).name
+        self.edit = source_edit(candidate)
+
+    def compile(self, paths: list[str]) -> tuple[dict, dict, list]:
+        """What `paths` need, each export's status and seconds, and the failures; a checked source that does not
+        compile raises, since it stops every path."""
+        prepared, statuses, failures = {}, {}, []
+        needed = [level for path, level in LEVELS.items() if path in paths or (level == "O0" and "hull" in paths)]
+        for name in [*needed, *(["yul"] if "yul" in paths else [])]:
+            started = time.monotonic()
+            try:
+                prepared[name] = self.yul(False) if name == "yul" else self.level(name, False)
+                status = "compiled"
+            except Excluded as error:
+                if error.stage == "rust-checked-source":
+                    raise
+                error.paths = ("yul",) if name == "yul" else (("hull", "sonatina-o0") if name == "O0" else ("sonatina-o2",))
+                failures.append(error)
+                status = error.reason
+            statuses[name] = {"status": status, "seconds": round(time.monotonic() - started, 3)}
+        return prepared, statuses, failures
 
 
 # Steps, Hull and EVM execution.
@@ -1159,6 +1236,19 @@ def run_hull_sequence(args, fixture: dict, exports: dict, chain: dict, deploy: d
     if stopped(deadline):
         return unrun(1 + len(entries))
     return hull_invocation(args, fixture, exports, chain, deploy, entries, args.hull_timeout, deadline)[0]
+
+
+def run_hull_program(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict],
+                     deadline: float | None = None) -> list[dict]:
+    """A source mutant's recorded steps on Lean Core in one invocation within --hull-entry-timeout; after a limit
+    there they run again as recorded steps do, each method entry in its own invocation and a raw scenario resumed."""
+    if stopped(deadline):
+        return unrun(1 + len(entries))
+    observed, resource, _ = hull_invocation(args, fixture, exports, chain, deploy, entries, args.hull_entry_timeout,
+                                            deadline)
+    if resource is None or resource == "budget":
+        return observed
+    return run_hull(args, fixture, exports, chain, deploy, entries, deadline)
 
 
 class Chain:
@@ -1590,6 +1680,80 @@ def descriptor(item: dict) -> dict:
     return {"step": item["step"], "persist": item["persist"], **({"mutant": item["mutant"]} if "mutant" in item else {})}
 
 
+# Source mutants: one site of a fixture's program changed, the recorded steps compared across the paths only.
+
+def literal_values(value: int) -> list[int]:
+    """A number literal's boundary values and small perturbations, below 2^256 and never the value itself."""
+    result = []
+    for item in (0, 1, value + 1, value - 1, U256 - 1, 2 * value):
+        if 0 <= item < U256 and item != value and item not in result:
+            result.append(item)
+    return result
+
+
+def literal_text(text: str, value: int) -> str:
+    """A replacement written in the literal's base; a hex literal keeps its digit count when the value fits."""
+    if not text.lower().startswith("0x"):
+        return str(value)
+    digits = len(text) - 2
+    return "0x" + (f"{value:0{digits}x}" if value < 16**digits else f"{value:x}")
+
+
+def replacements(site: dict) -> list[tuple[str, str]]:
+    """Each operator's replacement of one site's text, in order, as (operator, replacement)."""
+    kind, text = site["kind"], site["text"]
+    if kind in ("literal", "yul-literal") and site["literal"] in ("number", "hex"):
+        value = int(text.replace("_", ""), 16 if text.lower().startswith("0x") else 10)
+        return [("literal", literal_text(text, item)) for item in literal_values(value)]
+    if kind in ("literal", "yul-literal") and site["literal"] == "string":
+        return [] if text == '""' else [("empty-string", '""')]
+    if kind == "yul-literal" and site["literal"] == "bool":
+        return [("bool", "false" if text == "true" else "true")]
+    if kind == "binary":
+        return [("operator", item) for item in OPERATORS.get(text, ())]
+    if kind == "assign":
+        return [("operator", item + "=") for item in OPERATORS.get(text[:-1], ())]
+    if kind == "unary":
+        return [("drop-unary", "")]
+    if kind == "condition":
+        return [("negate", "!(" + text + ")")]
+    if kind == "yul-call":
+        return [("builtin", item) for item in YUL_BUILTINS.get(text, ())]
+    if kind == "yul-condition":
+        return [("negate", "iszero(" + text + ")")]
+    return []
+
+
+def source_candidates(documents: dict[str, dict]) -> list[dict]:
+    """Every source mutant of a fixture, ordered by file name, span and operator, and numbered p1, p2, …"""
+    result = []
+    for name in sorted(documents):
+        for site in sorted(documents[name]["sites"], key=lambda site: (site["span"][0], site["span"][1])):
+            for operator, replacement in replacements(site):
+                result.append({"id": f"p{len(result) + 1}", "file": name, "span": site["span"], "kind": site["kind"],
+                               "family": FAMILIES[site["kind"]], "operator": operator, "text": site["text"],
+                               "replacement": replacement, "owner": site.get("owner")})
+    return result
+
+
+def source_edit(candidate: dict) -> dict:
+    return {"file": candidate["file"], "start": candidate["span"][0], "end": candidate["span"][1],
+            "replacement": candidate["replacement"]}
+
+
+def write_mutant(source_directory: Path, directory: Path, candidate: dict) -> Path:
+    """A fresh copy of a fixture's directory with one edit; the edited file must hold the site's text."""
+    if directory.exists():
+        shutil.rmtree(directory)
+    shutil.copytree(source_directory, directory / "src")
+    target = directory / "src" / candidate["file"]
+    data, (start, end) = target.read_bytes(), candidate["span"]
+    require(data[start:end].decode() == candidate["text"], "source mutant site differs from its extracted text")
+    target.write_bytes(data[:start] + candidate["replacement"].encode() + data[end:])
+    (directory / "edit.json").write_text(json.dumps(source_edit(candidate)))
+    return directory / "src"
+
+
 class FixtureRun:
     """One fixture: exports, the recorded steps and mutants on every admitted path."""
 
@@ -1644,7 +1808,8 @@ class FixtureRun:
         require(source.is_relative_to(self.args.upstream) and common.file_digest(source) == self.fixture["sha256"],
                 "fixture differs from its pin: " + self.fixture["id"])
         exports = Exports(self.args, self.fixture, self.identity)
-        prepared = exports.prepare(self.builds["directive"], self.builds.get("declaration"))
+        prepared = exports.prepare(self.builds["directive"], self.builds.get("declaration"),
+                                   self.builds.get("site") if self.args.mode == "mutation" else None)
         for error in prepared["excluded"]:
             self.exclude(error)
         excluded = {path for error in prepared["excluded"] for path in error.paths}
@@ -1656,7 +1821,7 @@ class FixtureRun:
             self.steps, self.chain = build_steps(self.fixture, prepared["directives"], prepared["abi"], self.args)
         except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
             raise Excluded("directive-resolution", "unsupported-directive", str(error))
-        self.prepared = prepared
+        self.prepared, self.sites = prepared, prepared.get("sites") or {}
         self.abi = prepared["abi"].get(self.fixture["contract"], [])
         self.derived = derived_methods(prepared["declarations"], self.fixture["contract"])
         if self.derived:
@@ -1683,6 +1848,7 @@ class FixtureRun:
             if self.args.mode == "mutation":
                 self.deploy_mutants()
                 self.sequence_mutants()
+                self.source_mutants()
             if not self.args.no_reduce:
                 self.reduce_findings()
         finally:
@@ -1734,17 +1900,21 @@ class FixtureRun:
             result.append({**step, "id": str(step["index"]), "step": step["index"]})
         return result
 
-    def observe(self, deploy: dict, entries: list[dict], sequence: bool = False) -> dict[str, list[dict]]:
+    def observe(self, deploy: dict, entries: list[dict], sequence: bool = False,
+                program: dict | None = None) -> dict[str, list[dict]]:
         """Run a deployment and its entries on every admitted path, the EVM paths before Hull, so that a time
         budget spent on Hull leaves them compared; a Hull memory-range failure is classified against the
-        EVM paths' observations of the same entry. A sequence mutant runs on Hull in one invocation."""
+        EVM paths' observations of the same entry. A sequence mutant runs on Hull in one invocation, and a
+        source mutant's `program` (its exports, bytecode and compiled paths) as `run_hull_program` does."""
+        prepared, bytecode, paths = (self.prepared, self.bytecode, self.admitted) if program is None else \
+            (program["prepared"], program["bytecode"], program["paths"])
+        runner = run_hull_program if program is not None else run_hull_sequence if sequence else run_hull
         observed = {}
-        for path in sorted(self.admitted, key=lambda path: path == "hull"):
+        for path in sorted(paths, key=lambda path: path == "hull"):
             if path == "hull":
-                observed[path] = (run_hull_sequence if sequence else run_hull)(
-                    self.args, self.fixture, self.prepared, self.chain, deploy, entries, self.deadline)
+                observed[path] = runner(self.args, self.fixture, prepared, self.chain, deploy, entries, self.deadline)
             else:
-                init, runtime = self.bytecode[path]
+                init, runtime = bytecode[path]
                 observed[path] = run_evm(self.evm, path, init, runtime, deploy, entries, self.deadline)
         for number in range(1 + len(entries)):
             classified = memory_range({path: rows[number] for path, rows in observed.items()})
@@ -1892,6 +2062,124 @@ class FixtureRun:
             row["stop"] = stop
         return row
 
+    def source_mutants(self) -> None:
+        """The fixture's source mutants, at most --source-mutants and the run's share of --run-source-mutants: the
+        families (literal, operator, condition, inline Yul) take turns in a seeded order, each drawing one
+        candidate, and the kept ones run in number order."""
+        share = getattr(self.args, "source_share", None)
+        limit = self.args.source_mutants if share is None else min(self.args.source_mutants, share)
+        if not limit or not getattr(self, "sites", None):
+            return
+        started = time.monotonic()
+        # Mutant exports of an earlier run never outlive it, even when the fixture's own exports are reused.
+        shutil.rmtree((self.args.work / self.fixture["id"] / "sources").resolve(), ignore_errors=True)
+        candidates, families = source_candidates(self.sites), {}
+        for candidate in candidates:
+            families.setdefault(candidate["family"], []).append(candidate)
+        kept = sorted(sample(families, Stream(derive(self.args.seed, self.fixture["id"], "source")), limit),
+                      key=lambda candidate: int(candidate["id"][1:]))
+        self.programs, tallies, rows = {}, dict.fromkeys(SOURCE_COUNTS, 0), []
+        for candidate in kept:
+            rows.append(self.source(candidate, tallies))
+        self.record["sourceMutants"] = {
+            "limit": limit, "sites": sum(len(document["sites"]) for document in self.sites.values()),
+            "unsafe": sum(len(document["unsafe"]) for document in self.sites.values()), "candidates": len(candidates),
+            "kept": len(kept), "families": {name: len(items) for name, items in sorted(families.items())},
+            "seconds": round(time.monotonic() - started, 3)}
+        self.record["sources"] = rows
+        self.record["counts"]["source"] = tallies
+
+    def source(self, candidate: dict, tallies: dict) -> dict:
+        """One source mutant: compiled from a fresh copy of the fixture's directory on the paths the fixture admits,
+        its recorded steps run with their recorded persistence and compared across the paths that compiled, each
+        path until a step it did not complete, and nothing after the first disagreement."""
+        row = {key: candidate[key] for key in ("id", "file", "span", "kind", "family", "operator", "text", "replacement")}
+        if stopped(self.deadline):
+            tallies["unrun"] += 1
+            for key in ("steps", "budget"):
+                tallies[key] += len(self.steps)
+            return {**row, "status": "budget"}
+        directory = (self.args.work / self.fixture["id"] / "sources" / candidate["id"]).resolve()
+        write_mutant((self.args.upstream / self.fixture["source"]).resolve().parent, directory, candidate)
+        base = {"fixture": self.fixture["id"], "source": candidate["id"], "edit": source_edit(candidate)}
+        before, keep = len(self.record["findings"]), False
+        try:
+            try:
+                prepared, statuses, failures = MutantExports(self.args, self.fixture, directory, candidate).compile(self.admitted)
+            except Excluded as error:
+                # The frontend refused the mutant, which excludes it, or crashed on it, which is a finding.
+                tallies["rejected"] += 1
+                if error.reason == "compiler-crash":
+                    self.record["findings"].append({**base, "entry": candidate["id"], "category": "compiler-crash",
+                                                    "paths": list(self.admitted), "stage": error.stage, "detail": error.detail})
+                return {**row, "status": "rejected",
+                        "rejection": {"stage": error.stage, "reason": error.reason, "detail": error.detail[-2000:]}}
+            row["compile"] = statuses
+            compiled = [path for path in self.admitted if not any(path in error.paths for error in failures)]
+            for error in failures:
+                if error.reason == "compiler-crash":
+                    self.record["findings"].append({**base, "entry": candidate["id"], "category": "compiler-crash",
+                                                    "paths": list(error.paths), "stage": error.stage, "detail": error.detail})
+                elif error.reason != "resource" and compiled:
+                    # A path that the fixture admits refuses what the frontend accepted and another path compiled.
+                    self.record["findings"].append({**base, "entry": candidate["id"], "category": "compile-mismatch",
+                                                    "paths": list(error.paths), "compiled": compiled, "stage": error.stage,
+                                                    "reason": error.reason, "detail": error.detail})
+            if not compiled:
+                tallies["excluded"] += 1
+                return {**row, "status": "excluded"}
+            bytecode = {path: (common.image_bytes(prepared[level]["document"], [self.fixture["contract"] + "Deploy"]),
+                               common.image_bytes(prepared[level]["document"],
+                                                  [self.fixture["contract"] + "Deploy", self.fixture["contract"]]))
+                        for path, level in LEVELS.items() if path in compiled}
+            if "yul" in compiled:
+                bytecode["yul"] = (prepared["yul"]["init"], prepared["yul"]["runtime"])
+            program = {"prepared": prepared, "bytecode": bytecode, "paths": compiled}
+            row.update(paths=compiled, **self.compare_program(candidate, program, base, tallies))
+            keep = len(self.record["findings"]) > before
+            if keep:
+                self.programs[candidate["id"]] = program
+            return row
+        finally:
+            # A mutant with a finding keeps its exports for the reduction and as evidence.
+            if not keep and len(self.record["findings"]) == before:
+                shutil.rmtree(directory, ignore_errors=True)
+
+    def compare_program(self, candidate: dict, program: dict, base: dict, tallies: dict) -> dict:
+        """A compiled source mutant's recorded steps across its compiled paths, from the deployment on."""
+        deploy = {**self.steps[0], "id": "0", "step": 0}
+        entries = [{**step, "id": str(step["index"]), "step": step["index"]} for step in self.steps[1:]]
+        observed = self.observe(self.steps[0], entries, program=program)
+        tallies["mutants"] += 1
+        compared, stop, changed = [], None, 0
+        for position, observations, live in walk(program["paths"], observed, len(entries)):
+            entry = ([deploy] + entries)[position]
+            self.tally(observations)
+            if stop is not None:
+                tallies["stopped"] += 1
+                continue
+            result = sequence_agreement(observations, live, position == 0)
+            tallies["steps"] += 1
+            tallies[result["status"]] += 1
+            line = {"position": position, "step": entry["step"], "agreement": result}
+            if result["status"] == "agree":
+                seen, reference = comparable(observations[program["paths"][0]], position == 0), self.reference.get(entry["id"])
+                line["same"] = None if reference is None else seen == reference
+                changed += line["same"] is False
+                if not line["same"]:
+                    line["observation"] = seen
+            else:
+                line["observations"] = observations
+            compared.append(line)
+            where = {**base, "entry": f"{candidate['id']}@{position}", "step": entry["step"], "label": entry["label"],
+                     "position": position}
+            self.record["findings"] += sequence_findings(where, observations, live, result, position == 0)
+            if result["status"] == "disagree":
+                stop = position
+        tallies["changed"] += changed
+        tallies["reached"] += changed > 0
+        return {"status": "compared", "rows": compared, "changed": changed, **({"stop": stop} if stop is not None else {})}
+
     def reduce_findings(self) -> None:
         """Reduce each distinct finding within the run's deadline, not the fixture's own."""
         reduced: dict[str, str] = {}
@@ -1915,6 +2203,8 @@ class FixtureRun:
 
     def reduce(self, finding: dict) -> dict:
         """Fewer directives first, then the mutated input back toward the recorded one."""
+        if "source" in finding:
+            return self.reduce_source(finding)
         if "sequence" in finding:
             if finding["position"] >= finding["change"]:
                 return self.reduce_sequence(finding)
@@ -2053,16 +2343,59 @@ class FixtureRun:
                 "sequence": [descriptor(item) for item in [deploy] + sequence], "position": len(sequence),
                 "mutant": mutant}
 
+    def reduce_source(self, finding: dict) -> dict:
+        """A step finding of a source mutant toward the shortest prefix on the same mutated program: of the recorded
+        steps before the finding's, only the persisting ones stay and each is dropped, last first, while it
+        recurs. The single site is already minimal."""
+        started, runs = time.monotonic(), 0
+        program, position = self.programs[finding["source"]], finding["position"]
+        target = [{**self.steps[position], "id": str(position), "step": position}] if position else []
+
+        def holds(prefix: list[dict]) -> bool:
+            nonlocal runs
+            runs += 1
+            observed, until = self.observe(self.steps[0], prefix + target, program=program), len(prefix) + len(target)
+            for at, observations, live in walk(program["paths"], observed, until):
+                result = sequence_agreement(observations, live, at == 0)
+                if at == until:
+                    return any(item["category"] == finding["category"] and item["signature"] == finding["signature"]
+                               for item in sequence_findings({}, observations, live, result, at == 0))
+                if result["status"] == "disagree":
+                    return False
+            return False
+
+        def spent() -> bool:
+            return runs >= self.args.reduction_runs or time.monotonic() - started >= self.args.reduction_seconds or \
+                stopped(self.run_deadline)
+
+        prefix = [{**step, "id": str(step["index"]), "step": step["index"]} for step in self.steps[1:position]]
+        if not holds(prefix):
+            return {"status": "stopped" if stopped(self.run_deadline) else "not-reproduced", "runs": runs}
+        # Steps that do not persist leave no state, so they go first, together; then each persisting one.
+        rolled = [item for item in prefix if not item["persist"]]
+        if rolled and not spent() and holds([item for item in prefix if item["persist"]]):
+            prefix = [item for item in prefix if item["persist"]]
+        for item in reversed([item for item in prefix if item["persist"]]):
+            if spent():
+                break
+            trial = [other for other in prefix if other is not item]
+            if holds(trial):
+                prefix = trial
+        return {"status": "stopped" if stopped(self.run_deadline) else "budget-exhausted" if spent() else "reduced",
+                "runs": runs, "seconds": round(time.monotonic() - started, 3), "steps": [item["step"] for item in prefix],
+                "edit": finding["edit"]}
+
 
 def check_tools(args) -> dict:
     """The pinned compiler checkout, tool receipts and binaries this run requires."""
     driver, image, directive = scenario.identities(args.upstream, args.target_dir)
     resolver = methods.resolver.checked_identity(args.upstream, args.target_dir)
     declaration = declarations.checked_identity(args.upstream, args.target_dir)
+    site = sites.checked_identity(args.upstream, args.target_dir)
     version = subprocess.run([str(args.solc), "--version"], capture_output=True, text=True, timeout=30).stdout
     exporter.validate_version(version)
     return {"driver": driver, "image": image, "directive": directive, "resolver": resolver, "declaration": declaration,
-            "solcVersion": version.strip()}
+            "site": site, "solcVersion": version.strip()}
 
 
 def summarize(records: list[dict]) -> dict:
@@ -2073,11 +2406,17 @@ def summarize(records: list[dict]) -> dict:
     totals["sequence"] = dict.fromkeys(SEQUENCE_COUNTS, 0)
     totals["sequenceMutants"] = dict.fromkeys(("structural", "candidates", "kept", "redundant", "unobserved", "incomplete",
                                                "seconds"), 0)
+    totals["source"] = dict.fromkeys(SOURCE_COUNTS, 0)
+    totals["sourceMutants"] = dict.fromkeys(("sites", "unsafe", "candidates", "kept", "seconds"), 0)
     for record in records:
         for key, value in ((record.get("counts") or {}).get("sequence") or {}).items():
             totals["sequence"][key] += value
         for key in totals["sequenceMutants"]:
             totals["sequenceMutants"][key] += (record.get("sequenceMutants") or {}).get(key, 0)
+        for key, value in ((record.get("counts") or {}).get("source") or {}).items():
+            totals["source"][key] += value
+        for key in totals["sourceMutants"]:
+            totals["sourceMutants"][key] += (record.get("sourceMutants") or {}).get(key, 0)
         if record.get("unexecuted"):
             totals["unexecuted"] += 1
         elif record.get("stop"):
@@ -2114,6 +2453,10 @@ def main(argv=None) -> int:
                         help="at most this many sequence mutants per fixture, a seeded sample of the non-redundant ones; 0 runs none")
     parser.add_argument("--run-sequence-mutants", type=int,
                         help="at most this many sequence mutants per run, split evenly over its fixtures with a recorded call")
+    parser.add_argument("--source-mutants", type=int, default=SOURCE_MUTANTS,
+                        help="at most this many source mutants per fixture, a seeded sample by family; 0 runs none")
+    parser.add_argument("--run-source-mutants", type=int,
+                        help="at most this many source mutants per run, split evenly over its fixtures with a recorded call")
     parser.add_argument("--fixture", action="append", default=[], help="fixture id glob; repeatable")
     parser.add_argument("--fixture-mutants", type=int, help="at most this many mutants per fixture, a seeded sample of those drawn")
     parser.add_argument("--fixture-seconds", type=float, help="wall time per fixture; entries reached later are not run")
@@ -2144,7 +2487,7 @@ def main(argv=None) -> int:
     if args.mode == "fixed" and args.seed is not None:
         parser.error("--seed applies only to a mutation run")
     if not 1 <= args.mutants <= 64 or not 0 <= args.derived_mutants <= 4096 or not 0 <= args.sequence_mutants <= 4096 or \
-            not 1 <= args.jobs <= 16 or \
+            not 0 <= args.source_mutants <= 4096 or not 1 <= args.jobs <= 16 or \
             args.reduction_runs < 1 or \
             min(args.timeout, args.hull_timeout, args.hull_entry_timeout, args.reduction_seconds) <= 0:
         parser.error("invalid mutation, job, time or reduction bounds")
@@ -2152,6 +2495,8 @@ def main(argv=None) -> int:
         parser.error("--fixture-mutants needs a mutation run and a positive budget")
     if args.run_sequence_mutants is not None and (args.mode != "mutation" or args.run_sequence_mutants < 1):
         parser.error("--run-sequence-mutants needs a mutation run and a positive budget")
+    if args.run_source_mutants is not None and (args.mode != "mutation" or args.run_source_mutants < 1):
+        parser.error("--run-source-mutants needs a mutation run and a positive budget")
     if any(value is not None and value <= 0 for value in (args.fixture_seconds, args.seconds)):
         parser.error("time budgets must be positive")
     if args.output is None and not (args.list or args.check):
@@ -2165,6 +2510,8 @@ def main(argv=None) -> int:
     # The run's sequence mutants are shared evenly by its fixtures that record a call.
     args.sequence_share = None if args.run_sequence_mutants is None else \
         max(1, args.run_sequence_mutants // max(1, sum(1 for item in fixtures if item["calls"])))
+    args.source_share = None if args.run_source_mutants is None else \
+        max(1, args.run_source_mutants // max(1, sum(1 for item in fixtures if item["calls"])))
     if args.list:
         for item in fixtures:
             print(item["id"], item["mode"], item["contract"], item["calls"])
@@ -2190,6 +2537,8 @@ def main(argv=None) -> int:
               "derivedMutants": args.derived_mutants if args.mode == "mutation" else 0,
               "sequenceMutants": args.sequence_mutants if args.mode == "mutation" else 0,
               "runSequenceMutants": args.run_sequence_mutants, "sequenceShare": args.sequence_share,
+              "sourceMutants": args.source_mutants if args.mode == "mutation" else 0,
+              "runSourceMutants": args.run_source_mutants, "sourceShare": args.source_share,
               "bounds": {"exportSeconds": args.timeout, "hullSeconds": args.hull_timeout,
                          "hullEntrySeconds": args.hull_entry_timeout, "reductionRuns": args.reduction_runs,
                          "reductionSeconds": args.reduction_seconds, "fixtureMutants": args.fixture_mutants,
@@ -2204,16 +2553,18 @@ def main(argv=None) -> int:
         with lock:
             (args.output / "fixtures" / (fixture["id"] + ".json")).write_text(json.dumps(record, indent=1) + "\n")
             counts = record.get("counts", {})
-            sequence = counts.get("sequence") or {}
+            sequence, sources = counts.get("sequence") or {}, counts.get("source") or {}
             print(f"{fixture['id']}: admitted {','.join(record['admitted']) or '-'}; agree {counts.get('agree', 0)}, "
                   f"disagree {counts.get('disagree', 0)}, incomplete {counts.get('incomplete', 0)}; "
                   f"sequences {sequence.get('mutants', 0)} ({sequence.get('agree', 0)} of {sequence.get('steps', 0)} steps agree); "
+                  f"sources {sources.get('mutants', 0)} ({sources.get('agree', 0)} of {sources.get('steps', 0)} steps agree, "
+                  f"{sources.get('rejected', 0)} rejected); "
                   f"findings {len(record['findings'])}; {record.get('seconds', 0)} s"
                   + (f"; stopped by the {record['stop']}" if record.get("stop") else ""), flush=True)
         return {key: record.get(key) for key in ("id", "mode", "contract", "admitted", "exclusions", "findings", "counts",
                                                  "expectations", "statuses", "errors", "seconds", "exportSeconds",
-                                                 "exportsReused", "mutantBudget", "derivedMutants", "sequenceMutants", "stop",
-                                                 "unexecuted")}
+                                                 "exportsReused", "mutantBudget", "derivedMutants", "sequenceMutants",
+                                                 "sourceMutants", "stop", "unexecuted")}
 
     # A stop signal ends the run at the next entry and still writes the report.
     STOP.clear()
@@ -2236,7 +2587,9 @@ def main(argv=None) -> int:
     totals = report["totals"]
     print(f"{totals['fixtures']} fixtures; admitted {totals['admitted']}; {totals['agree']} agree, "
           f"{totals['disagree']} disagree, {totals['incomplete']} incomplete; sequences {totals['sequence']['mutants']}, "
-          f"{totals['sequence']['agree']} of {totals['sequence']['steps']} steps agree; findings {totals['findings']}; "
+          f"{totals['sequence']['agree']} of {totals['sequence']['steps']} steps agree; sources {totals['source']['mutants']}, "
+          f"{totals['source']['agree']} of {totals['source']['steps']} steps agree, {totals['source']['rejected']} rejected; "
+          f"findings {totals['findings']}; "
           f"harness errors {len(report['errors'])}; budget-stopped {totals['budgetStopped']}, "
           f"unexecuted {totals['unexecuted']}; tools unchanged: {report['toolsUnchanged']}")
     if STOP.is_set():

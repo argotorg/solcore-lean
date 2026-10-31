@@ -430,6 +430,37 @@ class FixtureAdmissionTests(unittest.TestCase):
                 exporter.export(args)
             prepare.assert_not_called()
 
+    def test_a_fixture_edit_admits_a_copy_that_differs_from_the_pin_by_exactly_that_edit(self):
+        pin = exporter.fixture_pins()['00answer']
+        pinned = (ROOT / '.upstream/solcore-rs-20261023' / pin['source']).resolve()
+        if not pinned.is_file():
+            self.skipTest('the pinned upstream checkout is not present')
+        original = pinned.read_bytes()
+        index = original.index(b'42') if b'42' in original else original.index(b'(')
+        width = 2 if b'42' in original else 1
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / pinned.name
+            edit = Path(directory) / 'edit.json'
+            edit.write_text(json.dumps({'file': pinned.name, 'start': index, 'end': index + width, 'replacement': '7'}))
+            source.write_bytes(original[:index] + b'7' + original[index + width:])
+            base = [str(source), '--output', str(Path(directory) / 'out.json'), '--solc', '/policy/solc', '--fixture', '00answer']
+            admitted = exporter.fixture_edit(edit, source, pinned, pin)
+            self.assertEqual((admitted['replacement'], admitted['editedSha256']), ('7', exporter.common.file_digest(source)))
+            # A copy that differs in any other byte, or an edit that changes nothing, is refused before compiling.
+            for contents, replacement in ((original[:index] + b'8' + original[index + width:], '7'), (original, original[index:index + width].decode())):
+                source.write_bytes(contents)
+                edit.write_text(json.dumps({'file': pinned.name, 'start': index, 'end': index + width, 'replacement': replacement}))
+                args = exporter.parse_args(base + ['--fixture-edit', str(edit)])
+                with patch.object(exporter, 'checked_build') as prepare, \
+                        self.assertRaisesRegex(ValueError, 'differs from its pin with the edit'):
+                    exporter.export(args)
+                prepare.assert_not_called()
+            edit.write_text(json.dumps({'file': '../main.sol', 'start': 0, 'end': 0, 'replacement': ''}))
+            with self.assertRaisesRegex(ValueError, 'names one source file'):
+                exporter.fixture_edit(edit, source, pinned, pin)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                exporter.parse_args(base[:-2] + ['--contract', CONTRACT, '--fixture-edit', str(edit)])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -773,7 +773,8 @@ class FakeFixtures:
         totals = {"fixtures": len(selected), "agree": 3 * len(selected), "disagree": 0, "incomplete": len(selected),
                   "unobserved": 1, "recorded": 2 * len(selected), "mutants": 2 * len(selected) + 1, "budgetStopped": 1,
                   "unexecuted": 0, "exclusions": {"rust-checked-source:compile-failure": 1},
-                  "sequence": {"mutants": 2, "steps": 7, "agree": 4, "disagree": 0, "incomplete": 1, "unobserved": 1, "budget": 1}}
+                  "sequence": {"mutants": 2, "steps": 7, "agree": 4, "disagree": 0, "incomplete": 1, "unobserved": 1, "budget": 1},
+                  "source": {"mutants": 1, "steps": 3, "agree": 2, "disagree": 0, "incomplete": 1, "unobserved": 0, "budget": 0}}
         fuzz.save(output / "report.json", {"schema": "solcore-lean.semantic-fixtures.v1", "coreReference": False,
                                            "stop": self.stop, "toolsUnchanged": True, "findings": findings, "errors": [],
                                            "totals": totals})
@@ -822,8 +823,9 @@ class FixtureRunTests(unittest.TestCase):
         config = {**fuzz.CONFIG_DEFAULTS, "base_seed": 10, "bin_dir": "/b", "cast": "/c/cast", "anvil": "/c/anvil"}
         argv = fuzz.fixtures_command(config, 2, Path("/out"))
         value = lambda name: argv[argv.index(name) + 1]
-        self.assertEqual([value(name) for name in ("--mode", "--seed", "--fixture-mutants", "--sequence-mutants", "--fixture-seconds",
-                                                   "--seconds", "--jobs")], ["mutation", "12", "32", "8", "300.0", "1800.0", "2"])
+        self.assertEqual([value(name) for name in ("--mode", "--seed", "--fixture-mutants", "--sequence-mutants", "--source-mutants",
+                                                   "--fixture-seconds", "--seconds", "--jobs")],
+                         ["mutation", "12", "32", "8", "2", "300.0", "1800.0", "2"])
         none = fuzz.fixtures_command({**config, "fixture_sequences": 0}, 2, Path("/out"))
         self.assertEqual(none[none.index("--sequence-mutants") + 1], "0")
         self.assertEqual([argv[index + 1] for index, item in enumerate(argv) if item == "--fixture"], fuzz.fixture_selection(config, 2))
@@ -839,10 +841,10 @@ class FixtureRunTests(unittest.TestCase):
         rows = fuzz.State(self.state).ledger()
         self.assertEqual([(row["iteration"], row["backend"], row["suiteStatus"], row["fixtures"]) for row in rows],
                          [(0, "fixtures", "failed", selections[0]), (1, "fixtures", "passed", selections[1])])
-        # A sequence mutant's compared steps count with the entries; a step its budget left unrun does not.
-        self.assertEqual(rows[0]["counts"], {"executed": 23, "matched": 16, "mismatched": 0, "errors": 0, "inconclusive": 7,
-                                             "sequences": 2, "fixtures": 4, "recorded": 8, "mutants": 9, "budgetStopped": 1,
-                                             "unexecuted": 0, "findings": 4, "exclusions": 1})
+        # Sequence and source mutants' compared steps count with the entries; a step a budget left unrun does not.
+        self.assertEqual(rows[0]["counts"], {"executed": 26, "matched": 18, "mismatched": 0, "errors": 0, "inconclusive": 8,
+                                             "sequences": 2, "sources": 1, "fixtures": 4, "recorded": 8, "mutants": 9,
+                                             "budgetStopped": 1, "unexecuted": 0, "findings": 4, "exclusions": 1})
         signatures = fuzz.State(self.state).registry()["signatures"]
         crashed, = [sid for sid, entry in signatures.items() if entry["category"] == "compiler-crash"]
         self.assertIn(crashed, fuzz.KNOWN)
@@ -863,7 +865,8 @@ class FixtureRunTests(unittest.TestCase):
         self.assertFalse((self.state / "runs/000001").exists())
         report = (self.state / "report.md").read_text()
         self.assertIn("known: Sonatina O2 has_inst assertion", report)
-        self.assertIn("Fixtures: 4 pinned end-to-end fixtures per iteration, at most 32 mutants, 8 sequence mutants", report)
+        self.assertIn("Fixtures: 4 pinned end-to-end fixtures per iteration, at most 32 mutants, 8 sequence mutants, "
+                      "2 source mutants", report)
 
     def test_the_epoch_covers_the_harness_check_only_when_fixtures_run(self):
         config = {"backend": list(fuzz.BACKENDS)}
@@ -894,6 +897,22 @@ class FixtureRunTests(unittest.TestCase):
         self.assertEqual((code, fake.calls), (2, []))
         code, fake = self.main("--iterations", "1", "--fixture-sequences", "-1")
         self.assertEqual((code, fake.calls), (2, []))
+        code, fake = self.main("--iterations", "1", "--fixture-sources", "4097")
+        self.assertEqual((code, fake.calls), (2, []))
+
+    def test_a_source_finding_is_its_edit_and_reduced_steps_and_a_refusal_its_symptom(self):
+        edit = {"file": "main.sol", "start": 10, "end": 12, "replacement": "0x00"}
+        mismatch = {"fixture": "f", "category": "path-mismatch", "step": 3, "source": "p16", "edit": edit,
+                    "signature": ["path-mismatch", ["output"], [["hull", "yul"], ["sonatina-o0"]]]}
+        reduced = fuzz.fixture_signature_key({**mismatch, "reduction": {"status": "reduced", "steps": [], "edit": edit}})
+        self.assertEqual(reduced["program"], fuzz.canonical_id({"fixture": "f", "edit": edit, "steps": []}))
+        unreduced = fuzz.fixture_signature_key({**mismatch, "reduction": {"status": "not-reproduced", "runs": 1}})
+        self.assertEqual(unreduced["program"], fuzz.canonical_id({"fixture": "f", "edit": edit, "step": 3}))
+        refusal = {"fixture": "f", "category": "compile-mismatch", "source": "p2", "edit": edit, "paths": ["yul"],
+                   "stage": "yul-export", "detail": "Error: StackTooDeepError at /tmp/a/x.sol:12"}
+        key = fuzz.fixture_signature_key(refusal)
+        self.assertEqual((key["stage"], key["paths"], "program" in key), ("yul-export", ["yul"], False))
+        self.assertEqual(key, fuzz.fixture_signature_key({**refusal, "source": "p9", "edit": {**edit, "start": 99}}))
 
     def test_a_sequence_finding_is_its_reduced_sequence_and_operator(self):
         mismatch = {"fixture": "f", "category": "path-mismatch", "step": 4, "sequence": "s7", "operator": "commit", "change": 3,

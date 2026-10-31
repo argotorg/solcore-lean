@@ -8015,6 +8015,32 @@ this section describes how to run them.
     first step that it did not complete, and nothing after the first
     disagreement. A sequence finding reduces to a shortest prefix with its
     operator.
+- **Source mutants:** a mutation run then changes the program. The pinned
+  site extractor (`export-rust-sites.py`) prints every literal, binary,
+  unary and compound-assignment operator and condition of each of a
+  fixture's source files, and inline Yul's literals, builtin calls and
+  conditions, with their spans.
+  - One site takes one operator: a number literal's boundary values and small
+    perturbations, an empty string, an arithmetic, bitwise, comparison or
+    logical operator swap, a dropped `!` or `~`, a negated condition, or an
+    inline Yul builtin swap, literal or `iszero` condition.
+  - Candidates are numbered `p1`, `p2`, … by file, span and operator. A
+    fixture keeps at most `--source-mutants` (default 8; 0 runs none), the
+    families (literal, operator, condition, inline Yul) drawing in turn from a
+    seeded order. `--run-source-mutants` splits a cap evenly over the run's
+    fixtures.
+  - Each mutant is a fresh copy of the fixture's directory with the one edit,
+    compiled on the paths the fixture admits; the Yul exporter's
+    `--fixture-edit` checks the copy against the pin byte for byte. A
+    frontend refusal excludes the mutant.
+  - The recorded steps run on Lean Core in one invocation within
+    `--hull-entry-timeout`, then again as recorded steps do after a limit.
+    Every step, the deployment included, is compared across the paths only,
+    as after a sequence change.
+  - A crash on any path, a backend refusal while another path compiled
+    (`compile-mismatch`), and a disagreement or path failure at a step are
+    findings. A step finding reduces to the shortest prefix on the same
+    mutated program.
 - **Exclusions and findings:** an unsupported directive, a compile failure, an
   export refusal or a resource limit excludes the paths that need it, with its
   stage and reason. A path mismatch, an unmet recorded expectation, a path
@@ -8047,7 +8073,8 @@ python3 scripts/semantic-fixtures.py --list --fixture 'abi-*'
 
 The pinned tools must be prepared: `prepare-semantic-tools.py --prepare`
 builds the checked Hull driver, the code-image tool, the directive extractor
-and resolver, the declaration extractor and the native tools offline. solc 0.8.35, Anvil and cast are
+and resolver, the declaration and site extractors and the native tools
+offline. solc 0.8.35, Anvil and cast are
 installed separately. `--check` verifies the tool receipts and solc, then
 prints the identity of everything a run reads, for the fuzz driver's
 readiness and epoch. Exports go to `.upstream/semantic-fixtures/<fixture>`,
@@ -8059,7 +8086,7 @@ one that made them.
 python3 scripts/semantic-fixtures.py --check
 python3 scripts/semantic-fixtures.py --mode mutation --seed 7 --fixture 'loop-*' \
   --output .upstream/fixtures-budget --fixture-mutants 32 --sequence-mutants 8 \
-  --fixture-seconds 300 --seconds 1800
+  --source-mutants 2 --fixture-seconds 300 --seconds 1800
 ```
 
 Lean Core meters fuel, not gas, so a mutant can run long before its fuel runs
@@ -8086,8 +8113,12 @@ for recorded steps. Its `sequences` keep each sequence mutant's operator,
 step order and change position, each path's expectation verdicts before the
 change, and each compared step's agreement, with whether it observed what the
 recorded step or the committed mutant did. `sequenceMutants` counts the
-candidates, the redundant ones and those kept. Each distinct finding carries
-its reduction. The command returns 1 for any finding, harness error or changed
+candidates, the redundant ones and those kept. Its `sources` keep each source
+mutant's site, replacement and family, each export's status and seconds, and
+each compared step's agreement, with whether it observed what the original
+program did; `sourceMutants` counts the sites, candidates and kept mutants. A
+mutant with a finding keeps its exports in `sources/` beside the fixture's.
+Each distinct finding carries its reduction. The command returns 1 for any finding, harness error or changed
 tool.
 
 `python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
@@ -8095,7 +8126,10 @@ the classification, std's derived structures, selectors, tags and layouts on
 recorded calls, the derived boundary Words and their cap, the mutation
 operators and sampling, the mutant budget, the sequence operators, their
 redundancy, numbering and caps, the paths leaving a sequence, the sequence
-comparison and reduction, Lean Core's single sequence invocation,
+comparison and reduction, Lean Core's single sequence invocation, the source
+operators, numbering, family draws and caps, the fixture edit, the site
+cache, the mutant exports, Lean Core's program invocation and fallback, the
+source comparison, its compile findings and reduction,
 the observation normalization, the memory-range rule, the `budget` status, the
 comparisons, the Lean result order and its deadlines, the reduction, the export
 lock, the run budget, a stop signal, `--check` and the totals, without a
