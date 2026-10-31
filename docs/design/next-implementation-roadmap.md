@@ -9648,6 +9648,234 @@ with no tracked difference.
 - **Findings:** none, no mismatch and no upstream defect, and `questions.md`
   is untouched.
 
+**Call branches.** In `stateful-call-sequences` every call site runs exactly
+once per transaction. A call that a branch skips leaves the previous call's
+buffer in place, and a call in a loop replaces it at every iteration. A
+compiler that caches `returndatasize`, hoists it out of a loop, or moves a read
+across a conditional call would show only there. A probe on main `247bcf26b`
+found the following.
+- **The probe:**
+  - **Sites:** a parent's calls sat in an `if`, in a `while` of zero to two
+    iterations, and in a second `if`. The loop's condition also read
+    `returndatasize()` in inline Yul and stopped once the latest data were 33
+    bytes long.
+  - **Reads:** before and after each site and inside the loop, it read
+    `returndatasize()` and copied a guarded in-bounds window.
+  - **The child** returned or reverted raw data of 0 to 96 bytes.
+- **The paths agree:**
+  - Five scenarios of eight transactions made zero to four calls each, with
+    skipped branches and loops that ran fully, stopped early or were skipped
+    at entry. The inputs 0, `2^255` and `2^256 - 1` were among them.
+  - O0, O2 and Yul and imported Hull with O0 and O2 images gave identical
+    rows, and every row equalled an independent Python model.
+
+A new call-family profile, `stateful-call-branches`, compares this, and
+`stateful-call-sequences`' corpus and results stay as they are. It shares:
+- the two wrapper names and methods, and so their Yul admission;
+- the call adapter's two-source paths;
+- `rust-hull-call-return-scenario`, with the parent's slots from the
+  scenario;
+- `stateful-call-sequences`' child.
+
+Inside `Solcore/ContractRuntime/` a call chain whose phases may each choose is
+added beside the call chain. Nothing changes in Core, the Hull importer, the
+backends, `CallChainExecution`, `CallResumeExecution` or any public
+statement.
+
+The definitions were fixed before execution:
+- **Boundary:**
+  - one to three call sites in program order, each a branch or a loop;
+  - zero to three calls per transaction, as the input decides, each to the
+    bound child;
+  - depth one, with zero value everywhere and no logs.
+- **Plan:** `solcore-lean.call-branch-plan.v1`, with the step program and one
+  to three sites. Each site has a kind, a call bound, a call window and an
+  exit window:
+  - **Kinds:** a branch has bound one; a loop has bound one to three and a
+    stop length from 0 to 96.
+  - **Bounds:** the sites' bounds sum to `P <= 3`. The potential calls are
+    the positions `0` to `P - 1`, in program order.
+  - **Windows:** each `(o, w)` has `o <= 96` and `w <= 32`.
+- **Input:**
+  - byte `q` is position `q`'s class byte;
+  - site `i`'s control bits are bits `24 + 2i` and `25 + 2i`;
+  - bit 30 reverts the parent;
+  - `mix = input >> 32`.
+- **Child:** `stateful-call-sequences`' child: the first `min(b >> 1, 96)`
+  bytes of `d0 ‖ d1 ‖ d2` for the class byte `b = x mod 256`, reverted through
+  `revert_` when `b` is odd.
+- **Parent,** for `S` sites and `P` positions:
+  1. With `p = slot 0`, it writes `p + input` to slot 0. In inline Yul it
+     copies zero bytes at offset 0 into a zeroed scratch Word, keeping `z`.
+  2. For each site `i` in order:
+     - in inline Yul before the site, `p_i = returndatasize()`;
+     - **a branch** calls position `q` when bit `24 + 2i` is set. Its other
+       bit is zero in generation and ignored;
+     - **a loop** sets `limit = min(r, bound)` for the two control bits'
+       value `r`, then runs while `counter < limit` and, read in inline Yul,
+       `returndatasize()` differs from the stop length. Each iteration calls
+       position `base + counter` and increments the counter;
+     - **a call** at position `q` sends `raw_call(address(target), 0,
+       0x9507d39a ‖ x_q)` with `x_q = mix·256 + b_q`. It keeps the flag plus
+       twice the copy's length as `k_q`, and the copy's first Word `f_q`
+       when it has one, else 0. Right after the call, in inline Yul, it reads
+       `n_q = returndatasize()` and the call window `v_q`. Then `mix` grows by
+       `f_q + n_q + v_q`;
+     - after the site, in inline Yul, `a_i = returndatasize()` and the exit
+       window `u_i`. Then `mix` grows by `a_i + u_i`.
+
+     A window is the scratch Word after zeroing it and, when `o + w <=
+     returndatasize()`, `returndatacopy(scratch, o, w)`. The arithmetic wraps.
+  3. With `B = 2 + 3S`, it writes `z` to slot 1. Then `p_i`, `a_i` and `u_i`
+     go to slots `2 + 3i` to `4 + 3i`, and `k_q`, `f_q`, `n_q` and `v_q` to
+     slots `B + 4q` to `B + 4q + 3`, zero for a position not called. The
+     number of calls goes to slot `B + 4P`.
+  4. With `s` the wrapping sum of every slot written, it reverts with the 32
+     bytes of `s` under bit 30, else returns `s`.
+- **What each read must see,** the EVM's return-data buffer:
+  - Every read and the loop's condition see the data of the latest call made
+    before them, whichever site made it.
+  - Before any call there is no buffer: the read sees 0 and every window 0,
+    and so `z = 0`.
+  - After a skipped branch, a loop's skipped iterations, or a loop stopped at
+    entry, the buffer stays the previous call's.
+  - `n_q = m_q`, the size of call `q`'s returned or reverted data.
+  - A window holds the data's bytes `o` to `o + w - 1` left-aligned in a zero
+    Word when they lie inside the data, and otherwise 0.
+- **Runtime convention,** additive in `Solcore/ContractRuntime/`. A choice
+  chain runs a parent given as a call phase installed as its code and the
+  phases that resume after each call, each in a role:
+  - **request:** under `wordTupleOutcomeV1 (keptWords + 1)`, it always
+    returns the next request, as the call chain's call and middle phases do;
+  - **finish:** under `wordOutcomeV1`, its outcome is the transaction's, as
+    the call chain's last phase;
+  - **choose:** under `wordTupleOutcomeV1 (keptWords + 2)`, its first Word
+    chooses. Zero finishes with the second Word's 32 bytes as the returned
+    data, and any other Word requests the call that the following Words name.
+
+  Each request's child runs as `CallResumeExecution`'s child step and each
+  later phase as its resume phase, all through the public top-level runner.
+  - **Rollback:** a revert or trap of any phase commits the pre-transaction
+    world.
+  - **The call phase's code** is restored on a return.
+  - **No phase left:** a request with no phase left to resume after it stops
+    the transaction.
+  - **Fuel:** running out in any step is reported with its step and call.
+  - **Laws, per step:**
+    - every recorded call is the child step of its request in the world its
+      requesting phase left, so the one-call laws hold for each;
+    - root rollback;
+    - the parent's code and every balance are unchanged;
+    - a completed transaction made at most one call per resume phase.
+  - **The call chain** stays as it is. A theorem shows it is the special case
+    of request phases and one last finish phase: the choice chain's result
+    equals the call chain's.
+- **Original Core:**
+  - **The child** is `stateful-call-sequences`' child, under `rawOutcomeV1 2`.
+  - **The parent** is a call phase and three resume phases, all choice phases
+    under `wordTupleOutcomeV1 7`:
+    - **kept Words:** five, the target, the input, `mix`, the position of
+      the requested call and the number of calls made;
+    - **the resume phases** are one program. It reads the kept Words, the
+      status Word and the call's data at base 192 through `inputDataSize`
+      and `inputDataWordBE?`;
+    - **each site's code** is one lambda that the phases share.
+  - **Slot writes:** each phase writes its reads' slots, and zeros for the
+    positions it passes without a call. The finishing phase writes the call
+    count and sums the slots. The source writes every slot at the end; no
+    read or call in between can tell the order.
+- **Paths:**
+  - original Core, through the choice chain;
+  - imported Hull: `rust-hull-call-return-scenario` with the parent's slots
+    0 to `B + 4P`;
+  - O0, O2 and Yul: both images, or each source's solc compilation, on Anvil.
+- **Node budget:** the child's shell and the step inside the budget, by
+  default 384, and the parent's phases outside it. The child is bounded by
+  1,024 nodes and each parent phase by 2,048.
+- **Generation,** from SplitMix64's finalizer of the seed xor each stream's
+  domain:
+  - **Plan:**
+    - **Sites:** one to three with equal probability, each a branch or a loop
+      with equal probability. A loop's bound is uniform from one to the
+      positions left, and sites stop once three positions are used.
+    - **Windows:** each window's offset comes from the bank 0, 1, 31, 32, 33,
+      63, 64, 95 and 96 with probability one half, otherwise uniform from 0
+      to 96. Its width comes from 0, 1, 31 and 32 with probability one half,
+      otherwise uniform from 0 to 32.
+    - **Stop lengths:** a loop's stop length comes from the length bank with
+      probability one half, otherwise uniform from 0 to 96.
+  - **Inputs:**
+    - **Class bytes:** each position's class byte reverts with probability
+      one third. Its length comes from the bank 0, 1, 31, 32, 33, 63, 64,
+      65, 95 and 96 with probability one half, otherwise uniform from 0 to 96.
+    - **Control bits:** a branch calls with probability one half, and a
+      loop's two bits are uniform.
+    - **Other bits:** the parent reverts with probability one quarter, and
+      `input >> 32` is uniform. Unused class bytes and control bits, and bit
+      31, are zero.
+  - **Transactions:** up to eight. Random runs use G0 revision three.
+- **Observations,** per transaction and prefix:
+  - the status and the whole return data;
+  - the parent's slots 0 to `B + 4P` and the child's slots 0 and 1;
+  - both contracts' whole committed storage and balances;
+  - the committed logs, which must stay empty.
+
+  Comparisons:
+  - **No mapping:** the paths must agree with no mapping between them.
+  - **Prescribed outcomes:** each transaction records the calls it makes, in
+    order, as their positions, statuses and data lengths, and whether the
+    parent reverts. A Lean model computes them, and the adapter recomputes
+    them from the plan and the input with its own Python model.
+  - **A returned parent:**
+    - the slots of `z`, `p_i`, `a_i`, `k_q`, `n_q` and the call count must
+      equal the adapter's own values;
+    - its output must be the slots' sum;
+    - the child's count must grow by the returned calls.
+  - **Reverts:** a parent revert keeps both prior storages. A returned
+    parent whose calls all reverted, or that made none, keeps the child's.
+- **Exclusions:** as for `stateful-call-sequences`.
+- **Reductions,** each sealed and strictly smaller, in this order:
+  - transactions, one at a time;
+  - the last site dropped, then a loop's bound lowered;
+  - a window to an earlier bank entry, then to width zero, and a stop length
+    to an earlier bank entry;
+  - the step, by program size;
+  - the inputs, in turn:
+    - the parent's revert bit cleared;
+    - `input >> 32` to zero;
+    - each control bit cleared;
+    - each class byte's revert bit cleared, and its length to an earlier bank
+      entry, then to zero.
+- **Campaign dimensions,** besides the call family's:
+  - `BranchSites`: one, two and three sites;
+  - `BranchLoops`: a loop's bound of one, two and three;
+  - `BranchCalls`: zero to three calls in a transaction;
+  - `BranchSkips`: the buffer at each position passed without a call: none
+    yet, or the latest data returned or reverted, empty or not;
+  - `BranchLoopExits`: a loop that stopped at entry, after a call on its
+    stop length, or at its limit;
+  - `BranchLengths`: the bank lengths, returned and reverted apart;
+  - `BranchWindows`: a window of nonzero width inside the data, one past its
+    end, and one of width zero inside it;
+  - `BranchRollbacks`: a child revert under a returned parent and under a
+    reverted one, and a parent revert after returned children;
+  - `BranchNodeBudgets`: 384 and 512.
+- **Fixed corpus:** imported entries over the imported steps of
+  `stateful-calls`, and generated seeds at both budgets. It must cover every
+  value of each dimension.
+- **Golden cases:** rows written out by the probe's independent Python model,
+  for fixed plans and inputs covering each dimension: every slot and output
+  of each transaction. The Lean model and original Core through the chain
+  must give them exactly.
+
+Out of scope:
+- calls in both arms of an `if`, nested loops and more than three calls;
+- a `returndatacopy` past the end, which the second part of this unit
+  takes;
+- child traps, which consume the forwarded gas, and targets that do not
+  resolve;
+- typed decoding, nonzero values, logs, nested depth and creation.
+
 **Known mismatch classes in the fuzz registry: definitions.** A mismatch's key
 is its reduced program. So a recorded semantic defect that random plans keep
 drawing registers new signatures at every occurrence. The case in point is
