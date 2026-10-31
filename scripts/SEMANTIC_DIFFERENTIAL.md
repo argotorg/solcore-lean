@@ -5750,7 +5750,11 @@ crash case, the recorded Sonatina O2 signextend-folding crash, passed the
 campaign's 4 MiB bound on tool output. With at most eight candidates, the same
 campaign on `9ce37afeb` executed all sixteen cases and matched fifteen. It
 reduced the crash case from eight transactions to one within the suite's
-sixteen shrink attempts.
+sixteen shrink attempts. A reduction now halves its batch after such a
+response. With a first batch of sixteen (`--shrink-batch 16`, on
+`567a2a0ae`), the same crash case's first request passed the bound and the
+batch halved to eight. The reduction then ran the same candidates as at eight
+and reached the same one-transaction case.
 
 ## Compare ABI-encoded tuple returns
 
@@ -7487,6 +7491,16 @@ directive tools, solc, Anvil and cast frozen.
   - The smoke iteration's entries had the same mutants and observations as
     the mutation run from the same root seed.
   - The mutant budget sampled six fixtures down to 32 mutants each.
+- **Derived ADT arguments** (`39e99cd06`, frozen): a mutation run of the eight
+  fixtures holding the raw calls without a standard-ABI method, root seed
+  `20261111`, 47 seconds.
+  - 26 calls classified by their derived layout. Two with an unknown tag,
+    and four without a derived argument, kept their reasons.
+  - All 519 derived boundary mutants agreed on every path: 241 tags, 251
+    dynamic offsets and 27 `bytes` lengths. So did the 227 other mutants,
+    and every recorded step matched.
+  - A fuzz-driver iteration with base seed `20281409` ran 103 of them in four
+    of the fixtures within its mutant budget, with no finding.
 
 ## Compare generic selection
 

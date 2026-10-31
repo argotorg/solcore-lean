@@ -7330,7 +7330,8 @@ states kept one epoch, `0ad56937aac4`.
 No compiled path disagreed with another. This is agreement among compiled
 paths and with upstream's recorded expectations; no original Core reference
 exists for these fixtures. Derived ADT arguments stay unclassified, and their
-classification from std's structural signatures is left for a later unit.
+classification from std's structural signatures is left for a later unit
+(see "Derived ADT arguments in the fixture mutation run" below).
 
 **Mixed sequence seeds for the tuple and bytes returns.** The block choices
 of `stateful-tuple-returns` and `stateful-bytes-returns` came from a raw
@@ -9035,6 +9036,95 @@ The definitions were fixed before any harness change:
   fuzz driver's known findings only if its signature is a stable symptom.
 - **Epoch:** the harness and the readiness receipt change, so an existing
   fuzz state needs `--accept-new-epoch`.
+
+**Derived ADT arguments in the fixture mutation run: results.** `39e99cd06`
+implements the definitions above:
+- **Tool and readiness:** `prepare-semantic-tools.py --prepare` builds the
+  declaration extractor offline beside the directive tools, and its receipt
+  joins the readiness receipt's directive builds. `semantic-fixtures.py
+  --check` verifies it, and the harness extracts each fixture's declarations
+  with the exports, cached and revalidated by the extractor's build.
+- **Tests:** `test-semantic-fixtures.py` grows from 30 to 37 tests. They
+  check:
+  - the recorded selectors and tags of `abi-sum-roundtrip`, `storage-adt-abi`
+    and `abi-batch-adt`, with type arguments, aliases, units, tuples, a
+    one-constructor type and the refused types;
+  - the classes of recorded calls, and the refusals;
+  - the boundary Words, relative to their bases;
+  - the draws, their numbering and the cap;
+  - the declaration cache, the tool check and the counts.
+
+  `test-prepare-semantic-tools.py` keeps its 30 tests with the third offline
+  build.
+
+The runs, on `39e99cd06` with the scripts, native tools, compilers, directive
+and declaration tools, solc, Anvil and cast frozen (168 digests, none
+changed):
+- **Mutation run** of the eight fixtures, root seed `20261111`, four jobs,
+  47 seconds:
+  - Every fixture was admitted on all four paths. All 66 recorded steps,
+    deployments included, matched their expectations on every path.
+  - 746 mutants ran, 519 of them derived boundary mutants: `abi-batch-adt`
+    196, `abi-dyn-sum` 114, `abi-sum-roundtrip` 99, `abi-array-sum` 95 and
+    `storage-adt-abi` 15. That is the probe's count, so the cap bound
+    nowhere.
+  - All 812 entries agreed on Hull, O0, O2 and Yul, each path returning 318
+    times and reverting 494 times.
+  - The 519 are 241 tags, 116 sum offsets, 77 array offsets, 58 `bytes`
+    offsets and 27 `bytes` lengths. Every path gave the same outcome:
+    - tags: 97 returned, 79 of them with the recorded bytes, for example for
+      a tag of an element the method does not read, and 18 with other bytes,
+      another constructor decoded. 99 reverted with empty data (unknown tags),
+      40 with `0x7f52b2bf` (the recorded out-of-bounds index) and 5 with
+      `0x08638556`;
+    - offsets: 53 returned. 28 sum offsets reverted with empty data, the body
+      moved onto a word that is no tag (`0`, `32` or the recorded offset ±
+      32). 107 reverted with `0x08638556` and 63 with `0x7f52b2bf`;
+    - `bytes` lengths: 11 returned, into the padding or in an element not
+      read; 10 reverted with `0x08638556` and 6 with `0x7f52b2bf`.
+  - The derived calls' 104 other mutants, 4 per call, include 5 unused head
+    words. Each of those gave its recorded step's output on every path, so
+    std ignores them everywhere.
+  - The 123 mutants of the other steps were identical, mutant and
+    observation, to unit 11's run from the same root seed.
+- **Fuzz driver:** one `fixtures` iteration, base seed `20281409`, chosen
+  because its first iteration draws four of the five fixtures with
+  classified calls. Default budgets, 232 seconds:
+  - The fixtures were `abi-array-sum`, `abi-batch-adt`, `abi-boundaries`,
+    `abi-dyn-sum`, `abi-sum-roundtrip`, `audit-nested-pair-tail`,
+    `closure-parameters` and `ecrecover`.
+  - The 32-mutant budget kept 20 to 30 derived boundary mutants of each of
+    the four fixtures, 103 in all.
+  - Of 274 entries, 273 agreed and 1 was incomplete: a `closure-parameters`
+    mutant whose seeded argument drives a deep recursion. Hull hit its time
+    limit and every EVM path halted exceptionally.
+  - The run passed with no occurrence, new signature or problem, in epoch
+    `d574355274af`.
+
+No compiled path disagreed with another, so there is no finding, and
+`questions.md` is unchanged. This is agreement among compiled paths and with
+upstream's recorded expectations; no original Core reference exists for these
+fixtures.
+
+**Shrink-batch halving.** `567a2a0ae` lets a storage reduction recover from a
+shrink response over the campaign's bound on tool output instead of stopping.
+The batch halves and the request repeats, down to one candidate. A profile's
+`shrinkBatch` stays the first batch, `--shrink-batch` replaces it, and the
+shrink history records each halving in `halvedBatches`. Only a one-candidate
+response over the bound, or any other stop, still ends the reduction.
+- **Tests:** `test-semantic-storage-campaign.py` grows from 123 to 125 tests.
+  They cover halving down to one candidate, the stops it leaves alone (a time
+  limit, or an output limit outside the shrink request) and the option.
+- **The archived ADT crash case** of the mixed streams' random O2 suite, with
+  the suite's budgets and `--shrink-batch 16`, on `567a2a0ae` with scripts
+  and tools frozen (168 digests, none changed):
+  - its first request for sixteen candidates passed the 4 MiB bound, and the
+    batch halved to eight;
+  - the reduction then completed in 153 seconds: sixteen attempts, thirteen
+    accepted, from eight transactions to one;
+  - it ran the same candidates in the same order and reached the same final
+    case (`c04807fca4b3`) as the batch-eight reduction on `9ce37afeb`, which
+    started at eight.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
