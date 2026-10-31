@@ -802,6 +802,59 @@ once, but every repeat still runs all its inputs: a 64-case random
 four](#revision-four-masks-within-the-emitter) keeps masks within each
 emitter's features and removes most of these repeats.
 
+## Per-case overhead and the fixed suite's budget
+
+Besides compilation, every pure case paid for work that does not depend on it.
+A fixed corpus lists a generated recipe once per boundary input, and the
+generator answers one request with every input's case, yet the campaign asked
+it once per entry: 1,449 requests for the 231 recipes of the twenty-six pure
+corpora. Every case hashed the case tool, the Hull runner, Anvil and both
+compiler builds, about 370 MB, and asked Anvil, and solc on Yul, for its
+version; every resource guard, run every 50 milliseconds while a process runs
+and around every RPC call, walked the whole campaign output.
+
+A pure campaign now generates each recipe once, and its entries take their own
+input's case from that response; `summary.json` records the requests as
+`corpus.generationRequests`. Tool and compiler files are hashed once per
+campaign while their path, device, inode, size and modification and
+status-change times are unchanged; a write always moves the status-change
+time, so a reused digest is that of the same bytes. A version output is reused
+the same way, and a later case lists that `tool-version` process with
+`reused: true`, as for a shared compilation. The guard walks the output with
+one status call per file, and the temporary case input the adapter reads is
+written compactly; the adapter still writes and digests its own `case.json`.
+Every case records the same tool identities as before and runs its own direct
+Core replay, deployment, EVM call and imported Hull execution.
+
+The saved cases of the inline Yul memory, trait, trait hierarchy, memory value
+and memory call profiles carry Core references of thousands of nodes, 185 to
+660 KB a case indented, and are retained as compact JSON, 50 to 90 KB; the
+other pure profiles' cases stay below 85 KB and keep the indented form.
+Digests and replay are unchanged.
+
+The complete default fixed suites, run one after the other and frozen, at
+`--seconds 7200 --profile-seconds 900` and the default disk limits, before
+(`48ed2f361`) and after these changes, with the machine's mean load average:
+
+| Run | Seconds | Pure profiles | Retained | Load | Smallest margin to 900 s |
+| --- | ---: | ---: | ---: | ---: | --- |
+| O0, 55 profiles, before | 6,472 | 3,546 | 533 MiB | 5.5 | 252, `runtime-memory-calls` |
+| O0, after | 5,574 | 2,710 | 340 MiB | 3.6 | 462, `runtime-memory-calls` |
+| Yul, 26 pure profiles, before | 4,951 | 4,949 | 490 MiB | 3.9 | 81, `runtime-memory-calls` |
+| Yul, after | 3,980 | 3,979 | 297 MiB | 4.1 | 310, `runtime-memory-calls` |
+
+Every run executed all its profiles, none stopped and the outcomes were the
+same before and after: on O0, 54 profiles passed and `runtime-memory-values`
+recorded its four Sonatina O0 mismatches; on Yul, 24 passed and the trait and
+trait hierarchy profiles recorded eight solc rejections each. Compilation and
+imported Hull runs took the same time before and after within 3%, direct
+replay and the repository checks within 7%, and the twenty-nine unchanged
+stateful profiles 2,920 and 2,857 seconds. The pure profiles' time outside
+recorded processes fell from 1,105 to 453 seconds on O0 and from 1,384 to 697
+on Yul, and `tool-version` from 124 and 251 seconds to 2 and 3. Sixteen memory
+value cases of two sources, run in turn under the same load, took 23.7 seconds
+before and 18.5 after.
+
 ## Check the reducer
 
 The explicit test adapter below perturbs a copied observation only after all

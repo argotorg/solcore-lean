@@ -137,6 +137,23 @@ overlapped each other and a cold tool build, so their timings are observations,
 not CI performance guarantees. The operational implementation is complete;
 the first hosted workflow run remains to be observed after publication.
 
+**The complete fixed suite's budget.** With fifty-five profiles, the default
+fixed suite on Sonatina O0 took 6,472 of its 7,200 seconds at `48ed2f361` and
+retained 533 MiB of its 1 GiB; the twenty-six pure profiles on Yul took 4,951
+seconds and 490 MiB. Every profile ran, none stopped, and the slowest,
+`runtime-memory-calls`, kept 252 and 81 seconds of its 900. The pure campaign
+then generated each fixed recipe once, hashed unchanged tools once per
+campaign and retained the five large pure profiles' cases as compact JSON
+([per-case overhead](../../scripts/SEMANTIC_DIFFERENTIAL.md#per-case-overhead-and-the-fixed-suites-budget)).
+The same runs took 5,574 and 3,980 seconds and retained 340 and 297 MiB,
+leaving `runtime-memory-calls` 462 and 310 seconds, with unchanged outcomes:
+Sonatina O0's four recorded memory value mismatches and solc's sixteen
+recorded trait and trait hierarchy rejections on Yul. The suite process
+itself, which measures its whole output every 0.1 seconds, used 1,298 CPU
+seconds of the O0 run. These were local runs, frozen and one after the other,
+at load averages of 3.6 to 5.5 on ten cores; a runner 1.3 times slower would
+exceed the O0 budget.
+
 ## 2. Generated Sonatina O2, then Yul
 
 First add Sonatina O2 while retaining O0 as a separate result. Then add Yul
