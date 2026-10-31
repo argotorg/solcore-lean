@@ -3113,6 +3113,212 @@ machine:
 
 No mismatch, crash or rejection was found, so nothing was recorded.
 
+**Revert data.** Every pure profile compares a returned Word, and the two
+memory profiles also std's `OutOfBounds()` revert, a single selector. std's
+`Error` has three constructors: `Error(w)`, which reverts with the low four
+bytes of `w`, `Error.Empty`, and `Error.Msg(s)`, which reverts with the bytes
+of the `memory<string>` `s` read at the revert; `require(c, "literal")` makes
+a message through std's `Str<Error>`, and `revertLit("…")` and
+`revertEmpty()` revert directly, `revertLit` through Hull's own revert
+statement. Revert data built in memory is where a dead store or a reordered
+write before `revert` would show, and no returned-Word profile can see it.
+One new pure profile, `runtime-revert-data`, generates `Error` values and the
+sites that revert with them.
+
+Before any code, a probe compiled hand-written sources through checked Hull
+export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner,
+against a Python model of the revert data at twelve inputs:
+- `Error(w)` with a selector Word computed from the input, raised directly
+  and through `require`; `Error.Empty`, `revertEmpty()` and an `Error.Empty`
+  variable; `require(c, "literal")` with literals of 0, 9, 32, 33 and 64
+  bytes and `revertLit` with 0, 5 and 32 bytes; messages over `memory<string>`
+  views `memory(Typedef.rep(b))` of bytes values built from the input, of 5
+  and 64 bytes, after other allocations, with a write made after the `Error`
+  and one through a second variable seen in the revert data.
+- `Error` values made, chosen and raised in helpers, through a function value
+  and two helpers deep; in pairs, std sums and a user enum taken apart by
+  matches; captured by closures and raised in them; raised in a bounded loop
+  at an iteration and with a selector that depend on the input, with a
+  message built in the loop; the first site whose condition holds decides.
+- All fourteen sources matched the model on every path, 1,008 outcomes. A
+  33-byte `revertLit` is refused by Sonatina's translation ("literal revert
+  message exceeds one EVM word"), as Hull's lowering and the Lean Hull
+  importer also refuse it, so the plans keep `revertLit` to 32 bytes.
+- The generator below, in drafts, then ran on every path at thirteen inputs:
+  34 plans of an early draft, the 19 seeds that cover every shape value below
+  within the first 100, and 20 more plans with loops. Every run matched except
+  two, both recorded upstream symptoms (`questions.md`, seen again): the early
+  draft's seed 13 on O0, whose loop body read and wrote a bytes value, the
+  recorded Sonatina O0 loop defect, so loop bodies here only allocate and
+  raise; and seed 131 on O2, the recorded code-image crash
+  `assertion failed: self.has_inst(inst_id)`, whose O0 and Yul runs matched.
+  A separate Python model of the plans agreed with the Lean reference on 400
+  seeds at thirteen inputs, 5,200 outcomes.
+
+Core, the Hull importer and runner, both EVM backends and `export-rust-yul.py`
+need no change, and no shared runtime code or proof changes. The reference
+needs no Core support beyond `runtime-memory-values`': a site binds a sum that
+continues or carries the payload, and every scope forwards it. The pure adapter
+`semantic-differential.py` adds this profile's schema to the revert matching of
+the memory profiles, which compares revert data exactly. The existing
+profiles, corpora, emitters and emitter proofs stay unchanged, and this emitter
+has no proof yet. The definitions were fixed before execution:
+
+- Plans (`core-revert-data-v1`): zero to three helpers `sc_h<k>` before the
+  contract `SynthesizedRevertData`, whose `run(uint256)` binds `sc_x` and
+  `sc_r` as `runtime-memory-values` does, runs one to twelve steps and returns
+  `sc_r`.
+  - A site reverts on a condition `C`, `(W < c)`, `(W > c)`, `(W == c)`,
+    `(W != c)` or `((W & m) == k)` with `c` among 0, 1, 2, 3, 5, 255, 256,
+    1,000 and `2^255` (0 to 3, 255 and 256 for `==` and `!=`) and `m` among
+    1, 2, 3 and 7, `k ≤ m`:
+    `if (C) { revertWithError(E); }`, `require(C, E);`,
+    `if (C) { revertLit("…"); }` with a literal of at most 32 bytes,
+    `require(C, "…");` or `if (C) { revertEmpty(); }`, the literals being
+    ten fixed ASCII strings of 0, 1, 2, 9, 11, 31, 32, 33, 63 and 64 bytes.
+  - `E` is made in place, `Error(W)`, `Error.Empty` or
+    `Error.Msg(memory(Typedef.rep(sc_b<n>)))` of a bytes variable of at most
+    64 bytes; an `Error` variable `sc_e<n>`; or the scope's own `sc_e`.
+  - Helpers: `raise`, `(sc_e: Error, sc_w: word) returns (word)`, a site over
+    `sc_w` whose `E` is `sc_e`, `Error(V)` or `Error.Empty`, then
+    `return (sc_w op c);`; `make`, `(sc_w: word) returns (Error)`,
+    `return Error((sc_w + c));`; `message`, `(sc_v: memory<bytes>) returns
+    (Error)`, `return Error.Msg(memory(Typedef.rep(sc_v)));`; `pick`,
+    `(sc_w: word, sc_a: Error, sc_b: Error) returns (Error)`, `sc_a` when a
+    test of `sc_w` holds and `sc_b` otherwise; and `call`,
+    `return sc_h<j>(sc_e, (sc_w + c));` of an earlier `raise` or `call`
+    helper. `V` is `sc_w`, `(sc_w + c)`, `(sc_w * c)` or `(sc_w ^ c)`.
+  - Steps:
+    - `runtime-memory-values`' actions without slices, arrays, hashes or
+      positions: bytes values built by `to_bytes` and `concat` of Words,
+      `empty(n)` and bytes variables, second variables, writes of a Word or a
+      byte inline or through `sc_put` and `sc_put8`, and observations of a
+      length, Word or byte, every index a literal in range;
+    - `error`: `let sc_e<n>: Error = …;` made in place or by a `make`,
+      `message` or `pick` helper;
+    - `data`: `let sc_t<n>: (Error, word) = (E, W);`,
+      `let sc_u<n>: sum<Error, word> = inl(E);` or `inr(W)`, and
+      `let sc_g<n>: Sc_F = Sc_F.Sc_F0(E, W);` or `Sc_F.Sc_F1(W)` of
+      `enum Sc_F { Sc_F0(Error, word), Sc_F1(word) }`, emitted when used;
+    - `site`; `call`: `sc_r = ((sc_r * c) op sc_h<k>(E, W));` of a `raise`
+      or `call` helper, or through a function value
+      `let sc_f<n>: function (Error, word) returns (word) = sc_h<k>;`;
+    - `take`: `match` of a data variable, its `Error` arm holding a site
+      whose `E` may be the arm's `sc_e`, its Word arm folding `sc_w`;
+    - `closure`: `let sc_c<n>: function (word) returns (word) =
+      lam (sc_j: word) -> word { SITE; return (sc_j op c); };` over `sc_j`,
+      capturing variables; `apply`: `sc_r = ((sc_r * c) op sc_c<n>(W));`;
+    - `loop`: `runtime-memory-values`' single loop (`sc_x & 1|3|7`), whose
+      one to three items are bytes values built from Words, zeros and
+      `sc_counter`, and at most one site over Words or `sc_counter`.
+
+    Words `W` are `runtime-memory-values`' straight-line Words, and
+    `sc_counter` in a loop; fold constants and operators are its own. A plan
+    has a site it reaches and a fold; at most four bytes variables of at most
+    128 bytes, three `Error` variables, two pairs, two sums, two enums, two
+    closures, two function values and one loop.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x7265766572740001`):
+  - zero to three helpers, weighted `raise` 4, `make` 2, `message` 2,
+    `pick` 2 and `call` 3 when a `raise` or `call` helper exists;
+  - one or two bytes values; a third of the time the hazard sequence: an
+    `Error.Msg` of the first that can be a message, made in place or by a
+    `message` helper, then a write of a byte of it, a second variable and a
+    write through it, or another bytes value, then
+    `if (C) { revertWithError(sc_e<n>); }`;
+  - then two to nine more steps, at most twelve in all, each drawn by weight
+    and kept when admitted: action 4, `error` 3, `data` 2, `site` 4, `call`
+    4, `take` 3, `closure` 2, `apply` 3 and `loop` 2 where each applies;
+  - a site is `revertWithError` 3, `require` 3, `revertLit` 2,
+    `requireLiteral` 2 or `revertEmpty` 1; an `if` site's test holds for few
+    inputs, `(W == c)`, `(W > c)` of 255 to `2^255`, `(W < c)` of 1 to 3 or a
+    bit test, and a `require`'s for most; the tested Word is the input six
+    times in ten, rarely `sc_r`, and in a loop `sc_counter` two thirds of the
+    time with small constants; an `E` is made in place 2, a variable 3 (6 in
+    a closure) and the scope's `sc_e` 5; a message favours the loop's own
+    bytes value half the time in a loop;
+  - a plan without a site or a fold ends with a site and the length of its
+    first bytes value.
+- Core reference, with no source text and no data definitions:
+  `fun input => …` of type `sum word (word × word × word)` over
+  `runtime-memory-values`' byte-list model, with every helper and closure
+  inlined where it runs:
+  - the right injection carries the revert data, its length and its bytes in
+    two Words: `Error(W)` the length 4 and the low four bytes of `W` at the top
+    of the first Word, `Error.Empty`, `revertEmpty()` and an empty literal
+    length 0, a literal its bytes, and `Error.Msg` the length and Words of its
+    bytes value at the site, so a write made after the `Error` was made, also
+    through a second variable, is seen;
+  - a site binds the payload's Words, then a sum that continues or carries the
+    payload when it raises (`if`) or its condition fails (`require`), and every
+    enclosing scope, a loop iteration among them, forwards a right injection,
+    so the first site whose condition holds decides;
+  - a `pick` binds its test and chooses between its two `Error` values at
+    every later site; a data value holds the `Error` and Word it was made with,
+    and its match runs the arm of its constructor; a closure's site reads its
+    captured variables where it is applied;
+  - a case observes a returned Word, or the revert data compared exactly with
+    the EVM's and the imported Hull's.
+
+  Admission checks every helper and step against the scope it is drawn in:
+  sites in their contexts (a helper sees only its parameters, a closure its
+  captures), sources, literals, tests and constants, messages of at most 64
+  bytes, loop items, the counts, and a site and a fold.
+- Bounds: the node budget, default 1,024, minimum 256 and at most 2,048,
+  bounds the applied reference; steps are dropped from the end while it
+  exceeds the budget, more than one step remains and the rest is still
+  admitted. A case's reference is at most 4,096 nodes. Of the first 1,000
+  seeds at the default budget, the reference had a median of 179 and at most
+  497 nodes, and none dropped a step; at 256 nodes, 78 of 500 dropped steps and
+  72 stayed over it.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stage `revert-data-profile`: a plan still over the
+  budget or not admitted; then, at the eight boundary inputs, fuel exhaustion
+  (an inconclusive resource exclusion), a result other than a Word or revert
+  data, or the same outcome for all eight, as for 69 of the first 1,000
+  seeds. None exhausted 1,000,000 fuel. Of the 931 accepted, 889 revert at a
+  boundary input and 133 at all eight, with differing data.
+- Identity filter: a plan whose only fold reads Word 0 of
+  `to_bytes(bytes32(sc_x))` or a Word arm holding `sc_x`, and none of whose
+  sites raise at the boundary inputs, returns its input, so random campaigns
+  apply `exclude-boundary-identity-v1`; 4 of the first 1,000 seeds (273, 416,
+  547 and 671) are identities.
+- Reductions: remove a step; remove a helper nothing calls or names,
+  renumbering the later helpers and their callers; replace a call by the site
+  it reaches, its `sc_e` being the call's `E` and its Word `sc_x`; call a
+  function value's helper directly; lower a site: its `E` to `Error.Empty`, a
+  selector's Word to `sc_x`, a literal to the empty one, a payload of an `if`
+  site to `revertEmpty()`, a `require` to an `if`, its test to `(W == 0)` or
+  to `==` of its constant, its Word to `sc_x`; lower a declaration to
+  `Error.Empty`, `Sc_F0` to `Sc_F1` of its Word, a helper's constant to 1, a
+  fold's `^` to `+` and its constant to 3, a loop's mask to 3 or 1 and remove
+  a loop item; then the inputs 0, 1 and half the input. Every candidate is
+  admitted and sealed by the full checker, and strictly smaller in plan size,
+  a call weighing 20, more than any site step, then input. A reduced origin
+  records the parent plan and input. A shrink response stops before its cases
+  would exceed 1.5 MB. Of 100 seeds' plans, a plan had a median of 27 and at
+  most 51 sealed candidates.
+- Specified revert data shapes, from the plan, never measured, 65 values:
+  `helpers` (`raise`, `make`, `message`, `pick`, `call`), `forms`
+  (`revertWithError`, `require`, `revertLit`, `requireLiteral`,
+  `revertEmpty`), `errors` raised (`selector`, `empty`, `message`, `picked`),
+  `contexts` of sites that run (`run`, `loop`, `helper`, `call` two helpers
+  deep, `closure`, `pair`, `sum`, `enum`), `carriers` of raised `Error`s
+  (`inline`, `variable`, `passed` to a helper, `value` through a function
+  value, `held` by a data value, `captured` by a closure, `loop` over a value
+  the loop builds), `declarations` (`variable`, `made`, `messaged`,
+  `picked`), `data` (`pair`, `inl`, `inr`, `enum0`, `enum1`), `tests`
+  (`lt`, `gt`, `eq`, `ne`, `bits`), tested `words` (`input`, `constant`,
+  `acc`, `counter`, `local`), payload `lengths` (`0`, `1-31`, `32`, `33-63`,
+  `64`), `hazards` (`written`: the message's value written after the `Error`
+  was made and before a site raises it; `alias`: written through another
+  variable; `allocated`: another bytes value built in between) and `steps`.
+- Fixed corpus: from seed 1 upwards at the default budget, every accepted plan
+  that covers a missing value, until nothing is missing, each at the eight
+  boundary inputs; every value is required. The draft generator needed 19
+  seeds within the first 100.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
