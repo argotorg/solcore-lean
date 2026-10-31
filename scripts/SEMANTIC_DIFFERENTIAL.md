@@ -876,6 +876,22 @@ suite, the walks come to an estimated 1,408 seconds before and 34 after. The
 process table the suite reads at every check, 6,262 and 6,546 `ps` calls
 taking 146 and 160 seconds in those runs, is now most of the suite's own cost.
 
+The suite reads the process table at every check, and at a stop, so that a
+descendant a profile started is stopped even after its parent exits:
+`ps -axo pid=,ppid=,pgid=,lstart=` cost about 23 milliseconds of CPU a read,
+most of it in `ps`. Reading less often would not keep that exact, since a
+descendant whose parent exits between two reads is found only by a read
+before the exit. On macOS the suite now reads the same table in-process,
+from the `kinfo_proc` records of `sysctl(KERN_PROC_ALL)` that `ps` itself
+reads, at every check and stop as before, with each process's start time to
+the microsecond as its identity. Elsewhere, or when those records do not
+place the suite under its own parent and group, it runs `ps` as before. The
+same short O0 fixed suite, frozen and run one after the other, took 884 and
+883 seconds before and after. Its 6,537 and 7,856 reads took 150.9 and 7.1
+CPU seconds, 136.8 of them in `ps` before, and the suite with its `ps`
+processes used 175 and 36. A check now takes about 0.11 seconds, so a
+profile past the disk limit is stopped sooner than before.
+
 ## Check the reducer
 
 The explicit test adapter below perturbs a copied observation only after all

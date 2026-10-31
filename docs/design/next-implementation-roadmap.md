@@ -154,7 +154,7 @@ seconds of the O0 run. These were local runs, frozen and one after the other,
 at load averages of 3.6 to 5.5 on ten cores; a runner 1.3 times slower would
 exceed the O0 budget.
 
-At `9c2fb49df` the suite measures only the running profile's folder and its two
+At `b2835f074` the suite measures only the running profile's folder and its two
 logs, adding the rest of the output as it was when the profile started, since a
 finished profile never changes again; the limits, the 0.1-second checks, the
 stopping decisions and the reports are unchanged. A short O0 fixed suite of
@@ -164,6 +164,14 @@ output walks from 56.6 to 24.5; over the complete O0 suite's folders the walks
 come to an estimated 1,408 seconds before and 34 after. The process table it
 reads at every check, about 6,500 `ps` calls taking 146 to 160 seconds in
 those runs, is now most of its own cost.
+
+At `9420d9d59` the suite reads that table in-process on macOS, from the
+`kinfo_proc` records `ps` itself reads, still at every check and stop, since a
+descendant whose parent exits between two reads is found only by a read before
+the exit; other platforms keep `ps`. The same short O0 fixed suite, frozen and
+run before and after one after the other in 884 and 883 seconds, read the table
+6,537 and 7,856 times for 150.9 and 7.1 CPU seconds, and the suite with its
+`ps` processes used 175 and 36.
 
 ## 2. Generated Sonatina O2, then Yul
 
