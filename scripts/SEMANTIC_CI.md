@@ -27,7 +27,7 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters
-and the directive extractor and resolver offline, and the thirty-eight native Lean
+and the directive extractor and resolver offline, and the forty native Lean
 tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
@@ -92,25 +92,25 @@ of backend selection, so optimization does not change the generated inputs.
 cases). The twenty-seven storage-family profiles also run on Yul when `--profile`
 selects them, with 416 fixed scenarios
 ([storage-family contracts on Yul](SEMANTIC_DIFFERENTIAL.md#compare-storage-family-contracts-on-yul));
-selecting either call profile fails before execution. Each random Yul run of
+selecting any of the three call profiles fails before execution. Each random Yul run of
 the default selection with `--cases 16` requests 416 cases. The shared
 preparation command builds Rust and Lean tools; solc is supplied and checked
 separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 2,302 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 2,302 | Sonatina O2 | Sonatina O2 |
+| `sonatina-o0` | 2,347 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 2,347 | Sonatina O2 | Sonatina O2 |
 | `yul` | 1,858 pure; 416 storage-family when selected | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure and
 storage-family results can still be compared with both other paths, because
 those observations do not depend on code layout; code-dependent observations
-and the two call profiles remain unsupported on Yul. Reports record this
+and the three call profiles remain unsupported on Yul. Reports record this
 distinction in `pathBackends`.
 
-The default selection is all fifty-five profiles: twenty-six pure profiles,
+The default selection is all fifty-six profiles: twenty-six pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
 mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
@@ -125,10 +125,11 @@ value of a user-defined enum of two to four constructors, a method that
 takes one, canonically encoded or malformed, a method that takes a calldata
 array of up to three of them and two indices, canonically encoded or malformed,
 a method that returns std's encoding of a memory array of up to three
-`uint256`, `bytes4`, `bytes` or `uint256[]` elements, and a contract whose
+`uint256`, `bytes4`, `bytes` or `uint256[]` elements, a contract whose
 constructor takes Words, `bytes` or a user enum, canonically encoded or
-malformed.
-Fixed mode runs all 2,302 manifest cases or scenarios. It rejects `--cases`,
+malformed, and a parent that calls a child method through std's `raw_call` and
+decodes its tuple, `bytes` or enum return data, typed or malformed.
+Fixed mode runs all 2,347 manifest cases or scenarios. It rejects `--cases`,
 `--functions` and `--nodes` overrides rather than silently truncating required
 coverage. Repeat `--profile NAME` to select a smaller suite.
 
@@ -167,7 +168,13 @@ campaign compiles each distinct source once per backend and shares it among
 cases whose source files, backend, library, exporters and compiler builds match
 by digest; every archive still holds its own copies of the outputs and records
 the shared compilation in `report.compilation`, and exact replay compiles
-again.
+again. A fixed pure campaign also generates each corpus recipe once for all of
+its entries' inputs and hashes each unchanged tool once, and the five pure
+profiles whose cases carry large Core references retain their case files as
+compact JSON. The complete default fixed suite of fifty-five profiles took
+5,574 seconds and 340 MiB on Sonatina O0 and 3,980 seconds and 297 MiB on Yul
+locally, within its 7,200 seconds and 1 GiB
+([per-case overhead](SEMANTIC_DIFFERENTIAL.md#per-case-overhead-and-the-fixed-suites-budget)).
 
 The CI finding check uses a reducible fixed addition case:
 
@@ -205,7 +212,7 @@ Iteration `i` runs the suite in random mode once per backend, with root seed
 `base + i`, so the backends compare the same generated programs. All three
 backends run by default. On Yul the driver runs the pure and the twenty-seven
 storage-family profiles, whether profiles are configured or not, and never the
-two call profiles. It selects the storage family explicitly, since the suite's
+three call profiles. It selects the storage family explicitly, since the suite's
 own Yul default is the pure profiles. With the default sixteen cases, this adds
 432 eight-transaction scenarios to each Yul iteration, about 4,800 seconds at
 the default node budgets and 4,950 at doubled ones, estimated from each

@@ -174,8 +174,10 @@ Yul compiled by pinned solc is
 available for the twenty-six pure profiles with `--backend yul`, and for the
 twenty-seven storage-family profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
-object linking and the two call profiles, whose sources compile a parent and a
-child contract, are outside this comparison.
+object linking and the three call profiles are outside this comparison: two
+compile a parent and a child contract from one source, and the call-return
+profile, which compiles each from its own source, waits for the exporter to
+admit its two contract names.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs
 may be constant-folded; source coverage is not runtime opcode coverage.
@@ -183,13 +185,15 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-five-profile suite runs locally with shared time and disk limits.
+The same fifty-six-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
 suites with advancing seeds and counts their findings in a signature registry.
 Upstream findings already recorded whose signatures are stable symptoms, such
-as known compiler crashes and rejections, count as known rather than new.
+as known compiler crashes and rejections, count as known rather than new. So do
+the mismatches of a recorded semantic defect that fall in its mismatch class,
+such as Sonatina O0's other Words for loops that write std memory values.
 An opt-in run kind also runs the pinned fixture comparison in mutation mode,
 a slice of the fixtures per iteration within per-fixture and per-run budgets.
 
@@ -660,7 +664,23 @@ and sixteen random scenarios at each of two node budgets match on both Sonatina
 levels and on Yul. See
 [constructor arguments](scripts/SEMANTIC_DIFFERENTIAL.md#compare-constructor-arguments).
 
-All twenty-nine stateful profiles also compare the installed contracts' whole
+The call-return profile compiles a parent and a child contract each from its
+own source. The parent calls a child method through std's `raw_call` and
+decodes the returned tuple of two to four Words, `bytes` value of up to 64
+bytes or user-defined enum with std's memory reader. The child returns the
+value through std's encoder, or raw through `return_` with one malformation
+such as truncation, trailing bytes, an offset, length or tail beyond the end,
+an unknown or cut tag or a static enum cut to a narrower head. Original Core
+cannot read return data, so an additive call-and-resume convention in the
+contract runtime splits the parent at its one call: a call phase, the child,
+then a resume phase that reads the child's status and bytes as its input, each
+through the public top-level runner. Each transaction records std's
+prescribed rejection from a byte-level Lean model, which the adapter
+recomputes. The 45 fixed scenarios and sixteen random scenarios at each of two
+node budgets match on both Sonatina levels. See
+[call returns](scripts/SEMANTIC_DIFFERENTIAL.md#compare-call-returns).
+
+All thirty stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
@@ -668,8 +688,8 @@ Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, or exactly the decoded record for the
 constructor-argument profile, and a revert must leave each path's whole storage
-unchanged. The latest fixed run of all twenty-nine profiles, 444 scenarios and
-1,150 transaction prefixes, matched on Sonatina O0, and every
+unchanged. The latest fixed run of all thirty profiles, 489 scenarios and
+1,239 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See

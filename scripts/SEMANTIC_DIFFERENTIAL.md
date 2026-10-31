@@ -7006,7 +7006,7 @@ Every stateful profile compares the declared slots on all three paths. The twent
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-twenty-nine stateful profiles now also compare the observed contracts' whole
+thirty stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -7016,7 +7016,7 @@ this section describes how the paths observe it.
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
 `contract` for the twenty-seven storage-family profiles, `parent` and `child` for
-`stateful-calls` and `stateful-forwarded-value`. Every account names its role,
+the three call profiles. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
 written are the same observation. An incomplete transaction reports the prior
@@ -7109,8 +7109,9 @@ then; the later profiles start at
 `solcore-lean.enum-return-history.v1`,
 `solcore-lean.enum-argument-history.v1`,
 `solcore-lean.enum-array-history.v1`,
-`solcore-lean.array-return-history.v1` and
-`solcore-lean.constructor-argument-history.v1`, whole storage included; the two inline
+`solcore-lean.array-return-history.v1`,
+`solcore-lean.constructor-argument-history.v1` and
+`solcore-lean.call-return-history.v1`, whole storage included; the two inline
 Yul loop profiles reuse their parents' history schemas. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
@@ -7193,9 +7194,11 @@ preservation proof.
 
 The twenty-seven storage-family profiles also run with `--backend yul --solc PATH`.
 They compile as the pure profiles do: the checked Rust driver's Yul goes
-through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The two
-call profiles stay on Sonatina, because each of their sources compiles a parent
-and a child contract. The
+through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The three
+call profiles stay on Sonatina: `stateful-calls` and `stateful-forwarded-value`
+compile a parent and a child contract from one source, and
+`stateful-call-returns`, which compiles each from its own source, waits for the
+exporter to admit its two contract names. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the observation
 boundary; this section describes how to run it.
 
