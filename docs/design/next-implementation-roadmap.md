@@ -10789,6 +10789,166 @@ the digest cache and compile on their own.
     sources, took 258 and 250 seconds before and 136 and 146 after, run in
     turn, with identical counts and analyses each time.
 
+**Source mutants of the pinned fixtures: probe and definitions.** Every fixture
+comparison so far changes inputs, one call or the sequence, but never the
+program: the compilers only ever see the 165 admitted sources. A source mutant
+changes one site of a fixture's program, so each path compiles a program that
+no upstream test compiled, and the recorded steps exercise it. A probe asked
+whether the pinned parser locates sites, what the frontend and each path do
+with single-site mutants, what one costs, and which sites the recorded steps
+reach:
+- **Sites.** `scripts/rust-site-export.rs`, a sibling of the declaration
+  extractor, is built offline by `export-rust-sites.py --build` from the same
+  pinned parser crates and upstream lock, in its own crate under `.upstream`
+  with its own receipt (`site-export-build.json`).
+  - The pinned HIR keeps a span for every expression and statement, the token
+    span of every binary and unary operator, and every literal's text. The
+    tool walks every function, contract method, instance method, lambda and
+    contract field initializer of one source file. It prints every literal
+    (decimal, hex or string, in expressions and match patterns), binary
+    operator, compound assignment, unary operator and condition (`if`, `for`
+    and the conditional expression), and in inline Yul every literal, builtin
+    call and condition, each with its absolute byte span and the text there.
+  - A site whose text is not the token its node names is unsafe and never
+    mutated. The parser lowers `x += e` to an assignment of a binary operator
+    whose token span covers `+=`, so such a token is a compound-assignment
+    site.
+  - Over the 165 admitted fixtures' 181 source files, no file failed to parse,
+    and every span's bytes are the reported text. 149 fixtures have 2,631 safe
+    sites: 1,467 literals, 458 binary operators, 32 compound assignments, 12
+    unary operators and 128 conditions, and in inline Yul 240 literals, 268
+    builtin calls and 26 conditions. 142 of them lie in the other modules of
+    seven fixtures. The only unsafe ones are six `~=` statements, whose
+    mutation would delete a statement. The other 16 fixtures compute only
+    through std calls, as `arithmetic`'s `Add.add(x, y)` does.
+- **Acceptance.** A seeded sample of 568 single-site mutants across 147
+  fixtures, up to four each and one per operator family in turn, went through
+  the checked-source stage from a copy of each fixture's directory. The
+  frontend accepted 562, every literal among them. It refused four for a
+  missing instance (`Pair: Sub`, `string: Sub`, `Choice: Sub`,
+  `operator le`), and two inline Yul mutants because compile-time reduction
+  reached its depth limit.
+- **Paths.** 30 accepted mutants of 30 fixtures, 20 with method directives,
+  were compiled on every path and run with the harness's runners:
+  - 29 compiled on O0, O2 and Yul. The other, of `ignored-builtin-effects`,
+    crashed Sonatina O2, as the fixture itself does.
+  - Their recorded steps agreed on Hull, O0, O2 and Yul, 326 steps in all.
+    One was incomplete: in `aggregate-closure-captures` a `-` turned into `+`
+    recursed until Lean Core's 120-second limit, and every EVM path halted.
+    No path refused a mutant or failed.
+  - 22 of the 29 changed at least one recorded step's observation. The other
+    seven sit in code the steps do not reach, or are equivalent there.
+- **Cost.** The checked-source stage alone takes 1.7 seconds. Compiling a
+  mutant takes a median of 2.8 seconds on O0 and on O2 and 3.0 on Yul, each
+  export checking the Hull again; under load, up to 9.7. The recorded steps
+  then take 0.01 to 0.08 seconds on each EVM path and a median of 0.3 on Lean
+  Core. Method fixtures run there one invocation per directive, up to 32
+  seconds, and 146 for the stalled mutant above; in one invocation a method
+  sequence is 2 to 26 times cheaper (unit 16's probe). Single-change mutants
+  on a mutated program would be cheap for most fixtures but cost the loop
+  fixtures' hour-long Lean stalls once per mutant.
+- **Candidates.** The operators below give 8,205 candidates: 6,237 literal,
+  609 operator, 128 condition and 1,231 inline Yul mutants. A fixture has a
+  median of 18 and at most 432 (`deposit`); 111 fixtures have at least eight.
+
+The definitions were fixed before any harness change:
+- **Source mutant:** one site of one of a fixture's source files changed by
+  one operator. The mutated program is compiled on every path that the
+  fixture itself admits, and its recorded steps run on it.
+- **Operators,** each replacing the site's text:
+  - a number or hex literal, in an expression or a pattern, becomes `0`, `1`,
+    its value ± 1, `2^256 - 1` and twice its value, each below `2^256` and
+    never the value itself, written in the literal's own base; a hex literal
+    keeps its digit count when the value fits;
+  - a string literal becomes the empty string;
+  - a binary operator: `+` ↔ `-`, `*` → `/`, `/` → `*` and `%`, `%` → `/`;
+    `&`, `|` and `^` into each of the other two; `<` → `<=` and `>`, `<=` →
+    `<` and `>=`, `>` → `>=` and `<`, `>=` → `>` and `<=`, `==` ↔ `!=`;
+    `&&` ↔ `||`;
+  - a compound assignment takes the same swaps (`+=` ↔ `-=`, …);
+  - a unary `!` or `~` is dropped;
+  - a condition `c` becomes `!(c)`;
+  - inline Yul: a builtin `add` ↔ `sub`, `mul` → `div`, `div` → `mul` and
+    `mod`, `mod` → `div`, `sdiv` ↔ `smod`, `lt` ↔ `gt`, `slt` ↔ `sgt`,
+    `and`, `or` and `xor` into each of the other two, `shl` ↔ `shr`, `shr`
+    → `sar`, `sar` → `shr`, and `eq` → `lt` and `gt`; a literal as above, or
+    `true` ↔ `false`; a condition `c` becomes `iszero(c)`.
+  - The probe suggested the compound assignments and the pattern literals.
+- **Order, numbering and seeding:**
+  - Candidates are ordered by file name, then span, then the operator's order
+    above, and numbered `p1`, `p2`, … over every candidate.
+  - A fixture keeps at most `--source-mutants` (default 8; 0 runs none). The
+    families (literal, operator, condition, inline Yul) take turns in a
+    seeded order, each drawing one candidate, as the single-change draw does,
+    from the root seed, the fixture id and `source`. The kept mutants keep
+    their numbers and run in that order.
+  - `--run-source-mutants M` splits `M` evenly over the run's fixtures with a
+    recorded call, at least one each, as for sequence mutants.
+  - The single-change, deployment and sequence streams are unchanged.
+- **Compilation:**
+  - Each mutant is a fresh copy of its fixture's directory with the one edit.
+  - O0 and O2 code images with their checked Hull come from
+    `export-rust-code-image.py`. Yul comes from `export-rust-yul.py --fixture
+    ID --fixture-edit EDIT`, which checks the copy against the pin byte for
+    byte before compiling and records the edit.
+  - Paths that the fixture itself excludes stay excluded and are not
+    compiled.
+- **Exclusions:**
+  - A frontend refusal (the checked-source stage) excludes the mutant, and is
+    counted with its reason.
+  - A resource limit while compiling excludes the paths it stops.
+  - A mutant reached after the fixture's or the run's deadline, or after a
+    stop signal, is not run and counts as `budget`, as do the steps a
+    deadline leaves unrun.
+- **Execution:** the recorded deployment and steps run with their recorded
+  callers, values, gas and persistence on every path that compiled. On Lean
+  Core they run in one invocation within `--hull-entry-timeout`. After a
+  limit there, they run again as recorded steps do: a method entry in its own
+  invocation, a raw scenario resumed past the limit.
+- **Comparison:** recorded expectations no longer hold, so every step, the
+  deployment included, is compared across the paths only, as after a sequence
+  change: status, return or revert bytes, logs, whole storage and balances.
+  A path leaves the program at its first step that it did not complete, and
+  the comparison stops at the first disagreement. Each step records whether
+  it observed what the original program's step did.
+- **Findings:**
+  - a compiler crash on any path, frontend or backend, as today;
+  - a compile-time disagreement, `compile-mismatch`: a path that the fixture
+    admits refuses a mutant that the frontend accepted and another path
+    compiled;
+  - from the deployment on, a disagreement or a path failure among the
+    compiled paths.
+
+  Each records the mutant's number and edit.
+- **Reduction:** the single site is already minimal, so a compile finding
+  stays as it is. A step finding reduces to the shortest prefix on the same
+  mutated program: of the recorded steps before it, only the persisting ones
+  stay, and each is dropped, last first, while the finding recurs. Every
+  reduction's bounds apply.
+- **Out of scope:** single-change mutants on a mutated program, given their
+  cost on the loop fixtures, and sites in std.
+- **Records:** each mutant's file, span, kind, text, replacement and family,
+  each path's compile status and seconds, and each compared step's agreement
+  and whether it observed what the original program did. Each fixture counts
+  its sites, candidates, kept, compiled and refused mutants and the mutants
+  that changed a step.
+- **Fuzz driver:** the `fixtures` run kind gains `--fixture-sources`
+  (default 2), passed on as the per-fixture cap. A crash registers by its
+  symptom as today, a `compile-mismatch` by its stage, paths and symptom, and
+  a step finding by its fixture, edit and reduced steps.
+- **Expected size:** with the default cap, 1,057 mutants in 147 fixtures,
+  some 9 seconds each at the median.
+- **Runs:**
+  - a frozen mutation run, root seed `20261111`, of every admitted fixture on
+    Hull, O0, O2 and Yul;
+  - one fuzz-driver `fixtures` iteration with source mutants.
+
+  Any disagreement or crash is a finding. It goes to `questions.md`, and joins
+  the known findings only if its signature is a stable symptom.
+- **Epoch and readiness:** the preparation builds and receipts the site
+  extractor, and the harness and fuzz driver change. Every checkout needs one
+  offline `--prepare`, and an existing fuzz state needs `--accept-new-epoch`.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
