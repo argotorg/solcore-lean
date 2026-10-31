@@ -44,6 +44,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-memory-values": ("memory-values-generate", "memory-values-emit", "memory-generated"),
                     "runtime-memory-calls": ("memory-calls-generate", "memory-calls-emit", "memory-call-generated"),
                     "runtime-revert-data": ("revert-data-generate", "revert-data-emit", "revert-data-generated"),
+                    "runtime-halts": ("halt-generate", "halt-emit", "halt-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-assembly-loops": ("assembly-loop-generate", "assembly-loop-emit", "assembly-loop-generated"),
@@ -105,6 +106,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-memory-values": m2.MEMORY_VERSIONS,
                           "runtime-memory-calls": m2.MEMORY_CALL_VERSIONS,
                           "runtime-revert-data": m2.REVERT_DATA_VERSIONS,
+                          "runtime-halts": m2.HALT_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-assembly-loops": m2.ASSEMBLY_LOOP_VERSIONS,
@@ -408,14 +410,14 @@ def minimum_nodes(profile: str) -> int:
     return {"runtime-primitives": 8, "runtime-assembly-memory": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39, "runtime-assembly-loops": 39,
             "runtime-aggregate-call-graphs": 13, "runtime-enums": 256, "runtime-traits": 256,
             "runtime-trait-hierarchies": 256, "runtime-memory-values": 256, "runtime-memory-calls": 256,
-            "runtime-revert-data": 256}.get(profile, 3)
+            "runtime-revert-data": 256, "runtime-halts": 256}.get(profile, 3)
 
 
 def maximum_nodes(profile: str) -> int:
     """The enum, trait and trait hierarchy budgets bound the applied reference, at most its 4,096-node case limit;
     the memory value and memory call budgets bound the applied reference without its hash closure, and the
-    revert data budget the applied reference, at most 2,048 nodes."""
-    if profile in ("runtime-memory-values", "runtime-memory-calls", "runtime-revert-data"):
+    revert data and halt budgets the applied reference, at most 2,048 nodes."""
+    if profile in ("runtime-memory-values", "runtime-memory-calls", "runtime-revert-data", "runtime-halts"):
         return 2048
     return 4096 if profile in ("runtime-enums", "runtime-traits", "runtime-trait-hierarchies") else 512
 
@@ -757,6 +759,34 @@ def specified_revert_data(case: dict) -> dict[str, set]:
     return {dimension: set(shapes[dimension.lower()]) for dimension in REVERT_DATA_DIMENSIONS}
 
 
+# The summary's dimension names and the halt shapes they hold.
+HALT_DIMENSIONS = {"Halts": "halts", "HaltContexts": "haltContexts", "HaltTests": "haltTests",
+                   "HaltWords": "haltWords", "HaltOrders": "haltOrders"}
+
+
+def halt_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("haltRequirements", {key: [] for key in m2.HALT_SHAPES})
+    if not isinstance(requirements, dict) or set(requirements) != set(m2.HALT_SHAPES):
+        raise ValueError("haltRequirements requires halts, haltContexts, haltTests, haltWords and haltOrders arrays")
+    for key, allowed in m2.HALT_SHAPES.items():
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid halt {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-halts" and any(requirements.values()):
+        raise ValueError("only halt corpora can require halt shapes")
+    return requirements
+
+
+def specified_halts(case: dict) -> dict[str, set]:
+    """The plan's halt shapes as native replay authenticates them in the
+    provenance; never measured halts or opcode coverage."""
+    if case.get("schema") != m2.HALT_CASE_SCHEMA:
+        return {dimension: set() for dimension in HALT_DIMENSIONS}
+    shapes = m2.validate_revert_data_shapes(case.get("provenance", {}).get("haltShapes"), "haltShapes", m2.HALT_SHAPES)
+    return {dimension: set(shapes[key]) for dimension, key in HALT_DIMENSIONS.items()}
+
+
 def specified_memory_calls(case: dict) -> dict[str, set]:
     """The plan's memory call shapes as native replay authenticates them in the
     provenance; never measured memory traffic or opcode coverage."""
@@ -1028,6 +1058,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["memoryValueCoverage"]["missing" + dimension] for dimension in MEMORY_DIMENSIONS)
         or any(summary["memoryCallCoverage"]["missing" + dimension] for dimension in MEMORY_CALL_DIMENSIONS)
         or any(summary["revertDataCoverage"]["missing" + dimension] for dimension in REVERT_DATA_DIMENSIONS)
+        or any(summary["haltCoverage"]["missing" + dimension] for dimension in HALT_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -1080,6 +1111,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("memory call corpus must require all eight boundary inputs")
     if profile == "runtime-revert-data" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("revert data corpus must require all eight boundary inputs")
+    if profile == "runtime-halts" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("halt corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
@@ -1110,6 +1143,7 @@ def validate_manifest(manifest) -> dict:
     memory_requirements(manifest)
     memory_call_requirements(manifest)
     revert_data_requirements(manifest)
+    halt_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -1122,9 +1156,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-halts": "haltPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -1187,6 +1221,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_memory_call_plan(entry["memoryCallPlan"])
         elif "revertDataPlan" in entry:
             m2.validate_revert_data_plan(entry["revertDataPlan"])
+        elif "haltPlan" in entry:
+            m2.validate_halt_plan(entry["haltPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -1209,7 +1245,7 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
         return RECURSION_INPUTS
     if profile in ("runtime-primitives", "runtime-assembly", "runtime-assembly-memory", "runtime-call-graphs",
                    "runtime-aggregate-call-graphs", "runtime-enums", "runtime-traits", "runtime-trait-hierarchies",
-                   "runtime-memory-values", "runtime-memory-calls", "runtime-revert-data"):
+                   "runtime-memory-values", "runtime-memory-calls", "runtime-revert-data", "runtime-halts"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -1238,8 +1274,9 @@ def generation_resource_exclusions(excluded: list) -> int:
     return count
 
 
-def analyze(report: dict, perturb: str | None = None, *, reverts: bool = False) -> dict:
-    """`reverts` is true for a profile whose matched cases may revert alike."""
+def analyze(report: dict, perturb: str | None = None, *, reverts: bool = False, halts: bool = False) -> dict:
+    """`reverts` is true for a profile whose matched cases may revert alike, `halts`
+    for one whose matched cases may halt alike."""
     actual = copy.deepcopy(report.get("comparison", {"category": "adapter-error", "stage": "missing-report", "pairs": {}}))
     observed = copy.deepcopy(report.get("observations", {}))
     synthetic = False
@@ -1248,16 +1285,18 @@ def analyze(report: dict, perturb: str | None = None, *, reverts: bool = False) 
             raise ValueError("unknown test observation path")
         if actual.get("category") == "matched":
             # Require fresh completed observations even in the test adapter.
-            if m2.compare(observed, reverts=reverts).get("category") != "matched":
+            if m2.compare(observed, reverts=reverts, halts=halts).get("category") != "matched":
                 raise ValueError("matched report has inconsistent observations")
-            if observed[perturb].get("status") == "reverted":
+            if observed[perturb].get("status") == "invalid":
+                observed[perturb] = {"status": "returned", "word": "0"}
+            elif observed[perturb].get("status") == "reverted":
                 data = m2.hex_bytes(observed[perturb].get("output"), "revert data")
                 observed[perturb]["output"] = "0x" + (data[:-1] + bytes([data[-1] ^ 1])).hex()
             else:
                 original = int(m2.word(observed[perturb].get("word")))
                 observed[perturb]["word"] = str(original ^ 1)
             synthetic = True
-    result = m2.compare(observed, reverts=reverts) if synthetic else actual
+    result = m2.compare(observed, reverts=reverts, halts=halts) if synthetic else actual
     return {"schema": ANALYSIS_SCHEMA, "backend": m2.resolve_backend(None, report), "synthetic": synthetic,
             "testAdapter": {"name": TEST_ADAPTER, "path": perturb} if perturb else None,
             "actualComparison": actual, "comparison": result, "observations": observed}
@@ -1391,6 +1430,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in MEMORY_CALL_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "revertDataCoverage": {"classification": "revert data plan helper kinds, site forms, raised Error kinds, contexts where sites run, carriers of raised Errors, Error declarations, data values, condition tests and tested Words, payload length classes, message write and allocation hazards and step kinds the plan specifies; matched plans verified by native replay; not measured revert traffic or opcode coverage",
                 **{prefix + dimension: [] for dimension in REVERT_DATA_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "haltCoverage": {"classification": "halt plan halt forms, contexts where halt sites run, their condition tests and tested Words, and their orders before and after revert sites and writes the plan specifies; matched plans verified by native replay; not measured halts or opcode coverage",
+                **{prefix + dimension: [] for dimension in HALT_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -1471,6 +1512,9 @@ class Campaign:
         reverts = self.summary["revertDataCoverage"]
         for dimension in REVERT_DATA_DIMENSIONS:
             reverts["missing" + dimension] = sorted(set(reverts["required" + dimension]) - set(reverts["matched" + dimension]))
+        halts = self.summary["haltCoverage"]
+        for dimension in HALT_DIMENSIONS:
+            halts["missing" + dimension] = sorted(set(halts["required" + dimension]) - set(halts["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -1555,6 +1599,11 @@ class Campaign:
         for dimension, values in specified_revert_data(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["revertDataCoverage"][key] = sorted(set(self.summary["revertDataCoverage"][key]) | values)
+
+    def record_halts(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_halts(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["haltCoverage"][key] = sorted(set(self.summary["haltCoverage"][key]) | values)
 
     def record_memory_calls(self, case: dict, *, matched: bool = False) -> None:
         for dimension, values in specified_memory_calls(case).items():
@@ -1673,7 +1722,8 @@ class Campaign:
             save_json(folder / "report.json", report)
             input_path.unlink(missing_ok=True)
         analysis = analyze(report, self.args.test_perturb_path,
-                           reverts=PROFILE_SCHEMAS.get(self.args.profile) in m2.REVERTING_SCHEMAS)
+                           reverts=PROFILE_SCHEMAS.get(self.args.profile) in m2.REVERTING_SCHEMAS,
+                           halts=PROFILE_SCHEMAS.get(self.args.profile) in m2.HALTING_SCHEMAS)
         # analysis is deliberately outside the immutable actual M2 report.
         save_json(folder / "analysis.json", analysis)
         return folder, report, analysis
@@ -1901,6 +1951,9 @@ class Campaign:
         reverts = revert_data_requirements(manifest)
         for dimension in REVERT_DATA_DIMENSIONS:
             self.summary["revertDataCoverage"]["required" + dimension] = sorted(reverts[dimension.lower()])
+        halts = halt_requirements(manifest)
+        for dimension, key in HALT_DIMENSIONS.items():
+            self.summary["haltCoverage"]["required" + dimension] = sorted(halts[key])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1944,9 +1997,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-halts": "haltPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -2002,6 +2055,7 @@ class Campaign:
             self.record_memory_values(case)
             self.record_memory_calls(case)
             self.record_revert_data(case)
+            self.record_halts(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -2066,6 +2120,7 @@ class Campaign:
             self.record_memory_values(case)
             self.record_memory_calls(case)
             self.record_revert_data(case)
+            self.record_halts(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -2105,6 +2160,7 @@ class Campaign:
                 self.record_memory_values(case, matched=True)
                 self.record_memory_calls(case, matched=True)
                 self.record_revert_data(case, matched=True)
+                self.record_halts(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -2138,7 +2194,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 1024 for memory values and memory calls (at most 2048, without the hash closure) and revert data (at most 2048), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 1024 for memory values and memory calls (at most 2048, without the hash closure) and revert data and halts (at most 2048), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     parser.add_argument("--functions", type=int,
                         help="random runtime-input profiles only: generate this many accepted functions, each "
@@ -2226,7 +2282,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-memory-values": 1024, "runtime-memory-calls": 1024, "runtime-revert-data": 1024, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-memory-values": 1024, "runtime-memory-calls": 1024, "runtime-revert-data": 1024, "runtime-halts": 1024, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

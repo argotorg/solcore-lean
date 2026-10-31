@@ -30,10 +30,17 @@ def Source.size : Source → Nat
   | .make made => made.size
   | .named _ | .param => 2
 
+/-- A halt: `assert` and inline Yul under `if` weigh nothing, a call of
+std.opcodes' `invalid()` and a Yul `if` one. -/
+def Halt.size : Halt → Nat
+  | .assert | .inline => 0
+  | .opcode | .yul => 1
+
 def Payload.size : Payload → Nat
   | .none => 0
   | .literal text => 1 + text
   | .error origin => 1 + origin.size
+  | .halt kind => kind.size
 
 def Site.size (site : Site) : Nat :=
   1 + (if site.form == .require then 1 else 0) + operandSize site.cond.word + site.cond.test.size + site.payload.size
@@ -110,6 +117,7 @@ def Payload.reductions (form : Form) : Payload → List Payload
   | .none => []
   | .literal text => (if text = 0 then [] else [.literal 0]) ++ (if form == .when then [.none] else [])
   | .error origin => origin.reductions.map Payload.error ++ (if form == .when then [.none] else [])
+  | .halt kind => if kind.size = 0 then [] else [.halt .inline]
 
 def Site.reductions (site : Site) : List Site :=
   (site.payload.reductions site.form).map (fun payload => {site with payload}) ++
@@ -119,7 +127,7 @@ def Site.reductions (site : Site) : List Site :=
     match site.payload with
     | .error _ => [{site with form := .when}]
     | .literal text => [{site with form := .when, payload := .literal (if literalLength text ≤ 32 then text else 0)}]
-    | .none => []
+    | .none | .halt _ => []
   else [])
 
 def foldReductions (fold : Fold) (constant : Nat) : List (Fold × Nat) :=

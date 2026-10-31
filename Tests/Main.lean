@@ -4072,6 +4072,7 @@ def run : IO Unit := do
   SourceMemoryValuesCases.testSourceMemoryValuesCases
   SourceMemoryCallsCases.testSourceMemoryCallsCases
   SourceRevertDataCases.testSourceRevertDataCases
+  SourceRevertDataCases.testSourceHaltCases
   CallGraphGenerator.testCallGraphGenerator
   SourceCallGraphEmitter.testSourceCallGraphEmitter
   SourceCallGraphCases.testSourceCallGraphCases

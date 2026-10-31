@@ -59,8 +59,24 @@ def sourceText (word : Operand → String) : Source → String
 
 def literalText (text : Nat) : String := "\"" ++ (literals[text]?).getD "" ++ "\""
 
-/-- A site's lines over the Words of its scope. -/
-def siteLines (word : Operand → String) (site : Site) : List String :=
+/-- A Word in Yul: `run`'s, or a helper's or closure's over its parameter. -/
+def yulWord (base : String) : Operand → String
+  | .add constant => "add(" ++ base ++ ", " ++ toString constant ++ ")"
+  | .mul constant => "mul(" ++ base ++ ", " ++ toString constant ++ ")"
+  | .xor constant => "xor(" ++ base ++ ", " ++ toString constant ++ ")"
+  | .acc => "sc_r"
+  | .counter => "sc_counter"
+  | .input => base
+
+def yulTest (word : String) : Test → String
+  | .lt constant => "lt(" ++ word ++ ", " ++ toString constant ++ ")"
+  | .gt constant => "gt(" ++ word ++ ", " ++ toString constant ++ ")"
+  | .eq constant => "eq(" ++ word ++ ", " ++ toString constant ++ ")"
+  | .ne constant => "iszero(eq(" ++ word ++ ", " ++ toString constant ++ "))"
+  | .bits mask value => "eq(and(" ++ word ++ ", " ++ toString mask ++ "), " ++ toString value ++ ")"
+
+/-- A site's lines over the Words of its scope, `yul` naming them in Yul. -/
+def siteLines (word : Operand → String) (site : Site) (yul : Operand → String := yulWord "sc_x") : List String :=
   let condition := testText (word site.cond.word) site.cond.test
   let guarded := fun (line : String) => ["if " ++ condition ++ " {", "    " ++ line, "}"]
   match site.form, site.payload with
@@ -69,13 +85,18 @@ def siteLines (word : Operand → String) (site : Site) : List String :=
   | .when, .literal text => guarded ("revertLit(" ++ literalText text ++ ");")
   | .require, .literal text => ["require(" ++ condition ++ ", " ++ literalText text ++ ");"]
   | _, .none => guarded "revertEmpty();"
+  | _, .halt .assert => ["assert(" ++ condition ++ ");"]
+  | _, .halt .opcode => guarded "invalid();"
+  | _, .halt .inline => ["if " ++ condition ++ " {", "    assembly {", "        invalid()", "    }", "}"]
+  | _, .halt .yul =>
+      ["assembly {", "    if " ++ yulTest (yul site.cond.word) site.cond.test ++ " {", "        invalid()", "    }", "}"]
 
 def helperName (index : Nat) : String := "sc_h" ++ toString index
 
 def helperLines (index : Nat) : Helper → List String
   | .raise site fold constant =>
       ["function " ++ helperName index ++ "(sc_e: Error, sc_w: word) returns (word) {"] ++
-      indent 4 (siteLines (localWord "sc_w") site) ++
+      indent 4 (siteLines (localWord "sc_w") site (yulWord "sc_w")) ++
       ["    return (sc_w" ++ foldText fold ++ toString constant ++ ");", "}"]
   | .make constant =>
       ["function " ++ helperName index ++ "(sc_w: word) returns (Error) {",
@@ -162,7 +183,7 @@ def stepLines (names : Names) : Step → List String × Names
   | .take held site fold constant => (takeLines held site fold constant, names)
   | .closure site fold constant =>
       (["let sc_c" ++ toString names.closures ++ ": function (word) returns (word) = lam (sc_j: word) -> word {"] ++
-        indent 4 (siteLines (localWord "sc_j") site) ++
+        indent 4 (siteLines (localWord "sc_j") site (yulWord "sc_j")) ++
         ["    return (sc_j" ++ foldText fold ++ toString constant ++ ");", "};"],
        {names with closures := names.closures + 1})
   | .apply closure word fold constant =>
@@ -190,7 +211,8 @@ def usesEnum (plan : Plan) : Bool :=
     | .data (.first ..) | .data (.second _) => true
     | _ => false
 
-def emit (plan : Plan) : EmittedProgram := Id.run do
+/-- The source with its contract and std.opcodes imports. -/
+def emitWith (contract : String) (opcodes : String) (plan : Plan) : EmittedProgram := Id.run do
   let mut names : Names := {}
   let mut lines : List String := []
   for step in plan.steps do
@@ -201,17 +223,20 @@ def emit (plan : Plan) : EmittedProgram := Id.run do
   let actionHelpers := Source.MemoryValues.helperNames.filter used.contains
   let enum := if usesEnum plan then ["enum Sc_F {", "    Sc_F0(Error, word),", "    Sc_F1(word)", "}", ""] else []
   let helpers := plan.helpers.zipIdx.flatMap fun (helper, index) => helperLines index helper ++ [""]
-  let source := ["import * from std;", "import * from std.dispatch;",
-      "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] ++
+  let source := ["import * from std;", "import * from std.dispatch;", opcodes, ""] ++
     actionHelpers.flatMap Source.MemoryValues.helperLines ++ enum ++ helpers ++
-    ["contract " ++ contractName ++ " {",
+    ["contract " ++ contract ++ " {",
      "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
      "        let sc_x: word = Typedef.rep(input);",
      "        let sc_r: word = 0;"] ++ indent 8 lines ++
     ["        return uint256(sc_r);", "    }", "}"]
   return {
     source := String.intercalate "\n" source ++ "\n"
-    contractName, methodName, methodSignature, deployPath, runtimePath
+    contractName := contract, methodName, methodSignature, deployPath := [contract ++ "Deploy"],
+    runtimePath := [contract ++ "Deploy", contract]
   }
+
+def emit (plan : Plan) : EmittedProgram :=
+  emitWith contractName "import { mload, mstore, mstore8, shr, mod } from std.opcodes;" plan
 
 end Solcore.Synthesis.Source.RevertData

@@ -17,7 +17,12 @@ continues or carries its payload, and every enclosing scope forwards a payload
 it receives, so the first site whose condition holds decides. A message is the
 bytes of its value at the site, so a write made after the `Error` was made is
 seen. Every helper and closure is inlined where it runs. Nothing here reads
-source text. -/
+source text.
+
+`runtime-halts` shares these plans with a fifth kind of site, which halts with
+INVALID through `assert`, std.opcodes' `invalid()` or inline Yul; it raises
+the right injection with a length no revert data has. Its plans are admitted,
+drawn, shaped and reduced here too, and a revert data plan admits no halt. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Core.RevertData
@@ -63,11 +68,24 @@ inductive Source where
   | param
   deriving Repr, BEq, DecidableEq, Inhabited
 
-/-- What a site reverts with: an `Error`, a literal, or nothing. -/
+/-- How a `runtime-halts` site halts with INVALID: std's `assert(C);`, which
+halts when `C` does not hold, or `if (C) { invalid(); }` through
+std.opcodes' `invalid()`, `if (C) { assembly { invalid() } }`, or
+`assembly { if C { invalid() } }` with `C` in Yul. -/
+inductive Halt where
+  | assert
+  | opcode
+  | inline
+  | yul
+  deriving Repr, BEq, DecidableEq, Inhabited
+
+/-- What a site reverts with: an `Error`, a literal, or nothing; or the halt
+of a `runtime-halts` site. -/
 inductive Payload where
   | error (source : Source)
   | literal (text : Nat)
   | none
+  | halt (halt : Halt)
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- `if (C) { … }` reverts when its condition holds, `require(C, …)` when
@@ -289,6 +307,8 @@ def site? (env : Env) (context : Context) (site : Site) : Bool :=
   | .require, .literal text => text < literals.length
   | .when, .none => true
   | .require, .none => false
+  | .require, .halt halt => halt == .assert
+  | .when, .halt halt => halt != .assert
 
 end Env
 
@@ -456,6 +476,36 @@ def Step.folds (env : Env) : Step → Bool
       | _ => false
   | _ => false
 
+def Site.halts (site : Site) : Bool := site.payload matches .halt _
+
+def Helper.halts : Helper → Bool
+  | .raise site .. => site.halts
+  | _ => false
+
+def Step.halts : Step → Bool
+  | .site single | .take _ single .. | .closure single .. => single.halts
+  | .loop _ body => body.any fun item => match item with
+      | .site single => single.halts
+      | _ => false
+  | _ => false
+
+/-- The halt sites a step can reach, as `Step.sites` counts sites. -/
+def Step.haltSites (helpers : List Helper) (env : Env) : Step → Nat
+  | .site single => if single.halts then 1 else 0
+  | .call helper .. => match resolve helpers (maximumHelpers + 1) helper with
+      | some (single, _) => if single.halts then 1 else 0
+      | none => 0
+  | .take held single .. => match env.held? held with
+      | some (.error _) => if single.halts then 1 else 0
+      | _ => 0
+  | .apply number .. => match env.closures[number]? with
+      | some (single, _) => if single.halts then 1 else 0
+      | none => 0
+  | .loop _ body => (body.filter fun item => match item with
+      | .site single => single.halts
+      | _ => false).length
+  | _ => 0
+
 namespace Plan
 
 def scan? (plan : Plan) : Option (Env × Nat × Bool) :=
@@ -463,14 +513,29 @@ def scan? (plan : Plan) : Option (Env × Nat × Bool) :=
     let next ← env.step? plan.helpers step
     return (next, sites + step.sites plan.helpers env, folded || step.folds env)
 
+def halts (plan : Plan) : Bool := plan.helpers.any Helper.halts || plan.steps.any Step.halts
+
 /-- At least one site and one fold. -/
-def admitted (plan : Plan) : Bool :=
+def admittedSteps (plan : Plan) : Bool :=
   plan.helpers.length ≤ maximumHelpers &&
   plan.helpers.zipIdx.all (fun (helper, index) => helper.admitted plan.helpers index) &&
   1 ≤ plan.steps.length && plan.steps.length ≤ maximumSteps &&
   match plan.scan? with
   | some (_, sites, folded) => sites ≥ 1 && folded
   | none => false
+
+/-- A `runtime-revert-data` plan: no site halts. -/
+def admitted (plan : Plan) : Bool := !plan.halts && plan.admittedSteps
+
+/-- The halt sites the plan's steps can reach. -/
+def reachedHalts (plan : Plan) : Nat :=
+  (plan.steps.foldl (init := (({} : Env), 0)) fun (env, halts) step =>
+    ((env.step? plan.helpers step).getD env, halts + step.haltSites plan.helpers env)).2
+
+/-- A `runtime-halts` plan: a halt site it can reach. -/
+def haltAdmitted (plan : Plan) : Bool := plan.admittedSteps && plan.reachedHalts ≥ 1
+
+def admittedFor (halts : Bool) (plan : Plan) : Bool := if halts then plan.haltAdmitted else plan.admitted
 
 end Plan
 
@@ -535,6 +600,12 @@ def payloadOf (state : State) : Desc → Expr
 def literalPayload (text : Nat) : Expr :=
   MemoryValues.packet [num (literalLength text), num (literalWord text 0), num (literalWord text 1)]
 
+/-- A halt's length, which no revert data has: the right injection of a
+`runtime-halts` reference with this length and no bytes is INVALID's halt. -/
+def haltLength : Nat := 2 ^ 256 - 1
+
+def haltPayload : Expr := MemoryValues.packet [num haltLength, num 0, num 0]
+
 /-- Revert with `payload` when `condition` holds: a bound sum that continues
 or carries the payload, unpacked so that the scope forwards it. -/
 def raise (state : State) (condition payload : Expr) : State :=
@@ -581,6 +652,7 @@ def site (errors : List Desc) (state : State) (scene : Scene) (site : Site) : St
         (state, payloadOf state desc)
     | .literal text => (state, literalPayload text)
     | .none => (state, MemoryValues.packet [num 0, num 0, num 0])
+    | .halt _ => (state, haltPayload)
   let condition := testExpr (scene.word state site.cond.word) site.cond.test
   let raising := match site.form with
     | .when => condition
@@ -781,6 +853,12 @@ end Plan
 
 /-! Specified shapes, from the plan. -/
 
+def Halt.name : Halt → String
+  | .assert => "assert"
+  | .opcode => "invalid"
+  | .inline => "inline"
+  | .yul => "yul"
+
 def Site.formName (site : Site) : String :=
   match site.form, site.payload with
   | .when, .error _ => "revertWithError"
@@ -788,6 +866,7 @@ def Site.formName (site : Site) : String :=
   | .when, .literal _ => "revertLit"
   | .require, .literal _ => "requireLiteral"
   | _, .none => "revertEmpty"
+  | _, .halt halt => halt.name
 
 def Test.name : Test → String
   | .lt _ => "lt"
@@ -846,6 +925,9 @@ structure Trace where
   writes : List (Nat × String) := []
   /-- Bytes values made so far. -/
   allocations : Nat := 0
+  /-- Every site in the order it runs: whether it halts, and the writes before
+  it. -/
+  visits : List (Bool × Nat) := []
   deriving Repr, Inhabited
 
 def Trace.add (trace : Trace) (dimension value : String) : Trace :=
@@ -861,9 +943,13 @@ def wordKind (context : Context) : Operand → String
   | .acc => "acc"
   | .counter => "counter"
 
-/-- A site's shapes, with the `Error` it raises. -/
+/-- A site's shapes, with the `Error` it raises; a halt site's are its own. -/
 def Trace.site (trace : Trace) (context : String) (word : String) (site : Site) (raised : Option (Made × String)) :
     Trace := Id.run do
+  let trace := {trace with visits := trace.visits ++ [(site.halts, trace.writes.length)]}
+  if site.halts then
+    return (((trace.add "halts" site.formName).add "haltContexts" context).add "haltTests" site.cond.test.name).add
+      "haltWords" word
   let mut trace := ((trace.add "forms" site.formName).add "contexts" context).add "tests" site.cond.test.name
   trace := trace.add "words" word
   match site.payload, raised with
@@ -898,7 +984,8 @@ def Trace.made (trace : Trace) (env : Env) (errors : List Made) (param : Option 
   | .named number => errors[number]?.map fun made => (made, "variable")
   | .param => param.map fun made => (made, "param")
 
-def Plan.shapes (plan : Plan) : List (String × List String) := Id.run do
+/-- Every site a plan's steps run, in order, with the shapes they record. -/
+def Plan.trace (plan : Plan) : Trace := Id.run do
   let mut trace : Trace := {}
   let mut env : Env := {}
   let mut errors : List Made := []
@@ -1009,13 +1096,35 @@ def Plan.shapes (plan : Plan) : List (String × List String) := Id.run do
                   | .error source => trace.made inner errors none (some outer) source
                   | _ => none)
     env := (env.step? plan.helpers step).getD env
-  let sorted := fun (values : List String) => values.eraseDups.mergeSort (· ≤ ·)
-  let of := fun (dimension : String) => sorted (trace.shapes.filterMap fun (name, value) =>
-    if name == dimension then some value else none)
-  return [("helpers", of "helpers"), ("forms", of "forms"), ("errors", of "errors"),
-    ("contexts", of "contexts"), ("carriers", of "carriers"), ("declarations", of "declarations"),
-    ("data", of "data"), ("tests", of "tests"), ("words", of "words"), ("lengths", of "lengths"),
-    ("hazards", of "hazards"), ("steps", of "steps")]
+  return trace
+
+def Trace.of (trace : Trace) (dimension : String) : List String :=
+  (trace.shapes.filterMap fun (name, value) => if name == dimension then some value else none).eraseDups.mergeSort
+    (· ≤ ·)
+
+def Plan.shapes (plan : Plan) : List (String × List String) :=
+  let trace := plan.trace
+  ["helpers", "forms", "errors", "contexts", "carriers", "declarations", "data", "tests", "words", "lengths",
+    "hazards", "steps"].map fun dimension => (dimension, trace.of dimension)
+
+/-- Where halt sites run: after a revert site, before one, after a write, and
+before one. -/
+def Trace.orders (trace : Trace) : List String :=
+  let visits := trace.visits.zipIdx
+  let halts := visits.filter (·.1.1)
+  let reverts := visits.filter (!·.1.1)
+  let writes := trace.writes.length
+  (if halts.any (fun (_, position) => reverts.any (·.2 < position)) then ["revert-before"] else []) ++
+  (if halts.any (fun (_, position) => reverts.any (·.2 > position)) then ["revert-after"] else []) ++
+  (if halts.any (·.1.2 > 0) then ["write-before"] else []) ++
+  (if halts.any (·.1.2 < writes) then ["write-after"] else [])
+
+/-- The `runtime-halts` shapes: halt forms, contexts, tests and tested Words,
+and orders. -/
+def Plan.haltShapes (plan : Plan) : List (String × List String) :=
+  let trace := plan.trace
+  ["halts", "haltContexts", "haltTests", "haltWords"].map (fun dimension => (dimension, trace.of dimension)) ++
+    [("haltOrders", trace.orders.mergeSort (· ≤ ·))]
 
 /-! Generation. -/
 
@@ -1094,7 +1203,22 @@ def drawSource (env : Env) (context : Context) (outer : Nat := 0) : Gen Source :
   | 1 => return .named (← draw variables)
   | _ => return .param
 
-def drawSite (env : Env) (context : Context) (outer : Nat := 0) : Gen Site := do
+/-- A halt site of `runtime-halts`: each form equally, `assert` with a test
+that holds for most inputs and the others with one that holds for few. -/
+def drawHalt (context : Context) : Gen Site := do
+  let counter := context == .run true && (← draw 3) != 0
+  let word ← if counter then pure Operand.counter else match context with
+    | .helper | .closure => drawLocal
+    | _ => drawTested
+  let halt ← pick [Halt.assert, .opcode, .inline, .yul]
+  let form := if halt == .assert then Form.require else .when
+  return {form, cond := {word, test := ← drawTest (form == .when) counter}, payload := .halt halt}
+
+/-- A site; with `halts`, half the time a halt site. -/
+def drawSite (env : Env) (context : Context) (outer : Nat := 0) (halts : Bool := false) : Gen Site := do
+  if halts then
+    -- Nested, so that a revert data plan draws exactly what it drew before.
+    if (← draw 2) = 0 then return ← drawHalt context
   let counter := context == .run true && (← draw 3) != 0
   let word ← if counter then pure Operand.counter else match context with
     | .helper | .closure => drawLocal
@@ -1109,10 +1233,10 @@ def drawSite (env : Env) (context : Context) (outer : Nat := 0) : Gen Site := do
   | 3 => return {form, cond, payload := .literal (← draw literals.length)}
   | _ => return {form, cond, payload := .none}
 
-def drawHelper (helpers : List Helper) : Gen Helper := do
+def drawHelper (helpers : List Helper) (halts : Bool := false) : Gen Helper := do
   let raising := (List.range helpers.length).filter fun index => (helpers[index]?).any Helper.raises
   match ← drawWeighted [4, 2, 2, 2, if raising.isEmpty then 0 else 3] with
-  | 0 => return .raise (← drawSite {} .helper) (← drawFold) (← pick MemoryValues.foldConstants)
+  | 0 => return .raise (← drawSite {} .helper (halts := halts)) (← drawFold) (← pick MemoryValues.foldConstants)
   | 1 => return .make (1 + (← draw 255))
   | 2 => return .message
   | 3 => return .pick (← drawTest true false)
@@ -1185,7 +1309,7 @@ def drawHeld (env : Env) : Gen (Option Held) := do
   return some (← pick candidates)
 
 /-- One step the environment admits, by weights that favour sites and calls. -/
-def drawStep (env : Env) (helpers : List Helper) : Gen (Option Step) := do
+def drawStep (env : Env) (helpers : List Helper) (halts : Bool := false) : Gen (Option Step) := do
   let raising := (List.range helpers.length).filter fun index => (helpers[index]?).any Helper.raises
   let data := env.pairs.length + env.sums.length + env.enums.length
   let weights := [4, if env.errors.length < maximumErrors then 3 else 0, 2, 4,
@@ -1196,7 +1320,7 @@ def drawStep (env : Env) (helpers : List Helper) : Gen (Option Step) := do
   | 0 => return (← drawAction env false).map Step.action
   | 1 => return some (.error (← drawDecl env helpers))
   | 2 => return some (.data (← drawDatum env))
-  | 3 => return some (.site (← drawSite env (.run false)))
+  | 3 => return some (.site (← drawSite env (.run false) (halts := halts)))
   | 4 =>
       let helper ← pick raising
       return some (.call helper (← drawSource env (.run false)) (← MemoryValues.drawOperand false) ((← draw 3) != 0)
@@ -1206,8 +1330,9 @@ def drawStep (env : Env) (helpers : List Helper) : Gen (Option Step) := do
       let kind : Context := match env.held? held with
         | some (.error kind) => .arm kind
         | _ => .arm .selector
-      return some (.take held (← drawSite env kind) (← drawFold) (← pick MemoryValues.foldConstants))
-  | 6 => return some (.closure (← drawSite env .closure) (← drawFold) (← pick MemoryValues.foldConstants))
+      return some (.take held (← drawSite env kind (halts := halts)) (← drawFold) (← pick MemoryValues.foldConstants))
+  | 6 => return some (.closure (← drawSite env .closure (halts := halts)) (← drawFold)
+      (← pick MemoryValues.foldConstants))
   | 7 => return some (.apply (← draw env.closures.length) (← MemoryValues.drawOperand false) (← drawFold)
       (← pick MemoryValues.foldConstants))
   | _ =>
@@ -1218,7 +1343,7 @@ def drawStep (env : Env) (helpers : List Helper) : Gen (Option Step) := do
       let mut site := false
       for position in List.range count do
         if !site && (position + 1 = count || (← draw 2) = 0) then
-          let drawn ← drawSite inner (.run true) env.scope.bytes.length
+          let drawn ← drawSite inner (.run true) env.scope.bytes.length halts
           if inner.site? (.run true) drawn then
             body := body ++ [.site drawn]
             site := true
@@ -1230,12 +1355,13 @@ def drawStep (env : Env) (helpers : List Helper) : Gen (Option Step) := do
       return some (.loop mask body)
 
 /-- Up to three helpers, one or two bytes values, then steps drawn by weight;
-each is kept when admitted. A plan without a site or a fold ends with one. -/
-def drawPlan : Gen Plan := do
+each is kept when admitted. A plan without a site or a fold ends with one;
+with `halts`, a plan without a halt site it reaches ends with a halt site. -/
+def drawPlan (halts : Bool := false) : Gen Plan := do
   let count ← draw (maximumHelpers + 1)
   let mut helpers : List Helper := []
   for index in List.range count do
-    let helper ← drawHelper helpers
+    let helper ← drawHelper helpers halts
     if helper.admitted helpers index then helpers := helpers ++ [helper]
   let mut env : Env := {}
   let mut steps : List Step := []
@@ -1267,15 +1393,15 @@ def drawPlan : Gen Plan := do
   let total := steps.length + 2 + (← draw (maximumSteps - 4))
   for _ in List.range (4 * total) do
     if steps.length ≥ min total maximumSteps then break
-    if let some step ← drawStep env helpers then
+    if let some step ← drawStep env helpers halts then
       if let some next := env.step? helpers step then
         env := next
         steps := steps ++ [step]
   let plan : Plan := {helpers, steps}
-  if plan.admitted then return plan
+  if plan.admittedFor halts then return plan
   let mut kept := steps.take (maximumSteps - 2)
   let mut last : Env := ((({helpers, steps := kept} : Plan).scan?).map (·.1)).getD {}
-  let site ← drawSite last (.run false)
+  let site ← if halts then drawHalt (.run false) else drawSite last (.run false)
   if last.site? (.run false) site then
     kept := kept ++ [.site site]
     last := (last.step? helpers (.site site)).getD last
@@ -1286,13 +1412,19 @@ def drawPlan : Gen Plan := do
 def generate (seed : UInt64) : Plan :=
   (drawPlan.run {seed, domain, index := 0}).1
 
+/-- `runtime-halts`' own stream. -/
+def haltDomain : UInt64 := 0x68616c7400000001
+
+def generateHalts (seed : UInt64) : Plan :=
+  ((drawPlan (halts := true)).run {seed, domain := haltDomain, index := 0}).1
+
 /-- Steps are dropped from the end while the reference exceeds `nodes`, more
 than one step remains and the rest is still admitted. -/
-def Plan.fit (nodes : Nat) (plan : Plan) : Plan := Id.run do
+def Plan.fit (nodes : Nat) (plan : Plan) (halts : Bool := false) : Plan := Id.run do
   let mut plan := plan
   for _ in List.range plan.steps.length do
     let shorter : Plan := {plan with steps := plan.steps.dropLast}
-    if plan.nodes > nodes && plan.steps.length > 1 && shorter.admitted then
+    if plan.nodes > nodes && plan.steps.length > 1 && shorter.admittedFor halts then
       plan := shorter
   return plan
 

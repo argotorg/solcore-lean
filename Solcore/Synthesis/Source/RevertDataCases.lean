@@ -88,6 +88,7 @@ def payloadJson : Payload → Json
   | .error origin => Json.mkObj [("payload", toJson "error"), ("source", sourceJson origin)]
   | .literal text => Json.mkObj [("payload", toJson "literal"), ("text", toJson text)]
   | .none => Json.mkObj [("payload", toJson "none")]
+  | .halt halt => Json.mkObj [("payload", toJson "halt"), ("halt", toJson halt.name)]
 
 def siteJson (site : Site) : Json := Json.mkObj [
   ("form", toJson (match site.form with
@@ -146,9 +147,11 @@ def stepJson : Step → Json
   | .loop mask body => Json.mkObj [("loop", Json.mkObj [("mask", toJson mask),
       ("body", .arr (body.map itemJson).toArray)])]
 
-def planJson (plan : Plan) : Json := Json.mkObj [
-  ("schema", toJson planSchema), ("helpers", .arr (plan.helpers.map helperJson).toArray),
+def planJsonWith (schema : String) (plan : Plan) : Json := Json.mkObj [
+  ("schema", toJson schema), ("helpers", .arr (plan.helpers.map helperJson).toArray),
   ("steps", .arr (plan.steps.map stepJson).toArray)]
+
+def planJson (plan : Plan) : Json := planJsonWith planSchema plan
 
 private def array (json : Json) (key : String) : Except String (List Json) := do
   return (← json.getObjValAs? (Array Json) key).toList
@@ -179,11 +182,17 @@ def sourceOf (json : Json) : Except String Source := do
   | "param" => return .param
   | _ => throw "unknown revert data source"
 
+def haltOf (text : String) : Except String Halt :=
+  match [Halt.assert, .opcode, .inline, .yul].find? (·.name == text) with
+  | some halt => .ok halt
+  | none => .error "unknown halt"
+
 def payloadOf (json : Json) : Except String Payload := do
   match ← json.getObjValAs? String "payload" with
   | "error" => return .error (← sourceOf (← json.getObjVal? "source"))
   | "literal" => return .literal (← json.getObjValAs? Nat "text")
   | "none" => return .none
+  | "halt" => return .halt (← haltOf (← json.getObjValAs? String "halt"))
   | _ => throw "unknown revert data payload"
 
 def siteOf (json : Json) : Except String Site := do
@@ -270,9 +279,11 @@ def stepOf (json : Json) : Except String Step := do
   let loop ← json.getObjVal? "loop"
   return .loop (← loop.getObjValAs? Nat "mask") (← (← array loop "body").mapM itemOf)
 
-def planOf (json : Json) : Except String Plan := do
-  unless (← json.getObjValAs? String "schema") = planSchema do throw "unsupported revert data plan schema"
+def planOfWith (schema : String) (json : Json) : Except String Plan := do
+  unless (← json.getObjValAs? String "schema") = schema do throw "unsupported revert data plan schema"
   return {helpers := ← (← array json "helpers").mapM helperOf, steps := ← (← array json "steps").mapM stepOf}
+
+def planOf (json : Json) : Except String Plan := planOfWith planSchema json
 
 def checkedPlan (json : Json) : Except String CheckedPlan := do
   let plan ← planOf json

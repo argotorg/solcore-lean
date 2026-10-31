@@ -401,6 +401,12 @@ def reverted():
     return {"comparison": campaign.m2.compare(observed, reverts=True), "observations": observed}
 
 
+def halted():
+    """A matched report of a halting profile: three INVALID halts."""
+    observed = {path: {"status": "invalid"} for path in campaign.PATHS}
+    return {"comparison": campaign.m2.compare(observed, reverts=True, halts=True), "observations": observed}
+
+
 MEMORY_CALL_PLAN = {'schema': 'solcore-lean.memory-call-plan.v1',
     'helpers': [{'param': 'generic', 'kind': 'read', 'obs': 'word', 'fold': 'add'}], 'steps': [
     {'action': {'kind': 'bytes', 'build': 'to_bytes', 'parts': [{'part': 'word', 'operand': {'operand': 'input'}}]}},
@@ -443,6 +449,35 @@ def revert_data_shapes(**changes):
                   steps=['action', 'site'])
     shapes.update(changes)
     return shapes
+
+
+HALT_PLAN = {**REVERT_DATA_PLAN, 'schema': 'solcore-lean.halt-plan.v1', 'steps': [
+    REVERT_DATA_PLAN['steps'][0],
+    {'site': {'form': 'require', 'cond': {'word': {'operand': 'input'}, 'test': {'test': 'ne', 'constant': 0}},
+              'payload': {'payload': 'halt', 'halt': 'assert'}}},
+    REVERT_DATA_PLAN['steps'][2]]}
+
+
+def halt_shapes(**changes):
+    shapes = {key: [] for key in campaign.m2.HALT_SHAPES}
+    shapes.update(halts=['assert'], haltContexts=['run'], haltTests=['ne'], haltWords=['input'],
+                  haltOrders=['write-after'])
+    shapes.update(changes)
+    return shapes
+
+
+def halt_policy_case(value=255, shapes=None):
+    """Halt envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(1)
+    case.update(schema=campaign.m2.HALT_CASE_SCHEMA, input=str(value), haltPlan=copy.deepcopy(HALT_PLAN))
+    case['contract'].update(name='SynthesizedHalts', deployPath=['SynthesizedHaltsDeploy'],
+        runtimePath=['SynthesizedHaltsDeploy', 'SynthesizedHalts'],
+        calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-halts'])},
+        'origin': {'kind': 'halt-generated', 'seed': '1', 'maxProgramNodes': 1024}, 'features': [],
+        'referenceNodes': 40, 'haltShapes': shapes or halt_shapes()}
+    return case
 
 
 def revert_data_policy_case(value=255, shapes=None):
@@ -1678,7 +1713,7 @@ class EnumCoverageTests(unittest.TestCase):
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
                           if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies',
                                              'runtime-memory-values', 'runtime-memory-calls',
-                                             'runtime-revert-data')}, {512})
+                                             'runtime-revert-data', 'runtime-halts')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -2148,7 +2183,7 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
         self.assertEqual(campaign.m2.REVERTING_SCHEMAS,
                          (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA,
-                          campaign.m2.REVERT_DATA_CASE_SCHEMA))
+                          campaign.m2.REVERT_DATA_CASE_SCHEMA, campaign.m2.HALT_CASE_SCHEMA))
         for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
             self.assertNotIn(self.PROFILE, group)
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
@@ -2679,6 +2714,162 @@ class RevertDataCoverageTests(unittest.TestCase):
         self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
                             for entry in manifest['cases']))
         self.assertEqual(len(manifest['cases']), 152)
+
+
+class HaltCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-halts'
+    CORPUS = ROOT / 'scripts/semantic-halt-corpus.json'
+    REQUIRED = {**{key: [] for key in campaign.m2.HALT_SHAPES}, 'halts': ['assert'], 'haltContexts': ['run']}
+
+    def manifest(self, generated=False):
+        case = halt_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'haltRequirements': self.REQUIRED,
+            'cases': [{'id': 'halt', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 1024}} if generated
+                   else {'haltPlan': case['haltPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE], ('halt-generate', 'halt-emit', 'halt-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.HALT_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
+        # Every accepted plan halts at a boundary input, so none is an identity.
+        self.assertNotIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertIn(campaign.m2.HALT_CASE_SCHEMA, campaign.m2.REVERTING_SCHEMAS)
+        self.assertIn(campaign.m2.HALT_CASE_SCHEMA, campaign.m2.HALTING_SCHEMAS)
+        for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES,
+                      campaign.COMPACT_CASE_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 2048))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-halt-v1'}))
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['halt-generate', '1', '1024', '1', '256', '1000000', campaign.RANDOM_INPUT_SELECTION]])
+        self.assertIsNone(summary['configuration']['acceptance'])
+        _, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', '2048')
+        self.assertEqual(seen[0][2], '2048')
+        for nodes in ('255', '2049'):
+            with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['haltCoverage']['requiredHalts'], [])
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['haltRequirements']
+        for invalid in (None, {}, {**base, 'halts': ['stop']}, {**base, 'haltContexts': ['storage']},
+                        {**base, 'haltOrders': ['before']}, {**base, 'halts': ['assert'] * 2},
+                        {key: values for key, values in base.items() if key != 'haltOrders'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'haltRequirements': invalid})
+        with self.assertRaises(ValueError):
+            campaign.halt_requirements({'profile': 'runtime-revert-data', 'haltRequirements': base})
+        with self.assertRaises(ValueError):
+            campaign.revert_data_requirements({'profile': self.PROFILE,
+                                               'revertDataRequirements': RevertDataCoverageTests.REQUIRED})
+        plan = entry['haltPlan']
+        for invalid in ({**plan, 'steps': []}, {**plan, 'schema': 'solcore-lean.revert-data-plan.v1'},
+                        {**plan, 'extra': 1}, {**plan, 'steps': [{'loop': {}}, {'loop': {}}]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'haltPlan': invalid}]})
+        for changed in ({**entry, 'program': {}}, {**entry, 'revertDataPlan': entry['haltPlan']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for nodes in (255, 2049):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                    'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        self.assertEqual(campaign.specified_halts(halt_policy_case()),
+            {'Halts': {'assert'}, 'HaltContexts': {'run'}, 'HaltTests': {'ne'}, 'HaltWords': {'input'},
+             'HaltOrders': {'write-after'}})
+        self.assertEqual(campaign.specified_halts(revert_data_policy_case()),
+                         {dimension: set() for dimension in campaign.HALT_DIMENSIONS})
+        self.assertEqual(campaign.specified_revert_data(halt_policy_case()),
+                         {dimension: set() for dimension in campaign.REVERT_DATA_DIMENSIONS})
+        for invalid in ({'halts': ['assert']}, halt_shapes(halts=['stop']), halt_shapes(halts=['yul', 'assert']),
+                        halt_shapes(haltOrders=['write-after', 'write-after'])):
+            with self.assertRaises(ValueError):
+                campaign.specified_halts(halt_policy_case(shapes=invalid))
+
+    def test_imported_plan_routes_to_halt_emit_and_halts_match(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+            value = self.manifest()
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return halt_policy_case()
+            instance.tool = tool
+            def execute_case(case):
+                folder = instance.work / 'halt'
+                folder.mkdir()
+                report = halted()
+                return folder, report, campaign.analyze(report, reverts=True, halts=True)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(calls, [('halt-emit', value['cases'][0]['haltPlan'], ['255', '1000'], 'corpus-emission')])
+            coverage = instance.summary['haltCoverage']
+            self.assertEqual((coverage['requiredHalts'], coverage['generatedHalts'], coverage['matchedHalts']),
+                             (['assert'], ['assert'], ['assert']))
+            self.assertTrue(all(not coverage['missing' + dimension] for dimension in campaign.HALT_DIMENSIONS))
+            self.assertEqual(instance.summary['counts']['matched'], 1)
+
+    def test_a_perturbed_halt_is_a_mismatch_and_halts_match_only_for_this_profile(self):
+        report = halted()
+        self.assertEqual(campaign.analyze(report, reverts=True, halts=True)['comparison']['category'], 'matched')
+        perturbed = campaign.analyze(report, 'rustEvm', reverts=True, halts=True)
+        self.assertTrue(perturbed['synthetic'])
+        self.assertEqual(perturbed['comparison']['category'], 'semantic-mismatch')
+        with self.assertRaisesRegex(ValueError, 'inconsistent observations'):
+            campaign.analyze(report, 'rustEvm', reverts=True)
+
+    def test_nonmatching_outcomes_cannot_satisfy_halt_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [halt_policy_case(), halt_policy_case(shapes=halt_shapes(halts=['yul'], haltOrders=['revert-before']))]
+            instance.summary['haltCoverage'].update(requiredHalts=['assert', 'yul'], requiredHaltOrders=['revert-before'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['provenance']['haltShapes']['halts'][0]
+                folder.mkdir()
+                report = halted()
+                if case['provenance']['haltShapes']['halts'] == ['yul']:
+                    report['comparison'] = {'category': 'semantic-mismatch', 'pairs': {}}
+                return folder, report, campaign.analyze(report, reverts=True, halts=True)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['haltCoverage']
+            self.assertEqual((coverage['generatedHalts'], coverage['matchedHalts']), (['assert', 'yul'], ['assert']))
+            self.assertEqual((coverage['missingHalts'], coverage['missingHaltOrders']), (['yul'], ['revert-before']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        self.assertEqual(manifest['haltRequirements'], {key: list(values) for key, values in campaign.m2.HALT_SHAPES.items()})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']), 96)
 
 
 class AssemblyMemoryCoverageTests(unittest.TestCase):
@@ -4462,7 +4653,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 27)
+        self.assertEqual(len(campaign.PROFILES), 28)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -5160,7 +5351,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
              'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values',
-             'runtime-memory-calls', 'runtime-revert-data'})
+             'runtime-memory-calls', 'runtime-revert-data', 'runtime-halts'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -5258,7 +5449,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
               'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12,
-              'runtime-revert-data': 12}
+              'runtime-revert-data': 12, 'runtime-halts': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))
@@ -5412,7 +5603,8 @@ class AcceptanceTests(CommandLine, unittest.TestCase):
         self.assertEqual(campaign.RANDOM_ACCEPTANCE, self.FILTER)
         self.assertEqual(set(campaign.RUNTIME_INPUT_PROFILES) - set(campaign.IDENTITY_FILTER_PROFILES),
                          {'runtime-loops', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-nested-loops',
-                          'runtime-recursion', 'runtime-recursive-loops', 'runtime-loop-closures', 'runtime-generics'})
+                          'runtime-recursion', 'runtime-recursive-loops', 'runtime-loop-closures', 'runtime-generics',
+                          'runtime-halts'})
         self.assertTrue(set(campaign.IDENTITY_FILTER_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = function_case(1)
         self.assertEqual(campaign.acceptance('runtime-functions', case), self.PROFILE)

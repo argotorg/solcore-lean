@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.RevertDataCases
+import Solcore.Synthesis.Source.HaltCases
 
 /-! The `runtime-revert-data` profile. Its Core reference returns the
 accumulator or the revert data of the first site whose condition decides; it
@@ -47,22 +47,25 @@ private def bigEndian (bytes : List Nat) : Nat := bytes.foldl (fun total byte =>
 
 private def hexDigit (value : Nat) : Char := "0123456789abcdef".toList.getD value '0'
 
-/-- A run's result: a returned Word, or revert data. -/
+/-- A run's result: a returned Word, revert data, or a `runtime-halts` halt. -/
 private inductive Result where
   | returned (word : Nat)
   | reverted (data : List Nat)
+  | halted
   deriving BEq, Repr
 
-/-- A returned Word in decimal, revert data in hex. -/
+/-- A returned Word in decimal, revert data in hex, a halt as `invalid`. -/
 private def Result.text : Result → String
   | .returned word => toString word
   | .reverted data => "0x" ++ String.ofList (data.flatMap fun byte => [hexDigit (byte / 16), hexDigit (byte % 16)])
+  | .halted => "invalid"
 
 private def run (program : Solcore.Core.Wire.Program) : IO Result :=
   match program.toCore.runStateful fuel with
   | .done (.inLeft _ (.word value)) _ => pure (.returned value.val)
   | .done (.inRight _ (.pair (.word length) (.pair (.word first) (.word second)))) _ =>
       if length.val ≤ 64 then pure (.reverted ((wordBytes first.val ++ wordBytes second.val).take length.val))
+      else if length.val = haltLength && first.val = 0 && second.val = 0 then pure .halted
       else throw (IO.userError "a reference program reverted with more than 64 bytes")
   | _ => throw (IO.userError "a reference program returned neither a Word nor revert data")
 
@@ -93,6 +96,7 @@ private structure Machine where
 
 private inductive Stop where
   | revert (data : List Nat)
+  | halt
   | fault (message : String)
 
 private abbrev Interp := StateT Machine (Except Stop)
@@ -150,7 +154,8 @@ private def holds (word : Nat) : Test → Bool
 
 private def literalBytes (text : Nat) : List Nat := (literals.getD text "").toUTF8.toList.map (·.toNat)
 
-/-- An `if` site raises when its condition holds, a `require` when it fails. -/
+/-- An `if` site raises when its condition holds, a `require` or `assert`
+when it fails; a halt site stops without data. -/
 private def raiseAt (base : Option Nat) (param : Option Err) (single : Site) : Interp Unit := do
   let condition := holds (← operand base single.cond.word) single.cond.test
   if condition == (single.form == .when) then
@@ -158,6 +163,7 @@ private def raiseAt (base : Option Nat) (param : Option Err) (single : Site) : I
       | .error source => do dataOf (← origin base param source)
       | .literal text => pure (literalBytes text)
       | .none => pure []
+      | .halt _ => throw .halt
     throw (.revert data)
 
 private def combine (fold : Fold) (left right : Nat) : Nat :=
@@ -307,6 +313,7 @@ private def interpret (plan : Plan) (input : Nat) : Option Result :=
   match (plan.steps.forM (runStep plan.helpers)).run {input} with
   | .ok ((), machine) => some (.returned machine.acc)
   | .error (.revert data) => some (.reverted data)
+  | .error .halt => some .halted
   | .error (.fault _) => none
 
 private def boundary : List Nat := [0, 1, 2, 255, 256, 2 ^ 256 - 1, 2 ^ 255, 2 ^ 255 - 1]
@@ -858,5 +865,411 @@ def testSourceRevertDataCases : IO Unit := do
   modelChecks
   generationChecks
   tamperChecks
+
+/-! `runtime-halts`. Its reference returns the accumulator, or the revert data or
+the halt of the first site whose condition decides, and agrees with the same
+interpreter, which stops at a halt site; two fixtures' sources and results are
+golden, the results from the corpus validator's Python model. Admission refuses
+halts outside their forms and plans that reach none, and revert data plans
+refuse halts; generation draws every halt shape and replays exactly; tampering
+is refused, and reductions keep a halt, are strictly smaller and replay. -/
+
+/-- The first fixture halts in a helper two helpers deep, through a function
+value with a Yul `if`, in a closure through std.opcodes' `invalid()`, in a loop
+and in `run` with inline Yul and `assert`, after a selector revert and before a
+byte write and a literal revert. The second halts in the `Error` arms of a
+pair, a sum and an enum, on the input, the accumulator and a constant, before
+and after an empty revert. -/
+private def haltFixtureA : Plan := {
+  helpers := [
+    .raise {form := .require, cond := {word := .input, test := .ne 0}, payload := .halt .assert} .add 3,
+    .call 0 1,
+    .raise {form := .when, cond := {word := .xor 5, test := .eq 0}, payload := .halt .yul} .xor 9],
+  steps := [
+    .action (.bytes (.toBytes (.word .input))),
+    .site {form := .when, cond := {word := .input, test := .eq 2}, payload := .error (.make (.selector .input))},
+    .site {form := .when, cond := {word := .input, test := .eq 255}, payload := .halt .inline},
+    .action (.write (.bytes 0) (.literal 0) .input .byte .inline),
+    .call 1 (.make .empty) .input true .add 3,
+    .site {form := .require, cond := {word := .input, test := .lt 1000}, payload := .literal 3},
+    .call 2 (.make .empty) (.add 2) false .xor 5,
+    .closure {form := .when, cond := {word := .input, test := .bits 3 1}, payload := .halt .opcode} .add 7,
+    .apply 0 (.add 7) .add 3,
+    .loop 7 [.action (.bytes (.toBytes (.word .counter))),
+      .site {form := .when, cond := {word := .counter, test := .eq 3}, payload := .halt .inline}],
+    .site {form := .require, cond := {word := .acc, test := .ne 3}, payload := .halt .assert},
+    .action (.observe .add 3 (.bytes 0) (.byte (.literal 0)))]}
+
+private def haltFixtureB : Plan := {
+  helpers := [],
+  steps := [
+    .error (.make .empty),
+    .data (.pair (.named 0) (.add 1)),
+    .data (.inl (.make (.selector .input))),
+    .data (.first (.named 0) (.mul 3)),
+    .take (.pair 0) {form := .require, cond := {word := .input, test := .ne 1}, payload := .halt .assert} .add 5,
+    .take (.sum 0) {form := .when, cond := {word := .acc, test := .bits 7 3}, payload := .halt .yul} .add 3,
+    .take (.enum 0) {form := .when, cond := {word := .input, test := .gt (2 ^ 255)}, payload := .halt .opcode} .xor 11,
+    .site {form := .when, cond := {word := .input, test := .lt 1}, payload := .error (.named 0)},
+    .site {form := .when, cond := {word := .xor 255, test := .eq 0}, payload := .halt .inline}]}
+
+private def haltHeader : List String := [
+  "import * from std;",
+  "import * from std.dispatch;",
+  "import { mload, mstore, mstore8, shr, mod, invalid } from std.opcodes;",
+  ""]
+
+/-- From the Python model of `Tests/scripts/test-semantic-revert-data-corpus.py`:
+a returned Word in decimal, revert data in hex, a halt as `invalid`. -/
+private def haltFixtureAResults : List (Nat × String) := [
+  (0, "321"),
+  (1, "217"),
+  (2, "0x00000002"),
+  (255, "invalid"),
+  (256, "10305"),
+  (2 ^ 256 - 1, "invalid"),
+  (2 ^ 255, "0x746f6f206c61726765"),
+  (2 ^ 255 - 1, "0x746f6f206c61726765"),
+  (3, "invalid"),
+  (5, "invalid"),
+  (6, "invalid"),
+  (1001, "0x746f6f206c61726765")]
+
+private def haltFixtureASource : String := String.intercalate "\n" (haltHeader ++ [
+  "function sc_byte<a>(sc_v: a, sc_i: word) returns (word) where a: MemorySize, a: MemoryPointer {",
+  "    return shr(248, mload(MemoryPointer.ptr(truncate(slice_(sc_v, sc_i), 1))));",
+  "}",
+  "",
+  "function sc_h0(sc_e: Error, sc_w: word) returns (word) {",
+  "    assert((sc_w != 0));",
+  "    return (sc_w + 3);",
+  "}",
+  "",
+  "function sc_h1(sc_e: Error, sc_w: word) returns (word) {",
+  "    return sc_h0(sc_e, (sc_w + 1));",
+  "}",
+  "",
+  "function sc_h2(sc_e: Error, sc_w: word) returns (word) {",
+  "    assembly {",
+  "        if eq(xor(sc_w, 5), 0) {",
+  "            invalid()",
+  "        }",
+  "    }",
+  "    return (sc_w ^ 9);",
+  "}",
+  "",
+  "contract SynthesizedHalts {",
+  "    function run(input: uint256) public returns (uint256) {",
+  "        let sc_x: word = Typedef.rep(input);",
+  "        let sc_r: word = 0;",
+  "        let sc_b0: memory<bytes> = to_bytes(bytes32(sc_x));",
+  "        if (sc_x == 2) {",
+  "            revertWithError(Error(sc_x));",
+  "        }",
+  "        if (sc_x == 255) {",
+  "            assembly {",
+  "                invalid()",
+  "            }",
+  "        }",
+  "        mstore8(MemoryPointer.ptr(truncate(slice_(sc_b0, 0), 1)), sc_x);",
+  "        sc_r = ((sc_r * 3) + sc_h1(Error.Empty, sc_x));",
+  "        require((sc_x < 1000), \"too large\");",
+  "        let sc_f0: function (Error, word) returns (word) = sc_h2;",
+  "        sc_r = ((sc_r * 5) ^ sc_f0(Error.Empty, (sc_x + 2)));",
+  "        let sc_c0: function (word) returns (word) = lam (sc_j: word) -> word {",
+  "            if ((sc_j & 3) == 1) {",
+  "                invalid();",
+  "            }",
+  "            return (sc_j + 7);",
+  "        };",
+  "        sc_r = ((sc_r * 3) + sc_c0((sc_x + 7)));",
+  "        let sc_limit: word = (sc_x & 7);",
+  "        let sc_counter: word = 0;",
+  "        while (sc_limit > sc_counter) {",
+  "            let sc_b1: memory<bytes> = to_bytes(bytes32(sc_counter));",
+  "            if (sc_counter == 3) {",
+  "                assembly {",
+  "                    invalid()",
+  "                }",
+  "            }",
+  "            sc_counter = (sc_counter + 1);",
+  "        }",
+  "        assert((sc_r != 3));",
+  "        sc_r = ((sc_r * 3) + sc_byte(sc_b0, 0));",
+  "        return uint256(sc_r);",
+  "    }",
+  "}"]) ++ "\n"
+
+private def haltFixtureAShapes : List (String × List String) := [
+  ("halts", ["assert", "inline", "invalid", "yul"]),
+  ("haltContexts", ["call", "closure", "helper", "loop", "run"]),
+  ("haltTests", ["bits", "eq", "ne"]),
+  ("haltWords", ["acc", "counter", "input", "local"]),
+  ("haltOrders", ["revert-after", "revert-before", "write-after", "write-before"])]
+
+private def haltFixtureBResults : List (Nat × String) := [
+  (0, "0x"),
+  (1, "invalid"),
+  (2, "invalid"),
+  (255, "invalid"),
+  (256, "2059"),
+  (2 ^ 256 - 1, "invalid"),
+  (2 ^ 255, "11"),
+  (2 ^ 255 - 1, "115792089237316195423570985008687907853269984665640564039457584007913129639933"),
+  (3, "37"),
+  (5, "77"),
+  (6, "95"),
+  (1001, "8373")]
+
+private def haltFixtureBSource : String := String.intercalate "\n" (haltHeader ++ [
+  "enum Sc_F {",
+  "    Sc_F0(Error, word),",
+  "    Sc_F1(word)",
+  "}",
+  "",
+  "contract SynthesizedHalts {",
+  "    function run(input: uint256) public returns (uint256) {",
+  "        let sc_x: word = Typedef.rep(input);",
+  "        let sc_r: word = 0;",
+  "        let sc_e0: Error = Error.Empty;",
+  "        let sc_t0: (Error, word) = (sc_e0, (sc_x + 1));",
+  "        let sc_u0: sum<Error, word> = inl(Error(sc_x));",
+  "        let sc_g0: Sc_F = Sc_F.Sc_F0(sc_e0, (sc_x * 3));",
+  "        match (sc_t0) {",
+  "            case (sc_e, sc_w) {",
+  "                assert((sc_x != 1));",
+  "                sc_r = ((sc_r * 5) + sc_w);",
+  "            }",
+  "        }",
+  "        match (sc_u0) {",
+  "            case inl(sc_e) {",
+  "                assembly {",
+  "                    if eq(and(sc_r, 7), 3) {",
+  "                        invalid()",
+  "                    }",
+  "                }",
+  "            }",
+  "            case inr(sc_w) {",
+  "                sc_r = ((sc_r * 3) + sc_w);",
+  "            }",
+  "        }",
+  "        match (sc_g0) {",
+  "            case Sc_F.Sc_F0(sc_e, sc_w) {",
+  "                if (sc_x > 57896044618658097711785492504343953926634992332820282019728792003956564819968) {",
+  "                    invalid();",
+  "                }",
+  "                sc_r = ((sc_r * 11) ^ sc_w);",
+  "            }",
+  "            case Sc_F.Sc_F1(sc_w) {",
+  "                sc_r = ((sc_r * 11) ^ sc_w);",
+  "            }",
+  "        }",
+  "        if (sc_x < 1) {",
+  "            revertWithError(sc_e0);",
+  "        }",
+  "        if ((sc_x ^ 255) == 0) {",
+  "            assembly {",
+  "                invalid()",
+  "            }",
+  "        }",
+  "        return uint256(sc_r);",
+  "    }",
+  "}"]) ++ "\n"
+
+private def haltFixtureBShapes : List (String × List String) := [
+  ("halts", ["assert", "inline", "invalid", "yul"]),
+  ("haltContexts", ["enum", "pair", "run", "sum"]),
+  ("haltTests", ["bits", "eq", "gt", "ne"]),
+  ("haltWords", ["acc", "constant", "input"]),
+  ("haltOrders", ["revert-after", "revert-before"])]
+
+private def haltFixtureChecks : IO Unit := do
+  for (label, plan, source, results, shapes) in [
+      ("first", haltFixtureA, haltFixtureASource, haltFixtureAResults, haltFixtureAShapes),
+      ("second", haltFixtureB, haltFixtureBSource, haltFixtureBResults, haltFixtureBShapes)] do
+    ensure plan.haltAdmitted s!"the {label} halt fixture plan is not admitted"
+    ensure (!plan.admitted) s!"the {label} halt fixture plan is admitted as a revert data plan"
+    let some checked := Halts.CheckedPlan.ofPlan? plan
+      | throw (IO.userError s!"the {label} halt fixture failed the checker")
+    ensure ((Halts.emit plan).source == source) s!"the {label} halt fixture source changed"
+    for (value, expected) in results do
+      ensure ((← run (checked.program (Word.ofNatModulo value))).text == expected)
+        s!"{label} halt fixture input {value}: Core result"
+      ensure ((interpret plan value).map Result.text == some expected) s!"{label} halt fixture input {value}: interpreter result"
+    ensure (plan.haltShapes == shapes) s!"the {label} halt fixture shapes changed"
+    ensure (match Halts.checkedPlan (Halts.planJson plan) with
+      | .ok decoded => decoded.plan == plan
+      | .error _ => false) s!"the {label} halt fixture plan JSON does not round-trip"
+    ensure (RevertData.checkedPlan (RevertData.planJson plan) matches .error _)
+      s!"the {label} halt fixture plan is checked as a revert data plan"
+  ensure (Halts.checkedPlan (Halts.planJson fixtureA) matches .error _) "a revert data plan is checked as a halt plan"
+  let some first := Halts.CheckedPlan.ofPlan? haltFixtureA
+    | throw (IO.userError "the first halt fixture failed the checker")
+  ensure (Halts.observe first (Word.ofNatModulo 255) fuel == Json.mkObj [("stage", toJson "execution"),
+    ("status", toJson "invalid")]) "a halt is not observed as INVALID's"
+  ensure (Halts.observe first (Word.ofNatModulo 2) fuel == Json.mkObj [("stage", toJson "execution"),
+    ("status", toJson "reverted"), ("output", toJson "0x00000002")]) "a revert of a halt plan lost its data"
+
+/-- Admission refuses a halt outside its forms and a plan that reaches no halt. -/
+private def haltAdmissionChecks : IO Unit := do
+  let refused := fun (label : String) (plan : Plan) => ensure (!plan.haltAdmitted) s!"admitted the halt plan with {label}"
+  let admitted := fun (label : String) (plan : Plan) => ensure plan.haltAdmitted s!"refused the halt plan with {label}"
+  let b := haltFixtureB
+  let halting := fun (form : Form) (halt : Halt) =>
+    ({form, cond := {word := .input, test := .eq 0}, payload := .halt halt} : Site)
+  let quiet : Site := {form := .when, cond := {word := .input, test := .eq 1}, payload := .none}
+  let bytes := Step.action (.bytes (.toBytes (.word .input)))
+  let observe := Step.action (.observe .add 3 (.bytes 0) .length)
+  admitted "a halt and an observation" {helpers := [], steps := [bytes, .site (halting .when .inline), observe]}
+  refused "an assert under if" (withStep b 8 (.site (halting .when .assert)))
+  for halt in [Halt.opcode, .inline, .yul] do
+    refused s!"{halt.name} through require" (withStep b 8 (.site (halting .require halt)))
+    admitted s!"{halt.name} under if" (withStep b 8 (.site (halting .when halt)))
+  admitted "assert through require" (withStep b 8 (.site (halting .require .assert)))
+  let unhalted : Plan := {b with steps := b.steps.take 4 ++
+    [.take (.pair 0) {form := .require, cond := {word := .input, test := .ne 1}, payload := .error .param} .add 5,
+     b.steps[7]!]}
+  refused "no halt" unhalted
+  ensure unhalted.admitted "a revert data plan without a halt is refused"
+  refused "a halt only in a closure never applied"
+    {helpers := [], steps := [bytes, .closure (halting .when .inline) .add 3, .site quiet, observe]}
+  admitted "a halt in an applied closure"
+    {helpers := [], steps := [bytes, .closure (halting .when .inline) .add 3, .apply 0 .input .add 3]}
+  refused "a halt only in the Error arm of a sum holding a Word"
+    {helpers := [], steps := [.data (.inr .input), .take (.sum 0) (halting .when .yul) .add 3, .site quiet]}
+  refused "a halt only in a helper nothing calls"
+    {helpers := [.raise (halting .when .yul) .add 3], steps := [bytes, .site quiet, observe]}
+  admitted "a halt in a called helper"
+    {helpers := [.raise (halting .when .yul) .add 3], steps := [.call 0 (.make .empty) .input true .add 3]}
+  let counted : Site := {form := .when, cond := {word := .counter, test := .eq 2}, payload := .halt .yul}
+  refused "a halt on a counter outside a loop" {helpers := [], steps := [bytes, .site counted, observe]}
+  admitted "a loop halting on its counter" {helpers := [], steps := [bytes, .loop 3 [.site counted], observe]}
+
+/-- The reference agrees with the interpreter on 200 generated halt plans at
+the eight boundary inputs and four others. -/
+private def haltModelChecks : IO Unit := do
+  let mut compared := 0
+  let mut halted := 0
+  let mut reverted := 0
+  for seed in List.range 200 do
+    match Halts.generatedPlan (Seed.ofNat (seed + 1)) Halts.defaultNodes with
+    | .error _ => pure ()
+    | .ok checked =>
+        for input in boundary ++ [3, 1001, 0x1234567890abcdef, 2 ^ 200 + 77] do
+          let core ← run (checked.program (Word.ofNatModulo input))
+          ensure (interpret checked.plan input == some core)
+            s!"halt seed {seed + 1} input {input}: the reference differs from the interpreter"
+          compared := compared + 1
+          match core with
+          | .halted => halted := halted + 1
+          | .reverted _ => reverted := reverted + 1
+          | .returned _ => pure ()
+  ensure (compared = 2400) "a generated halt plan failed admission or the checker"
+  ensure (halted ≥ 500 && reverted ≥ 500 && compared - halted - reverted ≥ 1000)
+    "fewer than 500 compared outcomes halted or reverted, or 1,000 returned"
+
+private def haltShapeValues : List (String × List String) := [
+  ("halts", ["assert", "inline", "invalid", "yul"]),
+  ("haltContexts", ["call", "closure", "enum", "helper", "loop", "pair", "run", "sum"]),
+  ("haltTests", ["bits", "eq", "gt", "lt", "ne"]),
+  ("haltWords", ["acc", "constant", "counter", "input", "local"]),
+  ("haltOrders", ["revert-after", "revert-before", "write-after", "write-before"])]
+
+/-- Generation is deterministic, its accepted plans draw every halt shape
+within 500 seeds, it replays exactly and drops steps to fit a smaller
+budget. -/
+private def haltGenerationChecks : IO Unit := do
+  let mut seen : List (String × String) := []
+  for seed in List.range 500 do
+    let plan := generateHalts (UInt64.ofNat (seed + 1))
+    ensure (Halts.planJson plan == Halts.planJson (generateHalts (UInt64.ofNat (seed + 1))))
+      "halt generation is not deterministic"
+    if let .ok checked := Halts.generatedPlan (Seed.ofNat (seed + 1)) Halts.defaultNodes then
+      if (Halts.inputSensitive checked fuel).isOk then
+        for (dimension, values) in checked.plan.haltShapes do
+          for value in values do
+            ensure ((haltShapeValues.lookup dimension).any (·.contains value)) s!"unknown halt shape {dimension}:{value}"
+            unless seen.contains (dimension, value) do seen := (dimension, value) :: seen
+  for (dimension, values) in haltShapeValues do
+    for value in values do
+      ensure (seen.contains (dimension, value)) s!"500 seeds never drew {dimension}:{value}"
+  let all ← cases (Halts.generateCases (Seed.ofNat 1) Halts.defaultNodes 64 64 fuel)
+  ensure (all.size = 64) "halt generation from seed 1 did not return 64 cases"
+  let mut halted := 0
+  for case in all do
+    ensure ((← expect (Halts.replayCase case fuel)) == case) "a generated halt case failed exact replay"
+    let direct ← expect (case.getObjVal? "directCore")
+    if (direct.getObjValAs? String "status").toOption == some "invalid" then halted := halted + 1
+  ensure (halted ≥ 16 && halted ≤ 48) "fewer than a quarter of 64 generated halt cases halted or did not"
+  let seeded ← cases (Halts.generateCases (Seed.ofNat 7) Halts.defaultNodes 12 4 fuel .seeded)
+  ensure (seeded.size = 12) "seeded halt generation did not return twelve inputs"
+  for case in seeded do
+    ensure ((← expect (Halts.replayCase case fuel)) == case) "a seeded halt case failed exact replay"
+  let mut dropped := false
+  for seed in List.range 200 do
+    if let .ok small := Halts.generatedPlan (Seed.ofNat (seed + 1)) Halts.minimumNodes then
+      ensure (small.plan.nodes ≤ Halts.minimumNodes) "a fitted halt plan exceeds its budget"
+      ensure small.plan.haltAdmitted "a fitted halt plan reaches no halt"
+      if small.plan.steps.length < (generateHalts (UInt64.ofNat (seed + 1))).steps.length then dropped := true
+  ensure dropped "a 256-node budget never dropped a step of a halt plan"
+
+/-- Tampering is refused; reductions reach a halt, are strictly smaller and
+replay, and a halt through std.opcodes or a Yul `if` lowers to inline Yul. -/
+private def haltTamperChecks : IO Unit := do
+  let all ← cases (Halts.generateCases (Seed.ofNat 1) Halts.defaultNodes 8 4 fuel)
+  let case := all[0]!
+  let plan ← expect (case.getObjVal? "haltPlan")
+  ensure (Halts.replayCase (case.setObjVal! "source" (toJson "contract C {}")) fuel matches .error _)
+    "a changed halt source replayed"
+  ensure (Halts.replayCase (case.setObjVal! "program" (Solcore.Core.Wire.encodeProgram
+      {resultType := .word, dataDefinitions := [], body := .word Word.zero})) fuel matches .error _)
+    "a changed halt reference replayed"
+  ensure (errorOf (Halts.replayCase (case.setObjVal! "provenance" ((← provenance case).setObjVal!
+      "generatorVersion" (toJson "core-halt-v0"))) fuel) == some "generatorVersion changed")
+    "a changed halt generator version replayed"
+  ensure (Halts.replayCase (case.setObjVal! "provenance" ((← provenance case).setObjVal!
+      "haltShapes" (Json.mkObj []))) fuel matches .error _) "changed halt shapes replayed"
+  ensure (Halts.replayCase (case.setObjVal! "haltPlan" (plan.setObjVal! "steps" (.arr #[]))) fuel
+    matches .error _) "a halt plan without steps replayed"
+  ensure (Halts.replayCase (case.setObjVal! "schema" (toJson RevertData.caseSchema)) fuel matches .error _)
+    "a halt case replayed as a revert data case"
+  ensure (Halts.replayCase (case.setObjVal! "directCore" (Json.mkObj [("stage", toJson "execution"),
+      ("status", toJson "returned"), ("word", toJson "0")])) fuel matches .ok _)
+    "halt replay read the saved observation"
+  let origin ← expect ((← provenance case).getObjVal? "origin")
+  ensure (Halts.replayCase (case.setObjVal! "provenance" ((← provenance case).setObjVal!
+      "origin" (origin.setObjVal! "seed" (toJson "4")))) fuel matches .error _) "a changed halt seed replayed"
+  let shrunk ← expect (Halts.shrinkCases case 4096 fuel)
+  let reduced ← cases shrunk
+  ensure (!reduced.isEmpty) "no reduction of the first generated halt case"
+  for candidate in reduced do
+    ensure ((← expect (Halts.replayCase candidate fuel)) == candidate) "a halt reduction failed exact replay"
+  let parent ← expect (Halts.caseProgram case)
+  for reduction in Halts.reductions parent do
+    ensure (decide (reduction.candidate.measure.StrictlySmaller parent.measure)) "a halt reduction is not strictly smaller"
+    ensure reduction.candidate.plan.plan.haltAdmitted "a halt reduction reaches no halt"
+  let mut kinds : List String := []
+  let sources := [haltFixtureA, haltFixtureB].filterMap Halts.CheckedPlan.ofPlan? ++ (List.range 40).filterMap fun seed =>
+    (Halts.generatedPlan (Seed.ofNat (seed + 1)) Halts.defaultNodes).toOption
+  for checked in sources do
+    let source : Halts.CheckedInput := ⟨checked, Word.ofNatModulo 5⟩
+    for reduction in Halts.reductions source do
+      let kind := reductionKind checked.plan reduction.candidate.plan.plan (reduction.candidate.input != source.input)
+      unless kinds.contains kind do kinds := kind :: kinds
+  for kind in ["step", "helper", "inline", "form", "word", "fold", "payload", "test", "mask", "body", "input"] do
+    ensure (kinds.contains kind) s!"no {kind} reduction in the halt fixtures and 40 plans"
+  let some fixture := Halts.CheckedPlan.ofPlan? haltFixtureA
+    | throw (IO.userError "the first halt fixture failed the checker")
+  let lowered := (Halts.reductions ⟨fixture, Word.ofNatModulo 5⟩).any fun reduction =>
+    reduction.candidate.plan.plan.helpers[2]? == some (.raise
+      {form := .when, cond := {word := .xor 5, test := .eq 0}, payload := .halt .inline} .xor 9)
+  ensure lowered "a Yul if halt did not lower to inline Yul"
+
+def testSourceHaltCases : IO Unit := do
+  haltFixtureChecks
+  haltAdmissionChecks
+  haltModelChecks
+  haltGenerationChecks
+  haltTamperChecks
 
 end Tests.SourceRevertDataCases

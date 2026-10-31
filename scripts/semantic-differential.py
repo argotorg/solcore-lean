@@ -151,10 +151,22 @@ REVERT_DATA_SHAPES = {
     "lengths": ("0", "1-31", "32", "33-63", "64"),
     "hazards": ("alias", "allocated", "written"),
     "steps": ("action", "apply", "call", "closure", "data", "error", "loop", "site", "take")}
+HALT_CASE_SCHEMA = "solcore-lean.semantic-halt-case.v1"
+HALT_VERSIONS = ("profileVersion", "boundaryVersion")
+# The specified shape values of the halt profile, from the plan, never measured.
+HALT_SHAPES = {
+    "halts": ("assert", "inline", "invalid", "yul"),
+    "haltContexts": ("call", "closure", "enum", "helper", "loop", "pair", "run", "sum"),
+    "haltTests": ("bits", "eq", "gt", "lt", "ne"),
+    "haltWords": ("acc", "constant", "counter", "input", "local"),
+    "haltOrders": ("revert-after", "revert-before", "write-after", "write-before")}
 # Cases whose original Core can stop with revert data: std's OutOfBounds() revert at an
-# out-of-range access, or a revert data plan's site; three reverts with the same data
-# are a match only for them.
-REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA)
+# out-of-range access, or a revert data or halt plan's site; three reverts with the same
+# data are a match only for them.
+REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA, HALT_CASE_SCHEMA)
+# Cases whose original Core can halt with INVALID; three INVALID halts are a match only
+# for them.
+HALTING_SCHEMAS = (HALT_CASE_SCHEMA,)
 FUNCTION_CASE_SCHEMA = "solcore-lean.semantic-function-case.v1"
 MUTATION_CASE_SCHEMA = "solcore-lean.semantic-mutation-case.v1"
 AGGREGATE_CASE_SCHEMA = "solcore-lean.semantic-aggregate-case.v1"
@@ -184,7 +196,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  GENERIC_CASE_SCHEMA: "runtime-generics", CLOSURE_CASE_SCHEMA: "runtime-closures", COMPTIME_CASE_SCHEMA: "runtime-comptime", MODULE_CASE_SCHEMA: "runtime-modules",
                  ENUM_CASE_SCHEMA: "runtime-enums", TRAIT_CASE_SCHEMA: "runtime-traits",
                  HIERARCHY_CASE_SCHEMA: "runtime-trait-hierarchies", MEMORY_CASE_SCHEMA: "runtime-memory-values",
-                 MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls", REVERT_DATA_CASE_SCHEMA: "runtime-revert-data"}
+                 MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls", REVERT_DATA_CASE_SCHEMA: "runtime-revert-data",
+                 HALT_CASE_SCHEMA: "runtime-halts"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -199,7 +212,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   GENERIC_CASE_SCHEMA: "SynthesizedGenerics", CLOSURE_CASE_SCHEMA: "SynthesizedClosures", COMPTIME_CASE_SCHEMA: "SynthesizedComptime", MODULE_CASE_SCHEMA: "SynthesizedModules",
                   ENUM_CASE_SCHEMA: "SynthesizedEnums", TRAIT_CASE_SCHEMA: "SynthesizedTraits",
                   HIERARCHY_CASE_SCHEMA: "SynthesizedTraitHierarchies", MEMORY_CASE_SCHEMA: "SynthesizedMemoryValues",
-                  MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData"}
+                  MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData",
+                  HALT_CASE_SCHEMA: "SynthesizedHalts"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
 BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
@@ -212,6 +226,8 @@ RESOURCE = re.compile(GAS_RESOURCE.pattern + r"|out.of.fuel|fuel.{0,40}(exhaust|
                       r"(specialization|recursion|export|depth).{0,40}(limit|exhaust)|"
                       r"stack overflow|memory limit", re.I)
 COMPLETED = {"returned", "reverted"}
+# INVALID's designated halt, an outcome of the profiles in HALTING_SCHEMAS.
+HALTED = {"invalid"}
 COMPILATION_SCHEMA = "solcore-lean.semantic-compilation.v1"
 # Compiler verdicts on the source bytes themselves. A resource or adapter failure
 # says nothing about the source, so the next case with that source compiles again.
@@ -730,11 +746,11 @@ REVERT_DATA_STEPS = ("action", "error", "data", "site", "call", "take", "closure
 REVERT_DATA_ACTIONS = ("bytes", "alias", "write", "observe")
 
 
-def validate_revert_data_plan(plan) -> dict:
+def validate_revert_data_plan(plan, schema="solcore-lean.revert-data-plan.v1") -> dict:
     """Validate the envelope, the helper and step counts and their kinds; native
     replay checks every helper and step against its scope, the sites, literals,
     lengths and the seed."""
-    if (not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.revert-data-plan.v1"
+    if (not isinstance(plan, dict) or plan.get("schema") != schema
             or set(plan) != {"schema", "helpers", "steps"}):
         raise ValueError("unsupported revert data plan schema")
     helpers, steps = plan["helpers"], plan["steps"]
@@ -756,11 +772,17 @@ def validate_revert_data_plan(plan) -> dict:
     return plan
 
 
-def validate_revert_data_shapes(values, label="revertDataShapes") -> dict:
+def validate_halt_plan(plan) -> dict:
+    """A halt plan is a revert data plan under its own schema; native replay
+    checks its halt sites and that it reaches one."""
+    return validate_revert_data_plan(plan, "solcore-lean.halt-plan.v1")
+
+
+def validate_revert_data_shapes(values, label="revertDataShapes", dimensions=REVERT_DATA_SHAPES) -> dict:
     """Native replay authenticates the shapes; Python checks their envelope."""
-    if not isinstance(values, dict) or set(values) != set(REVERT_DATA_SHAPES):
+    if not isinstance(values, dict) or set(values) != set(dimensions):
         raise ValueError(f"{label} must name every revert data shape dimension")
-    for key, allowed in REVERT_DATA_SHAPES.items():
+    for key, allowed in dimensions.items():
         found = values[key]
         if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
                 or found != sorted(set(found))):
@@ -880,6 +902,8 @@ def validate_case(case: dict) -> None:
         validate_memory_call_plan(case.get("memoryCallPlan"))
     if case["schema"] == REVERT_DATA_CASE_SCHEMA:
         validate_revert_data_plan(case.get("revertDataPlan"))
+    if case["schema"] == HALT_CASE_SCHEMA:
+        validate_halt_plan(case.get("haltPlan"))
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -966,6 +990,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
             raise ValueError("revert data referenceNodes must be an integer from 1 to 4,096")
         validate_revert_data_shapes(provenance.get("revertDataShapes"))
+    if case["schema"] == HALT_CASE_SCHEMA:
+        for key in HALT_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing halt provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("halt referenceNodes must be an integer from 1 to 4,096")
+        validate_revert_data_shapes(provenance.get("haltShapes"), "haltShapes", HALT_SHAPES)
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -989,7 +1020,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -1014,10 +1045,12 @@ def normalize_observation(row: dict, *, direct: bool = False) -> dict:
     return {"status": status, "detail": row.get("detail", "")}
 
 
-def compare(observations: dict, *, reverts: bool = False) -> dict:
+def compare(observations: dict, *, reverts: bool = False, halts: bool = False) -> dict:
     """Classify only actual completed observations, never missing paths as equal.
     Three returned observations with the same payload match; with `reverts`, for a
-    profile whose original Core can revert, so do three reverts with the same data."""
+    profile whose original Core can revert, so do three reverts with the same data;
+    with `halts`, for a profile whose original Core can halt, so do three INVALID
+    halts. Resource exhaustion on any path stays inconclusive."""
     names = ("directCore", "importedHull", "rustEvm")
     if set(observations) != set(names):
         return {"category": "adapter-error", "detail": "three observations are required", "pairs": {}}
@@ -1033,6 +1066,8 @@ def compare(observations: dict, *, reverts: bool = False) -> dict:
                 completed.append(("returned", data))
             elif row.get("status") == "reverted":
                 completed.append(("reverted", hex_bytes(row.get("output"), "revert data")))
+            elif halts and row.get("status") == "invalid":
+                completed.append(("invalid", b""))
             else:
                 completed.append(None)
     except (AttributeError, ValueError):
@@ -1040,11 +1075,12 @@ def compare(observations: dict, *, reverts: bool = False) -> dict:
     statuses = [row.get("status") for row in rows]
     if any(status in {"out-of-fuel", "out-of-gas", "timeout", "output-limit", "resource-limit"} for status in statuses):
         return {"category": "inconclusive-resource", "pairs": {}}
-    if any(status not in COMPLETED for status in statuses):
+    if any(status not in COMPLETED | (HALTED if halts else set()) for status in statuses):
         return {"category": "execution-error", "pairs": {}}
     pairs = {f"{names[left]}/{names[right]}": completed[left] == completed[right]
              for left, right in ((0, 2), (0, 1), (1, 2))}
-    agreed = all(status == "returned" for status in statuses) or (reverts and all(status == "reverted" for status in statuses))
+    agreed = (all(status == "returned" for status in statuses) or (reverts and all(status == "reverted" for status in statuses))
+              or (halts and all(status == "invalid" for status in statuses)))
     return {"category": "matched" if all(pairs.values()) and agreed else "semantic-mismatch", "pairs": pairs}
 
 
@@ -1237,6 +1273,27 @@ def evm_failure(error: RpcError) -> dict:
     if "revert" in message.lower() and isinstance(data, str):
         return {"stage": "execution", "status": "reverted", "output": "0x" + hex_bytes(data, "RPC revert data").hex()}
     return {"stage": "execution", "status": "evm-exceptional", "detail": message, "rpcError": error.error}
+
+
+# Anvil names an exceptional halt after revm's instruction result: INVALID (0xFE) is
+# `InvalidFEOpcode`, an undefined opcode `OpcodeNotFound`, and gas exhaustion
+# `OutOfGas` or a name ending in `OOG`, such as `InvalidOperandOOG` for a memory
+# offset past any gas.
+EVM_HALT = re.compile(r"EVM error (\w+)")
+
+
+def evm_halt(observation: dict) -> dict:
+    """An exceptional EVM observation classified by its halt, for a profile that
+    compares halts: INVALID is `invalid`, any gas exhaustion `out-of-gas`, and
+    every other halt stays `evm-exceptional`."""
+    halt = EVM_HALT.fullmatch(observation.get("detail", "")) if observation.get("status") == "evm-exceptional" else None
+    if halt is None:
+        return observation
+    if halt[1] == "InvalidFEOpcode":
+        return {**observation, "status": "invalid"}
+    if halt[1] == "OutOfGas" or halt[1].endswith("OOG"):
+        return {**observation, "status": "out-of-gas"}
+    return observation
 
 
 def deployment_failure(error: RpcError) -> Finding:
@@ -1464,6 +1521,7 @@ def execute(args, report: dict) -> None:
         MEMORY_CASE_SCHEMA: "runtime Word input, std's memory<bytes>, memory_ref and memory<DynArray<uint256>> values built from the input, with lengths, Word and byte reads and writes through std's range checks, concatenation, slices, copies, keccak256_, second variables and helpers that write, in straight-line code and bounded while loops, versus a Core reference over byte lists, std's OutOfBounds() revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         MEMORY_CALL_CASE_SCHEMA: "runtime Word input, std's memory<bytes>, memory_ref and memory<DynArray<uint256>> values passed to and returned by helpers, generic helpers over std's memory traits, function values, tuples, std sums and a user enum holding a value and closures capturing one, in straight-line code, versus a Core reference over byte lists with every call inlined, std's OutOfBounds() revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         REVERT_DATA_CASE_SCHEMA: "runtime Word input, std Error values made from the input, held by variables, pairs, std sums and a user enum, made, chosen and raised by helpers, closures, match arms and a bounded while loop, through revertWithError, require with an Error or a string literal, revertLit and revertEmpty, beside std's memory<bytes> values that messages view, versus a Core reference over byte lists whose right injection is the revert data, compared exactly, Sonatina O0, run(uint256) ABI Word",
+        HALT_CASE_SCHEMA: "runtime Word input, the revert data profile's sites beside halts with INVALID through std's assert, std.opcodes' invalid() and inline Yul invalid() under a Solcore or a Yul if, in run, helpers, closures, match arms and a bounded while loop, versus the revert data profile's Core reference, whose right injection with a length no revert data has is the halt, an INVALID halt matching only three INVALID halts and revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
@@ -1546,7 +1604,8 @@ def execute(args, report: dict) -> None:
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))
     report["rawObservations"]["directCore"] = fresh.get("directCore")
     report["observations"]["directCore"] = normalize_observation(fresh.get("directCore"), direct=True)
-    if report["observations"]["directCore"]["status"] not in COMPLETED:
+    halting = case["schema"] in HALTING_SCHEMAS
+    if report["observations"]["directCore"]["status"] not in COMPLETED | (HALTED if halting else set()):
         report["comparison"] = {"category": "inconclusive-resource" if report["observations"]["directCore"]["status"] == "out-of-fuel" else "execution-error", "pairs": {}}
         return
     hull_path, image_path = args.output / "hull.json", args.output / "images.json"
@@ -1629,6 +1688,8 @@ def execute(args, report: dict) -> None:
             evm = {"stage": "execution", "status": "returned", "output": returned}
         except RpcError as error:
             evm = evm_failure(error)
+            if halting:
+                evm = evm_halt(evm)
         report["rawObservations"]["rustEvm"] = evm
         report["observations"]["rustEvm"] = normalize_observation(evm)
         report["executionContext"] = {"sender": sender, "address": address, "calldata": case["contract"]["calldata"], "value": "0", "persist": False, "gas": args.gas}
@@ -1644,7 +1705,7 @@ def execute(args, report: dict) -> None:
         report["coreDeployment"] = rows[0]
         report["rawObservations"]["importedHull"] = rows[1]
         report["observations"]["importedHull"] = normalize_observation(rows[1])
-    report["comparison"] = compare(report["observations"], reverts=case["schema"] in REVERTING_SCHEMAS)
+    report["comparison"] = compare(report["observations"], reverts=case["schema"] in REVERTING_SCHEMAS, halts=halting)
 
 
 def main() -> int:

@@ -356,7 +356,8 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CASE_SCHEMA], "SynthesizedMemoryValues")
         self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
         self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA,
-                                                    runner.REVERT_DATA_CASE_SCHEMA))
+                                                    runner.REVERT_DATA_CASE_SCHEMA, runner.HALT_CASE_SCHEMA))
+        self.assertEqual(runner.HALTING_SCHEMAS, (runner.HALT_CASE_SCHEMA,))
 
     def test_revert_data_plan_envelope_and_shape_inventory(self):
         site = {"form": "when", "cond": {"word": {"operand": "input"}, "test": {"test": "eq", "constant": 0}},
@@ -393,6 +394,33 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.REVERT_DATA_CASE_SCHEMA], "runtime-revert-data")
         self.assertEqual(runner.CASE_CONTRACTS[runner.REVERT_DATA_CASE_SCHEMA], "SynthesizedRevertData")
         self.assertEqual(runner.REVERT_DATA_VERSIONS, ("profileVersion", "boundaryVersion"))
+
+    def test_halt_plan_envelope_and_shape_inventory(self):
+        site = {"form": "require", "cond": {"word": {"operand": "input"}, "test": {"test": "ne", "constant": 0}},
+                "payload": {"payload": "halt", "halt": "assert"}}
+        observe = {"kind": "observe", "fold": "add", "constant": 3, "value": "sc_b0", "access": {"access": "length"}}
+        plan = {"schema": "solcore-lean.halt-plan.v1", "helpers": [{"kind": "raise", "site": site, "fold": "add", "constant": 3}],
+                "steps": [{"site": site}, {"action": observe}]}
+        runner.validate_halt_plan(plan)
+        for invalid in (None, {**plan, "schema": "solcore-lean.revert-data-plan.v1"}, {**plan, "steps": []},
+                        {**plan, "steps": [{"action": {**observe, "kind": "slice"}}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_halt_plan(invalid)
+        with self.assertRaises(ValueError):
+            runner.validate_revert_data_plan(plan)
+        shapes = {key: list(values) for key, values in runner.HALT_SHAPES.items()}
+        runner.validate_revert_data_shapes(shapes, "haltShapes", runner.HALT_SHAPES)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "halts": ["yul", "assert"]},
+                        {**shapes, "haltOrders": ["after"]}, {key: values for key, values in shapes.items() if key != "halts"}):
+            with self.assertRaises(ValueError):
+                runner.validate_revert_data_shapes(invalid, "haltShapes", runner.HALT_SHAPES)
+        with self.assertRaises(ValueError):
+            runner.validate_revert_data_shapes(shapes)
+        self.assertEqual({key: len(values) for key, values in runner.HALT_SHAPES.items()},
+                         {"halts": 4, "haltContexts": 8, "haltTests": 5, "haltWords": 5, "haltOrders": 4})
+        self.assertEqual(runner.CASE_PROFILES[runner.HALT_CASE_SCHEMA], "runtime-halts")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.HALT_CASE_SCHEMA], "SynthesizedHalts")
+        self.assertEqual(runner.HALT_VERSIONS, ("profileVersion", "boundaryVersion"))
 
     def test_memory_call_plan_envelope_and_shape_inventory(self):
         build = {"kind": "bytes", "build": "to_bytes", "parts": [{"part": "word", "operand": {"operand": "input"}}]}
@@ -834,7 +862,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 27)
+        self.assertEqual(len(runner.CASE_PROFILES), 28)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))
@@ -1111,6 +1139,44 @@ class ClassificationTests(unittest.TestCase):
             actual = {name: dict(reverted) for name in observations()}
             actual["rustEvm"] = {"status": status}
             self.assertEqual(runner.compare(actual, reverts=True)["category"], category)
+
+    def test_equal_halts_match_only_for_a_halting_profile(self):
+        halted = {name: {"status": "invalid"} for name in observations()}
+        self.assertEqual(runner.compare(halted)["category"], "execution-error")
+        self.assertEqual(runner.compare(halted, reverts=True)["category"], "execution-error")
+        result = runner.compare(halted, reverts=True, halts=True)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["pairs"], {"directCore/rustEvm": True, "directCore/importedHull": True,
+                                           "importedHull/rustEvm": True})
+        self.assertEqual(runner.compare(observations(), reverts=True, halts=True)["category"], "matched")
+        # A halt the reference does not prescribe, or one path that does not halt, is a mismatch.
+        for path, row in (("directCore", {"status": "returned", "word": "7"}), ("rustEvm", {"status": "returned", "word": "7"}),
+                          ("importedHull", {"status": "reverted", "output": "0x"})):
+            actual = {name: {"status": "invalid"} for name in observations()}
+            actual[path] = row
+            result = runner.compare(actual, reverts=True, halts=True)
+            self.assertEqual(result["category"], "semantic-mismatch")
+            self.assertFalse(all(result["pairs"].values()))
+        for status, category in (("out-of-gas", "inconclusive-resource"), ("out-of-fuel", "inconclusive-resource"),
+                                 ("evm-exceptional", "execution-error")):
+            actual = {name: {"status": "invalid"} for name in observations()}
+            actual["rustEvm" if status != "out-of-fuel" else "importedHull"] = {"status": status}
+            self.assertEqual(runner.compare(actual, reverts=True, halts=True)["category"], category)
+
+    def test_evm_halts_are_classified_by_their_revm_names(self):
+        def failure(message):
+            return runner.evm_failure(runner.RpcError({"code": -32603, "message": message}))
+        self.assertEqual(runner.evm_halt(failure("EVM error InvalidFEOpcode"))["status"], "invalid")
+        for message in ("EVM error OutOfGas", "EVM error InvalidOperandOOG", "EVM error MemoryOOG"):
+            self.assertEqual(runner.evm_halt(failure(message))["status"], "out-of-gas")
+        for message in ("EVM error OpcodeNotFound", "EVM error StackUnderflow", "EVM error InvalidJump",
+                        "EVM error StackOverflow", "EVM error InvalidFEOpcode trailing", "invalid opcode"):
+            self.assertEqual(runner.evm_halt(failure(message))["status"], "evm-exceptional")
+        # Without the halt classification the other profiles keep every exceptional halt as before.
+        self.assertEqual(failure("EVM error InvalidFEOpcode")["status"], "evm-exceptional")
+        self.assertEqual(failure("EVM error InvalidOperandOOG")["status"], "evm-exceptional")
+        reverted = runner.evm_failure(runner.RpcError({"code": 3, "message": "execution reverted", "data": "0x"}))
+        self.assertEqual(runner.evm_halt(reverted), reverted)
 
     def test_revert_difference_preserves_bytes(self):
         row = runner.normalize_observation({"stage": "execution", "status": "reverted", "output": "0xAB00"})

@@ -66,6 +66,9 @@ LITERALS = (
     "the quick brown fox jumps over the lazy dog 0123456789 abcdefgh",
     "the quick brown fox jumps over the lazy dog 0123456789 abcdefghi")
 LIMITS = {"errors": 3, "data": 2, "closures": 2, "values": 2}
+# The runtime-halts profile's halts and plan schema; a revert data plan has none.
+HALTS = ("assert", "invalid", "inline", "yul")
+HALT_PLAN_SCHEMA = "solcore-lean.halt-plan.v1"
 
 
 # --- Admission ------------------------------------------------------------------------
@@ -90,7 +93,8 @@ def check_word(word, context):
 
 
 class Env:
-    def __init__(self):
+    def __init__(self, halts=False):
+        self.halts = halts
         self.scope = memory.Scope()
         self.errors = []          # kinds: ("selector",), ("empty",), ("message", object), ("picked",)
         self.pairs, self.sums, self.enums = [], [], []
@@ -99,7 +103,7 @@ class Env:
         self.loops = 0
 
     def copy(self):
-        other = Env()
+        other = Env(self.halts)
         other.scope = self.scope.copy()
         other.errors, other.pairs, other.sums, other.enums = list(self.errors), list(self.pairs), list(self.sums), list(self.enums)
         other.closures, other.values, other.loops = list(self.closures), self.values, self.loops
@@ -155,6 +159,10 @@ class Env:
                     and 0 <= payload["text"] < len(LITERALS), "unknown literal")
             if site["form"] == "when":
                 require(len(LITERALS[payload["text"]].encode()) <= 32, "revertLit takes at most 32 bytes")
+        elif kind == "halt":
+            require(self.halts and set(payload) == {"payload", "halt"} and payload["halt"] in HALTS
+                    and (payload["halt"] == "assert") == (site["form"] == "require"),
+                    "a halt is a runtime-halts site: assert, or invalid(), inline or Yul under if")
         else:
             require(kind == "none" and set(payload) == {"payload"} and site["form"] == "when", "revertEmpty is an if site")
 
@@ -181,7 +189,7 @@ def action_admitted(action, in_loop):
                 "an observation of a length, Word or byte at a literal position")
 
 
-def check_helpers(helpers):
+def check_helpers(helpers, halts=False):
     require(isinstance(helpers, list) and len(helpers) <= 3, "at most three helpers")
     for index, helper in enumerate(helpers):
         require(isinstance(helper, dict), "a helper is an object")
@@ -189,7 +197,7 @@ def check_helpers(helpers):
         if kind == "raise":
             require(set(helper) == {"kind", "site", "fold", "constant"} and helper["fold"] in ("add", "xor")
                     and helper["constant"] in FOLD_CONSTANTS, "invalid raise helper")
-            Env().site(helper["site"], "helper")
+            Env(halts).site(helper["site"], "helper")
         elif kind == "make":
             require(set(helper) == {"kind", "constant"} and type(helper["constant"]) is int
                     and 1 <= helper["constant"] <= 255, "invalid make helper")
@@ -324,18 +332,42 @@ def check_step(env, helpers, step):
     return env, sites, folds
 
 
-def check_plan(plan):
-    require(isinstance(plan, dict) and set(plan) == {"schema", "helpers", "steps"} and plan["schema"] == PLAN_SCHEMA,
-            "unexpected revert data plan schema")
-    check_helpers(plan["helpers"])
+def is_halt(site):
+    return site["payload"]["payload"] == "halt"
+
+
+def step_halts(env, helpers, step):
+    """The halt sites a step reaches, in the environment before it."""
+    key, value = next(iter(step.items()))
+    if key == "site":
+        return int(is_halt(value))
+    if key == "call":
+        return int(is_halt(resolve(helpers, value["helper"])[0]["site"]))
+    if key == "take":
+        return int(held_of(env, value["held"])[0] == "error" and is_halt(value["site"]))
+    if key == "apply":
+        return int(is_halt(env.closures[value["closure"]]["site"]))
+    if key == "loop":
+        return sum("site" in item and is_halt(item["site"]) for item in value["body"])
+    return 0
+
+
+def check_plan(plan, halts=False):
+    """A revert data plan, or with `halts` a runtime-halts plan, which reaches a halt."""
+    require(isinstance(plan, dict) and set(plan) == {"schema", "helpers", "steps"}
+            and plan["schema"] == (HALT_PLAN_SCHEMA if halts else PLAN_SCHEMA), "unexpected revert data plan schema")
+    check_helpers(plan["helpers"], halts)
     steps = plan["steps"]
     require(isinstance(steps, list) and 1 <= len(steps) <= 12, "one to twelve steps")
-    env, sites, folds = Env(), 0, False
+    env, sites, folds, reached = Env(halts), 0, False, 0
     for step in steps:
+        before = env
         env, more, folded = check_step(env, plan["helpers"], step)
+        reached += step_halts(before, plan["helpers"], step)
         sites += more
         folds = folds or folded
     require(sites >= 1 and folds, "a plan has a site it reaches and a fold")
+    require(not halts or reached >= 1, "a halt plan reaches a halt site")
     return plan
 
 
@@ -353,6 +385,8 @@ def length_class(length):
 
 def form_name(site):
     kind = site["payload"]["payload"]
+    if kind == "halt":
+        return site["payload"]["halt"]
     if kind == "error":
         return "revertWithError" if site["form"] == "when" else "require"
     if kind == "literal":
@@ -369,9 +403,14 @@ def word_kind(context, word):
     return "input" if kind == "input" else "constant"
 
 
-def shapes(plan):
-    found = {dimension: set() for dimension in SHAPES}
-    writes, allocations = [], 0
+HALT_SHAPES = {key: list(values) for key, values in m2.HALT_SHAPES.items()}
+
+
+def trace(plan):
+    """Every site the plan's steps run, in order: the shapes of revert data and
+    halt sites, and each site's halt and the writes before it."""
+    found = {dimension: set() for dimension in (*SHAPES, *HALT_SHAPES)}
+    writes, allocations, visits = [], 0, []
     errors, held = [], {"pair": [], "sum": [], "enum": []}
 
     def made_of(env, source, outer=None):
@@ -394,6 +433,13 @@ def shapes(plan):
         return {"kind": "message", "lengths": [length], "written": (obj, f"sc_b{value}", len(writes), allocations)}
 
     def site(context, word, spec, raised):
+        visits.append((is_halt(spec), len(writes)))
+        if is_halt(spec):
+            found["halts"].add(form_name(spec))
+            found["haltContexts"].add(context)
+            found["haltTests"].add(spec["cond"]["test"]["test"])
+            found["haltWords"].add(word)
+            return
         found["forms"].add(form_name(spec))
         found["contexts"].add(context)
         found["tests"].add(spec["cond"]["test"]["test"])
@@ -430,7 +476,7 @@ def shapes(plan):
 
     for helper in plan["helpers"]:
         found["helpers"].add(helper["kind"])
-    env = Env()
+    env = Env(halts=True)  # a walk over the admitted plan, revert data or halt
     for step in plan["steps"]:
         key, value = next(iter(step.items()))
         found["steps"].add(key)
@@ -513,7 +559,28 @@ def shapes(plan):
                     raised = made_of(inner_env, spec["payload"]["source"], outer) if spec["payload"]["payload"] == "error" else None
                     site("loop", word_kind("loop", spec["cond"]["word"]), spec, raised)
         env, _, _ = check_step(env, plan["helpers"], step)
-    return found
+    return found, visits, len(writes)
+
+
+def shapes(plan):
+    found, _, _ = trace(plan)
+    return {dimension: found[dimension] for dimension in SHAPES}
+
+
+def halt_shapes(plan):
+    found, visits, writes = trace(plan)
+    halts = [index for index, (halt, _) in enumerate(visits) if halt]
+    reverts = [index for index, (halt, _) in enumerate(visits) if not halt]
+    orders = set()
+    if any(revert < halt for halt in halts for revert in reverts):
+        orders.add("revert-before")
+    if any(revert > halt for halt in halts for revert in reverts):
+        orders.add("revert-after")
+    if any(visits[halt][1] > 0 for halt in halts):
+        orders.add("write-before")
+    if any(visits[halt][1] < writes for halt in halts):
+        orders.add("write-after")
+    return {**{dimension: found[dimension] for dimension in HALT_SHAPES if dimension != "haltOrders"}, "haltOrders": orders}
 
 
 # --- The shrink measure -----------------------------------------------------------------
@@ -548,6 +615,8 @@ def source_size(s):
 
 
 def payload_size(p):
+    if p["payload"] == "halt":
+        return 0 if p["halt"] in ("assert", "inline") else 1
     if p["payload"] == "none":
         return 0
     if p["payload"] == "literal":
@@ -661,12 +730,41 @@ def source_text(word, s):
     return f"sc_e{s['number']}" if s["source"] == "named" else "sc_e"
 
 
-def site_lines(word, s):
+def yul_word(base, o):
+    kind = o["operand"]
+    if kind == "input":
+        return base
+    if kind in ("add", "mul", "xor"):
+        return f"{kind}({base}, {o['constant']})"
+    return "sc_r" if kind == "acc" else "sc_counter"
+
+
+def yul_test(word, t):
+    kind = t["test"]
+    if kind == "bits":
+        return f"eq(and({word}, {t['mask']}), {t['value']})"
+    if kind == "ne":
+        return f"iszero(eq({word}, {t['constant']}))"
+    return f"{kind}({word}, {t['constant']})"
+
+
+def site_lines(word, s, yul=lambda o: yul_word("sc_x", o)):
     condition = test_text(word(s["cond"]["word"]), s["cond"]["test"])
     payload = s["payload"]
 
     def guarded(line):
         return [f"if {condition} {{", "    " + line, "}"]
+
+    if payload["payload"] == "halt":
+        halt = payload["halt"]
+        if halt == "assert":
+            return [f"assert({condition});"]
+        if halt == "invalid":
+            return guarded("invalid();")
+        if halt == "inline":
+            return [f"if {condition} {{", "    assembly {", "        invalid()", "    }", "}"]
+        return ["assembly {", f"    if {yul_test(yul(s['cond']['word']), s['cond']['test'])} {{", "        invalid()",
+                "    }", "}"]
 
     if payload["payload"] == "error":
         text = source_text(word, payload["source"])
@@ -686,7 +784,7 @@ def helper_lines(index, h):
     kind = h["kind"]
     if kind == "raise":
         return ([f"function {name}(sc_e: Error, sc_w: word) returns (word) {{"]
-                + indent(4, site_lines(lambda o: local_word("sc_w", o), h["site"]))
+                + indent(4, site_lines(lambda o: local_word("sc_w", o), h["site"], lambda o: yul_word("sc_w", o)))
                 + [f"    return (sc_w{FOLD_TEXT[h['fold']]}{h['constant']});", "}"])
     if kind == "make":
         return [f"function {name}(sc_w: word) returns (Error) {{", f"    return Error((sc_w + {h['constant']}));", "}"]
@@ -704,7 +802,7 @@ def fold_line(fold, constant, value):
     return f"sc_r = ((sc_r * {constant}){FOLD_TEXT[fold]}{value});"
 
 
-def emitted_source(plan):
+def emitted_source(plan, contract=NAME, opcodes="import { mload, mstore, mstore8, shr, mod } from std.opcodes;"):
     counts, used = {"bytes": 0, "slice": 0, "array": 0}, set()
     names = {"errors": 0, "pairs": 0, "sums": 0, "enums": 0, "closures": 0, "functions": 0}
     lines, enum = [], False
@@ -767,7 +865,7 @@ def emitted_source(plan):
                           ["    }", "    case Sc_F.Sc_F1(sc_w) {"] + indent(8, folded) + ["    }", "}"])
         elif key == "closure":
             lines += ([f"let sc_c{names['closures']}: function (word) returns (word) = lam (sc_j: word) -> word {{"]
-                      + indent(4, site_lines(lambda o: local_word("sc_j", o), v["site"]))
+                      + indent(4, site_lines(lambda o: local_word("sc_j", o), v["site"], lambda o: yul_word("sc_j", o)))
                       + [f"    return (sc_j{FOLD_TEXT[v['fold']]}{v['constant']});", "};"])
             names["closures"] += 1
         elif key == "apply":
@@ -783,9 +881,8 @@ def emitted_source(plan):
     helpers = [line for name in memory.HELPERS if name in used for line in memory.HELPER_LINES[name]]
     enum_lines = ["enum Sc_F {", "    Sc_F0(Error, word),", "    Sc_F1(word)", "}", ""] if enum else []
     own = [line for index, h in enumerate(plan["helpers"]) for line in helper_lines(index, h) + [""]]
-    source = (["import * from std;", "import * from std.dispatch;",
-               "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] + helpers + enum_lines + own +
-              [f"contract {NAME} {{", "    function run(input: uint256) public returns (uint256) {",
+    source = (["import * from std;", "import * from std.dispatch;", opcodes, ""] + helpers + enum_lines + own +
+              [f"contract {contract} {{", "    function run(input: uint256) public returns (uint256) {",
                "        let sc_x: word = Typedef.rep(input);", "        let sc_r: word = 0;"] + indent(8, lines) +
               ["        return uint256(sc_r);", "    }", "}"])
     return "\n".join(source) + "\n"
@@ -797,6 +894,10 @@ class Revert(Exception):
     def __init__(self, data):
         super().__init__(data.hex())
         self.data = bytes(data)
+
+
+class Halt(Exception):
+    """INVALID's halt at a runtime-halts site."""
 
 
 def b32(word):
@@ -863,6 +964,10 @@ class Machine:
 
     def site(self, s, base=None, param=None):
         payload = s["payload"]
+        if payload["payload"] == "halt":
+            if holds(self.word(s["cond"]["word"], base), s["cond"]["test"]) == (s["form"] == "when"):
+                raise Halt()
+            return
         if payload["payload"] == "error":
             data = self.data(self.source(payload["source"], base, param))
         elif payload["payload"] == "literal":
@@ -984,6 +1089,8 @@ class Machine:
                 self.step(s)
         except Revert as revert:
             return {"stage": "execution", "status": "reverted", "output": "0x" + revert.data.hex()}
+        except Halt:
+            return {"stage": "execution", "status": "invalid"}
         return {"stage": "execution", "status": "returned", "word": str(self.r)}
 
 
