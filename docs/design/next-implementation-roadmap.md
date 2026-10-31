@@ -9876,6 +9876,132 @@ Out of scope:
   resolve;
 - typed decoding, nonzero values, logs, nested depth and creation.
 
+**Results.** The checks outside the frozen matrices:
+- **Convention:**
+  - The laws above are proved without `sorry`, axioms beyond `propext` and
+    `Quot.sound`, or `native_decide`, and no earlier statement changed.
+  - `Solcore/Test/ContractCallChoice.lean` runs a parent whose call phase and
+    single resume program choose by its input bits how many calls to make:
+    - zero calls finish in the call phase;
+    - one to three calls run through the same resume program;
+    - a resume phase revert commits nothing;
+    - a request with no phase left stops the transaction at its call;
+    - the parent's code and every balance stay;
+    - the call chain's parent through `ofChain` gives the call chain's
+      results.
+- **Golden tests:** an independent Python model wrote 39 rows as text for
+  six plans, every slot, output and call of each transaction. The plans were
+  a branch, a loop, a branch and a loop, three branches, two loops around a
+  branch, and a loop and a branch. Their inputs skipped calls, stopped loops at
+  entry and after a call on their stop length, and reverted the parent. The
+  child had the imported identity step. The Lean byte-level model and
+  original Core through the choice chain gave every row exactly.
+- **Cases test:** original Core through the choice chain equalled the Lean
+  model on:
+  - 40 scenarios of eight transactions under G0 revision three at 384 nodes;
+  - 24 of three under revision one;
+  - 12 of four at 512.
+
+  Every chain made exactly the model's calls, with its statuses and lengths.
+  - Every case and the reductions of twelve cases replayed.
+  - The test pins the phases' sizes for five plans, from 399 and 502 nodes
+    for one branch to 1,037 and 1,340 for two loops around a branch, all
+    within 2,048.
+  - The draws over 256 seeds reached every site count, both kinds, every
+    loop bound, every bank offset, width, length and stop length beside
+    uniform ones, both statuses, every control outcome and both parent
+    outcomes.
+  - Generation reached zero to three calls per transaction.
+- **Adapter:** its own Python model gives each transaction's calls from the
+  plan and the input. Its tests pin:
+  - the prescribed calls, among them a loop stopped at entry by an earlier
+    site's data and a loop whose stop length 0 keeps it from running before
+    any call;
+  - the refusals of invalid sites and of tampered calls;
+  - the sizes before and after each site and the zeros of positions not
+    called;
+  - the call count and the output as the slots' sum;
+  - the child's kept storage when every call reverted or none was made;
+  - the Hull history's schema and the plan's slots.
+- **Corpus test:** it replayed 18 scenarios and 48 transactions, with every
+  original Core history equal to the model's and to the expected history,
+  and refused tampered entries.
+  - **Entries:** 13 imported plans over the steps that the call-sequence
+    corpus imports, among them every boundary input, and 5 generated.
+  - **Coverage:** every value of each dimension.
+- **Smoke and reduction runs,** unfrozen, before the profile commit:
+  - two random cases matched 16 prefixes on O0, and two on Yul;
+  - the fixed corpus matched 18 scenarios and 48 prefixes on O0 with
+    complete coverage, in 204 seconds;
+  - a synthetic output difference on imported Hull at `tx-1` of a random O0
+    case first stopped before any attempt. Its 32 candidates passed the
+    campaign's 4 MiB bound on tool output, so the call campaign now halves
+    its batch.
+  - With the halving, the same difference reduced in 26 attempts, 25
+    accepted, after one halving from 32 to 16:
+    - the case had a loop of bound two and eight transactions;
+    - it reduced to a loop of bound one, windows of width zero, and that one
+      transaction with input 0;
+    - the step was 80% smaller as compact JSON.
+- **Gate** on the tree committed as `41d83b6a3`:
+  - the kernel check and `lake build` (10,346 jobs);
+  - `lake test` in 40 minutes, and the 20 corpus validators and the
+    chunked-generation check in 13;
+  - 952 Python tests in 15 suites and the diff check;
+  - 42 native tools prepared offline and verified on the commit.
+
+The matrices ran on `41d83b6a3` with 203 digests frozen:
+- every tracked file under `scripts` and `Tests/scripts`;
+- the 42 native tools and the test driver;
+- solc and Anvil;
+- the Rust driver, code-image exporter, directive tools and declaration
+  extractor.
+
+None changed during any run, and all 687 case results record that revision
+with no tracked difference. The gate ran beside the O0 run in another
+worktree, so that run's timings are slower.
+- **Fixed corpora:**
+  - O0: all thirty-two stateful corpora matched, 523 scenarios and 1,326
+    prefixes, in 4,384 seconds. The thirty-one earlier ones kept their 505
+    scenarios and 1,278 prefixes, and the new corpus took 195 seconds.
+  - The new corpus matched its 18 scenarios and 48 prefixes with complete
+    coverage on O2 and Yul, in 245 and 320 seconds.
+  - The call-sequence corpus also matched its 16 scenarios and 39 prefixes
+    with complete coverage on O2 and Yul, in 204 and 282 seconds.
+- **Random suites:** root seed `20261041` (derived seed
+  `11687407688836069534`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes on O0, O2 and Yul.
+  - All six runs matched 16 scenarios and 128 prefixes with complete
+    coverage, in 193 to 301 seconds: O0 in 193 and 197, O2 in 225 and 227,
+    and Yul in 296 and 301.
+  - No attempt was excluded at either budget.
+
+  The counts below hold at each budget:
+  - **Plans:** 7 of one site, 6 of two and 3 of three, with 16 branches and
+    12 loops of bounds one (4), two (6) and three (2).
+  - **Calls:** 152, of which 107 returned and 45 reverted, and 10 had empty
+    data. 85 had a bank length and 67 another.
+  - **Calls per transaction:** none in 34, one in 50, two in 30 and three in
+    14.
+  - **Skips,** counted in transactions with a position passed without a
+    call:
+    - before any call, 58;
+    - after returned data, 30;
+    - after reverted data, 7;
+    - after returned empty data, 3;
+    - after reverted empty data, 2.
+  - **Loop exits,** counted in transactions: at the limit in 70, at entry on
+    the stop length in 8, and after a call on it in 2.
+  - **Windows:** every window place came.
+  - **Parents:** 86 returned and 42 reverted, and every rollback pattern
+    came. In 11 returned transactions every call reverted, and 24 returned
+    without a call.
+  - **Agreement across runs:** the cases were identical on O0, O2 and Yul at
+    each budget. Both budgets drew the same plans and inputs for all 16
+    seeds, with the step differing in 15.
+- **Findings:** none, no mismatch and no upstream defect, and `questions.md`
+  is untouched.
+
 **Known mismatch classes in the fuzz registry: definitions.** A mismatch's key
 is its reduced program. So a recorded semantic defect that random plans keep
 drawing registers new signatures at every occurrence. The case in point is

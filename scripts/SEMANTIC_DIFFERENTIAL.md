@@ -7590,6 +7590,42 @@ python3 scripts/semantic-suite.py --mode fixed --backend yul \
   - the shrink history records each halving in `halvedBatches`;
   - only a one-candidate response over the bound stops the reduction.
 
+### Results
+
+The matrices ran on `41d83b6a3` with scripts, native tools, solc, Anvil, and
+the Rust driver, code-image exporter, directive tools and declaration
+extractor frozen; none changed.
+- **Fixed corpus:** all 18 scenarios and 48 prefixes matched with complete
+  coverage on Sonatina O0 and O2 and on Yul, in 195, 245 and 320
+  seconds.
+  - On O0 all thirty-two stateful corpora matched, 523 scenarios and
+    1,326 prefixes. The thirty-one others kept their 505 scenarios and 1,278
+    prefixes.
+  - The call-sequence corpus also matched on O2 and Yul.
+- **Random suites:** root seed `20261041`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on O0, O2 and Yul. Each
+  matched 16 scenarios and 128 prefixes with complete coverage, in 193 to 301
+  seconds.
+  - No attempt was excluded.
+  - **At each budget:**
+    - 16 plans of one to three sites, with 16 branches and 12 loops of every
+      bound;
+    - 152 calls, 107 returned and 45 reverted, from none to three per
+      transaction;
+    - positions passed without a call after every buffer state;
+    - loops ending at the limit, at entry and after a call on their stop
+      length;
+    - 86 parents returned and 42 reverted, with every rollback pattern.
+  - The cases were identical on all three backends at each budget.
+- **Unfrozen checks before the profile commit:**
+  - an O0 run matched the corpus;
+  - a synthetic output difference on imported Hull at `tx-1` of a random O0
+    case reduced in 26 attempts, 25 accepted, after the batch halved once from
+    32 to 16. It reached a loop of bound one, windows of width zero and that
+    one transaction, with input 0.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-five
