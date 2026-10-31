@@ -9058,6 +9058,48 @@ difference.
 - **Findings:** none, no mismatch and no upstream defect, and `questions.md`
   is untouched.
 
+**Yul.** `bdc73e053` runs the profile on Yul, with no change to Core, the
+Hull importer or the backends:
+- `scripts/export-rust-yul.py` admits `SynthesizedReturnCaller` and
+  `SynthesizedReturnCallee`, taken from the call adapter's metadata, and
+  labels their scope `call-return`;
+- the Yul transport validates an export under a contract's file prefix, so
+  that each role's export and main checked Hull sit side by side;
+- the call adapter exports each source's Yul, deploys the child then the
+  parent from their solc bytes and keeps imported Hull on O0 images, and
+  exact replay checks both exports;
+- the call campaign, the suite and the fuzz driver admit Yul for this profile
+  only, and still refuse the other two call profiles there.
+
+The Python suites passed 917 tests, eleven of them new. An unfrozen random
+Yul case, the adapter's own run of it and an exact replay of that archive
+matched before the commit.
+
+The matrices ran on `bdc73e053` with 194 digests frozen: every tracked file
+under `scripts` and `Tests/scripts`, the 40 native tools and the test driver,
+solc, Anvil, and the Rust driver, code-image exporter and directive tools.
+None changed during any run, and all 77 case results of the suites record that
+revision with no tracked difference.
+- **Fixed corpus on Yul:** all 45 scenarios and 89 prefixes matched with
+  complete coverage, in 832 seconds.
+- **Random suites on Yul:** root seed `20261041` (derived seed
+  `1330793226701288047`), sixteen eight-transaction scenarios, G0 revision
+  three, at 384 and 512 nodes. Both runs matched 16 scenarios and 128 prefixes
+  with complete coverage and no exclusion, in 312 and 314 seconds. They drew
+  the cases of the O0 and O2 runs: the same plans and inputs, with every kind,
+  delivery, child, std decision and parent count as above.
+- **Fuzz driver:** one Yul iteration from base seed `20261031`, with the
+  default sixteen cases and the first node-budget scale, ran the twenty-six
+  pure profiles, the twenty-seven storage-family ones and this one: 864
+  scenarios in 1.89 hours, 848 matched and none mismatched or inconclusive.
+  Its epoch records `bdc73e053`.
+  - This profile matched its 16 scenarios and 128 prefixes at 384 nodes.
+  - The 16 errors were all `runtime-assembly-memory`'s, the known Sonatina O0
+    demanded-bits overflow in the Yul runs' code images (`questions.md`,
+    2026-10-28). The driver counted them under that signature, with no new
+    signature and no problem.
+- **Findings:** none new, and `questions.md` is untouched.
+
 **Known mismatch classes in the fuzz registry: definitions.** A mismatch's key
 is its reduced program. So a recorded semantic defect that random plans keep
 drawing registers new signatures at every occurrence. The case in point is

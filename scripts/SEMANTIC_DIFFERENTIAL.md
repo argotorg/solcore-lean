@@ -7164,6 +7164,17 @@ the Rust driver, code-image exporter and directive tools frozen.
   - A synthetic output difference on imported Hull at `tx-1` of the
     `quad-trailing` entry reduced in 11 attempts, 10 accepted, to a typed
     tuple of two Words and that one transaction.
+- **On Yul,** on `bdc73e053` with 194 digests frozen and none changed:
+  - the fixed corpus matched all 45 scenarios and 89 prefixes with complete
+    coverage, in 832 seconds;
+  - random suites from root seed `20261041`, sixteen eight-transaction
+    scenarios at 384 and 512 nodes, each matched 16 scenarios and 128
+    prefixes with complete coverage, in 312 and 314 seconds. They drew the
+    cases of the O0 and O2 runs;
+  - one fuzz-driver Yul iteration from base seed `20261031` matched this
+    profile's 16 scenarios and 128 prefixes beside the pure and
+    storage-family profiles. Its only errors were the known code-image
+    overflow of `runtime-assembly-memory`.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
