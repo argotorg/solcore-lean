@@ -10949,6 +10949,168 @@ The definitions were fixed before any harness change:
   extractor, and the harness and fuzz driver change. Every checkout needs one
   offline `--prepare`, and an existing fuzz state needs `--accept-new-epoch`.
 
+**Source mutants of the pinned fixtures: results.** `009db6174` implements
+the definitions above, and `3db65ea1a` lists one of the findings below as
+known:
+- **Tool and readiness:** `scripts/rust-site-export.rs` is built by
+  `export-rust-sites.py --build` into its own crate, from the pinned parser
+  crates and the upstream lock. It is the fourth offline build of
+  `prepare-semantic-tools.py --prepare`, after the declaration extractor,
+  with receipt `site-export-build.json`. `semantic-fixtures.py --check`
+  verifies it, and the harness extracts each source file's sites with the
+  fixture's exports, cached and revalidated by the extractor's build.
+- **Harness:** `semantic-fixtures.py` draws a mutation run's source mutants
+  after its sequence mutants and runs them in number order. Each is a fresh
+  copy of the fixture's directory with its one edit:
+  - The O0 and O2 code images come from `export-rust-code-image.py`.
+  - Yul comes from `export-rust-yul.py --fixture-edit`, which admits the
+    copy only when it is the pin with exactly that edit, and records the
+    edit in its provenance.
+  - The recorded steps run on every path that compiled, Lean Core's in one
+    invocation (`run_hull_program`), and are compared across those paths.
+
+  Records keep each mutant's site, replacement and family, each path's
+  compile status and seconds, and each compared step. `sourceMutants` counts
+  sites, unsafe sites, candidates, kept mutants and the phase's seconds, and
+  the totals sum both. A finding carries the mutant's number and edit, with
+  entry id `pN@position`. A step finding reduces to a shortest prefix on the
+  mutated program, and the mutant keeps its exports.
+- **Fuzz driver:** `--fixture-sources` (default 2) passes the per-fixture
+  cap. The ledger counts compared source steps with the entries, and the
+  source mutants as `sources`. A `compile-mismatch` keys on its stage, paths
+  and symptom, and a source step finding on its fixture, edit and reduced
+  steps.
+- **Tests:** `test-semantic-fixtures.py` grows from 45 to 54 tests. They
+  check:
+  - the operators and literal values, and the numbering;
+  - the mutant copy and the site cache;
+  - Lean Core's single invocation and its fallback;
+  - the compilation, with a frontend refusal, a backend refusal and a crash;
+  - the comparison, with a stop at the first disagreement;
+  - the draws and caps, and the reduction.
+
+  `test-semantic-fuzz.py` grows from 34 to 36 tests and
+  `test-export-rust-yul.py` from 20 to 21. `test-prepare-semantic-tools.py`
+  keeps its 30 with the fourth offline build.
+  `test_a_raw_scenario_resumes_past_an_entry_that_stalls` and
+  `test_method_entries_run_alone_after_the_sends_before_them` give the fake
+  runner 3 seconds instead of 1.
+
+The runs, with the scripts, native tools, compilers, directive, declaration
+and site tools, solc, Anvil and cast frozen (174 digests, none changed):
+- **Mutation run** on `009db6174` of all 168 fixtures, root seed
+  `20261111`, six jobs, 5,564 seconds:
+  - 165 were admitted on Hull, O0 and Yul and 164 on O2. Three are rejected
+    by the checked driver, and `ignored-builtin-effects` crashes Sonatina O2,
+    the recorded finding. All 1,382 recorded steps, deployments included,
+    matched their expectations on every admitted path.
+  - The earlier streams were unchanged:
+    - The 5,994 recorded and single-change entries of unit 16's 117
+      fixtures, and their sequence mutants' compared steps, were identical
+      to that run's from the same root seed.
+    - In all there were 4,827 single-change mutants, 519 of them derived
+      boundary mutants. 6,062 entries agreed, 31 were incomplete and 116
+      were observed by no path.
+    - The sequence mutants were unit 16's 558, plus two in single-call
+      fixtures: `payable-ctor`'s deployment commit and
+      `struct-storage-updates`' duplicate. All 5,465 of their compared steps
+      agreed.
+  - Sites and candidates:
+    - There were 2,631 safe sites and the 6 unsafe `~=` sites, as the probe
+      found.
+    - There were 8,207 candidates. The probe's count of 8,205 omitted two
+      inline Yul string literals of `asm-string-escapes`.
+    - The cap of 8 kept 1,057 in 147 fixtures, 111 of them at the cap: 711
+      literal, 172 operator, 48 condition and 126 inline Yul mutants.
+  - The frontend refused 8, which are excluded:
+    - four `SC0207` missing instances: `Choice: Sub`, `operator le`,
+      `Pair: Sub` and `string: Sub`;
+    - `SC0422`, "cannot lower lambda expression to Hull", for a negated
+      known condition in `known-if-binding-order`;
+    - three inline Yul mutants of `superclass-dictionaries`, whose
+      compile-time reduction exhausts its fuel (`SC0415`) or cycles
+      (`SC0414`).
+  - The other 1,049 compiled on every path their fixture admits: 1,049 on O0
+    and Yul and 1,041 on O2. There was no compile mismatch and no crash.
+    Compiling took 9.9 seconds per mutant at the median, and 43 at most.
+  - Their 8,889 compared steps:
+    - 8,135 agreed and 5 disagreed. The 3 steps after a disagreement were
+      not compared.
+    - 38 were incomplete:
+      - 30 steps came after Lean Core left a mutant;
+      - 5 steps reached Lean Core's 120-second limit while every EVM path
+        halted exceptionally, in recursions that the mutant made unbounded
+        (three `-` → `+`, a `1` → `0` and a `1` → `2^256 - 1`);
+      - 2 are the path failures below;
+      - 1 ran out of Lean Core's fuel while every EVM path returned:
+        `std-storage-bytes` p6 makes its poisoning store overwrite the stored
+        length to `0xffff`, and copying that costs the EVM mostly zero
+        stores.
+    - 711 were observed by no path:
+      - 595 steps followed 37 mutated constructors, in eight storage
+        fixtures, that halted on every path;
+      - at 22 steps every path stopped at a resource limit;
+      - 94 steps came after such a step.
+  - 1,083 of the agreeing steps observed something the original program's
+    step did not: 114 another status, 849 other return or revert bytes and
+    120 only other storage. 64 of them were deployments.
+  - 731 of the 1,049 mutants changed at least one step: 495 of 711
+    literals, 135 of 168 operators, 34 of 47 conditions and 67 of 123 inline
+    Yul mutants.
+  - The source mutants took 14,914 of the run's 31,102 fixture-seconds,
+    48%, and 11,863 of those went to compiling.
+  - The findings are five path mismatches in `ignored-builtin-effects` and
+    two path failures, below, besides the O2 crash.
+- **Fuzz driver:** one `fixtures` iteration on `3db65ea1a`, base seed
+  `20392780`, chosen because its first iteration draws eight fixtures with
+  source candidates and inline Yul sites, `ignored-builtin-effects` among
+  them. Default budgets, 100 seconds:
+  - The fixtures were `128minierc20`, `ignored-builtin-effects`,
+    `ignored-call-effects`, `mini-erc20`, `proxy-variant`, `raw-vector`,
+    `returned-closure-assembly-substitution` and `revert`.
+  - The cap of 2 kept 16 source mutants:
+    - 70 of their 72 compared steps agreed, and 22 observed something the
+      original program did not;
+    - 13 of the 16 changed at least one step.
+  - All 123 recorded steps and single-change entries agreed, and so did the
+    31 compared steps of the 15 sequence mutants.
+  - There were three occurrences:
+    - the O2 crash, known;
+    - the Hull memory-range failure of `revert` p2, known;
+    - a new path mismatch, `ignored-builtin-effects` p39 (`mload(0x40)` →
+      `mload(0x3f)`), of the O0 class below.
+
+    So the iteration failed with one new signature and no problem, in epoch
+    `bafe5c413bea`. A replay of the finding's fixture command gave the same
+    mutants, entries and finding.
+
+Both findings are recorded in `questions.md`, without investigation:
+- **Sonatina O0's first allocation is at `0x200`, Hull's and solc's at
+  `0x80`.** `ignored-builtin-effects` returns differences of free memory
+  pointers read with inline Yul, and those agree.
+  - Five of its eight mutants make a result depend on an absolute address:
+    `mload(0x40)` → `mload(0x00)`, `mload(0x01)` or `mload(0x80)`, and
+    `2 * before` → `1 * before` or `2 / before`. In each, O0 disagrees with
+    Hull and Yul.
+  - p16 reduced to its step alone. The other four share its fingerprint
+    within the fixture, and are recorded as its duplicates.
+  - Each key is the mutant's program, so the class is not registered, and
+    each new mutant of it is a new signature.
+- **solc's Yul removes a store that Hull and Sonatina cannot make.**
+  `asm-string-escapes` p8 and `revert` p2 move an inline Yul `mstore` to
+  `2^256 - 1`.
+  - Lean Core fails with Hull memory's range reason, and O0 and O2 run out
+    of gas. Yul returns or reverts with zero bytes: solc dropped the store,
+    whose only effect is the memory expansion.
+  - Hull's failure is the resource limit `memory-range` only when every EVM
+    path stops at one, so here it stays a path failure.
+  - Its key is a stable symptom, path `hull` and value
+    `Solcore.Core.Value.word 6`. So `3db65ea1a` lists it as known, with a
+    test of both real occurrences.
+
+This is agreement among the compiled paths of programs that no fixture
+records. No original Core reference exists for them.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

@@ -8198,6 +8198,23 @@ directive tools, solc, Anvil and cast frozen.
     mutants were as before.
   - A fuzz-driver iteration with base seed `20294371` ran 52 of them in seven
     fixtures, with no finding.
+- **Source mutants** (`009db6174`, frozen): a mutation run of all 168
+  fixtures, root seed `20261111`, 5,564 seconds.
+  - The cap of 8 kept 1,057 of 8,207 candidates in 147 fixtures. The
+    frontend refused 8, and the other 1,049 compiled on every path that
+    their fixture admits.
+  - Of their 8,889 compared steps, 8,135 agreed, 38 were incomplete and 711
+    were observed by no path, most of them after a mutated constructor
+    halted on every path. 731 of the mutants changed at least one step.
+  - Five mutants of `ignored-builtin-effects` disagree because Sonatina O0
+    allocates from `0x200` while Hull and solc allocate from `0x80`.
+  - Two Yul stores moved to `2^256 - 1` fail Hull memory's range and run
+    Sonatina out of gas, while solc's Yul drops the store and returns. The
+    fuzz driver lists that failure as known (`3db65ea1a`).
+  - The earlier streams were unchanged.
+  - A fuzz-driver iteration with base seed `20392780` ran 16 source mutants
+    in eight fixtures. It found one new mismatch of the O0 class, and the
+    known Hull failure.
 
 ## Compare generic selection
 
