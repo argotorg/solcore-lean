@@ -95,7 +95,8 @@ class Fixture:
         for binary in ("solcore-driver", "solcore-code-image-export", *(tool[0] for tool in prep.DIRECTIVE_TOOLS)):
             (self.target / "debug" / binary).write_text("fixture exporter " + binary)
         crates = {"solcore-directive-export": root / ".upstream/rust-directive-tool",
-                  "solcore-directive-resolve": root / ".upstream/rust-directive-resolve-tool"}
+                  "solcore-directive-resolve": root / ".upstream/rust-directive-resolve-tool",
+                  "solcore-declaration-export": root / ".upstream/rust-declaration-tool"}
         for crate in crates.values():
             (crate / "src").mkdir(parents=True)
             (crate / "Cargo.toml").write_text("test directive manifest")
@@ -249,7 +250,8 @@ class BootstrapTests(unittest.TestCase):
         self.assertLess(pins, next(i for i,e in enumerate(events) if e is fetch[1]))
         builders = [e for e in events if len(e)>1 and ('--build' in e[1] or e[1][1].endswith('build-rust-directive-resolver.py'))]
         self.assertEqual([Path(e[1][1]).name for e in builders], ['export-rust-hull.py', 'export-rust-code-image.py',
-                                                                  'export-rust-directives.py', 'build-rust-directive-resolver.py'])
+                                                                  'export-rust-directives.py', 'build-rust-directive-resolver.py',
+                                                                  'export-rust-declarations.py'])
         self.assertTrue(all('--allow-network' not in e[1] and not e[2].get('network') for e in builders))
         lakes = [e[1] for e in events if len(e)>1 and e[1][0]=='lake']
         self.assertEqual(lakes, [['lake','--no-cache','--rehash','build',*prep.TARGETS]])
@@ -271,7 +273,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue((self.root / 'Solcore/A.lean').exists())
 
     def directive_builds(self):
-        names = ('export-rust-directives.py', 'build-rust-directive-resolver.py')
+        names = ('export-rust-directives.py', 'build-rust-directive-resolver.py', 'export-rust-declarations.py')
         return [c for c in self.f.runner.calls if len(c[0]) > 1 and Path(c[0][1]).name in names]
 
     def test_directive_tool_receipts_are_verified_and_rebuilt_offline(self):
@@ -286,7 +288,8 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual([c[-1] for c in cleaned], ['solcore-directive-resolve'])
         self.assertIn(str(self.f.directives.crates['solcore-directive-resolve'] / 'Cargo.toml'), cleaned[0])
         builds = self.directive_builds()
-        self.assertEqual([Path(c[0][1]).name for c in builds], ['export-rust-directives.py', 'build-rust-directive-resolver.py'])
+        self.assertEqual([Path(c[0][1]).name for c in builds], ['export-rust-directives.py', 'build-rust-directive-resolver.py',
+                                                                'export-rust-declarations.py'])
         self.assertTrue(all('--allow-network' not in c[0] and not c[2].get('network') for c in builds))
 
     def test_a_fresh_checkout_builds_the_directive_crates_without_cleaning(self):
@@ -296,7 +299,7 @@ class BootstrapTests(unittest.TestCase):
         with patch.object(prep, 'inventory', return_value=self.f.record):
             prep.build(self.f.runner, self.root, self.f.upstream, self.f.target, self.f.versions, self.f.exporter, self.f.directives, False)
         self.assertFalse(any(c[0][:2] == ['cargo', 'clean'] for c in self.f.runner.calls))
-        self.assertEqual(len(self.directive_builds()), 2)
+        self.assertEqual(len(self.directive_builds()), 3)
 
     def test_pin_mismatch_aborts_before_exporter_build(self):
         def mismatch(_): raise prep.NotReady('dependency pin changed')
@@ -365,7 +368,7 @@ class BootstrapTests(unittest.TestCase):
                 prep.build(runner,self.root,self.f.upstream,target,self.f.versions,self.f.exporter,self.f.directives, False)
             self.assertFalse(any(c[0][:2]==['cargo','clean'] for c in runner.calls))
             self.assertEqual((target/'CACHEDIR.TAG').read_text(),'created by simulated Cargo')
-            self.assertEqual(len(export_calls),3)
+            self.assertEqual(len(export_calls),4)
 
     def test_nonempty_target_requires_a_real_cargo_cache_marker(self):
         marker=self.f.target/'CACHEDIR.TAG'

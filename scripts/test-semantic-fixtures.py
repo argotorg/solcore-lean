@@ -42,6 +42,64 @@ def observation(status="returned", output="0x", logs=(), storage=None, balances=
             "balances": balances or {"1": "0"}}
 
 
+# Declarations as the pinned extractor prints them: one field bare, several or none as a tuple.
+def named(name, *args):
+    return {"named": name, "qualifier": None, "args": list(args)}
+
+
+def data(name, *constructors, params=()):
+    return {"name": name, "params": list(params), "constructors": [
+        {"name": ctor, "fields": types[0] if len(types) == 1 else {"tuple": list(types)}, "fieldCount": len(types),
+         "fieldNames": None} for ctor, *types in constructors]}
+
+
+def method(name, *types, public=True, kind="function"):
+    return {"name": name, "kind": kind, "public": public, "payable": False, "returns": None,
+            "params": [{"name": f"p{index}", "comptime": False, "type": item} for index, item in enumerate(types)]}
+
+
+def declared(contract, datas=(), methods=(), aliases=(), local=()):
+    return {"schema": "solcore-rs.declarations.v1", "imports": [["std"]], "data": list(datas), "aliases": list(aliases),
+            "functions": [], "contracts": [{"name": contract, "params": [], "runtimeMain": False, "data": list(local),
+                                            "aliases": [], "functions": list(methods)}]}
+
+
+UINT, ADDRESS, BYTES32, BYTES = named("uint256"), named("address"), named("bytes32"), named("memory", named("bytes"))
+
+
+def calldata_array(item):
+    return named("calldata", named("array", item))
+
+
+# The declarations and recorded calls of abi-sum-roundtrip, storage-adt-abi and abi-batch-adt.
+SUMS = declared("SumRoundtrip", [data("D2", ("L", UINT), ("R", BYTES)), data("D3", ("X", UINT), ("Y", UINT), ("Z", BYTES)),
+                                 data("S2", ("P", UINT), ("Q", UINT)), data("S3", ("A",), ("B", UINT), ("C", UINT, UINT, UINT))],
+                [method("constructor", kind="constructor", public=False), method("rtD2", named("D2")), method("rtD3", named("D3")),
+                 method("rtS3", named("S3")), method("rtS2", named("S2")), method("plain", UINT),
+                 method("hidden", named("D2"), public=False)])
+OPTION = declared("C", [data("Option", ("None",), ("Some", named("a")), params=["a"])],
+                  [method("setOpt", named("Option", UINT)), method("getOpt"), method("echo", named("Option", UINT))])
+BATCH = declared("BatchDecoder", [data("Operation", ("AddSigner", ADDRESS), ("RemoveSigner", ADDRESS)),
+                                  data("Signature", ("ECDSA", BYTES32, BYTES32), ("Contract", ADDRESS)),
+                                  data("Batch", ("Queue", named("Operation"), named("Signature")), ("Execute", UINT, BYTES))],
+                 [method("queueSigner", calldata_array(named("Batch")), UINT),
+                  method("execPayload", calldata_array(named("Batch")), UINT)])
+D2_BLOB = ("0x219ee3fb0000000000000000000000000000000000000000000000000000000000000020"
+           "86c01c8118a42b422dd5ce2f69a3259cf8ea4606b78834ab34f9c573e887ea81"
+           "0000000000000000000000000000000000000000000000000000000000000040"
+           "0000000000000000000000000000000000000000000000000000000000000002"
+           "beef000000000000000000000000000000000000000000000000000000000000")
+D2_UNKNOWN = "0x219ee3fb" + word(32).hex() + word(0).hex() + word(42).hex()
+S3_NULLARY = "0xe096e642f446c1d0ceceeffa77e664bc78fba57853bda372d626a510062480375fa80e90" + word(0).hex() * 3
+OPTION_NONE = "0x9e0708f2312343540cf19bad8e24ee12fb32c550e430a21136a53271f61c15371c880b91" + word(0).hex()
+QUEUE_SIGNER = ("0x773db49a" + word(64).hex() + word(0).hex() + word(2).hex() + word(64).hex() + word(256).hex() +
+                "f427fbe982814deabb25b520b94c8a4aacc13735a4565bc505272a7ea25e3deb"
+                "637c77a2d598a51d085d4a2413332c45a235a25ee855bf3dfcdc2c8fcf02860f" + word(0xaa).hex() +
+                "680caed2a15cfb63556552d700ce53480b9d43a7f3bae18fb71abfb52505d31d" + word(0xcc).hex() + word(0).hex() +
+                "79db8da505fc8b36b2cabb9ee929bfe4b3b84ec91966dd325fdb184869c6a005" + word(7).hex() + word(96).hex() +
+                word(2).hex() + "beef" + "00" * 30)
+
+
 class InventoryAndStreamTests(unittest.TestCase):
     def test_the_two_parity_manifests_pin_all_168_fixtures_once(self):
         inventory = fixtures.inventory()
@@ -150,7 +208,7 @@ class MutationTests(unittest.TestCase):
         def draw(limit):
             run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
             run.args = SimpleNamespace(seed=11, mutants=4, fixture_mutants=limit)
-            run.fixture, run.abi, run.record = {"id": "f"}, [], {}
+            run.fixture, run.abi, run.derived, run.record = {"id": "f"}, [], {}, {}
             run.steps = [step(kind="deploy", index=0)] + [step(index=index, calldata="0x" + (selector("k(uint256)") + word(index)).hex())
                                                         for index in (1, 2, 3)]
             return run.draw_mutants(), run.record
@@ -186,6 +244,198 @@ class MutationTests(unittest.TestCase):
         constructor = step(kind="deploy", calldata="0x" + word(1).hex(), index=0)
         self.assertEqual(fixtures.apply(constructor, {"operator": "word", "word": 0, "value": "0x2"})["calldata"],
                          "0x" + word(2).hex())
+
+
+class DerivedArgumentTests(unittest.TestCase):
+    def labels(self, calldata, document, contract):
+        derived = fixtures.derived_methods(document, contract)
+        classes, origin = fixtures.step_classes(step(calldata=calldata), [], derived)
+        self.assertEqual(origin, "derived")
+        return [fixtures.class_label(classes[index]) for index in sorted(classes)], classes
+
+    def test_std_structures_give_the_recorded_structural_selectors_and_tags(self):
+        sums = fixtures.derived_methods(SUMS, "SumRoundtrip")
+        self.assertEqual({key.hex(): text for key, (text, _) in sums.items()},
+                         {"219ee3fb": "rtD2(sum(uint256,bytes))", "05e758d3": "rtD3(sum(uint256,sum(uint256,bytes)))",
+                          "e096e642": "rtS3(sum(,sum(uint256,uint256,uint256,uint256)))", "1def993a": "rtS2(sum(uint256,uint256))"})
+        d2, s3 = sums[bytes.fromhex("219ee3fb")][1], sums[bytes.fromhex("e096e642")][1]
+        self.assertEqual([hex(tag)[:10] for tag in fixtures.tags(d2)], ["0x9579c5dd", "0x86c01c81"])
+        self.assertEqual(hex(fixtures.tags(s3)[0])[:10], "0xf446c1d0")
+        self.assertEqual((fixtures.attribs(d2), fixtures.attribs(s3)), ((False, 32), (True, 128)))
+        option = fixtures.derived_methods(OPTION, "C")
+        self.assertEqual({key.hex(): text for key, (text, _) in option.items()},
+                         {"9e0708f2": "setOpt(sum(,uint256))", "f12ca2db": "echo(sum(,uint256))"})
+        self.assertEqual(hex(fixtures.tags(option[bytes.fromhex("9e0708f2")][1])[0])[:10], "0x31234354")
+        batch = fixtures.derived_methods(BATCH, "BatchDecoder")
+        self.assertEqual(batch[bytes.fromhex("773db49a")][0],
+                         "queueSigner(sum(sum(address,address),sum(bytes32,bytes32,address),uint256,bytes)[],uint256)")
+        self.assertEqual(sorted(text.split("(")[0] for text, _ in batch.values()), ["execPayload", "queueSigner"])
+        # A one-constructor type is its fields, without a tag or parentheses even as an array element.
+        pair = declared("P", local=[data("Pair", ("Pair", UINT, UINT))], methods=[method("f", calldata_array(named("Pair")))])
+        text, node = fixtures.derived_methods(pair, "P")[selector("f(uint256,uint256[])")]
+        self.assertEqual((text, node[0], node[1][0]), ("f(uint256,uint256[])", "array", "struct"))
+        # Aliases expand; a structure without a data type is standard, and units and tuples sign as std does.
+        units = declared("U", aliases=[{"name": "UnitAlias", "params": [], "type": {"tuple": []}},
+                                       {"name": "Units", "params": [], "type": calldata_array(named("UnitAlias"))}],
+                         methods=[method("units", named("Units")), method("wrapped", calldata_array({"tuple": [named("Units"), UINT]}))])
+        self.assertEqual(fixtures.derived_methods(units, "U"), {})
+        scope = {"Units": ("alias", units["aliases"][1]), "UnitAlias": ("alias", units["aliases"][0])}
+        self.assertEqual(fixtures.signature_text(fixtures.structure(calldata_array({"tuple": [named("Units"), UINT]}), scope)),
+                         "(()[],uint256)[]")
+        broken = declared("B", [data("Never"), data("Option", ("None",), ("Some", named("a")), params=["a"])], [
+            method("qualified", {"named": "D", "qualifier": "std", "args": []}), method("unknown", named("Mystery")),
+            method("arity", named("Option")), method("empty", named("Never")), method("function", {"fn": {}}),
+            method("untyped", None), method("word", named("word"))])
+        self.assertEqual(fixtures.derived_methods(broken, "B"), {})
+        with self.assertRaisesRegex(fixtures.Underived, "takes 1 type arguments"):
+            fixtures.structure(named("Option"), {"Option": ("data", broken["data"][1])})
+        self.assertEqual(fixtures.derived_methods(None, "C"), {})
+        self.assertEqual(fixtures.derived_methods(SUMS, "Other"), {})
+
+    def test_recorded_derived_calls_classify_under_their_layout(self):
+        labels, classes = self.labels(D2_BLOB, SUMS, "SumRoundtrip")
+        self.assertEqual(labels, ["dynamic-offset:sum", "tag:D2", "dynamic-offset:bytes", "bytes-length", "content"])
+        self.assertEqual((classes[0][2], classes[2][2], classes[3][1]), (0, 32, 128))
+        self.assertEqual(self.labels(S3_NULLARY, SUMS, "SumRoundtrip")[0], ["tag:S3", "unused", "unused", "unused"])
+        self.assertEqual(self.labels(OPTION_NONE, OPTION, "C")[0], ["tag:Option", "unused"])
+        labels, classes = self.labels(QUEUE_SIGNER, BATCH, "BatchDecoder")
+        self.assertEqual(labels, ["dynamic-offset:array", "leaf:uint256", "length", "dynamic-offset:sum", "dynamic-offset:sum",
+                                  "tag:Batch", "tag:Operation", "leaf:address", "tag:Signature", "leaf:address", "unused",
+                                  "tag:Batch", "leaf:uint256", "dynamic-offset:bytes", "bytes-length", "content"])
+        self.assertEqual([classes[index][2] for index in (0, 3, 4, 13)], [0, 96, 96, 352])
+        derived = fixtures.derived_methods(SUMS, "SumRoundtrip")
+        self.assertEqual(fixtures.step_classes(step(calldata=D2_UNKNOWN), [], derived),
+                         (None, "recorded input is not the derived layout of rtD2(sum(uint256,bytes)): "
+                                "the tag matches no constructor of D2"))
+        self.assertEqual(fixtures.step_classes(step(calldata="0xdeadc0de"), [], derived),
+                         (None, "no standard-ABI method with this selector"))
+        node = derived[bytes.fromhex("219ee3fb")][1]
+        body = bytes.fromhex(D2_BLOB[10:])
+        broken = {"misaligned offset": word(33) + body[32:], "offset outside": word(4096) + body[32:],
+                  "content outside": body[:-32], "overlapping": body[:64] + word(0) + body[96:], "empty": b""}
+        for name, value in broken.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                fixtures.derived_classify(value, node)
+
+    def test_derived_boundary_words_are_exhaustive_and_relative_to_their_base(self):
+        d2 = fixtures.derived_methods(SUMS, "SumRoundtrip")[bytes.fromhex("219ee3fb")][1]
+        low, high = fixtures.tags(d2)
+        tag = ("tag", "D2", (low, high))
+        self.assertEqual(fixtures.boundary_values(tag, low, 96), [high, 0, low + 1, low - 1, U256 - 1])
+        self.assertEqual(fixtures.boundary_values(("dynamic-offset", "sum", 0), 32, 160), [0, 161, 2**255, U256 - 4, 64])
+        self.assertEqual(fixtures.boundary_values(("dynamic-offset", "bytes", 32), 64, 160),
+                         [0, 32, 129, 2**255, U256 - 36, 96])
+        self.assertEqual(fixtures.boundary_values(("bytes-length", 128), 2, 160), [33, U256 - 1, 32])
+        self.assertEqual(fixtures.boundary_values(("bytes-length", 128), 32, 160), [33, U256 - 1])
+        self.assertEqual(fixtures.boundary_values(("unused",), 0, 64), [1, U256 - 1])
+        recorded = step(calldata=D2_BLOB)
+        classes, _ = fixtures.step_classes(recorded, [], fixtures.derived_methods(SUMS, "SumRoundtrip"))
+        self.assertEqual(sorted(fixtures.candidates(recorded, classes, fixtures.Stream(5))), ["content", "frame", "seeded"])
+        boundaries = fixtures.exhaustive(recorded, classes)
+        self.assertEqual([(item["word"], item["class"]) for item in boundaries],
+                         [(0, "dynamic-offset:sum")] * 5 + [(1, "tag:D2")] * 5 + [(2, "dynamic-offset:bytes")] * 6 +
+                         [(3, "bytes-length")] * 3)
+        self.assertEqual(boundaries[5], {"operator": "word", "class": "tag:D2", "word": 1, "recorded": hex(high),
+                                         "value": hex(low)})
+        changed = fixtures.apply(recorded, boundaries[-1])
+        self.assertEqual(changed["calldata"], D2_BLOB[:10 + 64 * 3] + word(32).hex() + D2_BLOB[10 + 64 * 4:])
+        self.assertEqual(fixtures.exhaustive(step(calldata="0x" + (selector("k(uint256)") + word(1)).hex()), None), [])
+
+    def draw(self, cap, budget=None, derived=True):
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        run.args = SimpleNamespace(seed=11, mutants=4, fixture_mutants=budget, derived_mutants=cap)
+        run.fixture, run.abi, run.record = {"id": "abi-sum-roundtrip"}, [], {}
+        run.derived = fixtures.derived_methods(SUMS, "SumRoundtrip") if derived else {}
+        run.steps = [step(kind="deploy", index=0), step(index=1, calldata=D2_BLOB), step(index=2, calldata=S3_NULLARY),
+                     step(index=3, calldata="0x" + (selector("plain(uint256)") + word(5)).hex())]
+        return run.draw_mutants(), run.record
+
+    def test_derived_boundaries_follow_the_draws_and_a_fixture_keeps_at_most_its_cap(self):
+        everything, record = self.draw(256)
+        self.assertEqual(record["classification"], {"1": "derived", "2": "derived", "3": "no standard-ABI method with this selector"})
+        self.assertEqual(record["derivedMutants"], {"limit": 256, "drawn": 19 + 6, "kept": 25})
+        self.assertEqual([number for number, _ in everything[1]], list(range(1, 24)))
+        self.assertEqual([number for number, _ in everything[2]], list(range(1, 11)))
+        self.assertFalse(any(fixtures.derived_boundary(mutant) for _, mutant in everything[1][:4] + everything[2][:4]))
+        self.assertTrue(all(fixtures.derived_boundary(mutant) for _, mutant in everything[1][4:] + everything[2][4:]))
+        self.assertEqual([mutant["class"] for _, mutant in everything[2][4:]], ["tag:S3"] * 6)
+        # Steps without a derived layout draw exactly as before.
+        plain, _ = self.draw(256, derived=False)
+        self.assertEqual(everything[3], plain[3])
+        self.assertEqual([len(plain[index]) for index in (1, 2, 3)], [4, 4, 4])
+        kept, record = self.draw(5)
+        self.assertEqual(record["derivedMutants"], {"limit": 5, "drawn": 25, "kept": 5})
+        boundary = [(index, item) for index in (1, 2) for item in kept[index][4:]]
+        self.assertEqual(len(boundary), 5)
+        self.assertTrue(all(item in everything[index] for index, item in boundary))
+        self.assertEqual([kept[index][:4] for index in (1, 2)], [everything[index][:4] for index in (1, 2)])
+        self.assertEqual(self.draw(5)[0], kept)
+        none, record = self.draw(0)
+        self.assertEqual((record["derivedMutants"]["kept"], [len(none[index]) for index in (1, 2)]), (0, [4, 4]))
+        budgeted, record = self.draw(256, budget=6)
+        self.assertEqual(record["mutantBudget"], {"limit": 6, "drawn": 12 + 25, "kept": 6})
+        self.assertEqual(sum(len(items) for items in budgeted.values()), 6)
+
+    def test_declarations_are_extracted_once_and_reused_only_by_the_same_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "main.sol"
+            source.write_text("contract C {}\n")
+            exports = fixtures.Exports.__new__(fixtures.Exports)
+            exports.args = SimpleNamespace(upstream=root, target_dir=root, timeout=5)
+            exports.source, exports.directory = source, root / "out"
+            exports.directory.mkdir()
+            calls = []
+
+            def extract(command, timeout, **_):
+                calls.append(command)
+                output = Path(command[command.index("--output") + 1])
+                output.write_text(json.dumps(OPTION))
+                output.with_suffix(".json.provenance.json").write_text(json.dumps({
+                    "schema": fixtures.declarations.SCHEMA, "toolBuild": {"build": len(calls)}, "source": source.as_uri(),
+                    "sourceSha256": fixtures.common.file_digest(source), "outputSha256": fixtures.common.file_digest(output)}))
+                return {"returncode": 0, "resource": None, "stdout": "", "stderr": ""}
+            with patch.object(fixtures, "run_process", side_effect=extract):
+                self.assertEqual(exports.declarations({"build": 1}, False), OPTION)
+                self.assertEqual(exports.declarations({"build": 1}, True), OPTION)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(exports.declarations({"build": 3}, True), OPTION)
+                self.assertEqual(len(calls), 2)
+                self.assertIn("export-rust-declarations.py", calls[0][1])
+            failed = {"returncode": 2, "resource": None, "stdout": "", "stderr": "parser diagnostics"}
+            with patch.object(fixtures, "run_process", return_value=failed), \
+                    self.assertRaisesRegex(ValueError, "declaration extraction failed: parser diagnostics"):
+                exports.declarations({"build": 4}, False)
+
+    def test_the_tool_check_requires_the_declaration_extractor_receipt(self):
+        version = SimpleNamespace(stdout="solc\nVersion: " + fixtures.exporter.SOLC_VERSION + "\n")
+        args = SimpleNamespace(upstream=ROOT, target_dir=ROOT, solc=Path("solc"))
+        with patch.object(fixtures.scenario, "identities", return_value=(1, 2, 3)), \
+                patch.object(fixtures.methods.resolver, "checked_identity", return_value=4), \
+                patch.object(fixtures.declarations, "checked_identity", return_value=5), \
+                patch.object(fixtures.subprocess, "run", return_value=version), \
+                patch.object(fixtures.exporter, "validate_version", return_value=None):
+            self.assertEqual(fixtures.check_tools(args)["declaration"], 5)
+        with patch.object(fixtures.scenario, "identities", return_value=(1, 2, 3)), \
+                patch.object(fixtures.methods.resolver, "checked_identity", return_value=4), \
+                patch.object(fixtures.declarations, "checked_identity", side_effect=ValueError("receipt is stale")), \
+                self.assertRaisesRegex(ValueError, "stale"):
+            fixtures.check_tools(args)
+
+    def test_records_count_the_derived_boundary_entries(self):
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        run.fixture, run.raw, run.admitted = {"id": "f", "mode": "raw"}, True, ["sonatina-o0", "yul"]
+        run.record = {"findings": [], "statuses": {}}
+        run.steps = [step(kind="deploy", index=0), step(index=1, calldata=D2_BLOB)]
+        mutants = [{"operator": operator, "class": label, "word": 0, "recorded": "0x20", "value": "0x0"}
+                   for operator, label in (("word", "tag:D2"), ("word", "dynamic-offset:sum"), ("word", "bytes-length"),
+                                           ("seeded-word", "tag:D2"), ("word", "unused"))]
+        entries = [{**run.steps[1], "id": f"1.{number}", "step": 1, "persist": False, "mutant": mutant}
+                   for number, mutant in enumerate(mutants, 1)] + [{**run.steps[1], "id": "1", "step": 1}]
+        run.compare(entries, {path: [observation()] * 7 for path in run.admitted})
+        self.assertEqual((run.record["counts"]["mutants"], run.record["counts"]["derivedBoundaries"]), (5, 3))
+        totals = fixtures.summarize([{**run.record, "id": "f", "admitted": run.admitted, "exclusions": []}] * 2)
+        self.assertEqual(totals["derivedBoundaries"], 6)
 
 
 class ObservationTests(unittest.TestCase):
@@ -477,6 +727,9 @@ class RunTests(unittest.TestCase):
         self.assertTrue(all(record["unexecuted"] and record["stop"] == "run time budget" for record in report["fixtures"]))
         self.assertEqual((report["bounds"]["fixtureMutants"], report["bounds"]["fixtureSeconds"], report["bounds"]["runSeconds"]),
                          (8, 30.0, 0.05))
+        self.assertEqual((report["mutantsPerStep"], report["derivedMutants"]), (4, fixtures.DERIVED_MUTANTS))
+        self.output = self.output.with_name("capped")
+        self.assertEqual(self.main("--derived-mutants", "8", "--seconds", "0.01", delay=0.05)[1]["derivedMutants"], 8)
 
     def test_a_stop_signal_ends_the_run_with_its_report(self):
         def run(self):
@@ -516,7 +769,9 @@ class CommandLineTests(unittest.TestCase):
     def test_modes_seeds_and_bounds_are_checked_before_any_work(self):
         for extra in (["--mode", "mutation"], ["--seed", "1"], ["--mode", "mutation", "--seed", "1", "--mutants", "0"],
                       ["--jobs", "0"], ["--fixture-mutants", "4"], ["--mode", "mutation", "--seed", "1", "--fixture-mutants", "0"],
-                      ["--seconds", "0"], ["--fixture-seconds", "-1"]):
+                      ["--seconds", "0"], ["--fixture-seconds", "-1"],
+                      ["--mode", "mutation", "--seed", "1", "--derived-mutants", "-1"],
+                      ["--mode", "mutation", "--seed", "1", "--derived-mutants", "4097"]):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 fixtures.main(["--output", "/nonexistent/out", *extra])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):

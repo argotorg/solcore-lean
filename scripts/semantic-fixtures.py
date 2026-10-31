@@ -7,7 +7,11 @@ O0 and O2 code images (`sonatina-o0`, `sonatina-o2`) and the pinned solc's
 compilation of the driver's Yul (`yul`), the last three on a local Anvil. The
 paths are compared with each other and with the fixture's own recorded
 expectation. A mutation run also executes seeded single-change inputs derived
-from the recorded calls and compares those across the paths only.
+from the recorded calls and compares those across the paths only. A call's
+words are classified by its method's standard ABI signature or, for a method
+taking user data types, by std's derived layout of the pinned declarations;
+every tag, dynamic offset and `bytes` length of such a call gets all of its
+boundary Words.
 
 No original Core reference exists for these programs. Agreement here is
 agreement among compiled paths and with upstream's recorded expectations; it is
@@ -58,6 +62,7 @@ storage = load("fixtures_storage", "semantic-storage-differential.py")
 scenario = load("fixtures_scenario", "rust-scenario-parity.py")
 methods = load("fixtures_methods", "rust-method-parity.py")
 exporter = load("fixtures_yul", "export-rust-yul.py")
+declarations = load("fixtures_declarations", "export-rust-declarations.py")
 static = methods.static
 hull = scenario.hull
 
@@ -91,6 +96,7 @@ STOP = threading.Event()
 U256 = 2**256
 MASK64 = 2**64 - 1
 MUTANTS_PER_STEP = 4
+DERIVED_MUTANTS = 256
 REDUCTION_RUNS = 48
 REDUCTION_SECONDS = 900
 MAX_ARRAY_ELEMENTS = 4096
@@ -103,10 +109,11 @@ CRASH = re.compile(r"panicked at|internal compiler error|process terminated by s
 REFUSAL = re.compile(r"Yul profile requires|solc AST|unexpected solc contract output inventory|"
                      r"unsupported solc link references|missing runtime bytes|export EVM code size limit")
 EXPORTERS = ("export-rust-hull.py", "export-rust-code-image.py", "export-rust-yul.py", "export-rust-directives.py",
-             "build-rust-directive-resolver.py", "rust-hull-export.rs", "rust-code-image-export.rs",
-             "rust-directive-export.rs", "rust-directive-resolve.rs")
+             "build-rust-directive-resolver.py", "export-rust-declarations.py", "rust-hull-export.rs",
+             "rust-code-image-export.rs", "rust-directive-export.rs", "rust-directive-resolve.rs",
+             "rust-declaration-export.rs")
 BINARIES = ("debug/solcore-driver", "debug/solcore-code-image-export", "debug/solcore-directive-export",
-            "debug/solcore-directive-resolve")
+            "debug/solcore-directive-resolve", "debug/solcore-declaration-export")
 
 
 def stopped(deadline: float | None) -> bool:
@@ -294,8 +301,247 @@ def classify(body: bytes, nodes) -> dict[int, tuple]:
     return classes
 
 
+# Derived ADT arguments: std's Generic structure of a public method's parameters, from the
+# pinned parser's declarations; its structural selector, the constructor tags, and the
+# layout std's derived decoder reads.
+
+STD_LEAVES = {"uint256": ("uint", 256), "bytes32": ("fixed", 32), "bytes4": ("fixed", 4), "address": ("address",),
+              "bool": ("bool",)}
+LEAF_KINDS = ("uint", "int", "fixed", "address", "bool")
+STRUCTURE_DEPTH = 16
+# Every boundary Word of these classes is a mutant; the other classes are drawn.
+EXHAUSTIVE = ("tag", "dynamic-offset", "bytes-length")
+
+
+class Underived(ValueError):
+    """A type outside std's derived signatures, which leaves its method without a derived layout."""
+
+
+def source_text(ref) -> str:
+    """A declared type as written."""
+    if not isinstance(ref, dict):
+        return "?"
+    if "tuple" in ref:
+        return "(" + ", ".join(source_text(item) for item in ref["tuple"]) + ")"
+    if "named" not in ref:
+        return "?"
+    args = ref.get("args") or []
+    return (ref["qualifier"] + "." if ref.get("qualifier") else "") + ref["named"] + \
+        ("<" + ", ".join(source_text(item) for item in args) + ">" if args else "")
+
+
+def product(nodes: list) -> tuple:
+    """std's right-nested product of fields: unit, the one field, or pairs."""
+    if not nodes:
+        return ("unit",)
+    return nodes[0] if len(nodes) == 1 else ("pair", nodes[0], product(nodes[1:]))
+
+
+def structure(ref, scope: dict, bindings: dict | None = None, depth: int = 0) -> tuple:
+    """std's Generic structure of a declared type: a sum of two or more constructors' products, a struct
+    of one constructor's product, a pair, unit, a leaf, `bytes`, `string` or a calldata array."""
+    if depth > STRUCTURE_DEPTH:
+        raise Underived("data types nest deeper than the model's bound")
+    bindings = bindings or {}
+    if not isinstance(ref, dict):
+        raise Underived("an untyped parameter")
+    if "tuple" in ref:
+        return product([structure(item, scope, bindings, depth + 1) for item in ref["tuple"]])
+    if "named" not in ref or ref.get("qualifier") is not None:
+        raise Underived("a type outside std's signatures: " + source_text(ref))
+    name, args = ref["named"], ref.get("args") or []
+    if name in bindings and not args:
+        return bindings[name]
+    if name in scope:
+        kind, item = scope[name]
+        if len(item["params"]) != len(args):
+            raise Underived(f"{name} takes {len(item['params'])} type arguments")
+        inner = dict(zip(item["params"], [structure(arg, scope, bindings, depth + 1) for arg in args]))
+        if kind == "alias":
+            return structure(item["type"], scope, inner, depth + 1)
+        if not item["constructors"]:
+            raise Underived(name + " has no constructors")
+        reps = tuple((ctor["name"], structure(ctor["fields"], scope, inner, depth + 1)) for ctor in item["constructors"])
+        return ("sum", name, reps) if len(reps) > 1 else ("struct", name, reps[0][1])
+    if name in STD_LEAVES and not args:
+        return STD_LEAVES[name]
+    inner = args[0] if len(args) == 1 else {}
+    if name == "memory" and inner.get("named") in ("bytes", "string") and not inner.get("args") and \
+            inner.get("qualifier") is None:
+        return (inner["named"],)
+    if name == "calldata" and inner.get("named") == "array" and len(inner.get("args") or []) == 1 and \
+            inner.get("qualifier") is None:
+        return ("array", structure(inner["args"][0], scope, bindings, depth + 1))
+    raise Underived("a type outside std's signatures: " + source_text(ref))
+
+
+def derived(node) -> bool:
+    """Whether a structure holds a user data type, which no standard ABI signature describes."""
+    if node[0] in ("sum", "struct"):
+        return True
+    if node[0] == "pair":
+        return derived(node[1]) or derived(node[2])
+    return node[0] == "array" and derived(node[1])
+
+
+def signature_text(node) -> str:
+    """std's SigString of a structure."""
+    kind = node[0]
+    if kind in LEAF_KINDS:
+        return canonical(node)
+    if kind in ("bytes", "string"):
+        return kind
+    if kind == "unit":
+        return ""
+    if kind == "pair":
+        return signature_text(node[1]) + "," + signature_text(node[2])
+    if kind == "array":
+        return element_signature(node[1]) + "[]"
+    if kind == "struct":
+        return signature_text(node[2])
+    reps = [rep for _, rep in node[2]]
+    text = signature_text(reps[-1])
+    for rep in reversed(reps[:-1]):
+        text = "sum(" + signature_text(rep) + "," + text + ")"
+    return text
+
+
+def element_signature(node) -> str:
+    """std's ABITypeString of an array element: a unit or a pair signs in parentheses."""
+    if node[0] == "unit":
+        return "()"
+    return "(" + signature_text(node) + ")" if node[0] == "pair" else signature_text(node)
+
+
+def attribs(node) -> tuple[bool, int]:
+    """std's ABIAttribs of a structure: whether it is static, and its head size. A sum's head is one tag
+    and its widest constructor's fields when static, else one offset Word."""
+    kind = node[0]
+    if kind in LEAF_KINDS:
+        return True, 32
+    if kind in ("bytes", "string", "array"):
+        return False, 32
+    if kind == "unit":
+        return True, 0
+    if kind == "pair":
+        (first, head), (second, tail) = attribs(node[1]), attribs(node[2])
+        return first and second, head + tail
+    if kind == "struct":
+        return attribs(node[2])
+    arms = [attribs(rep) for _, rep in node[2]]
+    static = all(arm[0] for arm in arms)
+    return static, 32 + max(arm[1] for arm in arms) if static else 32
+
+
+def element_head(node) -> int:
+    """std's ABIElementAttribs: a dynamic tuple element's head is one offset Word."""
+    static, head = attribs(node)
+    return 32 if node[0] == "pair" and not static else head
+
+
+def tags(node) -> list[int]:
+    """A sum's constructor tags, keccak256("Name(fields)") as Words, in declaration order."""
+    return [int.from_bytes(storage.keccak256((name + "(" + signature_text(rep) + ")").encode()), "big")
+            for name, rep in node[2]]
+
+
+def derived_methods(document: dict | None, contract: str) -> dict[bytes, tuple[str, tuple]]:
+    """The public methods of `contract` that take a user data type, with their structure, by structural
+    selector. A method with a type outside the model has no derived layout."""
+    scope, found = {}, [item for item in (document or {}).get("contracts") or [] if item.get("name") == contract]
+    for item in ([document] if document else []) + found[:1]:
+        for data in item.get("data") or []:
+            scope[data["name"]] = ("data", data)
+        for alias in item.get("aliases") or []:
+            scope[alias["name"]] = ("alias", alias)
+    result = {}
+    for method in found[0].get("functions") or [] if found else []:
+        if method.get("kind") != "function" or not method.get("public"):
+            continue
+        try:
+            node = product([structure(param.get("type"), scope) for param in method["params"]])
+        except Underived:
+            continue
+        if derived(node):
+            text = method["name"] + "(" + signature_text(node) + ")"
+            result[storage.keccak256(text.encode())[:4]] = (text, node)
+    return result
+
+
+def derived_classify(body: bytes, node) -> dict[int, tuple]:
+    """Classes of the words of `body` as std's derived encoding of `node`: typed leaves, tags, dynamic
+    offsets with their base, `bytes` and array lengths, content and unused head words. ValueError when
+    it is not one."""
+    classes: dict[int, tuple] = {}
+
+    def word_at(position: int) -> int:
+        if position < 0 or position % 32 or position + 32 > len(body):
+            raise ValueError("word outside the input")
+        return int.from_bytes(body[position:position + 32], "big")
+
+    def mark(position: int, value: tuple) -> None:
+        if classes.setdefault(position // 32, value) != value:
+            raise ValueError("overlapping encoding")
+
+    def follow(position: int, base: int, role: str) -> int:
+        offset = word_at(position)
+        mark(position, ("dynamic-offset", role, base))
+        if offset % 32 or base + offset > len(body):
+            raise ValueError("offset outside the input")
+        return base + offset
+
+    def value(node, base: int, head: int) -> None:
+        kind, position = node[0], base + head
+        if kind in LEAF_KINDS:
+            word_at(position)
+            mark(position, ("leaf", node))
+        elif kind == "pair":
+            value(node[1], base, head)
+            value(node[2], base, head + attribs(node[1])[1])
+        elif kind == "struct":
+            value(node[2], base, head)
+        elif kind in ("bytes", "string"):
+            start = follow(position, base, "bytes")
+            length = word_at(start)
+            mark(start, ("bytes-length", start + 32))
+            if start + 32 + length > len(body):
+                raise ValueError("content outside the input")
+            for index in range((length + 31) // 32):
+                mark(start + 32 + 32 * index, ("content",))
+        elif kind == "array":
+            start = follow(position, base, "array")
+            length = word_at(start)
+            mark(start, ("length",))
+            if length > MAX_ARRAY_ELEMENTS:
+                raise ValueError("array exceeds the classification bound")
+            element, region = node[1], start + 32
+            for index in range(length):
+                if element[0] == "pair" and not attribs(element)[0]:
+                    value(element, follow(region + 32 * index, region, "element"), 0)
+                else:
+                    value(element, region, index * element_head(element))
+        elif kind == "sum":
+            static, size = attribs(node)
+            start = position if static else follow(position, base, "sum")
+            tag, known = word_at(start), tags(node)
+            if tag not in known:
+                raise ValueError(f"the tag matches no constructor of {node[1]}")
+            mark(start, ("tag", node[1], tuple(known)))
+            rep = node[2][known.index(tag)][1]
+            value(rep, start, 32)
+            if static:
+                for unused in range(start + 32 + attribs(rep)[1], start + size, 32):
+                    word_at(unused)
+                    mark(unused, ("unused",))
+
+    value(node, 0, 0)
+    return classes
+
+
 def class_label(value: tuple) -> str:
-    return "leaf:" + canonical(value[1]) if value[0] == "leaf" else value[0]
+    if value[0] == "leaf":
+        return "leaf:" + canonical(value[1])
+    return value[0] + ":" + value[1] if value[0] in ("tag", "dynamic-offset") else value[0]
 
 
 def boundary_values(value: tuple, recorded: int, body_length: int) -> list[int]:
@@ -325,6 +571,17 @@ def boundary_values(value: tuple, recorded: int, body_length: int) -> list[int]:
         values = [0, recorded - 1, recorded + 1, 2**32, 2**64, U256 - 1]
     elif kind == "content":
         values = [0, U256 - 1, recorded ^ 1]
+    elif kind == "tag":
+        values = [tag for tag in value[2] if tag != recorded] + [0, recorded + 1, recorded - 1, U256 - 1]
+    elif kind == "dynamic-offset":
+        # Relative to its base: one byte past the input's end, and the Word that wraps to the selector.
+        base = value[2]
+        values = [0, 32, body_length - base + 1, 2**255, U256 - 4 - base, recorded - 32, recorded + 32]
+    elif kind == "bytes-length":
+        # One more than fits, the largest Word, and into the padding of the content's last word.
+        values = [body_length - value[1] + 1, U256 - 1] + ([-(-recorded // 32) * 32] if recorded % 32 else [])
+    elif kind == "unused":
+        values = [0, 1, U256 - 1]
     else:
         values = [0, 1, 32, recorded + 1, recorded - 1, 2**64, 2**255, U256 - 32, U256 - 1]
     result = []
@@ -372,7 +629,7 @@ def candidates(step: dict, classes: dict | None, stream: Stream) -> dict[str, li
         recorded = int.from_bytes(body[32 * index:32 * index + 32], "big")
         position = (classes or {}).get(index, ("unclassified",))
         family = "leaf" if position[0] == "leaf" else position[0]
-        for value in boundary_values(position, recorded, len(body)):
+        for value in [] if position[0] in EXHAUSTIVE else boundary_values(position, recorded, len(body)):
             add(family, {"operator": "word", "class": class_label(position), "word": index,
                          "recorded": hex(recorded), "value": hex(value)})
         seeded = seeded_value(position, stream.word())
@@ -388,6 +645,32 @@ def candidates(step: dict, classes: dict | None, stream: Stream) -> dict[str, li
     if step["kind"] in ("raw", "send", "deploy"):
         add("frame", {"operator": "value", "recorded": step["value"], "value": 0 if step["value"] else 1})
     return families
+
+
+def exhaustive(step: dict, classes: dict | None) -> list[dict]:
+    """Every boundary Word of a step's tags, dynamic offsets and `bytes` lengths, by word and value."""
+    body = bytes.fromhex(step["calldata"][2:])[selector_prefix(step):]
+    result = []
+    for index, position in sorted((classes or {}).items()):
+        if position[0] in EXHAUSTIVE:
+            recorded = int.from_bytes(body[32 * index:32 * index + 32], "big")
+            result += [{"operator": "word", "class": class_label(position), "word": index, "recorded": hex(recorded),
+                        "value": hex(value)} for value in boundary_values(position, recorded, len(body))]
+    return result
+
+
+def derived_boundary(mutant: dict | None) -> bool:
+    """Whether a mutant is one of the exhaustive boundary Words; a seeded Word keeps its position's class."""
+    return bool(mutant) and mutant["operator"] == "word" and mutant["class"].split(":")[0] in EXHAUSTIVE
+
+
+def seeded_subset(items: list, limit: int, stream: Stream) -> list:
+    """A seeded uniform sample of `limit` items, in their order."""
+    order = list(range(len(items)))
+    for position in range(min(limit, len(order))):
+        other = position + stream.below(len(order) - position)
+        order[position], order[other] = order[other], order[position]
+    return [items[index] for index in sorted(order[:limit])]
 
 
 def sample(families: dict[str, list[dict]], stream: Stream, count: int) -> list[dict]:
@@ -430,8 +713,9 @@ def apply(step: dict, mutant: dict) -> dict:
     return {**step, "calldata": "0x" + data.hex(), "value": value}
 
 
-def step_classes(step: dict, abi: list[dict]) -> tuple[dict | None, str]:
-    """Word classes of a step's recorded arguments and where they came from."""
+def step_classes(step: dict, abi: list[dict], derived: dict | None = None) -> tuple[dict | None, str]:
+    """Word classes of a step's recorded arguments and where they came from: a standard-ABI method, else
+    a method of `derived_methods` with the call's structural selector."""
     data = bytes.fromhex(step["calldata"][2:])
     if step["kind"] == "deploy":
         entries = [item for item in abi if item.get("type") == "constructor"]
@@ -451,7 +735,13 @@ def step_classes(step: dict, abi: list[dict]) -> tuple[dict | None, str]:
                 params = item.get("inputs", [])
                 break
         if params is None:
-            return None, "no standard-ABI method with this selector"
+            if data[:4] not in (derived or {}):
+                return None, "no standard-ABI method with this selector"
+            text, node = derived[data[:4]]
+            try:
+                return derived_classify(body, node), "derived"
+            except ValueError as error:
+                return None, f"recorded input is not the derived layout of {text}: {error}"
     nodes = [abi_type(param) for param in params]
     if any(node is None for node in nodes):
         return None, "non-standard ABI type"
@@ -549,7 +839,7 @@ class Exports:
         hull_path = self.directory / "hull-O0.json"
         return hull.source_hashes(json.loads(hull_path.read_text())) | main if hull_path.exists() else main
 
-    def prepare(self, directive_build: dict) -> dict:
+    def prepare(self, directive_build: dict, declaration_build: dict | None = None) -> dict:
         """Export everything once; an export failure excludes only the paths needing it."""
         reuse = self.receipt_valid()
         if not reuse and self.directory.exists():
@@ -562,6 +852,8 @@ class Exports:
                                                     self.args.target_dir, directive_build, reuse, self.args.timeout)
         except (ValueError, OSError, subprocess.SubprocessError) as error:
             raise Excluded("directives", "unsupported-directive", str(error))
+        # The declarations only classify words, so a failure on a source the directives parsed is a harness error.
+        result["declarations"] = None if declaration_build is None else self.declarations(declaration_build, reuse)
         for path, level in LEVELS.items():
             try:
                 result[level] = self.level(level, reuse)
@@ -589,6 +881,24 @@ class Exports:
                 {"schema": EXPORT_SCHEMA, "identity": self.identity, "sources": self.sources()}, indent=2) + "\n")
         result["seconds"] = round(time.monotonic() - started, 3)
         return result
+
+    def declarations(self, build: dict, reuse: bool) -> dict:
+        """The pinned parser's declarations of the main source."""
+        path = self.directory / "declarations.json"
+        record = path.with_suffix(".json.provenance.json")
+        if reuse and path.exists() and record.exists():
+            provenance = json.loads(record.read_text())
+            if provenance.get("schema") == declarations.SCHEMA and provenance.get("toolBuild") == build and \
+                    provenance.get("source") == self.source.as_uri() and \
+                    provenance.get("sourceSha256") == common.file_digest(self.source) and \
+                    provenance.get("outputSha256") == common.file_digest(path):
+                return json.loads(path.read_text())
+        outcome = run_process([sys.executable, str(ROOT / "scripts/export-rust-declarations.py"), str(self.source),
+                               "--output", str(path), "--upstream", str(self.args.upstream),
+                               "--target-dir", str(self.args.target_dir)], self.args.timeout)
+        require(not outcome["returncode"] and not outcome["resource"],
+                "declaration extraction failed: " + (outcome["resource"] or (outcome["stderr"] + outcome["stdout"])[-2000:]))
+        return json.loads(path.read_text())
 
     def level(self, level: str, reuse: bool) -> dict:
         hull_path, image_path = self.directory / f"hull-{level}.json", self.directory / f"images-{level}.json"
@@ -1161,7 +1471,7 @@ class FixtureRun:
         require(source.is_relative_to(self.args.upstream) and common.file_digest(source) == self.fixture["sha256"],
                 "fixture differs from its pin: " + self.fixture["id"])
         exports = Exports(self.args, self.fixture, self.identity)
-        prepared = exports.prepare(self.builds["directive"])
+        prepared = exports.prepare(self.builds["directive"], self.builds.get("declaration"))
         for error in prepared["excluded"]:
             self.exclude(error)
         excluded = {path for error in prepared["excluded"] for path in error.paths}
@@ -1175,6 +1485,9 @@ class FixtureRun:
             raise Excluded("directive-resolution", "unsupported-directive", str(error))
         self.prepared = prepared
         self.abi = prepared["abi"].get(self.fixture["contract"], [])
+        self.derived = derived_methods(prepared["declarations"], self.fixture["contract"])
+        if self.derived:
+            self.record["derivedMethods"] = {"0x" + key.hex(): text for key, (text, _) in self.derived.items()}
         self.bytecode = {}
         for path, level in LEVELS.items():
             if path in self.admitted:
@@ -1203,26 +1516,35 @@ class FixtureRun:
                 self.evm.close()
 
     def draw_mutants(self) -> dict[int, list[tuple[int, dict]]]:
-        """Each step's mutants with their draw numbers; over --fixture-mutants, a seeded uniform sample
-        of that many keeps draw order and numbers."""
-        drawn, sources = {}, {}
+        """Each step's mutants with their draw numbers: the drawn ones, then every boundary Word of a
+        derived layout's tags, dynamic offsets and `bytes` lengths, at most --derived-mutants of those
+        per fixture. Over --fixture-mutants, a seeded uniform sample of that many keeps draw order and
+        numbers."""
+        drawn, sources, boundaries = {}, {}, []
         for step in self.steps:
             if step["kind"] == "deploy" and step["calldata"] == "0x" and step["value"] == 0:
                 continue
             stream = Stream(derive(self.args.seed, self.fixture["id"], step["index"]))
-            classes, origin = step_classes(step, self.abi)
+            classes, origin = step_classes(step, self.abi, self.derived)
             sources[str(step["index"])] = origin
             drawn[step["index"]] = list(enumerate(sample(candidates(step, classes, stream), stream, self.args.mutants), 1))
+            boundaries += [(step["index"], number, mutant) for number, mutant in
+                           enumerate(exhaustive(step, classes), len(drawn[step["index"]]) + 1)]
         self.record["classification"] = sources
+        if boundaries:
+            limit = self.args.derived_mutants
+            self.record["derivedMutants"] = {"limit": limit, "drawn": len(boundaries),
+                                             "kept": min(limit, len(boundaries))}
+            if len(boundaries) > limit:
+                boundaries = seeded_subset(boundaries, limit, Stream(derive(self.args.seed, self.fixture["id"],
+                                                                            "derived-boundary")))
+            for index, number, mutant in boundaries:
+                drawn[index].append((number, mutant))
         limit, order = self.args.fixture_mutants, [(index, number) for index, items in drawn.items() for number, _ in items]
         if limit is not None:
             self.record["mutantBudget"] = {"limit": limit, "drawn": len(order), "kept": min(limit, len(order))}
             if len(order) > limit:
-                stream = Stream(derive(self.args.seed, self.fixture["id"], "mutant-budget"))
-                for position in range(limit):
-                    other = position + stream.below(len(order) - position)
-                    order[position], order[other] = order[other], order[position]
-                kept = set(order[:limit])
+                kept = set(seeded_subset(order, limit, Stream(derive(self.args.seed, self.fixture["id"], "mutant-budget"))))
                 drawn = {index: [item for item in items if (index, item[0]) in kept] for index, items in drawn.items()}
         return drawn
 
@@ -1276,7 +1598,8 @@ class FixtureRun:
             rows.append(row)
             self.record["findings"] += entry_findings(self.fixture, entry, observations)
         self.record["entries"] = rows
-        self.record["counts"] = {**counts, "recorded": len(self.steps), "mutants": len(entries) + 1 - len(self.steps)}
+        self.record["counts"] = {**counts, "recorded": len(self.steps), "mutants": len(entries) + 1 - len(self.steps),
+                                 "derivedBoundaries": sum(derived_boundary(entry.get("mutant")) for entry in entries)}
         self.record["expectations"] = expectations
 
     def tally(self, observations: dict[str, dict]) -> None:
@@ -1384,15 +1707,17 @@ def check_tools(args) -> dict:
     """The pinned compiler checkout, tool receipts and binaries this run requires."""
     driver, image, directive = scenario.identities(args.upstream, args.target_dir)
     resolver = methods.resolver.checked_identity(args.upstream, args.target_dir)
+    declaration = declarations.checked_identity(args.upstream, args.target_dir)
     version = subprocess.run([str(args.solc), "--version"], capture_output=True, text=True, timeout=30).stdout
     exporter.validate_version(version)
-    return {"driver": driver, "image": image, "directive": directive, "resolver": resolver, "solcVersion": version.strip()}
+    return {"driver": driver, "image": image, "directive": directive, "resolver": resolver, "declaration": declaration,
+            "solcVersion": version.strip()}
 
 
 def summarize(records: list[dict]) -> dict:
     totals = {"fixtures": len(records), "admitted": {path: 0 for path in PATHS}, "agree": 0, "disagree": 0,
-              "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "findings": {}, "exclusions": {},
-              "statuses": {}, "unexecuted": 0, "budgetStopped": 0}
+              "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "derivedBoundaries": 0, "findings": {},
+              "exclusions": {}, "statuses": {}, "unexecuted": 0, "budgetStopped": 0}
     expectations = {path: dict.fromkeys(VERDICTS, 0) for path in PATHS}
     for record in records:
         if record.get("unexecuted"):
@@ -1401,7 +1726,7 @@ def summarize(records: list[dict]) -> dict:
             totals["budgetStopped"] += 1
         for path in record.get("admitted") or []:
             totals["admitted"][path] += 1
-        for key in ("agree", "disagree", "incomplete", "unobserved", "recorded", "mutants"):
+        for key in ("agree", "disagree", "incomplete", "unobserved", "recorded", "mutants", "derivedBoundaries"):
             totals[key] += (record.get("counts") or {}).get(key, 0)
         for path, verdicts in (record.get("expectations") or {}).items():
             for verdict, count in verdicts.items():
@@ -1425,6 +1750,8 @@ def main(argv=None) -> int:
     parser.add_argument("--mode", choices=("fixed", "mutation"), default="fixed")
     parser.add_argument("--seed", type=int, help="root seed of a mutation run")
     parser.add_argument("--mutants", type=int, default=MUTANTS_PER_STEP, help="mutants drawn per recorded step")
+    parser.add_argument("--derived-mutants", type=int, default=DERIVED_MUTANTS,
+                        help="at most this many boundary mutants of derived layouts per fixture, a seeded sample")
     parser.add_argument("--fixture", action="append", default=[], help="fixture id glob; repeatable")
     parser.add_argument("--fixture-mutants", type=int, help="at most this many mutants per fixture, a seeded sample of those drawn")
     parser.add_argument("--fixture-seconds", type=float, help="wall time per fixture; entries reached later are not run")
@@ -1454,7 +1781,8 @@ def main(argv=None) -> int:
         parser.error("a mutation run requires --seed")
     if args.mode == "fixed" and args.seed is not None:
         parser.error("--seed applies only to a mutation run")
-    if not 1 <= args.mutants <= 64 or not 1 <= args.jobs <= 16 or args.reduction_runs < 1 or \
+    if not 1 <= args.mutants <= 64 or not 0 <= args.derived_mutants <= 4096 or not 1 <= args.jobs <= 16 or \
+            args.reduction_runs < 1 or \
             min(args.timeout, args.hull_timeout, args.hull_entry_timeout, args.reduction_seconds) <= 0:
         parser.error("invalid mutation, job, time or reduction bounds")
     if args.fixture_mutants is not None and (args.mode != "mutation" or args.fixture_mutants < 1):
@@ -1491,6 +1819,7 @@ def main(argv=None) -> int:
                         "yul": "the driver's Yul compiled by solc " + exporter.SOLC_VERSION + " on Anvil"},
               "environment": ENVIRONMENT, "mode": args.mode, "seed": args.seed,
               "mutantsPerStep": args.mutants if args.mode == "mutation" else 0,
+              "derivedMutants": args.derived_mutants if args.mode == "mutation" else 0,
               "bounds": {"exportSeconds": args.timeout, "hullSeconds": args.hull_timeout,
                          "hullEntrySeconds": args.hull_entry_timeout, "reductionRuns": args.reduction_runs,
                          "reductionSeconds": args.reduction_seconds, "fixtureMutants": args.fixture_mutants,
@@ -1511,7 +1840,7 @@ def main(argv=None) -> int:
                   + (f"; stopped by the {record['stop']}" if record.get("stop") else ""), flush=True)
         return {key: record.get(key) for key in ("id", "mode", "contract", "admitted", "exclusions", "findings", "counts",
                                                  "expectations", "statuses", "errors", "seconds", "exportSeconds",
-                                                 "exportsReused", "mutantBudget", "stop", "unexecuted")}
+                                                 "exportsReused", "mutantBudget", "derivedMutants", "stop", "unexecuted")}
 
     # A stop signal ends the run at the next entry and still writes the report.
     STOP.clear()

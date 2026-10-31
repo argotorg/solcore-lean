@@ -7350,6 +7350,21 @@ this section describes how to run them.
   take their class's boundary Words or a seeded Word; the frame loses or gains
   bytes or toggles the value. Each mutant runs before its recorded step and is
   rolled back.
+- **Derived ADT arguments:** a call whose selector matches no standard-ABI
+  method may match the structural selector of a public method that takes a
+  user data type.
+  - The pinned declaration extractor (`export-rust-declarations.py`) reads
+    the method's declared parameter types and the data types and aliases
+    they name. std's Generic structure of them gives the selector, each
+    constructor's tag and the layout std's derived decoder reads.
+  - A call whose words parse under that layout has typed leaves, tags,
+    dynamic offsets with their base, `bytes` and array lengths, content and
+    unused head words.
+  - Every boundary Word of its tags, dynamic offsets and `bytes` lengths is a
+    mutant, at most `--derived-mutants` (default 256) per fixture. Its other
+    words are drawn as above.
+  - A call with an unknown tag, or for a method with a type outside the
+    model, keeps the reason it was not classified.
 - **Exclusions and findings:** an unsupported directive, a compile failure, an
   export refusal or a resource limit excludes the paths that need it, with its
   stage and reason. A path mismatch, an unmet recorded expectation, a path
@@ -7381,7 +7396,7 @@ python3 scripts/semantic-fixtures.py --list --fixture 'abi-*'
 
 The pinned tools must be prepared: `prepare-semantic-tools.py --prepare`
 builds the checked Hull driver, the code-image tool, the directive extractor
-and resolver and the native tools offline. solc 0.8.35, Anvil and cast are
+and resolver, the declaration extractor and the native tools offline. solc 0.8.35, Anvil and cast are
 installed separately. `--check` verifies the tool receipts and solc, then
 prints the identity of everything a run reads, for the fuzz driver's
 readiness and epoch. Exports go to `.upstream/semantic-fixtures/<fixture>`,
@@ -7416,7 +7431,9 @@ for recorded steps. Each distinct finding carries its reduction. The command
 returns 1 for any finding, harness error or changed tool.
 
 `python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
-the classification, the mutation operators and sampling, the mutant budget,
+the classification, std's derived structures, selectors, tags and layouts on
+recorded calls, the derived boundary Words and their cap, the mutation
+operators and sampling, the mutant budget,
 the observation normalization, the memory-range rule, the `budget` status, the
 comparisons, the Lean result order and its deadlines, the reduction, the export
 lock, the run budget, a stop signal, `--check` and the totals, without a
