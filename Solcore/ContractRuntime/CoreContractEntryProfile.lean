@@ -34,6 +34,9 @@ inductive CoreContractEntryProfile where
   /-- Returned raw bytes, the first ones of `extraWords + 1` data Words up to a
   length the length Word names, or a reverted Word, or a trap reason. -/
   | rawBytesOutcomeV1 (extraWords : Nat)
+  /-- Returned or reverted raw bytes, each in the form of `rawBytesOutcomeV1`'s
+  returned side, or a trap reason. -/
+  | rawOutcomeV1 (extraWords : Nat)
   deriving Repr, BEq, DecidableEq
 
 namespace CoreContractEntryProfile
@@ -197,6 +200,7 @@ def resultType : CoreContractEntryProfile → Core.Ty
   | .boundedBytesOutcomeV1 => .sum boundedBytesType (.sum .word .word)
   | .enumOutcomeV1 first second rest => .sum (enumType first (second :: rest)) (.sum .word .word)
   | .rawBytesOutcomeV1 extraWords => .sum (rawBytesType extraWords) (.sum .word .word)
+  | .rawOutcomeV1 extraWords => .sum (rawBytesType extraWords) (.sum (rawBytesType extraWords) .word)
 
 /-- Recognize exactly the result types supported by the contract ABI. -/
 def ofResultType? : Core.Ty → Option CoreContractEntryProfile
@@ -212,6 +216,8 @@ def ofResultType? : Core.Ty → Option CoreContractEntryProfile
             | none => match ofEnumType? returned with
               | some (first, second :: rest) => some (.enumOutcomeV1 first second rest)
               | _ => none
+  | .sum returned (.sum reverted .word) =>
+      if returned = reverted then (ofRawBytesType? returned).map .rawOutcomeV1 else none
   | _ => none
 
 /--
@@ -225,6 +231,7 @@ def returnsOneWord : CoreContractEntryProfile → Bool
   | .boundedBytesOutcomeV1 => false
   | .enumOutcomeV1 _ _ _ => false
   | .rawBytesOutcomeV1 _ => false
+  | .rawOutcomeV1 _ => false
 
 /-- The concatenated big-endian Words of a right-nested tuple of `count + 1`
 Words: the static ABI encoding of the tuple. -/
@@ -359,6 +366,18 @@ def decode?
       else none
   | .rawBytesOutcomeV1 extraWords, .inRight returned (.inRight .word (.word reason)) =>
       if returned = rawBytesType extraWords then
+        some (.trapped reason)
+      else none
+  | .rawOutcomeV1 extraWords, .inLeft errors payload =>
+      if errors = .sum (rawBytesType extraWords) .word then
+        (decodeRawBytes? extraWords payload).map .returned
+      else none
+  | .rawOutcomeV1 extraWords, .inRight returned (.inLeft .word payload) =>
+      if returned = rawBytesType extraWords then
+        (decodeRawBytes? extraWords payload).map .reverted
+      else none
+  | .rawOutcomeV1 extraWords, .inRight returned (.inRight reverted (.word reason)) =>
+      if returned = rawBytesType extraWords ∧ reverted = rawBytesType extraWords then
         some (.trapped reason)
       else none
   | _, _ => none
@@ -591,6 +610,21 @@ theorem decode?_ne_none_of_hasType
           | inLeft innerTyping =>
               cases innerTyping with
               | word => simp [decode?]
+          | inRight innerTyping =>
+              cases innerTyping with
+              | word => simp [decode?]
+  | rawOutcomeV1 extraWords =>
+      cases typing with
+      | inLeft payloadTyping =>
+          have decoded := decodeRawBytes?_ne_none_of_hasType extraWords payloadTyping
+          simp only [decode?, ne_eq, ite_true, Option.map_eq_none_iff]
+          exact decoded
+      | inRight payloadTyping =>
+          cases payloadTyping with
+          | inLeft innerTyping =>
+              have decoded := decodeRawBytes?_ne_none_of_hasType extraWords innerTyping
+              simp only [decode?, ne_eq, ite_true, Option.map_eq_none_iff]
+              exact decoded
           | inRight innerTyping =>
               cases innerTyping with
               | word => simp [decode?]

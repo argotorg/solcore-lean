@@ -22,6 +22,8 @@ namespace CoreContractEntryProfile
       cases first <;> rfl
   | rawBytesOutcomeV1 extraWords =>
       simp [resultType, ofResultType?, rawBytesType, ofRawBytesType?, ofWordTupleType?, boundedBytesType]
+  | rawOutcomeV1 extraWords =>
+      simp [resultType, ofResultType?, rawBytesType, ofRawBytesType?]
 
 theorem resultType_injective :
     Function.Injective CoreContractEntryProfile.resultType := by
@@ -412,6 +414,24 @@ theorem decodeRawBytes?_size
       some (.trapped reason) := by
   simp [decode?]
 
+@[simp] theorem decode?_rawOutcomeV1_returned (extraWords : Nat) (payload : Core.Value) :
+    decode? (.rawOutcomeV1 extraWords) (.inLeft (.sum (rawBytesType extraWords) .word) payload) =
+      (decodeRawBytes? extraWords payload).map .returned := by
+  simp [decode?]
+
+/-- A raw-outcome revert carries raw bytes, as its return does. -/
+@[simp] theorem decode?_rawOutcomeV1_reverted (extraWords : Nat) (payload : Core.Value) :
+    decode? (.rawOutcomeV1 extraWords)
+        (.inRight (rawBytesType extraWords) (.inLeft .word payload)) =
+      (decodeRawBytes? extraWords payload).map .reverted := by
+  simp [decode?]
+
+@[simp] theorem decode?_rawOutcomeV1_trapped (extraWords : Nat) (reason : Core.Word) :
+    decode? (.rawOutcomeV1 extraWords)
+        (.inRight (rawBytesType extraWords) (.inRight (rawBytesType extraWords) (.word reason))) =
+      some (.trapped reason) := by
+  simp [decode?]
+
 @[simp] theorem returnsOneWord_returnWord :
     returnsOneWord .returnWord = true :=
   rfl
@@ -435,6 +455,10 @@ theorem decodeRawBytes?_size
 
 @[simp] theorem returnsOneWord_rawBytesOutcomeV1 (extraWords : Nat) :
     returnsOneWord (.rawBytesOutcomeV1 extraWords) = false :=
+  rfl
+
+@[simp] theorem returnsOneWord_rawOutcomeV1 (extraWords : Nat) :
+    returnsOneWord (.rawOutcomeV1 extraWords) = false :=
   rfl
 
 end CoreContractEntryProfile

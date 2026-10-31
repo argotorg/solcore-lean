@@ -71,6 +71,17 @@ def rawBytesOutcomeV1
     CheckedCoreContract :=
   ⟨code, .rawBytesOutcomeV1 extraWords, resultType_eq⟩
 
+/-- Bind checked code with the raw convention of `extraWords + 1` data Words on
+both its returned and reverted sides. -/
+def rawOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.rawOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .rawOutcomeV1 extraWords, resultType_eq⟩
+
 /-- Admit checked code only when its result type has a supported entry profile. -/
 def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
   let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType

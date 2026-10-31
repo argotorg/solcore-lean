@@ -1750,6 +1750,7 @@ import Solcore.Test.OneLevelNestedExecution
 import Solcore.Test.ContractTupleEntryProfile
 import Solcore.Test.ContractBoundedBytesEntryProfile
 import Solcore.Test.ContractCallResume
+import Solcore.Test.ContractCallChain
 import Solcore.Test.ContractEnumEntryProfile
 import Solcore.Test.OneLevelNestedExecutionExtended
 import Solcore.Test.OneLevelNestedExecutionResumption
@@ -4022,6 +4023,7 @@ def run : IO Unit := do
   Tests.ContractTupleEntryProfile.testContractTupleEntryProfile
   Tests.ContractBoundedBytesEntryProfile.testContractBoundedBytesEntryProfile
   Tests.ContractCallResume.testContractCallResume
+  Tests.ContractCallChain.testContractCallChain
   Tests.ContractEnumEntryProfile.testContractEnumEntryProfile
   testAdr0147NestedValueExecution
   testRuntimeScalars
