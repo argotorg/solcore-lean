@@ -10002,6 +10002,124 @@ worktree, so that run's timings are slower.
 - **Findings:** none, no mismatch and no upstream defect, and `questions.md`
   is untouched.
 
+**Call halts.** The call profiles compare only returned and reverted rows. Under
+EIP-211 a `returndatacopy` whose offset plus width exceeds the return data halts
+the frame, even for a width of zero. An optimizer that removes a copy whose
+memory is never read, or a zero-length copy, would turn that halt into a normal
+return. A probe on `41d83b6a3` found:
+- **The probe:**
+  - **One call:** a parent called the child once through `raw_call`. The input
+    chose a mode and an offset. The child returned or reverted raw data of 0 to
+    96 bytes.
+  - **Unguarded copies** in inline Yul, one per mode:
+    - 32 bytes copied into a zeroed scratch Word that the result reads;
+    - 32 bytes copied into memory that nothing reads;
+    - zero bytes copied at the offset.
+  - **Offsets:** a second parent wrote the offset 64 into all three copies
+    as a constant, and the first took it from the input.
+  - **Twenty-two transactions** in eleven scenarios. A copy inside the data
+    came before each copy past the end, and the past-the-end copies covered
+    the read copy, the unread one and the zero-length one, with both offset
+    sources. Some followed returned data, some reverted data and some empty
+    data.
+- **The paths agree:** every copy past the end halted the parent on O0, O2
+  and Yul: a failed receipt whose last step is not `REVERT`. Imported Hull
+  with O0 and O2 images reported `invalid`, and every path committed
+  nothing. The other transactions gave identical rows on all five paths, equal
+  to an independent Python model, which prescribed every halt.
+
+A new call-family profile, `stateful-call-halts`, compares this, and the other
+call profiles' corpora and results stay as they are.
+- **Shared with `stateful-call-sequences`:** the two wrapper names and methods,
+  and so their Yul admission; the child; and the call adapter's two-source
+  paths.
+- **Nothing changes** in `Solcore/ContractRuntime/`, Core, the Hull importer
+  or the backends.
+
+The definitions were fixed before execution:
+- **Boundary:**
+  - one call per transaction to the bound child, at depth one, with zero value
+    and no logs;
+  - then one unguarded copy of the plan's kind;
+  - a halt is the copy's own, never gas or a trap of the child.
+- **Plan:** `solcore-lean.call-halt-plan.v1`, with the step program and:
+  - **the copy's kind:** `read`, `unread` or `empty`;
+  - **where its offset comes from:** a constant from the offset bank 0, 1, 31,
+    32, 33, 63, 64, 95, 96 and 97, written into the source, or the input's
+    byte 1.
+
+  The width is 32 for `read` and `unread`, and 0 for `empty`.
+- **Input:**
+  - **byte 0:** the call's class byte;
+  - **byte 1:** the offset when the plan takes it from the input;
+  - **bit 24:** reverts the parent after a copy that does not halt;
+  - **`mix = input >> 32`;** the argument is `mix·256 + b`.
+- **Child:** `stateful-call-sequences`' child.
+- **Parent:**
+  1. With `p = slot 0`, it calls the child with `raw_call` and keeps the
+     flag plus twice the copy's length `k`.
+  2. In inline Yul it copies: for `read`, into a zeroed scratch Word whose
+     Word `v` it then reads; for `unread`, into memory that nothing reads; for
+     `empty`, zero bytes into that memory. No guard comes before the copy.
+  3. It writes `p + input` to slot 0, `k` to slot 1, `v` (zero unless `read`)
+     to slot 2 and the offset to slot 3. Then it reverts with their sum under
+     bit 24, or returns it.
+- **What each path must do:** the transaction halts exactly when the offset
+  plus the width exceeds the call's data size `m`, so an `empty` copy halts
+  exactly when the offset exceeds `m`. A halt commits nothing, the child's
+  writes included, and the next transaction runs on the prior world.
+- **Original Core:** the one-call convention, with no change.
+  - **The child** is under `rawOutcomeV1 2`.
+  - **The resume phase** is under `wordOutcomeV1`. It traps with a fixed
+    reason Word, the profile's halt, when the copy lies past the end, and
+    otherwise writes the slots and returns or reverts.
+  - **`CallResumeExecution`'s root rollback** already covers a trapped resume
+    phase.
+  - **The profile's execution module** continues to the next transaction
+    after that trap, since the committed world is the one before it.
+- **The halted outcome,** inside the call adapter only:
+  - **One outcome:** the EVM's exceptional halt, imported Hull's `invalid`
+    and original Core's trap with the profile's reason become one outcome,
+    `halted`. An EVM halt here is a failed receipt whose trace's last step is
+    not `REVERT` and whose error is not a resource limit.
+  - **When it matches:** only when the transaction's prescribed outcome is a
+    halt. A halt on every path where none is prescribed is a mismatch, as is
+    a prescribed halt that any path completes.
+  - **What it commits:** a halted row's committed accounts and whole storage
+    must equal the prior row's on every path.
+  - **The histories continue past it:** the EVM path keeps executing.
+    `rust-hull-call-return-scenario` gains an additive scenario field that
+    continues past an `invalid` row on the prior world.
+
+  Lane A's halt outcome for the pure adapter stays separate; the two are
+  reconciled at integration.
+- **Prescribed outcomes:** each transaction records whether the copy halts and
+  whether the parent reverts, from a Lean model. The adapter recomputes them
+  from the plan and the input.
+- **Generation, observations, exclusions and reductions:** as for
+  `stateful-call-sequences`, over one call. The plan's kind and offset source
+  are uniform, and a constant offset comes from the bank. The offset byte is
+  drawn from the bank or uniform from 0 to 255. Reductions lower the kind
+  from `read` to `unread` to `empty` and the offset to an earlier bank entry.
+- **Campaign dimensions:**
+  - `HaltKinds`: each kind with and without a halt;
+  - `HaltOffsets`: a constant and an input offset;
+  - `HaltLengths`: the bank lengths, returned and reverted apart;
+  - `HaltRollbacks`: a halt after a returned child, after a reverted one,
+    and a parent revert after a copy;
+  - `HaltNodeBudgets`.
+- **Fixed corpus and golden cases:** imported plans over the imported steps of
+  `stateful-calls`, generated seeds at both budgets, and golden rows from the
+  probe's independent model. The corpus must cover every value of each
+  dimension.
+
+Out of scope:
+- halts other than a copy past the end, such as `invalid()` and failed
+  assertions, which lane A takes for the pure adapter;
+- gas exhaustion;
+- a halt in the child;
+- several calls or copies in one transaction.
+
 **Known mismatch classes in the fuzz registry: definitions.** A mismatch's key
 is its reduced program. So a recorded semantic defect that random plans keep
 drawing registers new signatures at every occurrence. The case in point is
