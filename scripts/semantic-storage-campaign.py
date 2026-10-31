@@ -1222,7 +1222,8 @@ class Campaign:
         self.counter = self.shrink_attempts = 0
         self.materialized = []
         self.summary = {"schema": SCHEMA, "backend": self.backend, "status": "running", "synthetic": args.test_perturb_path is not None,
-            "configuration": {"profile": self.profile, "backend": self.backend, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")}},
+            "configuration": {"profile": self.profile, "backend": self.backend, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")},
+                              **({"shrinkBatch": args.shrink_batch} if getattr(args, "shrink_batch", None) else {})},
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path, "transactionId": args.test_transaction_id, "field": args.test_field} if args.test_perturb_path else None,
             "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-storage-differential.py"), "caseTool": str(args.case_tool),
                       **({"solc": str(self.solc)} if self.backend == "yul" else {})},
@@ -1518,13 +1519,23 @@ class Campaign:
         history["status"] = "running"
         current, current_path = original, self.args.output / finding["originalArchive"] / "case.json"
         seen = {case_hash(original)}
+        # A profile may bound one native response below the requested batch, and --shrink-batch replaces that
+        # first batch. A response over the tool output bound halves the batch and asks again, down to one.
+        batch = min(self.args.shrink_candidates, getattr(self.args, "shrink_batch", None) or
+                    self.specification.get("shrinkBatch", self.args.shrink_candidates))
         try:
             while self.shrink_attempts < self.args.shrink_attempts:
                 self.guard()
-                # A profile may bound one native response below the requested batch.
-                limit = min(self.args.shrink_candidates, self.specification.get("shrinkBatch", self.args.shrink_candidates),
-                            self.args.shrink_attempts - self.shrink_attempts)
-                response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
+                limit = min(batch, self.args.shrink_attempts - self.shrink_attempts)
+                try:
+                    response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
+                except common.Finding as error:
+                    if (error.category, error.stage, error.detail) != (RESOURCE, "shrink-candidates", "output-limit") or limit == 1:
+                        raise
+                    batch = limit // 2
+                    history.setdefault("halvedBatches", []).append({"attempts": self.shrink_attempts, "limit": limit, "next": batch})
+                    save_json(history_path, history)
+                    continue
                 candidates = response.get("cases")
                 if response.get("schema") != self.specification["corpusSchema"] or not isinstance(candidates, list) or len(candidates) > limit:
                     raise ValueError("invalid native bounded shrink response")
@@ -1653,6 +1664,8 @@ def main():
     parser.add_argument("--disk-bytes", type=int, default=256 * 1024 * 1024)
     parser.add_argument("--shrink-attempts", type=int, default=32)
     parser.add_argument("--shrink-candidates", type=int, default=64)
+    parser.add_argument("--shrink-batch", type=int,
+                        help="first native shrink batch of each reduction, instead of the profile's; halved after an output limit")
     parser.add_argument("--case-timeout", type=float, default=90)
     parser.add_argument("--direct-fuel", type=int, default=1000000)
     parser.add_argument("--core-fuel", type=int, default=10000000)
@@ -1701,6 +1714,8 @@ def main():
         parser.error(f"transactions must be between 1 and {adapter.MAX_TRANSACTIONS}")
     if args.case and args.cases != 1:
         parser.error("--case requires --cases 1")
+    if args.shrink_batch is not None and not 1 <= args.shrink_batch <= 4096:
+        parser.error("shrink_batch must be between 1 and 4096")
     if args.test_transaction_id and (not args.test_perturb_path or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", args.test_transaction_id)):
         parser.error("test transaction ID requires the explicit adapter and a valid ID")
     if args.test_field != "output" and not args.test_perturb_path:

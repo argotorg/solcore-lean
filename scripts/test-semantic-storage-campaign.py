@@ -384,6 +384,56 @@ class RetentionTests(unittest.TestCase):
             self.assertEqual(history["status"], "budget-exhausted")
             self.assertEqual(history["finalArchive"], finding["originalArchive"])
 
+    def test_an_output_limit_halves_the_shrink_batch_down_to_one_candidate(self):
+        limit_error = campaign.common.Finding(campaign.RESOURCE, "shrink-candidates", "output-limit")
+        for fits, expected, status in ((4, [8, 4], "no-preserving-candidate"), (None, [8, 4, 2, 1], "budget-exhausted")):
+            with self.subTest(fits=fits), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, shrink_attempts=12))
+                value, finding = self.retained(instance)
+                limits = []
+
+                def shrink(command, stage):
+                    limits.append(command[2])
+                    if fits is None or command[2] > fits:
+                        raise limit_error
+                    return {"schema": campaign.CORPUS_SCHEMA, "cases": []}
+                with patch.object(instance, "tool", side_effect=shrink):
+                    if fits is None:
+                        with self.assertRaises(campaign.common.Finding):
+                            instance.shrink(value, finding)
+                    else:
+                        instance.shrink(value, finding)
+                history = campaign.common.read_json(Path(directory) / finding["history"])
+                self.assertEqual((limits, history["status"]), (expected, status))
+                self.assertEqual([step["limit"] for step in history["halvedBatches"]], expected[:-1])
+                self.assertEqual(history["finalArchive"], finding["originalArchive"])
+        # Another resource stop, or the same one at another stage, is not retried.
+        for error in (campaign.common.Finding(campaign.RESOURCE, "shrink-candidates", "timeout"),
+                      campaign.common.Finding(campaign.RESOURCE, "campaign-time", "output-limit")):
+            with self.subTest(error=error.detail), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, shrink_attempts=12))
+                value, finding = self.retained(instance)
+                with patch.object(instance, "tool", side_effect=error) as tool, self.assertRaises(campaign.common.Finding):
+                    instance.shrink(value, finding)
+                self.assertEqual(tool.call_count, 1)
+                self.assertNotIn("halvedBatches", campaign.common.read_json(Path(directory) / finding["history"]))
+
+    def test_a_shrink_batch_option_replaces_the_profiles_first_batch(self):
+        slot = "storage:" + str(fixtures.CAST_ENTRY_SLOTS[5])
+        for batch, expected in ((None, 16), (4, 4), (32, 32), (128, 64)):
+            with self.subTest(batch=batch), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, profile="stateful-mapping", shrink_attempts=100,
+                                                     shrink_candidates=64, shrink_batch=batch))
+                self.assertEqual(instance.summary["configuration"].get("shrinkBatch"), batch)
+                value = mapping_case()
+                raw = mapping_report(value)
+                analysis = campaign.analyze(raw, value, "rustEvm", "tx-0", slot)
+                folder, _, _ = saved_execution(instance, value, raw, analysis)
+                finding = instance.retain_finding(0, folder, value, analysis)
+                with patch.object(instance, "tool", return_value={"schema": instance.specification["corpusSchema"], "cases": []}) as tool:
+                    instance.shrink(value, finding)
+                self.assertEqual(tool.call_args.args[0][2], expected)
+
     def test_nonpreserving_real_secondary_finding_survives_synthetic_work_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             instance = campaign.Campaign(options(directory, shrink_attempts=1))

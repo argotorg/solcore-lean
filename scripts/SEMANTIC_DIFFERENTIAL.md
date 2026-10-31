@@ -2947,6 +2947,14 @@ and outcome/payload forms. Candidate identity includes both the original Core
 program and the transaction sequence. Every accepted candidate has been
 rechecked and rerun on all three paths.
 
+Each shrink request asks the native tool for at most `--shrink-candidates`
+candidates, or the profile's `shrinkBatch` when it has one, and never more
+than the shrink attempts left. `--shrink-batch` replaces that first batch. A
+response over the campaign's bound on tool output, `min(4 MiB, --disk-bytes /
+64)`, halves the batch and asks again, down to one candidate. The shrink
+history records each halving in `halvedBatches`. Only a one-candidate response
+over the bound stops the reduction.
+
 To exercise reduction deliberately, use an explicit copied-observation adapter:
 
 ```sh
