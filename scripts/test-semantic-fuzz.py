@@ -455,7 +455,7 @@ class FuzzTests(unittest.TestCase):
             keys.add(sid)
         # Every listed suite signature has an occurrence; each is a symptom, never a reduced program.
         self.assertEqual({fuzz.canonical_id(key) for key, _ in fuzz.KNOWN_FINDINGS} - keys,
-                         {fuzz.canonical_id(fuzz.KNOWN_FINDINGS[0][0])})
+                         {fuzz.canonical_id(key) for key, _ in fuzz.KNOWN_FINDINGS if key["backend"] == fuzz.FIXTURES})
         self.assertTrue(all("symptom" in key and "program" not in key for key, _ in fuzz.KNOWN_FINDINGS))
         _, profile, backend, category, stage, detail, _ = UPSTREAM_OCCURRENCES[0]
         fingerprint = {"backend": backend, "category": category, "stage": stage}
@@ -913,6 +913,24 @@ class FixtureRunTests(unittest.TestCase):
         key = fuzz.fixture_signature_key(refusal)
         self.assertEqual((key["stage"], key["paths"], "program" in key), ("yul-export", ["yul"], False))
         self.assertEqual(key, fuzz.fixture_signature_key({**refusal, "source": "p9", "edit": {**edit, "start": 99}}))
+
+    def test_a_source_mutants_hull_memory_range_failure_is_known_by_its_real_occurrences(self):
+        # asm-string-escapes p8 and revert p2 store at 2^256 - 1: Hull's range fails, O0 and O2 run out of gas, and
+        # solc's Yul returns without the store.
+        widest = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        occurrences = [("asm-string-escapes", "p8", 517, "suite `assembly_string_escapes` test #2"), ("revert", "p2", 208, "fail/1")]
+        for fixture, source, start, label in occurrences:
+            edit = {"file": "main.sol", "start": start, "end": start + 1, "replacement": widest}
+            finding = {"fixture": fixture, "source": source, "edit": edit, "entry": f"{source}@1", "step": 1, "label": label,
+                       "position": 1, "category": "path-failure", "path": "hull",
+                       "signature": ["path-failure", "hull", "language-failure"], "detail": "Solcore.Core.Value.word 6",
+                       "reduction": {"status": "reduced", "runs": 1, "steps": [], "edit": edit}}
+            sid = fuzz.canonical_id(fuzz.fixture_signature_key(finding))
+            self.assertIn("Hull memory's range", fuzz.KNOWN[sid], fixture)
+        # Another Core value, another path or another status stays new.
+        for changes in ({"detail": "Solcore.Core.Value.word 7"}, {"path": "yul", "signature": ["path-failure", "yul", "language-failure"]},
+                        {"signature": ["path-failure", "hull", "error"]}):
+            self.assertNotIn(fuzz.canonical_id(fuzz.fixture_signature_key({**finding, **changes})), fuzz.KNOWN, changes)
 
     def test_a_sequence_finding_is_its_reduced_sequence_and_operator(self):
         mismatch = {"fixture": "f", "category": "path-mismatch", "step": 4, "sequence": "s7", "operator": "commit", "change": 3,

@@ -116,8 +116,9 @@ def canonical_id(value):
 
 # Upstream findings recorded in questions.md: they count, but never as new. Each
 # key is a stable symptom taken from a real occurrence through the driver, a crash
-# by its panic and call site and a rejection by its first error line; mismatches,
-# whose keys are reduced programs, are never listed here but in MISMATCH_CLASSES.
+# by its panic and call site, a rejection by its first error line and a path
+# failure by its path and Core value; mismatches, whose keys are reduced programs,
+# are never listed here but in MISMATCH_CLASSES.
 PRIMITIVE_TYPES = "primitive-types-0.14.0/src/lib.rs:43:1"
 DEMANDED_BITS = ["<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_binary",
                  "<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_from_value"]
@@ -128,6 +129,9 @@ KNOWN_FINDINGS = (
     ({"backend": FIXTURES, "category": "compiler-crash", "stage": "rust-code-images-O2", "paths": ["sonatina-o2"],
       "symptom": {"panic": "crates/ir/src/dfg.rs:354:9", "message": "assertion failed: self.has_inst(inst_id)"}},
      "Sonatina O2 has_inst assertion on ignored-builtin-effects (questions.md, 2026-10-29)"),
+    ({"backend": FIXTURES, "category": "path-failure", "stage": "execution", "path": "hull", "status": "language-failure",
+      "symptom": {"value": "Solcore.Core.Value.word 6"}},
+     "Hull memory's range on a source mutant's store at 2^256 - 1 that solc's Yul removes (questions.md, 2026-10-31)"),
     *(({"backend": backend, "category": "compiler-crash", "stage": "rust-code-images",
         "symptom": {"panic": PRIMITIVE_TYPES, "message": "Integer overflow when casting to usize", "site": DEMANDED_BITS}}, label)
       for backend, label in (
