@@ -393,6 +393,7 @@ still return some seeded input unchanged.
 | `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
+| `runtime-halts` | not needed: every accepted plan halts at a boundary input, so none returns all its inputs |
 
 A closure returns `5 * step(x) + 4 * x + 4` (snapshot) or `+ 5`
 (independent), and a module combines its constant with step results, so both
@@ -586,7 +587,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twenty-seven pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twenty-eight pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -2855,6 +2856,106 @@ digest unchanged on every run, under load averages of 5 to 8 from other work:
   attempts without an exclusion and drew 96 cases from 8 sources, 53 of them
   reverts, and 47 of the 65 shape values. O0, O2 and Yul matched all 96, in
   87, 84 and 115 seconds.
+
+No mismatch, crash or rejection was found.
+
+## Compare Solcore halts
+
+The pure profiles compare a returned Word, and the memory and revert data
+profiles revert data, but none an exceptional halt: std's `assert(c)` calls
+std.opcodes' `invalid()`, whose inline Yul `invalid()` is the EVM's designated
+INVALID instruction, and a case that halted was excluded or incomplete. An
+optimizer that treats `invalid()` as unreachable could drop the condition or
+the halt, which only a compared halt shows. `runtime-halts` keeps
+`runtime-revert-data`'s plans and lets any of their sites halt instead:
+- `assert(C);`, std's, which halts when `C` does not hold;
+- `if (C) { invalid(); }` through std.opcodes' `invalid()`, which the source
+  imports beside the memory profile's opcodes;
+- `if (C) { assembly { invalid() } }`;
+- `assembly { if C' { invalid() } }`, `C'` the same test in Yul (`lt`, `gt`,
+  `eq`, `iszero(eq(…))`, `eq(and(…), k)`) of the same Word: `sc_x`,
+  `add(sc_x, c)`, `mul(sc_x, c)`, `xor(sc_x, c)`, `sc_r`, `sc_counter`, or a
+  helper's `sc_w` or a closure's `sc_j`.
+
+A halt site runs wherever a revert site does: in `run` and its loop, in a
+`raise` helper called directly, through a function value or two helpers deep,
+in a closure, and in the `Error` arm of a match of a pair, a sum or an enum.
+The contract is `SynthesizedHalts`. A plan reaches a halt site; the profile
+draws from its own stream, in which every site is a halt half the time.
+
+The Core reference is `runtime-revert-data`'s, of the same type. A halt site
+raises the right injection with the length `2^256 − 1`, which no revert data
+has, and no bytes, so the first site whose condition decides, a revert or a
+halt, decides. Every path reports INVALID's halt as such: original Core and
+the Lean Hull runner as `invalid`, Anvil as `EVM error InvalidFEOpcode`.
+For the schemas in `HALTING_SCHEMAS` only, the adapter classifies an
+exceptional EVM failure by revm's name with `evm_halt`: `InvalidFEOpcode` is
+`invalid`, `OutOfGas` and every name ending in `OOG` (an `MLOAD` at an offset
+no gas pays for is `InvalidOperandOOG`) are `out-of-gas`, and every other halt
+stays `evm-exceptional`. `compare(..., halts=True)` matches three `invalid`
+observations; a halt on one or two paths is a semantic mismatch, so a halt
+matches only where the reference prescribes it, and exhausted gas or fuel on
+any path stays inconclusive. Revert data are compared exactly.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-halts --functions 8 --output .upstream/semantic-halts
+python3 Tests/scripts/test-semantic-halt-corpus.py
+```
+
+Native commands are `halt-generate SEED NODES COUNT ATTEMPTS FUEL
+[seeded-inputs-v1/splitmix64]` and `halt-emit PLAN.json INPUT [FUEL]`. Saved
+cases contain `haltPlan` and the whole Core reference, whose exact
+correspondence native admission checks for every origin, and `haltShapes`,
+which replay recomputes. Replay requires a generated plan to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profile records no G0 step features.
+- The node budget and the case limit are `runtime-revert-data`'s: default
+  1,024, minimum 256, at most 2,048, and 4,096 nodes for a case's reference.
+- Exclusions, under `halt-profile`, are a plan still over the budget or not
+  admitted, then a plan that halts at none of the eight boundary inputs or has
+  the same outcome for all eight, or one that exhausts fuel. Every accepted
+  plan halts at a boundary input, so none returns its inputs, and random
+  campaigns apply no identity filter.
+- Reductions are `runtime-revert-data`'s, which keep a halt site's form and
+  lower its test and Word, and a halt through std.opcodes' `invalid()` or a
+  Yul `if` lowered to inline Yul under an `if`. Each candidate still reaches a
+  halt.
+- `haltRequirements` declares `halts` (the forms), `haltContexts` where halt
+  sites run, `haltTests`, `haltWords` (the tested Word's kind) and
+  `haltOrders` (`revert-before`, `revert-after`, `write-before`,
+  `write-after`: a revert site or a write before or after a halt site, in the
+  order sites run), all specified by the plan.
+
+The fixed corpus takes, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing value, until nothing is missing, each at
+the eight boundary inputs; every value is required. Seeds 2, 4, 5, 7, 8, 12,
+17, 47, 61, 80, 98 and 415 cover all 26 values: 96 cases from 12 sources, 31
+of them halts and 19 reverts. `Tests/scripts/test-semantic-halt-corpus.py`
+rebuilds that selection and, with `test-semantic-revert-data-corpus.py`'s
+walk and model, which admit halts only for this profile and stop at a halt
+site, admits every plan, recomputes every shape and the shrink measure,
+re-emits the source and compares it exactly, evaluates every case's plan
+against the recorded outcome, and checks replay, reductions and tampering
+natively. That model agrees with the reference on the 647 accepted plans of
+the first 1,000 seeds at twelve inputs, 7,764 outcomes, 2,880 of them halts,
+and its re-emission and shapes with the native ones on all 647 plans.
+
+The gate passed before the profile was committed: the kernel check, 959
+Python tests, `lake build` (10,338 jobs), forty-one native tools, `lake test`,
+twenty-four corpus validators and the chunked-generation check over the
+twenty-eight pure profiles. Frozen matrices at `dd39b454e`, with the freeze
+digest unchanged on every run, under load averages of 7 to 10 from other work:
+- The fixed corpus matched all 96 cases on O0, O2 and Yul with complete shape
+  and input coverage, 31 of them halts and 19 reverts, compiling 12 sources,
+  in 110, 102 and 147 seconds, retaining 8.2, 7.7 and 9.4 MB. Of the Yul run's
+  147 seconds, 97 compile the sources, to Yul and to the O0 images imported
+  Hull runs, and check them.
+- Random suites from root seed 1 with eight whole functions took 13 attempts,
+  excluding 5 plans that halted at no boundary input, and drew 96 cases from 8
+  sources, 31 of them halts and 19 reverts, and 21 of the 26 shape values.
+  O0, O2 and Yul matched all 96, in 81, 79 and 108 seconds.
 
 No mismatch, crash or rejection was found.
 

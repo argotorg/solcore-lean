@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented, counting the recorded upstream findings with stable signatures and the mismatches of recorded mismatch classes as known; automatic CI triggers disabled, manual dispatch only; the complete default fixed suite of fifty-five profiles measured locally within its documented 7,200 seconds and 1 GiB on Sonatina O0 and Yul; no passing hosted run yet; the pinned end-to-end fixture comparison runs only locally, standalone or as the fuzz driver's opt-in fixtures run kind | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the twenty-seven storage-family profiles also run on Yul when selected and are validated locally; the call-return and call-sequence profiles also run on Yul when selected; `stateful-calls` and `stateful-forwarded-value` stay on Sonatina; the pinned end-to-end fixtures run on Hull, O0, O2 and Yul in a comparison of the compiled paths, standalone or in the fuzz driver, without an original Core reference, with derived ADT arguments mutated at every boundary Word of their tags, dynamic offsets and `bytes` lengths, with sequence mutants that carry one change forward through every later step, and with a recorded O2 compiler crash | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eighteen profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call and revert data profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eighteen profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call, revert data and halt profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata, several-methods, storage-loop, Keccak-loop, tuple-return, inline Yul storage-loop and Keccak-loop, bounded `bytes`-return, enum and struct storage, enum-return, enum-argument, enum-array, array-return, constructor-argument, call-return and call-sequence extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, two to four external methods on one contract dispatched as std does, a bounded source loop whose iterations read and write declared slots, a bounded source loop whose iterations read and write Keccak-addressed mapping entries and emit one log each, static ABI tuple returns of two to four Words through the `wordTupleOutcomeV1` contract entry convention, both loop plans with every storage access, entry hash and log in inline Yul blocks around the Solcore step call, `bytes` returns of up to 64 bytes through the `boundedBytesOutcomeV1` convention, user-defined enum and struct values in contract fields and behind mapping keys through `std.StorageGeneric`, returned user-defined enums of two to four constructors through the `enumOutcomeV1` convention, user-defined enum arguments decoded by std's derived decoder, canonical and malformed, compared by std's selector or empty revert data, calldata arrays of user-defined enums read element by element through std's `abiArrayGet`, canonical and malformed, compared by std's selectors, `ArrayOutOfBounds()` among them, or empty revert data, and memory arrays of `uint256`, `bytes4`, `bytes` and `uint256[]` elements returned through std's `abi_encode` and `return_` under `wordTupleOutcomeV1`, the shape read at run time, constructor arguments decoded by std's memory reader from the init code's suffix, canonical and malformed, with the deployment row compared, a parent's decoding of a child method's tuple, `bytes` or enum return data through std's `raw_call` and memory reader, typed and malformed, under a call-and-resume convention, at one call per transaction, and a parent's two or three calls with `returndatasize` and in-bounds `returndatacopy` reads around each in inline Yul, under a call chain; all thirty-one stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions, and storage campaigns compile each distinct source once per backend; `bytes` returns beyond 64 bytes, returned enums, enum arguments, enum arrays, array returns, constructor arguments, call returns and call sequences beyond the recorded shapes and other dynamic return values are not built; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -3547,6 +3547,81 @@ definitions were fixed before execution:
   that covers a missing value, until nothing is missing, each at the eight
   boundary inputs; every value is required. The draft generator needs 12
   seeds: 2, 4, 5, 7, 8, 12, 17, 47, 61, 80, 98 and 415.
+
+The profile was implemented at `dd39b454e` with the definitions above:
+- `runtime-revert-data`'s modules take the halt site additively:
+  `Solcore.Synthesis.Core.RevertData` (the halt payload and its admission,
+  the halt's right injection in the reference, the halt shapes and their
+  orders, and the halt stream), `RevertDataShrink` (the halts' sizes and their
+  lowering to inline Yul), `RevertDataEmitter` (the four forms and the Yul
+  tests, with the contract and the std.opcodes import as parameters) and
+  `RevertDataCases` (the halt payload in plan JSON). The new `HaltCases` holds
+  the halt plan schema, an admission that also requires a reached halt, the
+  observation of a halt as `invalid`, generation, replay and reduction. The
+  case-tool commands are `halt-generate` and `halt-emit`; the adapter adds its
+  halt classification and halt matching, and the campaign and the suite
+  register the profile. `runtime-revert-data`'s plans, sources, references,
+  shapes, draws and reductions are unchanged: its Lean test and its corpus
+  validator pass as before, and its 152 cases re-materialize exactly. The
+  profile is not G0-based, applies no identity filter and takes budgets up to
+  2,048 nodes.
+- A registered Lean test checks:
+  - two fixtures' sources against golden texts, and their results on the Core
+    reference and on the revert data test's direct interpreter, which now
+    stops at a halt site, against golden values from the corpus validator's
+    Python model, at twelve inputs each. The first halts in a helper two
+    helpers deep with `assert`, through a function value with a Yul `if`, in a
+    closure through std.opcodes' `invalid()`, in a loop and in `run` with
+    inline Yul and with `assert` on the accumulator, after a selector revert,
+    around a byte write and before a literal revert; the second halts in the
+    `Error` arms of a pair, a sum and an enum, on the input, the accumulator
+    and a constant, before and after an empty revert. Together they cover
+    every halt form, context, tested Word and order;
+  - that a revert data plan refuses a halt and a halt plan needs one: an
+    `assert` under `if`, the other three forms through `require`, a plan
+    without a halt, and a halt only in a closure never applied, in the `Error`
+    arm of a sum holding a Word, in a helper nothing calls or on a counter
+    outside a loop are refused, and their counterparts admitted;
+  - the reference against the interpreter on 2,400 outcomes of 200 generated
+    plans at twelve inputs, 588 of them halts and 658 reverts.
+
+  Generation is deterministic, draws every halt shape value within 500 seeds,
+  replays exactly, also with seeded inputs, and a 256-node budget drops steps
+  and keeps a halt. Tampering is refused, replay never reads the saved
+  observation, and reductions reach a halt, are strictly smaller and replay,
+  a Yul `if` halt lowering to inline Yul.
+- A fixed corpus of 96 cases from 12 seeds between 2 and 415, covering every
+  shape value, 31 of them halts and 19 reverts; 154 of the first 416 seeds
+  were excluded. Its validator, `Tests/scripts/test-semantic-halt-corpus.py`,
+  reuses `test-semantic-revert-data-corpus.py`'s walk, emitter and model,
+  which admit halts only for this profile and stop at a halt site, to admit
+  every plan, re-emit every source exactly and evaluate every case's plan
+  against the recorded outcome.
+
+The gate passed before the profile was committed: the kernel check, 959
+Python tests in fifteen suites, `lake build` (10,338 jobs), forty-one native
+tools, offline `--prepare` and `--verify`, `lake test`, and twenty-four corpus
+validators with the chunked-generation check over the twenty-eight pure
+profiles.
+
+Frozen matrices at `dd39b454e`, with the freeze digest unchanged, under load
+averages of 7 to 10 from other work on the machine:
+- The fixed corpus matched all 96 cases on O0, O2 and Yul with complete shape
+  and input coverage, 31 of them halts and 19 reverts, compiling 12 sources,
+  in 110, 102 and 147 seconds, retaining 8.2, 7.7 and 9.4 MB. Of the Yul run's
+  147 seconds, 97 compile and check the 12 sources, to Yul and to the O0
+  images imported Hull runs, and the rest run the cases. The complete fixed
+  O0 suite, projected at about 6,440 of its 7,200 seconds before this
+  profile, comes to about 6,550, and the profile adds 8 MB on O0 and 9 MB on
+  Yul.
+- Random suites from root seed 1 with eight whole functions took 13
+  attempts, excluding 5 plans that halted at no boundary input, and drew 96
+  cases from 8 sources, 31 of them halts and 19 reverts, and 21 of the 26
+  shape values. O0, O2 and Yul matched all 96, in 81, 79 and 108 seconds.
+
+The matrices found no mismatch, crash or rejection, so they recorded nothing,
+and the probe departed nowhere: every path kept every condition and every
+halt.
 
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
