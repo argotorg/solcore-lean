@@ -26,9 +26,9 @@ python3 scripts/prepare-semantic-tools.py --verify
 ```
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
-its tracked files, and fetches locked dependencies. It builds the two exporters
-and the directive extractor and resolver offline, and the forty native Lean
-tools in one Lake invocation. Existing
+its tracked files, and fetches locked dependencies. It builds the two exporters,
+the directive extractor and resolver and the declaration extractor offline, and
+the forty native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -332,8 +332,8 @@ with upstream's recorded expectations, never with original Core.
   is counted but never new.
 - Readiness also runs `semantic-fixtures.py --check`. The epoch adds the
   digest of what that check reports: the scripts, the compilers, the
-  directive tools, the Lean runner, solc, Anvil, cast and the parity
-  manifests. A state without fixtures keeps its epoch.
+  directive tools, the declaration extractor, the Lean runner, solc, Anvil,
+  cast and the parity manifests. A state without fixtures keeps its epoch.
 - Exports are cached in `.upstream/semantic-fixtures` and locked per fixture.
   `--cast` selects cast, and `--bin-dir` also selects the Lean runner.
 
