@@ -136,6 +136,10 @@ lean_exe semanticCallSequenceTool where
   root := `Tests.SemanticCallSequenceTool
   exeName := "semantic-call-sequence-tool"
 
+lean_exe semanticCallBranchTool where
+  root := `Tests.SemanticCallBranchTool
+  exeName := "semantic-call-branch-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

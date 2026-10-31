@@ -459,6 +459,40 @@ class RetentionTests(unittest.TestCase):
             self.assertEqual(history["status"], "budget-exhausted")
             self.assertEqual(history["finalArchive"], finding["originalArchive"])
 
+    def test_an_output_limit_halves_the_shrink_batch_down_to_one_candidate(self):
+        limit_error = campaign.common.Finding(campaign.RESOURCE, "shrink-candidates", "output-limit")
+        for fits, expected, status in ((4, [8, 4], "no-preserving-candidate"), (None, [8, 4, 2, 1], "budget-exhausted")):
+            with self.subTest(fits=fits), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, shrink_attempts=12, shrink_candidates=8))
+                value, finding = self.retained(instance)
+                limits = []
+
+                def shrink(command, stage):
+                    limits.append(command[2])
+                    if fits is None or command[2] > fits:
+                        raise limit_error
+                    return {"schema": campaign.CORPUS_SCHEMA, "cases": []}
+                with patch.object(instance, "tool", side_effect=shrink):
+                    if fits is None:
+                        with self.assertRaises(campaign.common.Finding):
+                            instance.shrink(value, finding)
+                    else:
+                        instance.shrink(value, finding)
+                history = campaign.common.read_json(Path(directory) / finding["history"])
+                self.assertEqual((limits, history["status"]), (expected, status))
+                self.assertEqual([step["limit"] for step in history["halvedBatches"]], expected[:-1])
+                self.assertEqual(history["finalArchive"], finding["originalArchive"])
+        # Another resource stop, or the same one at another stage, is not retried.
+        for error in (campaign.common.Finding(campaign.RESOURCE, "shrink-candidates", "timeout"),
+                      campaign.common.Finding(campaign.RESOURCE, "campaign-time", "output-limit")):
+            with self.subTest(error=error.detail), tempfile.TemporaryDirectory() as directory:
+                instance = campaign.Campaign(options(directory, shrink_attempts=12))
+                value, finding = self.retained(instance)
+                with patch.object(instance, "tool", side_effect=error) as tool, self.assertRaises(campaign.common.Finding):
+                    instance.shrink(value, finding)
+                self.assertEqual(tool.call_count, 1)
+                self.assertNotIn("halvedBatches", campaign.common.read_json(Path(directory) / finding["history"]))
+
     def test_nonpreserving_real_secondary_finding_survives_synthetic_work_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             instance = campaign.Campaign(options(directory, shrink_attempts=1))
@@ -1003,6 +1037,87 @@ class CallSequenceCampaignTests(unittest.TestCase):
         fingerprint = campaign.fingerprint(analysis)
         self.assertEqual((analysis["backend"], fingerprint["backend"], fingerprint["category"]), ("yul", "yul", "matched"))
 
+
+
+def branch_case(plan=None, inputs=None, budget=None):
+    value = fixtures.branch_case(plan, inputs)
+    function = lambda body: {"tag": "lambda", "parameterType": "word", "resultType": "word", "body": body}
+    body = {"tag": "let", "initializer": function({"tag": "var", "index": 0}), "body": function({"tag": "var", "index": 0})}
+    value["callBranchPlan"]["stepProgram"] = {"dataDefinitions": [], "resultType": {
+        "tag": "function", "parameter": "word", "result": "word"}, "body": body}
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    origin = {"kind": "imported"} if budget is None else {"kind": "call-branch-generated", "maxProgramNodes": budget,
+        "stepOrigin": {"kind": "aggregate-generated", "helpers": [{"template": 2}]}}
+    value["provenance"].update(features=["local"], origin=origin)
+    return value
+
+
+class CallBranchCampaignTests(unittest.TestCase):
+    def test_the_fixed_corpus_validates_and_its_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-call-branch-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(campaign.PROFILES["stateful-call-branches"]["dimensions"][-len(campaign.BRANCH_EXTRA):],
+                         campaign.BRANCH_EXTRA)
+        self.assertNotIn("LogPatterns", campaign.PROFILES["stateful-call-branches"]["dimensions"])
+        self.assertEqual(len(manifest["requiredBranchLengths"]), 20)
+        changes = [lambda m: m.update(requiredLogPatterns=[""]), lambda m: m.update(requiredBranchSites=[4]),
+                   lambda m: m.update(requiredBranchLoops=[0]), lambda m: m.update(requiredBranchCalls=[4]),
+                   lambda m: m.update(requiredBranchSkips=["returned"]), lambda m: m.update(requiredBranchLoopExits=["break"]),
+                   lambda m: m.update(requiredBranchWindows=["middle"]), lambda m: m.update(requiredBranchLengths=["returned:97"]),
+                   lambda m: m.update(requiredSequenceCalls=[2]), lambda m: m.update(requiredBranchNodeBudgets=[513]),
+                   lambda m: m.update(requiredCallModes=[2]), lambda m: m["cases"][0].update(callSequencePlan={}),
+                   lambda m: m["cases"][0].update(transactions=[{"id": f"tx-{i}", "input": "0"} for i in range(4)]),
+                   lambda m: m["cases"][0].pop("callBranchPlan")]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_coverage_follows_prescribed_calls_skips_and_loop_exits(self):
+        three = [fixtures.branch_site("branch", 1, 0, (0, 32), (0, 0)), fixtures.branch_site("loop", 2, 33, (31, 2), (64, 32))]
+        value = branch_case(fixtures.branch_plan(three), budget=512, inputs=[
+            fixtures.branch_input([("returned", 33), ("returned", 1), ("reverted", 0)], [1, 2]),
+            fixtures.branch_input([("reverted", 0), ("returned", 33), ("returned", 5)], [1, 3], 5, True),
+            fixtures.branch_input([("reverted", 64), ("returned", 1), ("returned", 2)], [0, 1])])
+        coverage = campaign.branch_coverage(value)
+        self.assertEqual((coverage["BranchSites"], coverage["BranchLoops"], coverage["BranchCalls"]), ({2}, {2}, {1, 2}))
+        # The loop stops at entry on the branch's 33 bytes, after its own 33-byte call, and at its limit of one.
+        self.assertEqual(coverage["BranchLoopExits"], {"stop-at-entry", "stop-after-call", "limit"})
+        self.assertEqual(coverage["BranchSkips"], {"returned-data", "none"})
+        self.assertEqual(coverage["BranchLengths"], {"returned:33", "reverted:0", "returned:1"})
+        self.assertEqual(coverage["BranchWindows"], {"inside", "outside", "empty"})
+        self.assertEqual(coverage["BranchRollbacks"], {"child-reverted-parent-reverted", "children-returned-parent-reverted"})
+        self.assertEqual(coverage["BranchNodeBudgets"], {512})
+        self.assertEqual(campaign.recipes(value), {2})
+        # Only the transactions whose matched outcome is the prescribed one count.
+        matched = campaign.branch_coverage(value, ["returned", "returned", "returned"])
+        self.assertEqual(matched["BranchRollbacks"], set())
+        self.assertEqual(matched["BranchCalls"], {1})
+
+    def test_a_campaign_records_branch_coverage_and_runs_on_yul(self):
+        value = branch_case()
+        raw = {"schema": campaign.adapter.REPORT_SCHEMA, "histories": fixtures.branch_histories(value),
+               "bindings": copy.deepcopy(fixtures.BINDINGS)}
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        self.assertEqual(campaign.history_parent_slots(raw["histories"]), tuple(value["observedSlots"]["parent"]))
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-call-branches", backend="yul",
+                                                 solc=Path("/chosen/solc")))
+            self.assertEqual(instance.backend, "yul")
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", raw["histories"], raw["bindings"])
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedBranchCalls"], [1, 2])
+            self.assertEqual(coverage["matchedOutcomes"], ["returned", "reverted"])
+            self.assertNotIn("matchedLogPatterns", coverage)
+            self.assertNotIn("matchedSequenceCalls", coverage)
+            counts = campaign.transaction_counts(raw["histories"], value, raw["bindings"])
+            self.assertEqual(counts, {"executed": 3, "completed": 3, "matched": 3})
+        analysis = campaign.analyze({**raw, "backend": "yul"}, value)
+        fingerprint = campaign.fingerprint(analysis)
+        self.assertEqual((analysis["backend"], fingerprint["backend"], fingerprint["category"]), ("yul", "yul", "matched"))
 
 if __name__ == "__main__":
     unittest.main()

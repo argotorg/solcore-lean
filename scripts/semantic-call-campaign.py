@@ -76,6 +76,16 @@ SEQUENCE_CORPUS_SCHEMA = "solcore-lean.semantic-call-sequence-corpus.v1"
 SEQUENCE_ROLLBACKS = ("child-reverted-parent-returned", "child-reverted-parent-reverted", "children-returned-parent-reverted")
 SEQUENCE_WINDOWS = ("inside", "outside", "empty")
 SEQUENCE_STATES = tuple(f"{status}-{data}" for status in ("returned", "reverted") for data in ("data", "empty"))
+# The call-branch profile's own dimensions: the site count, the loops' bounds,
+# the calls per transaction, the buffer at each position passed without a call,
+# each loop's exit, the data lengths by status, where each window lies, the
+# rollback patterns and the node budgets.
+BRANCH_EXTRA = ("BranchSites", "BranchLoops", "BranchCalls", "BranchSkips", "BranchLoopExits", "BranchLengths",
+                "BranchWindows", "BranchRollbacks", "BranchNodeBudgets")
+BRANCH_DIMENSIONS = DIMENSIONS[:-1] + BRANCH_EXTRA
+BRANCH_CORPUS_SCHEMA = "solcore-lean.semantic-call-branch-corpus.v1"
+BRANCH_SKIPS = ("none",) + SEQUENCE_STATES
+BRANCH_LOOP_EXITS = ("stop-at-entry", "stop-after-call", "limit")
 # Profile rules; the adapter selects schemas, programs and protocols by case schema.
 PROFILES = {
     "stateful-calls": {"dimensions": DIMENSIONS, "modeMask": 7, "corpusSchema": CORPUS_SCHEMA, "originKind": "call-generated",
@@ -88,6 +98,9 @@ PROFILES = {
     "stateful-call-sequences": {"dimensions": SEQUENCE_DIMENSIONS, "modeMask": 1, "corpusSchema": SEQUENCE_CORPUS_SCHEMA,
         "originKind": "call-sequence-generated",
         "scope": "two or three child method calls through std's raw_call; raw return and revert data of 0 to 96 bytes measured by inline Yul returndatasize and returndatacopy around each call; unfunded accounts; the parent's slots0-(5n+2) and the child's slots0/1, both contracts' whole committed storage, balances and empty logs; zero value; no gas/nonce or arbitrary-world equivalence"},
+    "stateful-call-branches": {"dimensions": BRANCH_DIMENSIONS, "modeMask": 1, "corpusSchema": BRANCH_CORPUS_SCHEMA,
+        "originKind": "call-branch-generated",
+        "scope": "zero to three child method calls through std's raw_call from one to three sites in branches and bounded loops, as the input decides; raw return and revert data of 0 to 96 bytes measured by inline Yul returndatasize and returndatacopy before and after each site and after each call; unfunded accounts; the parent's slots0-(B+4P) and the child's slots0/1, both contracts' whole committed storage, balances and empty logs; zero value; no gas/nonce or arbitrary-world equivalence"},
 }
 
 
@@ -105,6 +118,8 @@ def helper_count(case):
 
 def generated_kind(case):
     """The origin kind of a profile's generated cases."""
+    if adapter.branches(case):
+        return "call-branch-generated"
     if adapter.sequences(case):
         return "call-sequence-generated"
     if adapter.returns(case):
@@ -207,9 +222,58 @@ def sequence_coverage(case, statuses=None):
     return values
 
 
-def validate_sequence_manifest(manifest):
-    """The call-sequence corpus: the call family's requirements but its log
-    patterns, and its own dimensions."""
+def branch_coverage(case, statuses=None):
+    """The call-branch dimensions of a case, from each transaction's prescribed
+    calls, the plan's sites and the input's control bits; with statuses, only
+    the transactions whose matched outcome is the prescribed one count."""
+    sites = case["callBranchPlan"]["sites"]
+    origin = case["provenance"]["origin"]
+    values = {"BranchSites": {len(sites)}, "BranchLoops": {site["bound"] for site in sites if site["kind"] == "loop"},
+              "BranchCalls": set(), "BranchSkips": set(), "BranchLoopExits": set(), "BranchLengths": set(),
+              "BranchWindows": set(), "BranchRollbacks": set(),
+              "BranchNodeBudgets": {origin["maxProgramNodes"]} if origin.get("kind") == "call-branch-generated" else set()}
+    firsts = [sum(site["bound"] for site in sites[:index]) for index in range(len(sites))]
+    place = lambda window, size: "outside" if window["offset"] + window["width"] > size else \
+        "inside" if window["width"] else "empty"
+    for index, tx in enumerate(case["transactions"]):
+        if statuses is not None and statuses[index] != adapter.return_expected_status(tx):
+            continue
+        x, calls = int(tx["input"]), tx["calls"]
+        called = {call["position"]: call for call in calls}
+        latest = lambda before: next((call for call in reversed(calls) if call["position"] < before), None)
+        values["BranchCalls"].add(len(calls))
+        for site_index, site in enumerate(sites):
+            positions = range(firsts[site_index], firsts[site_index] + site["bound"])
+            for position in positions:
+                if position not in called:
+                    prior = latest(position)
+                    values["BranchSkips"].add("none" if prior is None else
+                                              prior["status"] + ("-data" if prior["length"] else "-empty"))
+            if site["kind"] == "loop":
+                limit = min(x >> (24 + 2 * site_index) & 3, site["bound"])
+                made = sum(position in called for position in positions)
+                values["BranchLoopExits"].add("limit" if made == limit else "stop-at-entry" if made == 0 else "stop-after-call")
+            prior = latest(firsts[site_index] + site["bound"])
+            values["BranchWindows"].add(place(site["exitWindow"], prior["length"] if prior else 0))
+        for call in calls:
+            site_index = max(i for i in range(len(sites)) if firsts[i] <= call["position"])
+            values["BranchWindows"].add(place(sites[site_index]["callWindow"], call["length"]))
+            values["BranchLengths"].add(f"{call['status']}:{call['length']}")
+        reverted = any(call["status"] == "reverted" for call in calls)
+        if tx["parentReverts"]:
+            if reverted:
+                values["BranchRollbacks"].add("child-reverted-parent-reverted")
+            if any(call["status"] == "returned" for call in calls):
+                values["BranchRollbacks"].add("children-returned-parent-reverted")
+        elif reverted:
+            values["BranchRollbacks"].add("child-reverted-parent-returned")
+    return values
+
+
+def validate_measured_manifest(manifest, label, extra, allowed, plan_key, plan_schema):
+    """A corpus of the two-source profiles that measure raw return data: the
+    call family's requirements but its log patterns, and the profile's own
+    dimensions, the last of them its node budgets."""
     if manifest.get("coverageKind") != "step-core-ast-features":
         raise ValueError("call corpus coverage must name the step AST")
     for key in VERSIONS:
@@ -237,17 +301,16 @@ def validate_sequence_manifest(manifest):
     if manifest.get("requiredOutcomes") is None or sorted(manifest["requiredOutcomes"]) != ["returned", "reverted"]:
         raise ValueError("call coverage requires returned and reverted root outcomes")
     if "requiredLogPatterns" in manifest or any("required" + dimension in manifest for dimension in VALUE_DIMENSIONS + RETURN_EXTRA):
-        raise ValueError("the call-sequence profile commits no logs, forwards no value and decodes no typed value")
-    lengths = {f"{status}:{length}" for status in ("returned", "reverted") for length in range(97)}
-    allowed = {"SequenceCalls": {2, 3}, "SequenceTransitions": {first + ":" + second for first in SEQUENCE_STATES for second in SEQUENCE_STATES},
-               "SequenceLengths": lengths, "SequenceWindows": set(SEQUENCE_WINDOWS), "SequenceRollbacks": set(SEQUENCE_ROLLBACKS)}
-    for dimension in SEQUENCE_EXTRA:
+        raise ValueError(f"the {label} profile commits no logs, forwards no value and decodes no typed value")
+    if any("required" + dimension in manifest for dimension in SEQUENCE_EXTRA + BRANCH_EXTRA if dimension not in extra):
+        raise ValueError(f"the {label} corpus requires only its own dimensions")
+    for dimension in extra:
         values = manifest.get("required" + dimension)
         if not isinstance(values, list) or not values or len({json.dumps(v) for v in values}) != len(values):
-            raise ValueError(f"call-sequence coverage requires unique required{dimension}")
+            raise ValueError(f"{label} coverage requires unique required{dimension}")
         if dimension in allowed and any(v not in allowed[dimension] for v in values):
             raise ValueError(f"invalid required{dimension}")
-        if dimension == "SequenceNodeBudgets" and any(type(v) is not int or not 1 <= v <= 512 for v in values):
+        if dimension == extra[-1] and any(type(v) is not int or not 1 <= v <= 512 for v in values):
             raise ValueError("required node budgets lie in 1 to 512")
     if not isinstance(manifest.get("cases"), list):
         raise ValueError("corpus cases must be an array")
@@ -257,11 +320,11 @@ def validate_sequence_manifest(manifest):
             raise ValueError("corpus IDs must be unique bounded identifiers")
         ids.add(entry["id"])
         generated = "generation" in entry
-        if generated == ("callSequencePlan" in entry) or ("transactions" in entry) == generated:
-            raise ValueError("corpus entry requires generation XOR callSequencePlan+transactions")
+        if generated == (plan_key in entry) or ("transactions" in entry) == generated:
+            raise ValueError(f"corpus entry requires generation XOR {plan_key}+transactions")
         if any(key in entry for key in ("program", "programs", "storagePlan", "loopPlan", "input", "callPlan", "forwardPlan",
-                                        "callReturnPlan")):
-            raise ValueError("call-sequence corpus uses a plan and transaction sequence")
+                                        "callReturnPlan", "callSequencePlan", "callBranchPlan") if key != plan_key):
+            raise ValueError(f"{label} corpus uses a plan and transaction sequence")
         expected = entry.get("expectedFeatures")
         if not isinstance(expected, list) or any(not isinstance(v, str) for v in expected) or len(set(expected)) != len(expected):
             raise ValueError("expectedFeatures must contain unique strings")
@@ -274,13 +337,34 @@ def validate_sequence_manifest(manifest):
             if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
                 raise ValueError("call generation request exceeds bounds")
         else:
-            if not isinstance(entry["callSequencePlan"], dict) or entry["callSequencePlan"].get("schema") != "solcore-lean.call-sequence-plan.v1":
-                raise ValueError("invalid imported call-sequence plan")
+            if not isinstance(entry[plan_key], dict) or entry[plan_key].get("schema") != plan_schema:
+                raise ValueError(f"invalid imported {label} plan")
             # Full source/host checking is native.
             if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3 or \
                     any(not isinstance(tx, dict) or set(tx) != {"id", "input"} for tx in entry["transactions"]):
                 raise ValueError("invalid imported transaction count or fields")
     return manifest
+
+
+def validate_sequence_manifest(manifest):
+    """The call-sequence corpus: the call family's requirements but its log
+    patterns, and its own dimensions."""
+    lengths = {f"{status}:{length}" for status in ("returned", "reverted") for length in range(97)}
+    allowed = {"SequenceCalls": {2, 3}, "SequenceTransitions": {first + ":" + second for first in SEQUENCE_STATES for second in SEQUENCE_STATES},
+               "SequenceLengths": lengths, "SequenceWindows": set(SEQUENCE_WINDOWS), "SequenceRollbacks": set(SEQUENCE_ROLLBACKS)}
+    return validate_measured_manifest(manifest, "call-sequence", SEQUENCE_EXTRA, allowed, "callSequencePlan",
+                                      "solcore-lean.call-sequence-plan.v1")
+
+
+def validate_branch_manifest(manifest):
+    """The call-branch corpus: the call family's requirements but its log
+    patterns, and its own dimensions."""
+    lengths = {f"{status}:{length}" for status in ("returned", "reverted") for length in range(97)}
+    allowed = {"BranchSites": {1, 2, 3}, "BranchLoops": {1, 2, 3}, "BranchCalls": {0, 1, 2, 3},
+               "BranchSkips": set(BRANCH_SKIPS), "BranchLoopExits": set(BRANCH_LOOP_EXITS), "BranchLengths": lengths,
+               "BranchWindows": set(SEQUENCE_WINDOWS), "BranchRollbacks": set(SEQUENCE_ROLLBACKS)}
+    return validate_measured_manifest(manifest, "call-branch", BRANCH_EXTRA, allowed, "callBranchPlan",
+                                      "solcore-lean.call-branch-plan.v1")
 
 
 def validate_manifest(manifest):
@@ -289,6 +373,8 @@ def validate_manifest(manifest):
     forwards = manifest["profile"] == "stateful-forwarded-value"
     if manifest["profile"] == "stateful-call-sequences":
         return validate_sequence_manifest(manifest)
+    if manifest["profile"] == "stateful-call-branches":
+        return validate_branch_manifest(manifest)
     if manifest["profile"] == "stateful-call-returns":
         return validate_return_manifest(manifest)
     plan_key, plan_schema = ("forwardPlan", "solcore-lean.forward-plan.v1") if forwards else ("callPlan", "solcore-lean.call-plan.v1")
@@ -448,26 +534,26 @@ def validate_return_manifest(manifest):
 
 
 def resolve_backend(explicit, returning, saved=None):
-    """Only the call-return profile runs on Yul; the other call profiles stay on Sonatina."""
+    """Only the two-source profiles run on Yul; the other call profiles stay on Sonatina."""
     return (common.resolve_backend if returning else common.resolve_sonatina_backend)(explicit, saved)
 
 
-TWO_SOURCE_HISTORIES = (adapter.RETURN_HISTORY_SCHEMA, adapter.SEQUENCE_HISTORY_SCHEMA)
+TWO_SOURCE_HISTORIES = (adapter.RETURN_HISTORY_SCHEMA, adapter.SEQUENCE_HISTORY_SCHEMA, adapter.BRANCH_HISTORY_SCHEMA)
 
 
 def analysis_returns(analysis):
-    """A two-source analysis: one of its histories has the call-return or call-sequence schema."""
+    """A two-source analysis: one of its histories has a two-source profile's schema."""
     histories = analysis.get("histories", {})
     return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in TWO_SOURCE_HISTORIES
                                                for history in histories.values())
 
 
 def history_parent_slots(histories):
-    """The parent's observed slots a call-sequence history's initial accounts
-    list, or the call-return profile's 0 to 6."""
+    """The parent's observed slots a call-sequence or call-branch history's
+    initial accounts list, or the call-return profile's 0 to 6."""
     for history in histories.values():
         try:
-            if history.get("schema") == adapter.SEQUENCE_HISTORY_SCHEMA:
+            if history.get("schema") in (adapter.SEQUENCE_HISTORY_SCHEMA, adapter.BRANCH_HISTORY_SCHEMA):
                 return tuple(entry["slot"] for entry in history["initialAccounts"][0]["storage"])
         except (AttributeError, KeyError, IndexError, TypeError):
             continue
@@ -740,7 +826,7 @@ class Campaign:
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case),
                   "CallModes": {int(tx["input"]) & self.specification["modeMask"] for tx in case["transactions"]}, "Outcomes": set()}
         forwards = self.profile == "stateful-forwarded-value"
-        returning = self.profile in ("stateful-call-returns", "stateful-call-sequences")
+        returning = self.profile in ("stateful-call-returns", "stateful-call-sequences", "stateful-call-branches")
         if not forwards and not returning:
             values["LogPatterns"] = set()
         if prefix == "matched":
@@ -759,6 +845,8 @@ class Campaign:
             values.update(return_coverage(case, statuses if prefix == "matched" else None))
         if self.profile == "stateful-call-sequences":
             values.update(sequence_coverage(case, statuses if prefix == "matched" else None))
+        if self.profile == "stateful-call-branches":
+            values.update(branch_coverage(case, statuses if prefix == "matched" else None))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -818,7 +906,8 @@ class Campaign:
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         extra = VALUE_DIMENSIONS if self.profile == "stateful-forwarded-value" else RETURN_EXTRA \
             if self.profile == "stateful-call-returns" else SEQUENCE_EXTRA \
-            if self.profile == "stateful-call-sequences" else ("LogPatterns",)
+            if self.profile == "stateful-call-sequences" else BRANCH_EXTRA \
+            if self.profile == "stateful-call-branches" else ("LogPatterns",)
         for dimension in ("CallModes", "Outcomes") + extra:
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         self.checkpoint()
@@ -923,11 +1012,21 @@ class Campaign:
         history["status"] = "running"
         current, current_path = original, self.args.output / finding["originalArchive"] / "case.json"
         seen = {case_hash(original)}
+        # A response over the tool output bound halves the batch and asks again, down to one candidate.
+        batch = self.args.shrink_candidates
         try:
             while self.shrink_attempts < self.args.shrink_attempts:
                 self.guard()
-                limit = min(self.args.shrink_candidates, self.args.shrink_attempts - self.shrink_attempts)
-                response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
+                limit = min(batch, self.args.shrink_attempts - self.shrink_attempts)
+                try:
+                    response = self.tool(["shrink", current_path, limit, self.args.direct_fuel], "shrink-candidates")
+                except common.Finding as error:
+                    if (error.category, error.stage, error.detail) != (RESOURCE, "shrink-candidates", "output-limit") or limit == 1:
+                        raise
+                    batch = limit // 2
+                    history.setdefault("halvedBatches", []).append({"attempts": self.shrink_attempts, "limit": limit, "next": batch})
+                    save_json(history_path, history)
+                    continue
                 candidates = response.get("cases")
                 if response.get("schema") != self.specification["corpusSchema"] or not isinstance(candidates, list) or len(candidates) > limit:
                     raise ValueError("invalid native bounded shrink response")
@@ -1039,7 +1138,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0",
-                        help="yul, for stateful-call-returns and stateful-call-sequences only, runs each scenario's EVM path on the pinned solc's Yul output; "
+                        help="yul, for stateful-call-returns, stateful-call-sequences and stateful-call-branches only, runs each scenario's EVM path on the pinned solc's Yul output; "
                              "imported Hull keeps Sonatina O0")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; used only by --backend yul")
     selection = parser.add_mutually_exclusive_group()
@@ -1075,7 +1174,8 @@ def main():
     args = parser.parse_args()
     selected = adapter.PROFILES[args.profile]
     if args.backend == "yul" and not selected.get("returns"):
-        parser.error("--backend yul supports only stateful-call-returns and stateful-call-sequences; the other call profiles must use Sonatina")
+        parser.error("--backend yul supports only stateful-call-returns, stateful-call-sequences and stateful-call-branches; "
+                     "the other call profiles must use Sonatina")
     args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
     args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
     recorded = None

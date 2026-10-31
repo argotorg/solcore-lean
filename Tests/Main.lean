@@ -2236,6 +2236,9 @@ import Solcore.Test.SourceCallReturnCases
 import Solcore.Test.SourceCallSequenceCases
 import Solcore.Test.SourceCallReturnCorpus
 import Solcore.Test.SourceCallSequenceCorpus
+import Solcore.Test.SourceCallBranchGolden
+import Solcore.Test.SourceCallBranchCases
+import Solcore.Test.SourceCallBranchCorpus
 import Solcore.Test.SourceConstructorArgumentCases
 import Solcore.Test.SourceConstructorArgumentCorpus
 import Solcore.Test.SourceAggregatePrimitives
@@ -4313,6 +4316,9 @@ def main : IO UInt32 := do
   Tests.SourceCallSequenceCases.testSourceCallSequenceCases
   Tests.SourceCallReturnCorpus.testSourceCallReturnCorpus
   Tests.SourceCallSequenceCorpus.testSourceCallSequenceCorpus
+  Tests.SourceCallBranchGolden.testSourceCallBranchGolden
+  Tests.SourceCallBranchCases.testSourceCallBranchCases
+  Tests.SourceCallBranchCorpus.testSourceCallBranchCorpus
   Tests.SourceConstructorArgumentCases.testSourceConstructorArgumentCases
   Tests.SourceConstructorArgumentCorpus.testSourceConstructorArgumentCorpus
   Tests.SourceAggregatePrimitives.testSourceAggregatePrimitives

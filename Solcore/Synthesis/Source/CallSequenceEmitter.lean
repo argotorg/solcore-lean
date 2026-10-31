@@ -109,19 +109,20 @@ private def sumExpression (calls : Nat) : String :=
   | [] => "0"
   | first :: rest => rest.foldl (fun total term => "(" ++ total ++ " + " ++ term ++ ")") first
 
-def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
+/-- The child's source: the step's helpers and entry, then the contract. -/
+def childSource (step : Solcore.Synthesis.Core.Aggregates.CheckedDAG) : Except EmitError String := do
   let mut names : List String := []
   let mut child := stdImports ++
     [AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "return_", "revert_"]
-      (plan.step.helpers ++ [plan.step.entry]), ""]
-  for (body, index) in plan.step.helpers.zipIdx do
+      (step.helpers ++ [step.entry]), ""]
+  for (body, index) in step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered
     let helper := "sc_fn" ++ toString index
     child := child ++ ["function " ++ helper ++ "(sc_arg: word) returns (word) {"] ++
       rendered.lines ++ ["    return " ++ result ++ ";", "}", ""]
     names := helper :: names
-  let entry ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 plan.step.entry
+  let entry ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 step.entry
   let result ← AggregateRenderer.requireValue entry
   child := child ++ ["function sc_step(sc_arg: word) returns (word) {"] ++
     entry.lines ++ ["    return " ++ result ++ ";", "}", "",
@@ -153,6 +154,10 @@ def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
     "        return uint256(0);",
     "    }",
     "}"]
+  return String.intercalate "\n" child ++ "\n"
+
+def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
+  let childText ← childSource plan.step
   let calls := plan.calls
   let parent := stdImports ++
     [AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "mload", "revert_"] [], "",
@@ -191,7 +196,7 @@ def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
     "}"]
   return {
     parentSource := String.intercalate "\n" parent ++ "\n"
-    childSource := String.intercalate "\n" child ++ "\n"
+    childSource := childText
   }
 
 end Solcore.Synthesis.Source.CallSequence

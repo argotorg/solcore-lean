@@ -23,6 +23,8 @@ def bconst (value : Word) : B := fun _ => .word value
 def bunit : B := fun _ => .unit
 def bhost (index : Nat) (argument : B) : B := fun depth => .apply (.var (index + depth)) (argument depth)
 def bapply (function argument : B) : B := fun depth => .apply (function depth) (argument depth)
+def blam (parameter result : Ty) (body : Nat → B) : B := fun depth =>
+  .lambda parameter result (body depth (depth + 1))
 def blet (value : B) (body : Nat → B) : B := fun depth => .letE (value depth) (body depth (depth + 1))
 def bcond (condition yes no : B) : B := fun depth => .ifE (condition depth) (yes depth) (no depth)
 def bcase (scrutinee : B) (left right : Nat → B) : B := fun depth =>

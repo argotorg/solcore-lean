@@ -960,6 +960,227 @@ class CallSequenceTests(unittest.TestCase):
             adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
 
 
+def branch_site(kind, bound, stop, call, exit_):
+    return {"kind": kind, "bound": bound, "stop": stop, "callWindow": {"offset": call[0], "width": call[1]},
+            "exitWindow": {"offset": exit_[0], "width": exit_[1]}}
+
+
+def branch_plan(sites=None):
+    sites = sites or [branch_site("branch", 1, 0, (0, 32), (64, 32)), branch_site("loop", 2, 33, (31, 2), (0, 0))]
+    return {"schema": "solcore-lean.call-branch-plan.v1", "sites": sites, "stepProgram": {}}
+
+
+def branch_input(classes, controls, high=0, parent_reverts=False):
+    """An input whose class bytes give each position's (status, length) and
+    whose control bits give each site's."""
+    value = sum((2 * length + (status == "reverted")) << (8 * position) for position, (status, length) in enumerate(classes))
+    control = sum(bits << (24 + 2 * index) for index, bits in enumerate(controls))
+    return (high << 32) + (parent_reverts << 30) + control + value
+
+
+def branch_case(plan=None, inputs=None):
+    """Envelope fixture only: native replay checks the actual programs; each
+    transaction's prescribed calls are the adapter's own."""
+    plan = plan or branch_plan()
+    inputs = inputs or [branch_input([("returned", 33), ("returned", 1), ("reverted", 0)], [1, 2], 7),
+                        branch_input([("reverted", 64), ("returned", 5), ("returned", 96)], [0, 3], 9),
+                        branch_input([("returned", 32), ("reverted", 31), ("returned", 1)], [1, 1], 11, True)]
+    transactions = [{"id": f"tx-{index}", "input": str(value), "value": "0", "target": "parent", "callee": "child"}
+                    for index, value in enumerate(inputs)]
+    for tx in transactions:
+        tx["calls"], tx["parentReverts"] = adapter.branch_prescribed(plan, tx)
+    return {"schema": adapter.BRANCH_CASE_SCHEMA, "callBranchPlan": plan,
+        "programs": {"parentCall": {}, "parentResume": {}, "child": {}},
+        "sources": {"parent": "protocol fixture only", "child": "protocol fixture only"},
+        "contracts": adapter.return_contract_metadata(),
+        "observedSlots": {"parent": [str(slot) for slot in range(adapter.branch_slot_count(plan))],
+                          "child": list(adapter.RETURN_CHILD_SLOTS)},
+        "initialState": {"accounts": [{"role": "parent", "balance": "0", "storage": []},
+            {"role": "child", "balance": "0", "storage": []}], "callerBalance": "0"},
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": transactions}
+
+
+def branch_history(value):
+    """Rows that follow the protocol, with the content reads (first Words and
+    windows) zero and the child's step result its call count."""
+    plan = value["callBranchPlan"]
+    sites, slots = plan["sites"], adapter.branch_slot_count(plan)
+    base = 2 + 3 * len(sites)
+    parent, child = [0] * slots, [0, 0]
+    rows = []
+    for index, tx in enumerate(value["transactions"]):
+        written = [(parent[0] + int(tx["input"])) % WORD] + [0] * (slots - 1)
+        called = {call["position"]: call for call in tx["calls"]}
+        count, size, first = child[1], 0, 0
+        for site_index, site in enumerate(sites):
+            written[2 + 3 * site_index] = size
+            for position in range(first, first + site["bound"]):
+                if position in called:
+                    call = called[position]
+                    ok = call["status"] == "returned"
+                    written[base + 4 * position] = ok + 2 * call["length"]
+                    written[base + 4 * position + 2] = size = call["length"]
+                    count += ok
+            written[3 + 3 * site_index] = size
+            first += site["bound"]
+        written[base + 4 * first] = len(tx["calls"])
+        output = word(sum(written) % WORD)
+        if tx["parentReverts"]:
+            status = "reverted"
+        else:
+            status = "returned"
+            parent = written
+            if count != child[1]:
+                child = [count, count]
+        rows.append({"id": tx["id"], "index": index, "status": status, "output": output,
+                     "committedAccounts": return_accounts(parent, child), "logs": []})
+    return with_whole({"schema": adapter.BRANCH_HISTORY_SCHEMA,
+        "initialAccounts": adapter.return_initial_accounts(BINDINGS, tuple(value["observedSlots"]["parent"])),
+        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete",
+        "unexecuted": []})
+
+
+def branch_histories(value):
+    return {path: branch_history(value) for path in adapter.PATHS}
+
+
+class CallBranchTests(unittest.TestCase):
+    def test_the_case_carries_its_plan_programs_and_prescribed_calls(self):
+        value = branch_case()
+        adapter.validate_case(value)
+        self.assertTrue(adapter.branches(value) and adapter.returns(value) and not adapter.sequences(value))
+        self.assertFalse(adapter.branches(sequence_case()))
+        selected = adapter.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"]), ("semantic-call-branch-tool", "rust-hull-call-return-scenario"))
+        # A branch and a loop of bound two: three sites' worth of slots for two sites and three positions.
+        self.assertEqual(adapter.return_parent_slots(value), tuple(str(slot) for slot in range(21)))
+        # The branch's 33 bytes stop the loop at entry; a skipped branch leaves the loop two calls; a parent revert.
+        self.assertEqual([tx["calls"] for tx in value["transactions"]], [
+            [{"position": 0, "status": "returned", "length": 33}],
+            [{"position": 1, "status": "returned", "length": 5}, {"position": 2, "status": "returned", "length": 96}],
+            [{"position": 0, "status": "returned", "length": 32}, {"position": 1, "status": "reverted", "length": 31}]])
+        self.assertEqual([tx["parentReverts"] for tx in value["transactions"]], [False, False, True])
+        # Every bit of 2^256 - 1 calls, reverts and has the largest length; zero calls nothing.
+        plan = branch_plan()
+        self.assertEqual(adapter.branch_prescribed(plan, {"input": str(2**256 - 1)}),
+                         ([{"position": 0, "status": "reverted", "length": 96}, {"position": 1, "status": "reverted", "length": 96},
+                           {"position": 2, "status": "reverted", "length": 96}], True))
+        self.assertEqual(adapter.branch_prescribed(plan, {"input": "0"}), ([], False))
+        # A loop whose stop length is zero never runs before a call.
+        stopped = branch_plan([branch_site("loop", 3, 0, (0, 0), (0, 0))])
+        self.assertEqual(adapter.branch_prescribed(stopped, {"input": str(branch_input([("returned", 5)] * 3, [3]))}), ([], False))
+        for change in (lambda v: v["transactions"][0].update(parentReverts=True),
+                       lambda v: v["transactions"][1]["calls"][0].update(length=6),
+                       lambda v: v["transactions"][1]["calls"].pop(),
+                       lambda v: v["transactions"][0]["calls"][0].update(position=1),
+                       lambda v: v["programs"].pop("parentResume"),
+                       lambda v: v["callBranchPlan"]["sites"][1].update(bound=3),
+                       lambda v: v["callBranchPlan"]["sites"][1].update(bound=0),
+                       lambda v: v["callBranchPlan"]["sites"][0].update(stop=1),
+                       lambda v: v["callBranchPlan"]["sites"][1].update(stop=97),
+                       lambda v: v["callBranchPlan"]["sites"][0]["callWindow"].update(offset=97),
+                       lambda v: v["callBranchPlan"]["sites"][0]["exitWindow"].update(width=33),
+                       lambda v: v["callBranchPlan"].update(sites=[]),
+                       lambda v: v.update(contracts=adapter.contract_metadata())):
+            invalid = branch_case()
+            change(invalid)
+            with self.assertRaises((ValueError, adapter.Finding)):
+                adapter.validate_case(invalid)
+        invalid = branch_case()
+        invalid["observedSlots"] = {"parent": [str(slot) for slot in range(18)], "child": ["0", "1"]}
+        with self.assertRaises(adapter.Finding):
+            adapter.validate_case(invalid)
+        self.assertEqual(adapter.resolve_backend(value, "yul"), "yul")
+
+    def test_matched_histories_follow_the_calls_and_sizes(self):
+        value = branch_case()
+        histories = branch_histories(value)
+        result = adapter.compare(histories, value, BINDINGS)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [])
+        # One path's size after the branch differs: a pairwise mismatch.
+        changed = copy.deepcopy(histories)
+        changed["rustEvm"]["transactions"][0]["committedAccounts"][0]["storage"][3]["value"] = "34"
+        with_whole(changed["rustEvm"])
+        changed["rustEvm"]["finalAccounts"] = changed["rustEvm"]["transactions"][-1]["committedAccounts"]
+        result = adapter.compare(changed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        # Every path agrees on a value the input does not give: the protocol fails.
+        for slot, label in ((1, "z"), (2, "the size before the first site"), (5, "the size before the loop"),
+                            (12, "a position no call reached"), (20, "the call count")):
+            agreed = copy.deepcopy(histories)
+            for path in adapter.PATHS:
+                row = agreed[path]["transactions"][0]
+                row["committedAccounts"][0]["storage"][slot]["value"] = str(int(row["committedAccounts"][0]["storage"][slot]["value"]) + 1)
+                row["output"] = word((int(row["output"], 16) + 1) % WORD)
+                with_whole(agreed[path])
+            with self.subTest(label=label):
+                result = adapter.compare(agreed, value, BINDINGS)
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertIn("committedAccounts", result["fields"])
+        # An output that is not the slots' sum.
+        agreed = copy.deepcopy(histories)
+        for path in adapter.PATHS:
+            agreed[path]["transactions"][1]["output"] = word(1)
+        result = adapter.compare(agreed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertIn("output", result["fields"])
+
+    def test_a_parent_revert_keeps_both_storages_and_a_parent_without_returned_calls_the_child(self):
+        value = branch_case(inputs=[branch_input([("returned", 64), ("returned", 0), ("returned", 1)], [1, 2], 3),
+                                    branch_input([("reverted", 32), ("reverted", 0), ("reverted", 96)], [1, 2], 5),
+                                    branch_input([], [0, 0], 7)])
+        histories = branch_histories(value)
+        self.assertEqual(adapter.compare(histories, value, BINDINGS)["category"], "matched")
+        # Every call of tx-1 reverted and tx-2 made none, so the child's storage must stay.
+        for index in (1, 2):
+            changed = copy.deepcopy(histories)
+            for path in adapter.PATHS:
+                row = changed[path]["transactions"][index]
+                row["committedAccounts"][1]["storage"][0]["value"] = "12345"
+                changed[path]["finalAccounts"] = changed[path]["transactions"][-1]["committedAccounts"]
+                with_whole(changed[path])
+            result = adapter.compare(changed, value, BINDINGS)
+            self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", f"tx-{index}"))
+            self.assertEqual(result["accountStorageRollbackPaths"], sorted(adapter.PATHS))
+        # A parent revert that commits a write.
+        value = branch_case(inputs=[branch_input([("returned", 64), ("returned", 0), ("returned", 1)], [1, 2], 3, True)])
+        changed = branch_histories(value)
+        for path in adapter.PATHS:
+            row = changed[path]["transactions"][0]
+            row["committedAccounts"][0]["storage"][0]["value"] = "1"
+            changed[path]["finalAccounts"] = row["committedAccounts"]
+            with_whole(changed[path])
+        result = adapter.compare(changed, value, BINDINGS)
+        self.assertEqual(result["category"], "semantic-mismatch")
+        self.assertIn("accountStorage", result["fields"])
+
+    def test_the_hull_history_uses_the_branch_schema_and_the_plan_slots(self):
+        value = branch_case(plan=branch_plan([branch_site("loop", 3, 96, (0, 0), (96, 32))]),
+                            inputs=[branch_input([("returned", 96), ("reverted", 17), ("returned", 2)], [3], 1)])
+        runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
+        slots = tuple(value["observedSlots"]["parent"])
+        self.assertEqual(len(slots), 18)
+        # The first call's 96 bytes stop the loop.
+        self.assertEqual(value["transactions"][0]["calls"], [{"position": 0, "status": "returned", "length": 96}])
+        rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
+                 "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.return_initial_accounts(BINDINGS, slots),
+                  "accountStorage": whole(adapter.return_initial_accounts(BINDINGS, slots))}]
+        rows += [{**row, "stage": "execution"} for row in branch_history(value)["transactions"]]
+        encode = lambda values: "\n".join(json.dumps(row) for row in values)
+        history = adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+        self.assertEqual((history["schema"], history["status"]), (adapter.BRANCH_HISTORY_SCHEMA, "complete"))
+        self.assertEqual(adapter.compare({**branch_histories(value), "importedHull": history}, value, BINDINGS)["category"],
+                         "matched")
+        # The call-return profile's seven slots are not this plan's.
+        rows[2]["committedAccounts"] = adapter.return_initial_accounts(BINDINGS)
+        with self.assertRaises(ValueError):
+            adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+
+
 class CallReturnYulTests(unittest.TestCase):
     """Backend policy and the Yul export boundary; mocked processes are not compiler or EVM results."""
 

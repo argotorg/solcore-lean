@@ -64,6 +64,7 @@ TARGETS = {
     "semanticCallReturnTool": "semantic-call-return-tool",
     "rustHullCallReturnScenario": "rust-hull-call-return-scenario",
     "semanticCallSequenceTool": "semantic-call-sequence-tool",
+    "semanticCallBranchTool": "semantic-call-branch-tool",
     "semanticEventLogTool": "semantic-log-tool",
     "semanticCallValueTool": "semantic-call-value-tool",
     "rustHullValueScenario": "rust-hull-value-scenario",

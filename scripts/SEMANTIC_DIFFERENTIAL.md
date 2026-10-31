@@ -7460,6 +7460,136 @@ the Rust driver, code-image exporter and directive tools frozen; none changed.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare call branches
+
+The `stateful-call-branches` profile compares a parent whose calls sit in
+branches and loops, so that the input decides how many calls a transaction
+makes, zero to three.
+- **What it targets:** a call that a branch skips leaves the previous call's
+  buffer in place, and a call in a loop replaces it at every iteration. A
+  compiler that caches `returndatasize`, hoists it out of a loop, or moves a
+  read across a conditional call shows only there. The loop's condition reads
+  `returndatasize()` in inline Yul as well.
+- **Original Core** runs the parent through the choice chain in
+  `Solcore/ContractRuntime/CallChoiceExecution.lean`. Its phases each request a
+  call or finish, as the first Word of their returned tuple chooses. The call
+  chain is its special case of request phases and one last finish phase.
+- **Shared with `stateful-call-sequences`:** the two wrapper names and methods,
+  so the profile runs on Yul too, the child, the call adapter's two-source
+  paths and `rust-hull-call-return-scenario`.
+
+The [roadmap](../docs/design/next-implementation-roadmap.md) records the
+probe and the definitions.
+
+### Definitions
+
+- **Plan:** one to three sites in program order, each a branch of bound one or
+  a loop of bound one to three with a stop length from 0 to 96, and each with
+  a call window and an exit window. The bounds sum to at most three, and the
+  potential calls are the positions from 0 in program order.
+- **Input:**
+  - byte `q` is position `q`'s class byte;
+  - site `i`'s control bits are bits `24 + 2i` and `25 + 2i`;
+  - bit 30 reverts the parent;
+  - `mix = input >> 32`.
+- **Parent:**
+  1. It writes `slot 0 + input` to slot 0 and keeps `z` from a zero-length
+     copy before any call.
+  2. For each site `i`:
+     - it reads `p_i = returndatasize()` before it;
+     - **a branch** calls when bit `24 + 2i` is set;
+     - **a loop** calls while its counter is below `min(r, bound)` for the
+       two control bits' value `r` and, read in inline Yul,
+       `returndatasize()` differs from the stop length;
+     - **after each call at position `q`**, it keeps the flag plus twice the
+       copy's length `k_q` and the first Word `f_q`, and reads
+       `n_q = returndatasize()` and the call window `v_q`;
+     - **after the site**, it reads `a_i = returndatasize()` and the exit
+       window `u_i`.
+  3. With `B = 2 + 3S`, the slots are:
+     - `z` in slot 1;
+     - `p_i`, `a_i` and `u_i` in slots `2 + 3i` to `4 + 3i`;
+     - `k_q`, `f_q`, `n_q` and `v_q` in slots `B + 4q` to `B + 4q + 3`, zero
+       for a position not called;
+     - the call count in slot `B + 4P`.
+  4. It returns their sum, or reverts with it under bit 30.
+- **What each read must see:** the data of the latest call made before it, or
+  no buffer before any call, so a skipped branch or iteration leaves the
+  previous call's buffer.
+- **Original Core:**
+  - **The child** is the call-sequence child, under `rawOutcomeV1 2`.
+  - **The phases:** a call phase and three resume phases, all choice phases
+    under `wordTupleOutcomeV1 7`.
+  - **Kept Words:** the target, the input, `mix`, the position of the
+    requested call and the calls made.
+  - **The resume phases** are one program that reads the call's data at base
+    192. Each phase defines every site's steps as lambdas over `mix`, the
+    calls made, the latest size and a loop's counter.
+- **Prescribed outcomes:** each transaction records the calls it makes, as
+  their positions, statuses and lengths, and whether the parent reverts,
+  computed by a Lean byte-level model. The adapter recomputes them from the
+  plan and the input.
+
+### Running and validation
+
+```sh
+lake build semanticCallBranchTool rustHullCallReturnScenario
+python3 scripts/semantic-call-campaign.py --profile stateful-call-branches \
+  --corpus scripts/semantic-call-branch-corpus.json \
+  --output .upstream/semantic-call-branch-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random \
+  --profile stateful-call-branches --cases 16 \
+  --output .upstream/semantic-call-branch-random
+python3 scripts/semantic-suite.py --mode fixed --backend yul \
+  --profile stateful-call-branches \
+  --output .upstream/semantic-call-branch-yul
+```
+
+- **Schemas:**
+  - plans: `solcore-lean.call-branch-plan.v1` under `callBranchPlan`, with
+    `sites` and `stepProgram`;
+  - cases: `solcore-lean.semantic-call-branch-case.v1`, carrying `sources`
+    for both roles, the programs `parentCall`, `parentResume` and `child`,
+    and each transaction's `calls` and `parentReverts`;
+  - histories: `solcore-lean.call-branch-history.v1`.
+- **Node budget:**
+  - the child's shell takes 129 nodes inside the budget;
+  - the call phase and the resume program lie outside it, each bounded by
+    2,048 nodes: 399 and 502 for one branch, up to 1,037 and 1,340 for three
+    sites.
+- **Comparison:**
+  - every row's status and whole return data, the parent's slots 0 to
+    `B + 4P`, the child's slots 0 and 1, both balances, both contracts' whole
+    committed storage and empty logs, with no mapping between the paths;
+  - a returned parent's `z`, sizes before and after each site, flags and
+    sizes of each position, zeros for the positions not called, and call
+    count must equal the adapter's own values, its output the sum of its
+    slots, and the child's count must grow by the returned calls;
+  - a parent revert keeps both prior storages, and a returned parent whose
+    calls all reverted, or that made none, keeps the child's.
+- **Campaign dimensions,** beside the call family's without log patterns:
+  - `BranchSites`, `BranchLoops` and `BranchCalls`;
+  - `BranchSkips`: the buffer at each position passed without a call;
+  - `BranchLoopExits`: at entry, after a call on the stop length, or at the
+    limit;
+  - `BranchLengths`, `BranchWindows`, `BranchRollbacks` and
+    `BranchNodeBudgets`.
+- **Corpus:** `scripts/semantic-call-branch-corpus.json` holds 18 scenarios
+  and 48 transactions:
+  - 13 imported plans over the steps the call-sequence corpus imports, among
+    them every boundary input;
+  - 5 generated at 384 and 512 nodes.
+
+  Each entry records its expected history, which the corpus check compares
+  with the byte-level model's rows and with the choice chain's actual history.
+- **Reduction batches:** a call-branch case is about 100 to 150 KB, so 32
+  candidates passed the campaign's bound on tool output, `min(4 MiB,
+  --disk-bytes / 64)`, before any attempt. As in the storage campaign:
+  - a call campaign's shrink response over the bound halves the batch and
+    asks again, down to one candidate, for every call profile;
+  - the shrink history records each halving in `halvedBatches`;
+  - only a one-candidate response over the bound stops the reduction.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-five

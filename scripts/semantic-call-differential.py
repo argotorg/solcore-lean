@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Compare bounded parent/child calls, committed accounts and logs on three paths.
 
-Four profiles share this adapter: `stateful-calls` (zero-value transactions and
+Five profiles share this adapter: `stateful-calls` (zero-value transactions and
 a fixed eight-unit parent), `stateful-forwarded-value` (payable transactions
 whose parent forwards bank amounts to the child), `stateful-call-returns` (a
 parent that decodes a child method's return data with std, each contract
-compiled from its own source) and `stateful-call-sequences` (the same two
+compiled from its own source), `stateful-call-sequences` (the same two
 wrappers, the parent calling the child two or three times and measuring the
-latest return data around each call). The original checked Core
+latest return data around each call) and `stateful-call-branches` (the same
+wrappers, the parent's calls in branches and loops, so that the input decides
+zero to three calls). The original checked Core
 contracts execute through the public nested runtime.
-The two two-source profiles also run with `--backend yul`: the EVM path deploys
+The three two-source profiles also run with `--backend yul`: the EVM path deploys
 each source's Yul through the pinned solc and imported Hull keeps Sonatina O0, as
 for the storage family; the other call profiles' sources each compile both
 contracts, which the Yul exporter does not admit.
@@ -52,6 +54,8 @@ RETURN_CASE_SCHEMA = "solcore-lean.semantic-call-return-case.v1"
 RETURN_HISTORY_SCHEMA = "solcore-lean.call-return-history.v1"
 SEQUENCE_CASE_SCHEMA = "solcore-lean.semantic-call-sequence-case.v1"
 SEQUENCE_HISTORY_SCHEMA = "solcore-lean.call-sequence-history.v1"
+BRANCH_CASE_SCHEMA = "solcore-lean.semantic-call-branch-case.v1"
+BRANCH_HISTORY_SCHEMA = "solcore-lean.call-branch-history.v1"
 # The forwarding parent's endowment covers every generated forward: a generated
 # sequence forwards at most the endowment in total. Original Core and Hull fund
 # the caller with 2^80.
@@ -75,6 +79,11 @@ PROFILES = {
         "caseTool": "semantic-call-sequence-tool", "coreRunner": "rust-hull-call-return-scenario",
         "scenarioSchema": "solcore-lean.call-return-scenario.v1", "forwarding": False, "returns": True, "sequences": True,
         "scope": "two or three depth-one calls through std's raw_call to a child method returning or reverting raw data of 0 to 96 bytes; the parent's inline Yul returndatasize reads before and after each call, in-bounds returndatacopy windows and re-reads of call 1's memory copy; zero value; the parent's slots0-(5n+2) and the child's slots0/1, balances, root outcome and empty logs; both accounts' whole committed storage; the adapter's own sizes and call counts from the inputs; no gas/nonce equivalence"},
+    "stateful-call-branches": {"caseSchema": BRANCH_CASE_SCHEMA, "historySchema": BRANCH_HISTORY_SCHEMA,
+        "planKey": "callBranchPlan", "planSchema": "solcore-lean.call-branch-plan.v1",
+        "caseTool": "semantic-call-branch-tool", "coreRunner": "rust-hull-call-return-scenario",
+        "scenarioSchema": "solcore-lean.call-return-scenario.v1", "forwarding": False, "returns": True, "branches": True,
+        "scope": "zero to three depth-one calls through std's raw_call from one to three call sites in branches and bounded loops, as the input decides, to a child method returning or reverting raw data of 0 to 96 bytes; the parent's inline Yul returndatasize reads before and after each site and after each call, a loop condition on returndatasize and in-bounds returndatacopy windows; zero value; the parent's slots0-(B+4P) and the child's slots0/1, balances, root outcome and empty logs; both accounts' whole committed storage; the adapter's own calls and sizes from the plan and inputs; no gas/nonce equivalence"},
 }
 
 
@@ -138,6 +147,8 @@ def contract_metadata(forwards=False):
 
 def validate_case(case):
     selected = profile(case)
+    if selected.get("branches"):
+        return validate_branch_case(case)
     if selected.get("sequences"):
         return validate_sequence_case(case)
     if selected.get("returns"):
@@ -427,7 +438,8 @@ def verify_archive(directory, report):
     if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported call archive schema")
     if common.resolve_backend(None, report) == "yul" and report.get("scope") in (
-            PROFILES["stateful-call-returns"]["scope"], PROFILES["stateful-call-sequences"]["scope"]):
+            PROFILES["stateful-call-returns"]["scope"], PROFILES["stateful-call-sequences"]["scope"],
+            PROFILES["stateful-call-branches"]["scope"]):
         return return_verify_yul_archive(directory, report)
     common.resolve_sonatina_backend(None, report)
     common.verify_archive(directory, {**report, "schema": common.REPORT_SCHEMA})
@@ -662,10 +674,14 @@ def sequences(case):
     return profile(case).get("sequences", False)
 
 
+def branches(case):
+    return profile(case).get("branches", False)
+
+
 def return_parent_slots(case):
     """The parent's observed slots: 0 to 6 for call returns, 0 to 5n + 2 for
-    call sequences."""
-    return tuple(case["observedSlots"]["parent"]) if sequences(case) else RETURN_PARENT_SLOTS
+    call sequences and 0 to B + 4P for call branches."""
+    return tuple(case["observedSlots"]["parent"]) if sequences(case) or branches(case) else RETURN_PARENT_SLOTS
 
 
 def return_contract_metadata():
@@ -944,6 +960,137 @@ def validate_sequence_case(case):
             raise ValueError("a prescribed outcome differs from the adapter's own")
 
 
+BRANCH_PROGRAMS = ("parentCall", "parentResume", "child")
+BRANCH_SITE_KEYS = {"kind", "bound", "stop", "callWindow", "exitWindow"}
+
+
+def branch_slot_count(plan):
+    """The parent's slots: the accumulator, `z`, three per site, four per
+    position and the call count."""
+    return 3 + 3 * len(plan["sites"]) + 4 * sum(site["bound"] for site in plan["sites"])
+
+
+def branch_prescribed(plan, tx):
+    """The calls a transaction makes and the parent's revert, from the plan and
+    the input alone: a branch calls when its site's first control bit is set; a
+    loop calls while its counter is below the two control bits' value, at most
+    its bound, and the latest data's length differs from its stop length.
+    Position q's class byte is the input's byte q, whose bit 0 reverts and whose
+    rest halves to the length, at most 96; bit 30 reverts the parent."""
+    x = int(tx["input"])
+    calls, size, first = [], 0, 0
+    for index, site in enumerate(plan["sites"]):
+        bits = x >> (24 + 2 * index) & 3
+
+        def call(position):
+            byte = x >> (8 * position) & 255
+            calls.append({"position": position, "status": "reverted" if byte & 1 else "returned",
+                          "length": min(byte >> 1, SEQUENCE_CAPACITY)})
+            return calls[-1]["length"]
+
+        if site["kind"] == "branch":
+            if bits & 1:
+                size = call(first)
+        else:
+            limit, counter = min(bits, site["bound"]), 0
+            while counter < limit and size != site["stop"]:
+                size = call(first + counter)
+                counter += 1
+        first += site["bound"]
+    return calls, bool(x >> 30 & 1)
+
+
+def validate_branch_case(case):
+    plan = case.get("callBranchPlan")
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-branch-plan.v1" or \
+            not isinstance(plan.get("stepProgram"), dict):
+        raise ValueError("call-branch case requires its checked plan")
+    window = lambda value: isinstance(value, dict) and set(value) == {"offset", "width"} and \
+        type(value["offset"]) is int and 0 <= value["offset"] <= SEQUENCE_CAPACITY and \
+        type(value["width"]) is int and 0 <= value["width"] <= 32
+    valid = lambda site: isinstance(site, dict) and set(site) == BRANCH_SITE_KEYS and window(site["callWindow"]) and \
+        window(site["exitWindow"]) and type(site["bound"]) is int and type(site["stop"]) is int and (
+            (site["kind"] == "branch" and site["bound"] == 1 and site["stop"] == 0) or
+            (site["kind"] == "loop" and 1 <= site["bound"] <= 3 and 0 <= site["stop"] <= SEQUENCE_CAPACITY))
+    sites = plan.get("sites")
+    if not isinstance(sites, list) or not 1 <= len(sites) <= 3 or not all(valid(site) for site in sites) or \
+            sum(site["bound"] for site in sites) > 3:
+        raise ValueError("call-branch plan has one to three valid sites of at most three positions")
+    programs = case.get("programs")
+    if not isinstance(programs, dict) or set(programs) != set(BRANCH_PROGRAMS) or \
+            any(not isinstance(programs[role], dict) for role in BRANCH_PROGRAMS):
+        raise ValueError("call-branch case requires its original Core programs")
+    sources = case.get("sources")
+    if not isinstance(sources, dict) or set(sources) != set(ROLES) or any(not isinstance(sources[role], str) for role in ROLES):
+        raise ValueError("call-branch case requires one source per contract")
+    if case.get("contracts") != return_contract_metadata():
+        raise ValueError("call-branch contract metadata changed")
+    initial = {"accounts": [{"role": role, "balance": "0", "storage": []} for role in ROLES], "callerBalance": "0"}
+    if case.get("initialState") != initial or case.get("observedSlots") != \
+            {"parent": [str(slot) for slot in range(branch_slot_count(plan))], "child": list(RETURN_CHILD_SLOTS)}:
+        raise Finding("unsupported-scope", "input", "call-branch profile requires unfunded empty accounts and its observed slots")
+    provenance = case.get("provenance")
+    if not isinstance(provenance, dict) or any(not isinstance(provenance.get(key), str) or not provenance[key]
+            for key in ("generatorVersion", "emitterVersion", "wrapperVersion")):
+        raise ValueError("missing versioned call-branch provenance")
+    transactions = case.get("transactions")
+    if not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
+        raise ValueError(f"call-branch case requires 1 to {MAX_TRANSACTIONS} transactions")
+    ids = set()
+    for tx in transactions:
+        if not isinstance(tx, dict) or set(tx) != {"id", "input", "value", "target", "callee", "calls", "parentReverts"}:
+            raise ValueError("call-branch transactions retain symbolic roles and their prescribed outcomes")
+        if not isinstance(tx["id"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", tx["id"]) or tx["id"] in ids:
+            raise ValueError("transaction IDs must be unique bounded identifiers")
+        ids.add(tx["id"])
+        common.word(tx["input"], "transaction input")
+        if (tx["target"], tx["callee"], tx["value"]) != ("parent", "child", "0"):
+            raise Finding("unsupported-scope", "input", "call-branch transactions must use the fixed roles and zero value")
+        if (tx["calls"], tx["parentReverts"]) != branch_prescribed(plan, tx):
+            raise ValueError("a prescribed outcome differs from the adapter's own")
+
+
+def branch_protocol_fields(case, tx, row, prior):
+    """Fields that break the protocol, against the adapter's own calls and
+    sizes from the plan and the input: `z` zero, each site's size before and
+    after it, each position's flag plus twice the size and its size, or zeros
+    when no call reached it, the call count, and the child's count growing by
+    the returned calls; the sum is the slots'."""
+    plan = case["callBranchPlan"]
+    sites = plan["sites"]
+    parent, child = (return_slots(account) for account in row["committedAccounts"])
+    before_parent, before_child = (return_slots(account) for account in prior)
+    if row["status"] == "reverted":
+        return ([] if tx["parentReverts"] else ["status"]) + ([] if row["committedAccounts"] == prior else ["committedAccounts"])
+    if tx["parentReverts"]:
+        return ["status"]
+    base = 2 + 3 * len(sites)
+    expected = {0: (before_parent[0] + int(tx["input"])) % WORD_MODULUS, 1: 0}
+    called = {call["position"]: call for call in tx["calls"]}
+    size, first = 0, 0
+    for index, site in enumerate(sites):
+        expected[2 + 3 * index] = size
+        for position in range(first, first + site["bound"]):
+            slot = base + 4 * position
+            if position in called:
+                call = called[position]
+                expected[slot] = (1 if call["status"] == "returned" else 0) + 2 * call["length"]
+                expected[slot + 2] = size = call["length"]
+            else:
+                expected.update({slot: 0, slot + 1: 0, slot + 2: 0, slot + 3: 0})
+        expected[3 + 3 * index] = size
+        first += site["bound"]
+    expected[base + 4 * first] = len(tx["calls"])
+    fields = []
+    returned = sum(call["status"] == "returned" for call in tx["calls"])
+    if len(parent) != branch_slot_count(plan) or any(parent[slot] != value for slot, value in expected.items()) or \
+            child[1] != (before_child[1] + returned) % WORD_MODULUS or (not returned and child != before_child):
+        fields.append("committedAccounts")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != sum(parent) % WORD_MODULUS:
+        fields.append("output")
+    return fields
+
+
 def sequence_protocol_fields(case, tx, row, prior):
     """Fields that break the protocol, against the adapter's own sizes from the
     input: before any call nothing, around each call its data's size, and the
@@ -1069,6 +1216,8 @@ def return_protocol_fields(case, tx, row, prior):
     the child's bytes rebuilt from its committed slots and the input."""
     if sequences(case):
         return sequence_protocol_fields(case, tx, row, prior)
+    if branches(case):
+        return branch_protocol_fields(case, tx, row, prior)
     plan = case["callReturnPlan"]
     parent, child = (return_slots(account) for account in row["committedAccounts"])
     before_parent, before_child = (return_slots(account) for account in prior)
@@ -1507,7 +1656,7 @@ def main():
     choice.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=common.BACKENDS,
-        help="default sonatina-o0; yul, for stateful-call-returns and stateful-call-sequences only, runs the EVM path on the pinned solc's Yul output; "
+        help="default sonatina-o0; yul, for stateful-call-returns, stateful-call-sequences and stateful-call-branches only, runs the EVM path on the pinned solc's Yul output; "
              "exact replay inherits its saved backend")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")
     parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
