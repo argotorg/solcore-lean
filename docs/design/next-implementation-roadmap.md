@@ -9979,6 +9979,131 @@ The definitions were fixed before any harness change:
 - **Epoch:** the harness and the fuzz driver change, so an existing fuzz state
   needs `--accept-new-epoch`.
 
+**Sequence mutants of the pinned fixtures: results.** `e0333d32a` implements
+the definitions above:
+- **Harness:** `semantic-fixtures.py` draws a mutation run's sequence mutants
+  after its single-change and deployment mutants, from the recorded and
+  single-change observations, and runs each from a fresh deployment, Lean
+  Core in one invocation (`run_hull_sequence`). Records keep each sequence
+  mutant's operator, order, change position, prefix verdicts and compared
+  steps; `sequenceMutants` counts candidates, redundant ones, kept ones and
+  the phase's seconds; totals sum both. Findings carry the sequence id,
+  operator, change and position, with entry ids `sN@position`, and reduce to a
+  shortest prefix with their operator.
+- **Fuzz driver:** `--fixture-sequences` (default 8) passes the per-fixture
+  cap; the ledger counts compared sequence steps with the entries and the
+  sequence mutants as `sequences`; a sequence finding keys on its reduced
+  sequence and operator.
+- **Tests:** `test-semantic-fixtures.py` grows from 37 to 45 tests: the
+  operators and change positions, numbering and redundancy (a reverting
+  commit as its step's drop, unobserved and incomplete mutants), committed
+  directives and deployments, paths leaving a sequence, the comparison with
+  prefix expectations and a stop at the first disagreement, the caps and the
+  run's share, the reduction, and Lean Core's single sequence invocation.
+  `test-semantic-fuzz.py` grows from 33 to 34.
+
+The runs, with the scripts, native tools, compilers, directive and
+declaration tools, solc, Anvil and cast frozen (168 digests, none changed):
+- **Mutation run** on `e0333d32a` of the 117 fixtures with two or more
+  recorded calls, root seed `20261111`, four jobs, 4,453 seconds:
+  - 114 were admitted on Hull, O0 and Yul and 113 on O2. Three are rejected
+    by the checked driver, and `ignored-builtin-effects` crashes Sonatina O2,
+    the recorded finding and the run's only one.
+  - All 1,283 recorded steps, deployments included, matched their
+    expectations on every admitted path.
+  - The single-change stream was unchanged: 4,711 mutants, 519 of them
+    derived boundary mutants. 5,847 entries agreed, 31 were incomplete and
+    116 were observed by no path, the same Lean time limits, fuel and memory
+    range against the EVM's gas as before. 4,104 of the mutants were
+    identical, mutant, agreement and observation, to unit 11's run from the
+    same root seed; the other 88 are the derived calls' mutants redrawn since
+    unit 15.
+  - Sequence candidates: 6,409 in all. 5,706 were redundant and 140 commits
+    had a mutant that did not complete or agree, leaving 563 in 36 fixtures,
+    26 raw and 10 method fixtures. The cap of 64 bound only `array-copy` (69),
+    so 558 ran: 138 commits (5 of them deployments), 31 persists, 104 drops,
+    103 duplicates and 182 swaps.
+  - All 5,462 steps compared from a change on agreed on Hull, O0, O2 and
+    Yul. No path left a sequence and no comparison stopped. The 5,251
+    recorded steps run before a change matched their expectations on every
+    path, 21,004 verdicts.
+  - 2,194 of the compared steps observed something the recorded run did not:
+    148 another status, 521 other return or revert bytes, 1,510 only other
+    storage and 15 only other balances. 473 of the 558 sequence mutants
+    changed at least one later observation: every commit, 103 of the 104
+    drops, 178 of the 182 swaps, 25 of the 31 persists and 29 of the 103
+    duplicates, most of whose steps write the same value again. For example,
+    dropping `array-copy`'s `pushB(1)` leaves array `b` one element shorter,
+    so every later push and the copy leave other storage, on all four paths
+    alike.
+  - The sequence mutants took 958 of the run's 16,622 fixture-seconds, 6%;
+    `deposit`'s 4 took 130 seconds, mostly Lean Core's 15-second deployment.
+- **Fuzz driver:** one `fixtures` iteration on `33406df52`, whose fixture
+  harness and fuzz driver equal `e0333d32a`'s, base seed `20294371`, chosen
+  because its first iteration draws seven fixtures with sequence candidates.
+  Default budgets, 95 seconds:
+  - The fixtures were `049rgb3`, `array-copy`, `array-ops`,
+    `array-string`, `forloops`, `ownable`, `storage-array-layout` and
+    `struct-storage`.
+  - The cap of 8 kept 52 sequence mutants. Their 415 compared steps agreed on
+    every path, 212 of them observing something the recorded run did not.
+    287 of the 291 recorded steps and single-change mutants agreed; the other
+    4, seeded or boundary Words of `array-copy` and `array-ops`, were
+    observed by no path, Lean Core's fuel against the EVM's gas. A replay of
+    the iteration's fixture command gave the same entries and split.
+  - The run passed with no occurrence, new signature or problem, in epoch
+    `8068492de688`.
+
+No compiled path disagreed with another, so there is no finding, and
+`questions.md` is unchanged. This is agreement among compiled paths and with
+upstream's recorded expectations; no original Core reference exists for these
+fixtures. Two single-call fixtures also have candidates in unit 11's draws,
+`payable-ctor`'s deployment commit and `struct-storage-updates`' duplicate;
+the run of multi-step fixtures leaves them to the fuzz driver.
+
+**Storage campaign overheads.** `33406df52` cuts two per-scenario overheads
+of the storage campaign that the measurement of the complete fixed suite's
+budget (section 1) found: the fixed stateful corpora compiled every scenario,
+and every scenario hashed its tools and asked Anvil for its version. Each
+storage campaign now keeps one `CompileCache` and one `DigestCache`, as a pure
+campaign does, and passes both to every scenario; shrink candidates get only
+the digest cache and compile on their own.
+- **Sharing:** scenarios whose compilation identities agree, with the storage
+  adapter's own digest in place of the pure runner's, compile once, a Yul
+  export included. Each copies the outputs into its own run directory,
+  records `compilation` and lists the shared processes with `reused: true`.
+  A source rejection or compiler crash is shared the same way; any other
+  failure is not. Tool and compiler files are hashed once per campaign while
+  unchanged, and `anvil --version`, and solc's on Yul, runs once.
+- **Reports:** every summary and outcome stays as it was. A scenario's report,
+  and its compact receipt in `results/`, gains the `compilation` record.
+- **Tests:** `test-semantic-storage-campaign.py` grows from 125 to 126 tests
+  and `test-semantic-storage-differential.py` from 156 to 157. They check
+  that the caches reach every scenario but shrink candidates, that two
+  scenarios with one source compile once and copy its outputs, and that a
+  rejection is shared.
+- **Measurement:** the fixed O0 suite of all thirty stateful profiles at
+  `--seconds 7200 --profile-seconds 900`, before (`cb4ac3606`) and after,
+  one after the other from frozen copies, with the load sampled every 20
+  seconds:
+
+  | Run | Suite seconds | 27 storage profiles | 3 call profiles | Storage compilations | Storage `tool-version` runs | Retained | Mean load |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+  | before | 3,409 | 2,728 | 680 | 416 | 416 | 166.9 MB | 5.9 |
+  | after | 3,167 | 2,479 | 688 | 363 | 27 | 168.8 MB | 8.5 |
+
+  - Every profile passed both times with the same counts, transaction counts
+    and summary keys, and every scenario's analysis was identical.
+  - The 416 storage scenarios have 363 distinct sources. Their fresh
+    compilations took 2,151 seconds before and 1,936 after, and
+    `tool-version` 25.4 and 2.7. Imported Hull, direct replay and the
+    repository checks took the same time within the load's difference.
+  - The three call profiles run through the call campaign, which keeps its
+    73 compilations for 66 sources.
+  - Same-load A/B: `stateful-constructor-arguments`, 40 scenarios of 19
+    sources, took 258 and 250 seconds before and 136 and 146 after, run in
+    turn, with identical counts and analyses each time.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

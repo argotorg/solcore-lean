@@ -3112,6 +3112,11 @@ crash is shared the same way; any other failure is not, so the next scenario
 compiles again. Tool and compiler files are hashed once per campaign while
 they are unchanged, and `anvil --version`, and solc's on Yul, runs once. Shrink
 candidates compile on their own. The summary and every outcome are as before.
+On the fixed O0 suite of all thirty stateful profiles, frozen, the 27
+storage profiles compiled 363 sources for their 416 scenarios instead of 416
+and asked Anvil for its version 27 times instead of 416, and took 2,479
+seconds instead of 2,728 though the machine's mean load rose from 5.9 to 8.5;
+every count, summary and scenario analysis was identical.
 
 To exercise reduction deliberately, use an explicit copied-observation adapter:
 
@@ -7769,7 +7774,8 @@ one that made them.
 ```sh
 python3 scripts/semantic-fixtures.py --check
 python3 scripts/semantic-fixtures.py --mode mutation --seed 7 --fixture 'loop-*' \
-  --output .upstream/fixtures-budget --fixture-mutants 32 --fixture-seconds 300 --seconds 1800
+  --output .upstream/fixtures-budget --fixture-mutants 32 --sequence-mutants 8 \
+  --fixture-seconds 300 --seconds 1800
 ```
 
 Lean Core meters fuel, not gas, so a mutant can run long before its fuel runs
@@ -7861,6 +7867,19 @@ directive tools, solc, Anvil and cast frozen.
     and every recorded step matched.
   - A fuzz-driver iteration with base seed `20281409` ran 103 of them in four
     of the fixtures within its mutant budget, with no finding.
+- **Sequence mutants** (`e0333d32a`, frozen): a mutation run of the 117
+  fixtures with two or more recorded calls, root seed `20261111`, 4,453
+  seconds.
+  - Of 6,409 sequence candidates, 563 start a later step from a state that
+    neither the recorded run nor an earlier candidate reached, in 36
+    fixtures. With `array-copy` capped at 64, 558 ran: 138 commits, 31
+    persists, 104 drops, 103 duplicates and 182 swaps.
+  - All 5,462 steps compared from a change on agreed on every path, and
+    2,194 of them observed something the recorded run did not. Every recorded
+    step run before a change matched its expectation, and the single-change
+    mutants were as before.
+  - A fuzz-driver iteration with base seed `20294371` ran 52 of them in seven
+    fixtures, with no finding.
 
 ## Compare generic selection
 
