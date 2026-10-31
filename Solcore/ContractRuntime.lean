@@ -73,6 +73,7 @@ import Solcore.ContractRuntime.OneLevelNestedTransitionSystem
 import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.ContractRuntime.CallResumeExecution
 import Solcore.ContractRuntime.CallChainExecution
+import Solcore.ContractRuntime.CallChoiceExecution
 import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-!
