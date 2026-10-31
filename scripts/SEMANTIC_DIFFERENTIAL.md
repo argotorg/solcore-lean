@@ -7331,7 +7331,7 @@ Every stateful profile compares the declared slots on all three paths. The twent
 declared-slot profiles also require the Hull and EVM paths to hold no nonzero
 slot outside the declaration. A stray write by original Core itself, or any
 stray write in the two-slot, rollback and two call profiles, was invisible. All
-thirty stateful profiles now also compare the observed contracts' whole
+thirty-one stateful profiles now also compare the observed contracts' whole
 committed storage after deployment and after every transaction. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the definitions;
 this section describes how the paths observe it.
@@ -7341,7 +7341,7 @@ this section describes how the paths observe it.
 Each history carries `initialAccountStorage`, an `accountStorage` list on every
 row and `finalAccountStorage`. Each lists the observed accounts in role order:
 `contract` for the twenty-seven storage-family profiles, `parent` and `child` for
-the three call profiles. Every account names its role,
+the four call profiles. Every account names its role,
 its bound decimal address and its nonzero entries `{slot, value}` in strictly
 increasing slot order. Zero is never listed, so a cleared slot and a slot never
 written are the same observation. An incomplete transaction reports the prior
@@ -7435,8 +7435,9 @@ then; the later profiles start at
 `solcore-lean.enum-argument-history.v1`,
 `solcore-lean.enum-array-history.v1`,
 `solcore-lean.array-return-history.v1`,
-`solcore-lean.constructor-argument-history.v1` and
-`solcore-lean.call-return-history.v1`, whole storage included; the two inline
+`solcore-lean.constructor-argument-history.v1`,
+`solcore-lean.call-return-history.v1` and
+`solcore-lean.call-sequence-history.v1`, whole storage included; the two inline
 Yul loop profiles reuse their parents' history schemas. Reports use
 `solcore-lean.semantic-storage-differential.v2` and
 `solcore-lean.semantic-call-differential.v2`, and campaign analyses use
@@ -7519,11 +7520,11 @@ preservation proof.
 
 The twenty-seven storage-family profiles also run with `--backend yul --solc PATH`.
 They compile as the pure profiles do: the checked Rust driver's Yul goes
-through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The three
-call profiles stay on Sonatina: `stateful-calls` and `stateful-forwarded-value`
-compile a parent and a child contract from one source, and
-`stateful-call-returns`, which compiles each from its own source, waits for the
-exporter to admit its two contract names. The
+through solc `0.8.35+commit.47b9dedd` with optimization and Osaka. The
+call-return and call-sequence profiles also run on Yul when selected
+([call returns](#compare-call-returns), [call sequences](#compare-call-sequences));
+`stateful-calls` and `stateful-forwarded-value` stay on Sonatina, because each
+compiles a parent and a child contract from one source. The
 [roadmap](../docs/design/next-implementation-roadmap.md) fixes the observation
 boundary; this section describes how to run it.
 
@@ -7548,8 +7549,9 @@ boundary; this section describes how to run it.
   their creation code reads only its own runtime object, besides the
   arguments appended after the constructor-argument wrapper's init code. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the twenty-six pure and the
-  twenty-four storage-family wrappers, taken from the adapters' profile tables;
+- **Admission:** `export-rust-yul.py` admits the twenty-seven pure, the
+  twenty-four storage-family and the two call-return wrappers, taken from the
+  adapters' profile tables;
   the three malformed profiles reuse wrappers. Each must compile to one
   creation object with one runtime sub-object and no link or immutable
   references. `--fixture ID` separately admits a pinned end-to-end fixture's
@@ -7580,7 +7582,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the twenty-six pure profiles. `--backend yul`
+Its default Yul selection stays the twenty-seven pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 

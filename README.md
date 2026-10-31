@@ -174,13 +174,12 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-six pure profiles with `--backend yul`, and for the
-twenty-seven storage-family profiles when they are selected. Its EVM bytes are
+available for the twenty-seven pure profiles with `--backend yul`, and for the
+twenty-seven storage-family profiles and the call-return and call-sequence
+profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
-object linking and the three call profiles are outside this comparison: two
-compile a parent and a child contract from one source, and the call-return
-profile, which compiles each from its own source, waits for the exporter to
-admit its two contract names.
+object linking and the other two call profiles, which compile a parent and a
+child contract from one source, are outside this comparison.
 See [generated semantic comparisons](scripts/SEMANTIC_DIFFERENTIAL.md) for the
 tools, supported operations and validation commands. Closed generated programs
 may be constant-folded; source coverage is not runtime opcode coverage.
@@ -188,7 +187,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-six-profile suite runs locally with shared time and disk limits.
+The same fifty-eight-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -288,6 +287,17 @@ same byte-list model, so a returned argument is the caller's value and a
 written argument is seen by the caller. All 328 fixed cases and 96 random
 cases of eight functions match on O0, O2 and Yul
 ([Solcore memory calls](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-calls)).
+The `runtime-revert-data` profile reverts with std's `Error` values made from
+the input: `Error(w)`, whose revert data are the low four bytes of a run-time
+selector Word, `Error.Empty`, and `Error.Msg` over a `memory<string>` view of a
+bytes value, raised by `revertWithError` or `require`, beside `require` with a
+literal message, `revertLit` and `revertEmpty()`. Sites run in helpers, two
+helpers deep, function values, closures, pair, sum and enum arms and a bounded
+loop, and a message's bytes written after its `Error` was made, also through a
+second variable, are seen. Original Core carries revert data of up to 64 bytes
+in the same byte-list model, and the paths compare them exactly. All 152 fixed
+cases and 96 random cases of eight functions match on O0, O2 and Yul
+([Solcore revert data](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-revert-data)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -309,7 +319,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the seventeen profiles whose functions can be identities they
+inputs, and in the eighteen profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
@@ -680,10 +690,20 @@ then a resume phase that reads the child's status and bytes as its input, each
 through the public top-level runner. Each transaction records std's
 prescribed rejection from a byte-level Lean model, which the adapter
 recomputes. The 45 fixed scenarios and sixteen random scenarios at each of two
-node budgets match on both Sonatina levels. See
+node budgets match on both Sonatina levels and on Yul. See
 [call returns](scripts/SEMANTIC_DIFFERENTIAL.md#compare-call-returns).
 
-All thirty stateful profiles also compare the installed contracts' whole
+The call-sequence profile's parent calls the child two or three times in one
+method and reads `returndatasize` and an in-bounds `returndatacopy` window in
+inline Yul before and after each call, so a stale return-data buffer or a read
+moved across a later call would show. The child returns or reverts raw data of
+0 to 96 bytes. An additive call chain in the contract runtime splits original
+Core's parent at every call; the one-call convention is the chain without
+middle phases. The 16 fixed scenarios and sixteen random scenarios at each of
+two node budgets match on both Sonatina levels and on Yul. See
+[call sequences](scripts/SEMANTIC_DIFFERENTIAL.md#compare-call-sequences).
+
+All thirty-one stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
@@ -691,8 +711,8 @@ Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, or exactly the decoded record for the
 constructor-argument profile, and a revert must leave each path's whole storage
-unchanged. The latest fixed run of all thirty profiles, 489 scenarios and
-1,239 transaction prefixes, matched on Sonatina O0, and every
+unchanged. The latest fixed run of all thirty-one profiles, 505 scenarios and
+1,278 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See
