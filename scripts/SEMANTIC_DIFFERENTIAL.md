@@ -3101,6 +3101,18 @@ response over the campaign's bound on tool output, `min(4 MiB, --disk-bytes /
 history records each halving in `halvedBatches`. Only a one-candidate response
 over the bound stops the reduction.
 
+A storage campaign shares compilations and tool digests as a pure campaign
+does (see [shared compilation](#shared-compilation-in-campaigns)). Scenarios
+whose compilation identities are equal, with the storage adapter's own digest
+in place of the pure runner's, compile once in `.work/compilations/DIGEST/`; on
+Yul the shared compilation includes the Yul export. Each case copies the
+outputs into its own run directory, records `compilation`, and lists the
+shared compiler processes with `reused: true`. A source rejection or compiler
+crash is shared the same way; any other failure is not, so the next scenario
+compiles again. Tool and compiler files are hashed once per campaign while
+they are unchanged, and `anvil --version`, and solc's on Yul, runs once. Shrink
+candidates compile on their own. The summary and every outcome are as before.
+
 To exercise reduction deliberately, use an explicit copied-observation adapter:
 
 ```sh

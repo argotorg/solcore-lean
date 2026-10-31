@@ -3698,12 +3698,21 @@ def execute(args, report: dict) -> None:
             raise ValueError(f"native storage replay changed {key}")
     save(args.output / "replayed-case.json", fresh)
     hull, images_path = args.output / "hull.json", args.output / "images.json"
-    export_args = [str(source), "--root", str(args.output), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
-    common.checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *export_args, "--output", str(hull)])
-    common.checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *export_args,
-        "--optimization", common.optimization_for_backend(linked),
-        "--output", str(images_path), "--hull-output", str(hull), "--timeout", str(args.timeout)], args.timeout * 3)
-    report["exportProvenance"] = common.validate_export(hull, images_path, source, args.artifact_limit, backend=linked)
+    cache = common.shared_compilations(args)
+    compiled, shared = source, None
+    if cache is None:
+        export_args = [str(source), "--root", str(args.output), "--upstream", str(args.upstream), "--target-dir", str(args.target_dir)]
+        common.checked_process(runner, "rust-checked-source", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *export_args, "--output", str(hull)])
+        common.checked_process(runner, "rust-code-images", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *export_args,
+            "--optimization", common.optimization_for_backend(linked),
+            "--output", str(images_path), "--hull-output", str(hull), "--timeout", str(args.timeout)], args.timeout * 3)
+    else:
+        # A campaign's scenarios with the same source and tools share one compilation; this case copies its outputs.
+        shared = cache.compile(args, runner, case, report, args.backend, None, lambda directory=None: None)
+        compiled = shared["source"]
+        cache.fail(shared)
+    report["exportProvenance"] = common.validate_export(hull, images_path, source, args.artifact_limit, backend=linked,
+                                                        compiled=compiled)
     if previous and "exportProvenance" in previous:
         old, new = previous["exportProvenance"], report["exportProvenance"]
         if old["images"].get("toolBuild") != new["images"].get("toolBuild") or old["hull"].get("binarySha256") != new["hull"].get("binarySha256") or old["hull"].get("patches") != new["hull"].get("patches"):
@@ -3716,7 +3725,11 @@ def execute(args, report: dict) -> None:
     runtime = common.image_bytes(images, case["contract"]["runtimePath"])
     if args.backend == "yul":
         # The EVM deploys one solc compilation's bytes; Hull keeps the O0 images.
-        init, runtime = common.yul_transport("execute", args, runner, case, source, hull, report, previous)
+        if shared is None:
+            init, runtime = common.yul_transport("execute", args, runner, case, source, hull, report, previous)
+        else:
+            cache.fail(shared, yul=True)
+            init, runtime = common.accept_yul(args, case, report, shared["yul"])
     with common.anvil(runner, args.anvil, steps_tracing=True) as rpc:
         accounts = rpc.call("eth_accounts", [])
         if not accounts or not re.fullmatch(r"0x[0-9a-fA-F]{40}", accounts[0]):

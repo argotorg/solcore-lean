@@ -896,6 +896,65 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(sent, [("eth_sendTransaction", {"from": "0x" + "11" * 20, "data": "0x" + b"yul-init".hex(),
                                                               "value": "0x0", "gas": hex(1000)})])
 
+    def test_cases_with_one_source_share_its_compilation_and_copy_its_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "upstream/std").mkdir(parents=True)
+            (directory / "upstream/std/std.sol").write_text("// std")
+            for name in runner.common.COMPILERS:
+                (directory / "target" / name).parent.mkdir(parents=True, exist_ok=True)
+                (directory / "target" / name).write_text(name)
+            cache, digests = runner.common.CompileCache(directory / "compilations"), runner.common.DigestCache()
+            fake = Mock()
+            fake.identity.return_value = {"sha256": "0" * 64}
+            fake.process.return_value = {"returncode": 0, "stdout": "revision"}
+            commands, reports, outputs = [], [], []
+
+            def checked(_runner, stage, command, *_limits):
+                if stage == "direct-core-replay":
+                    return {"stdout": json.dumps(case())}
+                commands.append(stage)
+                reports[-1]["processes"].append({"stage": stage})
+                if rejected:
+                    raise runner.common.Finding("source-rejected", stage, "rejected")
+                for flag in ("--output", "--hull-output"):
+                    if flag in command:
+                        Path(command[command.index(flag) + 1]).write_text(json.dumps({"stage": stage}))
+                return {"stdout": ""}
+
+            def execute(name):
+                source, output = directory / f"{name}.json", directory / name
+                source.write_text(json.dumps(case())); output.mkdir()
+                args = SimpleNamespace(case=source, replay=None, backend="sonatina-o0", output=output, artifact_limit=1 << 20,
+                    case_tool=Path("unused-case"), core_runner=Path("unused-core"), anvil=Path("unused-anvil"),
+                    direct_fuel=1000, timeout=1, upstream=directory / "upstream", target_dir=directory / "target",
+                    compile_cache=cache, digest_cache=digests)
+                reports.append({"processes": [], "histories": {}})
+                with patch.object(runner.common, "Runner", return_value=fake), \
+                     patch.object(runner.common, "checked_process", side_effect=checked), \
+                     patch.object(runner.common, "validate_export", side_effect=ValueError("stops after the exports")) as validate:
+                    with self.assertRaises((ValueError, runner.common.Finding)) as stop:
+                        runner.execute(args, reports[-1])
+                outputs.append(validate.call_args)
+                return output, stop.exception
+            rejected = False
+            first, _ = execute("first")
+            second, _ = execute("second")
+            # One compilation for both: the second case copies its outputs and records its processes as reused.
+            self.assertEqual(commands, ["rust-checked-source", "rust-code-images"])
+            self.assertEqual([report["compilation"]["reused"] for report in reports], [False, True])
+            self.assertEqual(reports[1]["processes"][-2:], [{"stage": "rust-checked-source", "reused": True},
+                                                           {"stage": "rust-code-images", "reused": True}])
+            for name in ("hull.json", "images.json"):
+                self.assertEqual((second / name).read_text(), (first / name).read_text())
+            shared = Path(reports[0]["compilation"]["directory"]) / "case.sol"
+            self.assertEqual([call.kwargs["compiled"] for call in outputs], [shared, shared])
+            # A rejection of the source is shared too; the next case raises it without compiling again.
+            cache, rejected = runner.common.CompileCache(directory / "rejections"), True
+            _, error = execute("third")
+            _, again = execute("fourth")
+            self.assertEqual((error.category, again.category, commands[2:]), ("source-rejected", "source-rejected", ["rust-checked-source"]))
+
     def test_yul_replay_rejects_compiler_or_transport_drift_before_export(self):
         tools = {"runnerSha256": runner.common.file_digest(ROOT / "scripts/semantic-storage-differential.py"),
                  "sharedRunnerSha256": runner.common.file_digest(ROOT / "scripts/semantic-differential.py"),

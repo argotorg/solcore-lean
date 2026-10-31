@@ -443,7 +443,7 @@ class RetentionTests(unittest.TestCase):
             raw = report(candidate, path="directCore", transaction_id="tx-1", field="storage:1")
             analysis = campaign.analyze(raw, candidate)
             with patch.object(instance, "tool", return_value={"schema": campaign.CORPUS_SCHEMA, "cases": [candidate]}), \
-                 patch.object(instance, "execute_case", side_effect=lambda _: saved_execution(instance, candidate, raw, analysis)):
+                 patch.object(instance, "execute_case", side_effect=lambda _, **__: saved_execution(instance, candidate, raw, analysis)):
                 instance.shrink(value, finding)
             secondary = instance.summary["secondaryFindings"][0]
             self.assertFalse(secondary["synthetic"])
@@ -526,6 +526,22 @@ class BackendTests(unittest.TestCase):
                 self.assertEqual(instance.summary["backend"], backend)
                 self.assertEqual(instance.summary["configuration"]["backend"], backend)
                 self.assertEqual(instance.summary["tools"].get("solc"), str((Path(temporary) / "solc").resolve()) if backend == "yul" else None)
+
+    def test_scenarios_share_the_campaigns_compilations_and_tool_digests_and_shrink_candidates_compile_alone(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            instance = campaign.Campaign(options(temporary))
+            seen = []
+
+            def execute(args, raw):
+                seen.append((args.compile_cache, args.digest_cache))
+                raw.update(report(json.loads(args.case.read_text())))
+            with patch.object(campaign.adapter, "execute", side_effect=execute):
+                instance.execute_case(case(3))
+                instance.execute_case(case(1))
+                instance.execute_case(case(1), reuse=False)
+            self.assertIsInstance(instance.compilations, campaign.common.CompileCache)
+            self.assertEqual(instance.compilations.directory, instance.work / "compilations")
+            self.assertEqual(seen, [(instance.compilations, instance.digests)] * 2 + [(None, instance.digests)])
 
     def test_yul_campaign_cli_forwards_its_compiler(self):
         with tempfile.TemporaryDirectory() as temporary:

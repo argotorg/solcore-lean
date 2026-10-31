@@ -1219,6 +1219,10 @@ class Campaign:
         self.reserve = min(40 * 1024 * 1024, args.disk_bytes // 4)
         self.work = args.output / ".work"
         self.work.mkdir()
+        # Scenarios whose sources, backend and compiler tools agree by digest share one compilation, and every
+        # case's unchanged tools are hashed once; shrink candidates compile on their own.
+        self.compilations = common.CompileCache(self.work / "compilations")
+        self.digests = common.DigestCache()
         self.counter = self.shrink_attempts = 0
         self.materialized = []
         self.summary = {"schema": SCHEMA, "backend": self.backend, "status": "running", "synthetic": args.test_perturb_path is not None,
@@ -1451,23 +1455,24 @@ class Campaign:
         self.summary["generation"] = {"requested": self.args.cases, "attempted": min(self.args.cases, len(manifest["cases"])), "attemptUnit": "manifest scenarios", "excluded": exclusions}
         save_json(self.args.output / "generation.json", self.summary["generation"])
 
-    def case_args(self, case_path, folder):
+    def case_args(self, case_path, folder, compilations=None):
         left = max(.001, self.deadline - time.monotonic())
         return SimpleNamespace(case=case_path, replay=None, backend=self.backend, solc=self.solc, output=folder, case_tool=self.args.case_tool,
+            compile_cache=compilations, digest_cache=self.digests,
             core_runner=self.args.core_runner, anvil=self.args.anvil, upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
             timeout=min(self.args.case_timeout, left), startup_timeout=min(30, left), total_timeout=min(self.args.case_timeout, left),
             output_limit=min(4 * 1024 * 1024, self.args.disk_bytes // 64),
             artifact_limit=min(64 * 1024 * 1024, (self.args.disk_bytes - self.reserve) // 8), resource_guard=self.guard)
 
-    def execute_case(self, case):
+    def execute_case(self, case, reuse=True):
         self.guard()
         self.counter += 1
         folder = self.work / f"run-{self.counter:06d}"
         folder.mkdir()
         input_path = self.work / f"input-{self.counter:06d}.json"
         save_json(input_path, case)
-        args = self.case_args(input_path, folder)
+        args = self.case_args(input_path, folder, self.compilations if reuse else None)
         report = {"schema": adapter.REPORT_SCHEMA, "backend": self.backend, "processes": [], "histories": {},
             "budgets": {key: getattr(args, key) for key in ("direct_fuel", "core_fuel", "gas", "timeout", "startup_timeout", "total_timeout", "output_limit", "artifact_limit")},
             "scope": adapter.scope(case) if self.specification["declared"] else
@@ -1547,7 +1552,7 @@ class Campaign:
                         continue
                     seen.add(identity)
                     self.shrink_attempts += 1
-                    folder, report, analysis = self.execute_case(candidate)
+                    folder, report, analysis = self.execute_case(candidate, reuse=False)
                     keep = same_failure(finding["fingerprint"], analysis)
                     step = {"attempt": self.shrink_attempts, "caseSha256": identity,
                         "programSha256": common.digest(common.json_bytes(candidate["program"])),
