@@ -9800,6 +9800,185 @@ response over the bound, or any other stop, still ends the reduction.
     case (`c04807fca4b3`) as the batch-eight reduction on `9ce37afeb`, which
     started at eight.
 
+**Sequence mutants of the pinned fixtures: probe and definitions.** Every
+fixture mutant so far is one rolled-back transaction. A mutated step never
+persists, so every recorded step after it starts from the recorded state. A
+probe read how each path runs a fixture's steps, which fixtures change state
+along their sequences, and what a changed sequence costs:
+- **Runners.**
+  - Lean Core: `rust-hull-scenario` takes the deployment and an ordered list
+    of calls, each with its own `persist` flag. A persisting call that returns
+    keeps its storage, balances and account world for the next call; any
+    other call's are discarded. The harness runs a raw scenario's entries in
+    one invocation, resumed past a time limit by replaying the persisting
+    steps before it, and each method entry in its own invocation after the
+    sends before it.
+  - Anvil: one chain per fixture. Each path reverts to the fixture's base
+    snapshot, deploys and sends the entries in order, and a non-persisting
+    entry runs on a snapshot reverted afterwards. Storage is reread for every
+    slot a persisting transaction touched.
+  - So both runners take any order and any persistence of steps, and a
+    changed sequence needs no runner change.
+- **Stateful sequences,** from unit 11's kept fixed and mutation runs of all
+  168 fixtures:
+  - Raw scenarios: 72 with 626 calls, all persisting. 61 have two or more
+    calls (618), 59 of them admitted (596). In 24 of the 59, 104 steps change
+    the observed state: the storage of any account, or the contract's or
+    the sender's balance. The other 35 change none.
+  - Method fixtures: 95 admitted, with 613 directives and one send
+    (`persistent-storage`). Upstream discards every other directive's state.
+    Still, 43 directives in 17 fixtures change the state when they run, and
+    31 of them, in 9 fixtures, have a later directive:
+    `storage-array-layout` 10, `aggregate-closure-captures` 5,
+    `closure-parameters` and `mutable-pattern-bindings` 4 each,
+    `struct-load-once` 3, `inferred-local-lambdas` 2, and `126nanoerc20`,
+    `struct-compound` and `struct-fields` 1 each. Committing a directive
+    means something exactly there. Any other committed directive leaves the
+    state that the next one starts from as it was.
+- **Cost** of one changed sequence, in seconds, from nine fixtures. Each ran
+  its recorded sequence, the sequence with a middle persisting step dropped,
+  duplicated, and swapped with the next, and, for the four method fixtures,
+  with every directive committed:
+
+  | Fixture | Mode, calls | Lean Core deployment | Lean Core sequence | O0 | O2 | Yul |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: |
+  | `storage-adt-abi` | raw, 10 | 0.23 | 0.40–0.45 | 0.02–0.03 | 0.02 | 0.01–0.02 |
+  | `mini-erc20` | raw, 3 | 1.09 | 1.28–1.35 | 0.01–0.02 | 0.01 | 0.01 |
+  | `weth9` | raw, 15 | 0.33 | 0.77–0.81 | 0.03–0.05 | 0.02–0.03 | 0.02–0.03 |
+  | `array-copy` | raw, 26 | 0.25 | 0.94–0.96 | 0.08 | 0.07–0.08 | 0.06–0.09 |
+  | `deposit` | raw, 15 | 15.26 | 25.57–34.92 | 0.15–0.19 | 0.13–0.14 | 0.13–0.14 |
+  | `persistent-storage` | methods, 3 | 0.13 | 0.43–0.77, in one 0.17–0.19 | 0.01 | 0.01 | 0.01 |
+  | `struct-load-once` | methods, 4 | 0.12 | 0.56–0.94, in one 0.17–0.18 | 0.01–0.02 | 0.01 | 0.01 |
+  | `storage-array-layout` | methods, 11 | 0.79 | 11.86–21.16, in one 2.73–2.83 | 0.04–0.06 | 0.03–0.05 | 0.03–0.05 |
+  | `closure-parameters` | methods, 36 | 0.70 | 30.84–51.36, in one 1.99–2.00 | 0.07–0.09 | 0.05–0.07 | 0.05–0.06 |
+
+  - Lean Core takes 90 to 99% of a sequence's time, much of it loading and
+    deploying the contract.
+  - A method sequence run as one invocation, like a raw scenario, is 2 to
+    26 times cheaper than one invocation per directive.
+  - All 35 changed sequences agreed on every path.
+- **Candidates,** counted over unit 11's single-change draws:
+  - The operators below give 6,010 candidates.
+  - 5,448 of them repeat a continuation that the recorded run or an earlier
+    candidate already reached: the same state before the same next step.
+    That leaves 562, in 38 fixtures.
+  - Commits give 3,811 of the 6,010 but only 137 of the 562. Most mutants
+    revert or leave the recorded state, and a reverting one is its step's
+    drop.
+
+The definitions were fixed before any harness change:
+- **Sequence mutant:** the recorded sequence with exactly one change, run
+  from a fresh deployment on every admitted path. The steps after the change
+  start from whatever state it leaves.
+- **Operators,** at recorded call `k` of `N`, the deployment being step 0:
+  - `commit`: a drawn single-change mutant of step `k`, the existing draw
+    with its number, in place of the step and persisting. A call's commit
+    needs a recorded call after it. A deployment's commit is a deployment
+    mutant followed by every recorded call.
+  - `persist`: a rolled-back method directive committed as recorded. It
+    needs a later call.
+  - `drop`: step `k` left out. Only a persisting step with a later call.
+  - `duplicate`: step `k` run twice in a row. Only a persisting step.
+  - `swap`: steps `k` and `k + 1` exchanged. One of them must persist.
+  - Every step keeps its recorded caller, value and gas, and every other step
+    its recorded persistence.
+- **Redundancy,** decided from the recorded and single-change observations
+  before any sequence runs:
+  - A step changes the state when, on some admitted path, it did not
+    complete, or it left other storage or balances than it found.
+  - `drop` and `duplicate` need step `k` to persist and change the state.
+    `swap` needs one of its two steps to, and `persist` needs the directive
+    to change the state.
+  - `commit` needs its mutant to have completed and agreed on every admitted
+    path. It continues from the mutant's state, or, if the mutant reverted,
+    from the state before the step. A deployment's commit needs a deployment
+    mutant that returned.
+  - `drop`, `persist` and `commit` continue from a known state before a
+    known next step. Such a candidate is redundant when the recorded run or
+    an earlier candidate continues from the same state before the same step.
+    So a commit of a reverting mutant is its step's drop.
+- **Order, numbering and seeding:**
+  - Candidates are ordered by position. The deployment's commits come first,
+    then, for each call, `drop`, `persist`, its commits by mutant number,
+    `duplicate` and `swap`.
+  - They are numbered `s1`, `s2`, … in that order over every candidate
+    before redundancy, with each call's commits taken over the step's whole
+    draw before `--fixture-mutants`. So a number depends only on the
+    recorded steps and the single-change draw.
+  - The single-change draws, numbers and budget are unchanged.
+- **Caps:**
+  - Per fixture, `--sequence-mutants` (default 64; 0 disables) keeps at most
+    that many non-redundant candidates. Beyond that, a seeded uniform sample
+    keeps that many with their numbers and order, drawn from the root seed,
+    the fixture id and `sequence`.
+  - Per run, `--run-sequence-mutants M` splits `M` evenly over the run's
+    fixtures with a recorded call: each keeps at most `M / F` of them,
+    rounded down and at least one, `F` being the count of those fixtures.
+- **Execution:** each kept sequence mutant runs after the fixture's
+  single-change and deployment mutants, from a fresh deployment on every
+  admitted path. On Anvil it starts from the fixture's snapshot. On Lean Core
+  the whole sequence runs in one invocation within `--hull-timeout`, method
+  fixtures included, and is not resumed after a limit.
+- **Comparison:**
+  - Before the change, the steps are the recorded ones. Their recorded
+    expectations apply, and the paths are compared as for recorded steps.
+  - From the change on, each step is compared across the paths only: status,
+    return or revert bytes, logs, whole storage and balances.
+- **Exclusions:**
+  - A path leaves a sequence at its first step that did not complete there:
+    a resource limit, a path failure, or a step that was not executed
+    because the deployment did not complete. Its later steps start from an
+    unknown state, so they are not compared. A step that the remaining paths
+    agree on is then incomplete, not agreeing.
+  - The comparison of a sequence stops at its first disagreement, since the
+    paths then start from different states.
+  - A sequence mutant reached after the fixture's or the run's deadline, or
+    after a stop signal, is not run. Its steps, and the steps of one that a
+    deadline stops partway, count as `budget`, which is neither a resource
+    limit nor a finding. The fixture records its stop as today.
+- **Findings and reduction:**
+  - From the change on, a disagreement or a path failure is a finding. It
+    records the sequence mutant, its operator and the step's position.
+    Before the change, the recorded steps' categories apply.
+  - A sequence finding reduces to a shortest prefix with its single
+    operator:
+    - the sequence ends at the finding's step;
+    - of the steps before the change, only the persisting ones stay, and
+      each is dropped, last first, while the finding recurs;
+    - the steps between the change and the finding's step are then dropped
+      the same way;
+    - a commit's mutated word or length then moves toward the recorded one.
+
+    Every reduction's bounds apply: 48 runs and 900 seconds.
+- **Records:** for each sequence mutant, its operator, position, committed
+  mutant, step order and change position. For each compared step, the
+  agreement, and whether its observation equals the recorded step's, or the
+  committed mutant's. The observations are kept where they differ or where
+  the paths did not agree. Each fixture counts its candidates, redundant,
+  kept and run sequence mutants.
+- **Fuzz driver:** the `fixtures` run kind gains `--fixture-sequences`
+  (default 8), passed on as the per-fixture cap. A sequence finding's
+  signature keys on its reduced sequence and operator.
+- **Expected size,** from unit 11's draws:
+  - The 562 non-redundant candidates are 104 drops, 106 duplicates, 184
+    swaps, 31 persists and 137 commits. Another 140 commits fall out because
+    their mutant did not complete or agree.
+  - At most 69 fall in one fixture (`array-copy`), so the default cap binds
+    only there.
+- **Runs:**
+  - a frozen mutation run, root seed `20261111`, of every fixture with two or
+    more recorded calls, on every path;
+  - one fuzz-driver `fixtures` iteration with sequence mutants.
+
+  Any disagreement is a finding. It goes to `questions.md`, joins the known
+  findings only if its signature is a stable symptom, and is reduced to a
+  shortest prefix and a single operator.
+- **Out of scope,** as for every step: block numbers and time, which move
+  with the number of transactions on Anvil, and the balances of accounts
+  other than the contract and the sender.
+- **Epoch:** the harness and the fuzz driver change, so an existing fuzz state
+  needs `--accept-new-epoch`.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
