@@ -390,7 +390,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 
@@ -404,12 +404,14 @@ Word whose arm multiplies by 1 returns its input, so `runtime-traits` and
 `runtime-trait-hierarchies` do as well, and a memory value plan whose only
 observation reads `sc_x` back returns its input, so `runtime-memory-values`
 does too, and so does `runtime-memory-calls`, where a helper's read of a zero
-byte added to or xored with `sc_x` can be a plan's only nonzero Word.
+byte added to or xored with `sc_x` can be a plan's only nonzero Word, and
+`runtime-revert-data`, where a plan whose only fold reads `sc_x` back and none
+of whose sites raises at a boundary input returns its input.
 `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-seven of the seventeen profiles do not use G0. Only generated cases pass filters:
+eight of the eighteen profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -584,7 +586,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the twenty-six pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the twenty-seven pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -854,6 +856,24 @@ recorded processes fell from 1,105 to 453 seconds on O0 and from 1,384 to 697
 on Yul, and `tool-version` from 124 and 251 seconds to 2 and 3. Sixteen memory
 value cases of two sources, run in turn under the same load, took 23.7 seconds
 before and 18.5 after.
+
+The suite checks its time, disk and output limits every 0.1 seconds while a
+profile's campaign runs, and its disk check walked the whole suite output each
+time, every finished profile's folder included. A campaign writes only its own
+folder and its two logs, and a finished profile's files never change again, so
+the check now walks the running profile's folder alone and adds the logs'
+lengths to the rest of the output as measured when the profile started. The
+limits, the checks' frequency, the stopping decisions and the report fields
+are unchanged, and the disk limit keeps its margin: a profile is stopped at
+the first check, every 0.1 seconds plus the process-table poll, about 0.14
+in all, after the output reaches the limit less the suite's reserve of 8 MiB
+at the default 1 GiB. The same short O0 fixed suite of nine profiles, frozen
+and run one after the other, took 877 and 888 seconds before and after; the
+suite's own CPU time fell from 70.3 to 38.9 seconds and its disk walks from
+56.6 to 24.5. Applied to every profile's folder of the complete O0 fixed
+suite, the walks come to an estimated 1,408 seconds before and 34 after. The
+process table the suite reads at every check, 6,262 and 6,546 `ps` calls
+taking 146 and 160 seconds in those runs, is now most of the suite's own cost.
 
 ## Check the reducer
 
@@ -2692,6 +2712,132 @@ on every run:
   attempts, three excluded for one outcome everywhere, and drew 96 cases from
   8 sources, 14 of them out of range, and 52 of the 107 shape values. O0, O2
   and Yul matched all 96, in 138, 133 and 177 seconds.
+
+No mismatch, crash or rejection was found.
+
+## Compare Solcore revert data
+
+The memory profiles revert only with std's `OutOfBounds()`, a single
+selector. `runtime-revert-data` computes std `Error` values as data and
+reverts with them on input-dependent paths: `Error(W)` with a selector Word
+computed from the input, `Error.Empty`, `Error.Msg(memory(Typedef.rep(sc_b<n>)))`
+over a bytes value built from the input, `require(C, E)`, `require(C, "…")`
+through std's `Str<Error>`, `revertLit("…")` and `revertEmpty()`, in `run`,
+helpers, closures, match arms and a bounded loop. `assert`'s `invalid()` is
+left out: it reverts without data.
+
+Helpers are `sc_h<k>`:
+- `raise`, `(sc_e: Error, sc_w: word) returns (word)`: a site over `sc_w`,
+  then `return (sc_w op c);`;
+- `make`, `(sc_w: word) returns (Error)`: `return Error((sc_w + c));`;
+- `message`, `(sc_v: memory<bytes>) returns (Error)`:
+  `return Error.Msg(memory(Typedef.rep(sc_v)));`;
+- `pick`, `(sc_w: word, sc_a: Error, sc_b: Error) returns (Error)`: `sc_a`
+  when its test of `sc_w` holds, otherwise `sc_b`;
+- `call`, `(sc_e: Error, sc_w: word) returns (word)`:
+  `return sc_h<j>(sc_e, (sc_w + c));` of an earlier `raise` or `call` helper.
+
+`run(uint256)` of `SynthesizedRevertData` binds `sc_x` and `sc_r`, runs one
+to twelve steps and returns `sc_r`. A step is a `runtime-memory-values`
+action (a bytes value, a second variable, a write or an observation at a
+literal position), an `Error` variable made in place or by a `make`,
+`message` or `pick` helper, a data value (`(E, W)`, `inl(E)`, `inr(W)`,
+`Sc_F.Sc_F0(E, W)` or `Sc_F.Sc_F1(W)`), a site, a call of a `raise` or `call`
+helper, directly or through a function value, a match of a data value whose
+`Error` arm has a site and whose Word arm folds, a closure
+`lam (sc_j: word) -> word { SITE; return (sc_j op c); }` or its application,
+or one loop `while (sc_limit > sc_counter)` with `sc_limit = (sc_x & m)`
+whose body builds bytes values and has sites. A site is
+`if (C) { revertWithError(E); }`, `require(C, E);`,
+`if (C) { revertLit("…"); }`, `require(C, "…");` or
+`if (C) { revertEmpty(); }`, and its condition tests a Word of its scope with
+`<`, `>`, `==`, `!=` or a masked equality. A plan has a site it can reach and
+a fold.
+
+The Core reference is `runtime-memory-values`' byte-list model, never reading
+the source. It returns the left injection of the accumulator, or the right
+injection of the revert data: its length and its bytes in two Words, at most
+64 bytes. Each site binds a sum that continues or carries its payload, and
+every enclosing scope forwards a payload it receives, so the first site whose
+condition decides raises. A selector's data are the low four bytes of its
+Word, a message's the bytes of its value at the site, so a write made after
+the `Error` was made is seen through every variable of the value, and a
+literal's its bytes. Helpers and closures are inlined where they run. The
+adapter compares the revert data exactly: three reverts match only with the
+same data.
+
+```sh
+python3 scripts/semantic-campaign.py \
+  --profile runtime-revert-data --functions 8 --output .upstream/semantic-revert-data
+python3 Tests/scripts/test-semantic-revert-data-corpus.py
+```
+
+Native commands are `revert-data-generate SEED NODES COUNT ATTEMPTS FUEL
+[seeded-inputs-v1/splitmix64] [exclude-boundary-identity-v1]` and
+`revert-data-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`revertDataPlan` and the whole Core reference, whose exact correspondence
+native admission checks for every origin, and `revertDataShapes`, which
+replay recomputes. Replay requires a generated plan to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profile records no G0 step features.
+- Literals are ten texts of 0 to 64 bytes. `revertLit` takes those of at most
+  32, which Sonatina requires and the other lowerings accept; `require` takes
+  all of them. A message's value has at most 64 bytes.
+- A loop body builds bytes values and raises, but neither reads nor writes
+  one: such loops are Sonatina O0's recorded loop mismatches.
+- The node budget bounds the applied reference: default 1,024, minimum 256,
+  at most 2,048. Steps are dropped from the end while a reference exceeds it.
+  A case's reference has at most 4,096 nodes.
+- Exclusions, under `revert-data-profile`, are a plan still over the budget
+  or not admitted, then a plan with the same outcome for all eight boundary
+  inputs, or one that exhausts fuel. A plan whose only fold reads `sc_x` and
+  whose sites never raise at a boundary input returns its input, so random
+  campaigns apply the identity filter.
+- Reductions remove a step or an unused helper, replace a call by the site it
+  reaches, call a function value's helper directly, lower a site's `Error`
+  to `Error.Empty`, its payload to none or the empty literal, a `require` to
+  an `if`, its test to `== 0` and its Word to `sc_x`, a declaration to
+  `Error.Empty`, a helper's constant to 1, a fold to `+` and 3, a loop's mask
+  and its items; then they reduce the input. Each is strictly smaller in plan
+  size, a call weighing 20, then input.
+- `revertDataRequirements` declares `helpers`, `forms`, `errors` (raised
+  kinds), `contexts` where sites run, `carriers` (how a raised `Error` reached
+  its site), `declarations`, `data`, `tests`, `words` (the tested Word's
+  kind), `lengths` (payload classes `0`, `1-31`, `32`, `33-63`, `64`),
+  `hazards` (`written`, `alias` and `allocated` between a message's making
+  and its revert) and `steps`, all specified by the plan.
+- Saved cases are about 70 KB of indented JSON and keep that form.
+
+The fixed corpus takes, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing value, until nothing is missing, each at
+the eight boundary inputs; every value is required. Seeds 1, 2, 3, 4, 6, 8,
+9, 10, 11, 12, 13, 14, 21, 24, 30, 47, 48, 72 and 100 cover all 65 values:
+152 cases from 19 sources, 87 of them reverting, with 0 to 64 bytes of data.
+`Tests/scripts/test-semantic-revert-data-corpus.py` rebuilds that selection,
+admits every plan with its own walk over the helpers, sites and scope,
+recomputes every shape and the shrink measure from the plan, re-emits the
+source and compares it exactly, evaluates every case's plan with its own
+model, which runs each helper and closure as a function over byte lists and
+raises each site's data, against the recorded outcome, and checks replay,
+reductions and tampering natively. That model and the probe's agree with the
+reference on the first 1,000 seeds' plans at thirteen inputs, 13,000
+outcomes, 6,785 of them reverts, and its re-emission and shapes with the
+native ones on all 1,000 plans.
+
+The gate passed before the profile was committed: the kernel check, 917
+Python tests, `lake build` (10,327 jobs), forty native tools, `lake test`,
+twenty-three corpus validators and the chunked-generation check over the
+twenty-seven pure profiles. Frozen matrices at `6480ac74b`, with the freeze
+digest unchanged on every run, under load averages of 5 to 8 from other work:
+- The fixed corpus matched all 152 cases on O0, O2 and Yul with complete shape
+  and input coverage, 87 of them reverts, compiling 19 sources, in 177, 166
+  and 239 seconds, retaining 13, 12 and 15 MB. Of the Yul run's 239 seconds,
+  155 compile the sources, to Yul and to the O0 images imported Hull runs.
+- Random suites from root seed 1 with eight whole functions took eight
+  attempts without an exclusion and drew 96 cases from 8 sources, 53 of them
+  reverts, and 47 of the 65 shape values. O0, O2 and Yul matched all 96, in
+  87, 84 and 115 seconds.
 
 No mismatch, crash or rejection was found.
 
