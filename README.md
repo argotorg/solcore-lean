@@ -92,7 +92,12 @@ none of 4,308 mutants disagrees, and Sonatina O2 crashes on one fixture, a
 recorded finding ([pinned fixtures across paths](scripts/SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
 Calls whose arguments are user data types under std's derived ABI also get
 every boundary Word of their tags, dynamic offsets and `bytes` lengths: all
-519 such mutants of the 26 recorded calls agree on every path.
+519 such mutants of the 26 recorded calls agree on every path. Sequence mutants
+carry one change forward instead of rolling it back: a committed mutant or
+method directive, or a dropped, duplicated or swapped step, with every later
+step compared across the paths. In a run of the 117 fixtures with two or more
+recorded calls, all 5,462 steps compared after the change in 558 such mutants
+agree on every path.
 Generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the

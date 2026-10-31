@@ -329,11 +329,19 @@ with upstream's recorded expectations, never with original Core.
   seeded sample of its four per step, and gets `--fixture-seconds` of wall
   time (default 300). The run gets `--fixture-run-seconds` (default 1,800),
   and `--fixture-jobs` fixtures (default 2) run at a time.
+- After them, each fixture runs at most `--fixture-sequences` sequence mutants
+  (default 8; 0 runs none), a seeded sample. Each carries one change forward
+  through every later step: a committed mutant or method directive, or a
+  dropped, duplicated or swapped step.
 - An entry past a budget has the status `budget`, and a fixture not started
-  in time is unexecuted. Neither is a finding; the ledger counts both.
+  in time is unexecuted. Neither is a finding; the ledger counts both. The
+  ledger's executed, matched, mismatched and inconclusive counts include the
+  steps compared in sequence mutants, and `sequences` counts the mutants.
 - Findings register with the backend `fixtures`. A compiler crash or a path
-  failure registers by its symptom, and a path mismatch or an unmet
-  expectation by its fixture and reduced input. The first examples keep the
+  failure registers by its symptom, a path mismatch or an unmet expectation
+  by its fixture and reduced input, and a sequence finding by its fixture,
+  operator and reduced sequence, or, unreduced, by its operator, step, change
+  and committed mutant. The first examples keep the
   fixture's result record and the command that replays that fixture alone.
 - The Sonatina O2 crash on `ignored-builtin-effects` is listed as known: it
   is counted but never new.

@@ -700,7 +700,8 @@ Checked Hull export and code-image export read a case's source files, not its
 runtime input, and they took most of each case's time: 3.9 of 4.5 seconds per
 case in a random `runtime-word` run on O0. With seeded inputs one function has
 eight to twelve cases. A pure campaign therefore compiles each distinct source
-once per backend and shares the result.
+once per backend and shares the result, and a storage campaign does the same
+([storage campaigns](#run-and-reduce-storage-campaigns)).
 
 Before compiling, the runner computes the case's compilation identity: the
 SHA-256 digests of its own source files (all four bundle files for modules),
