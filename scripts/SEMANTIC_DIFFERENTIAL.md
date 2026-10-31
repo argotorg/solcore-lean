@@ -7036,9 +7036,10 @@ method and decodes its multi-Word return data with std.
   transaction. The resume phase reads the kept input, the child's status
   Word and its returned or reverted bytes through the input-data requests.
 - **Each contract compiles from its own source** on every path, so the Yul
-  exporter admits the two wrapper names and the profile also runs on Yul. The
-  other two call profiles compile both contracts from one source and stay on
-  Sonatina.
+  exporter admits the two wrapper names and the profile also runs on Yul, as
+  `stateful-call-sequences` does under the same names. `stateful-calls` and
+  `stateful-forwarded-value` compile both contracts from one source and stay
+  on Sonatina.
 
 The [roadmap](../docs/design/next-implementation-roadmap.md) records the
 probe and the definitions.
@@ -7288,6 +7289,41 @@ python3 scripts/semantic-suite.py --mode fixed --backend yul \
   expected history, computed by the byte-level model, in which each step runs
   alone in Core. The corpus check compares it with the chain's actual
   history.
+
+### Results
+
+The matrices ran on `eb5f20574` with scripts, native tools, solc, Anvil, and
+the Rust driver, code-image exporter and directive tools frozen; none changed.
+- **Fixed corpus:** all 16 scenarios and 39 prefixes matched with complete
+  coverage on Sonatina O0 and O2 and on Yul, in 176, 202 and 287 seconds.
+  - On O0 all thirty-one stateful corpora matched, 505 scenarios and 1,278
+    prefixes.
+  - The thirty others kept their 489 scenarios and 1,239 prefixes.
+  - The call-return corpus also matched on O2 and Yul, with the Hull runner
+    taking the parent's slots from the scenario.
+- **Random suites:** root seed `20261041`, sixteen eight-transaction
+  scenarios, G0 revision three, at 384 and 512 nodes on O0, O2 and Yul. Each
+  matched 16 scenarios and 128 prefixes with complete coverage, in 209 to 322
+  seconds.
+  - No attempt was excluded.
+  - **At each budget:**
+    - 6 plans of two calls and 10 of three;
+    - 336 calls, 225 returned and 111 reverted, 21 of them with empty data,
+      and every bank length both returned and reverted;
+    - 88 windows inside the data, 225 past its end and 23 of width zero;
+    - 102 parents returned and 26 reverted, with every rollback pattern.
+  - The cases were identical on all three backends at each budget.
+- **Unfrozen checks:**
+  - Before the profile commit, an O0 run matched the corpus.
+  - On the committed code, the adapter's own model gave the prescribed
+    outcomes of all 1,600 transactions of 200 generated cases.
+  - On the committed code, a synthetic output difference on imported Hull at
+    `tx-1` of a random O0 case reduced in 26 attempts, 25 accepted:
+    - the case had two calls and eight transactions;
+    - it reduced to windows of width zero and that one transaction, with
+      input 0.
+
+There was no finding. Agreement is test evidence, not a preservation proof.
 
 ## Compare whole committed storage
 
