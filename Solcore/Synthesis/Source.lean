@@ -20,6 +20,8 @@ import Solcore.Synthesis.Source.MemoryValuesEmitter
 import Solcore.Synthesis.Source.MemoryValuesCases
 import Solcore.Synthesis.Source.MemoryCallsEmitter
 import Solcore.Synthesis.Source.MemoryCallsCases
+import Solcore.Synthesis.Source.RevertDataEmitter
+import Solcore.Synthesis.Source.RevertDataCases
 import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter

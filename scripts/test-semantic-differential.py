@@ -355,7 +355,44 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.MEMORY_CASE_SCHEMA], "runtime-memory-values")
         self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CASE_SCHEMA], "SynthesizedMemoryValues")
         self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
-        self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA))
+        self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA,
+                                                    runner.REVERT_DATA_CASE_SCHEMA))
+
+    def test_revert_data_plan_envelope_and_shape_inventory(self):
+        site = {"form": "when", "cond": {"word": {"operand": "input"}, "test": {"test": "eq", "constant": 0}},
+                "payload": {"payload": "none"}}
+        observe = {"kind": "observe", "fold": "add", "constant": 3, "value": "sc_b0", "access": {"access": "length"}}
+        helper = {"kind": "raise", "site": site, "fold": "add", "constant": 3}
+        plan = {"schema": "solcore-lean.revert-data-plan.v1", "helpers": [helper] * 3,
+                "steps": [{"site": site}, {"action": observe}, {"loop": {"mask": 1, "body": [{"site": site}]}}] +
+                         [{"site": site}] * 9}
+        runner.validate_revert_data_plan(plan)
+        runner.validate_revert_data_plan({**plan, "helpers": []})
+        for kind in ("make", "message", "pick", "call"):
+            runner.validate_revert_data_plan({**plan, "helpers": [{"kind": kind}]})
+        for key in ("error", "data", "call", "take", "closure", "apply"):
+            runner.validate_revert_data_plan({**plan, "steps": [{key: {}}]})
+        for invalid in (None, {}, {**plan, "schema": "solcore-lean.memory-call-plan.v1"}, {**plan, "extra": 0},
+                        {**plan, "helpers": [helper] * 4}, {**plan, "helpers": [{"kind": "free"}]}, {**plan, "helpers": [0]},
+                        {**plan, "steps": []}, {**plan, "steps": plan["steps"] + [{"site": site}]},
+                        {**plan, "steps": [{"site": site, "action": observe}]}, {**plan, "steps": [site]},
+                        {**plan, "steps": [{"sleep": {}}]}, {**plan, "steps": [{"loop": {}}, {"loop": {}}]},
+                        {**plan, "steps": [{"action": {**observe, "kind": "slice"}}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_revert_data_plan(invalid)
+        shapes = {key: list(values) for key, values in runner.REVERT_DATA_SHAPES.items()}
+        runner.validate_revert_data_shapes(shapes)
+        for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, "forms": ["revertLit", "require"]},
+                        {**shapes, "data": ["pair", "pair"]}, {**shapes, "errors": ["invalid"]},
+                        {**shapes, "lengths": ["65"]}, {key: values for key, values in shapes.items() if key != "steps"}):
+            with self.assertRaises(ValueError):
+                runner.validate_revert_data_shapes(invalid)
+        self.assertEqual({key: len(values) for key, values in runner.REVERT_DATA_SHAPES.items()},
+                         {"helpers": 5, "forms": 5, "errors": 4, "contexts": 8, "carriers": 7, "declarations": 4,
+                          "data": 5, "tests": 5, "words": 5, "lengths": 5, "hazards": 3, "steps": 9})
+        self.assertEqual(runner.CASE_PROFILES[runner.REVERT_DATA_CASE_SCHEMA], "runtime-revert-data")
+        self.assertEqual(runner.CASE_CONTRACTS[runner.REVERT_DATA_CASE_SCHEMA], "SynthesizedRevertData")
+        self.assertEqual(runner.REVERT_DATA_VERSIONS, ("profileVersion", "boundaryVersion"))
 
     def test_memory_call_plan_envelope_and_shape_inventory(self):
         build = {"kind": "bytes", "build": "to_bytes", "parts": [{"part": "word", "operand": {"operand": "input"}}]}
@@ -797,7 +834,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 26)
+        self.assertEqual(len(runner.CASE_PROFILES), 27)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

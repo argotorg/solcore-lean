@@ -12,8 +12,9 @@ import Solcore.Synthesis.Source.TraitCases
 import Solcore.Synthesis.Source.HierarchyCases
 import Solcore.Synthesis.Source.MemoryValuesCases
 import Solcore.Synthesis.Source.MemoryCallsCases
+import Solcore.Synthesis.Source.RevertDataCases
 
-/-! The identity filter `exclude-boundary-identity-v1` of the seventeen runtime-input
+/-! The identity filter `exclude-boundary-identity-v1` of the eighteen runtime-input
 profiles whose generated functions can be identities. Over a window of
 attempts it excludes exactly the functions that return every boundary input
 unchanged, under its own reason and code, and keeps every other function with
@@ -116,7 +117,11 @@ private def profiles : List Profile := [
   {name := "runtime-memory-calls", generate := fun seed nodes count attempts fuel inputs acceptance =>
       MemoryCalls.generateCases seed nodes count attempts fuel inputs acceptance,
     replay := MemoryCalls.replayCase, shrink := MemoryCalls.shrinkCases, nodes := 1024, inputs := 8,
-    identity := some 19}]
+    identity := some 19},
+  {name := "runtime-revert-data", generate := fun seed nodes count attempts fuel inputs acceptance =>
+      RevertData.generateCases seed nodes count attempts fuel inputs acceptance,
+    replay := RevertData.replayCase, shrink := RevertData.shrinkCases, nodes := 1024, inputs := 8,
+    identity := some 273}]
 
 private def fuel : Nat := 1000000
 
@@ -145,8 +150,8 @@ private def functions (all : Array Json) (size : Nat) : List (Array Json) :=
   (List.range (all.size / size)).map fun index => all.extract (index * size) ((index + 1) * size)
 
 /-- The function returned each of these inputs unchanged; a reverted case,
-which only `runtime-memory-values` and `runtime-memory-calls` observe, is
-never part of one. -/
+which only `runtime-memory-values`, `runtime-memory-calls` and
+`runtime-revert-data` observe, is never part of one. -/
 private def isIdentity (function : Array Json) : IO Bool := do
   for case in function do
     let input ← get (case.getObjValAs? String "input")
@@ -271,7 +276,7 @@ private def acceptanceChecks : IO Unit := do
 
 def testSourceAcceptanceCases : IO Unit := do
   acceptanceChecks
-  ensure (profiles.length == 17) "a profile whose functions can be identities is missing"
+  ensure (profiles.length == 18) "a profile whose functions can be identities is missing"
   for profile in profiles do
     checkWindow profile
     if let some seed := profile.identity then checkIdentity profile seed

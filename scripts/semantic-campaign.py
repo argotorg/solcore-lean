@@ -43,6 +43,7 @@ PROFILE_COMMANDS = {"closed-g0": ("generate", "emit", "generated"),
                     "runtime-trait-hierarchies": ("hierarchy-generate", "hierarchy-emit", "hierarchy-generated"),
                     "runtime-memory-values": ("memory-values-generate", "memory-values-emit", "memory-generated"),
                     "runtime-memory-calls": ("memory-calls-generate", "memory-calls-emit", "memory-call-generated"),
+                    "runtime-revert-data": ("revert-data-generate", "revert-data-emit", "revert-data-generated"),
                     "runtime-call-graphs": ("call-graph-generate", "call-graph-emit", "call-graph-generated"),
                     "runtime-call-graph-loops": ("call-graph-loop-generate", "call-graph-loop-emit", "call-graph-loop-generated"),
                     "runtime-assembly-loops": ("assembly-loop-generate", "assembly-loop-emit", "assembly-loop-generated"),
@@ -103,6 +104,7 @@ PROFILE_VERSION_FIELDS = {"closed-g0": (), "runtime-word": INPUT_VERSIONS,
                           "runtime-trait-hierarchies": m2.HIERARCHY_VERSIONS,
                           "runtime-memory-values": m2.MEMORY_VERSIONS,
                           "runtime-memory-calls": m2.MEMORY_CALL_VERSIONS,
+                          "runtime-revert-data": m2.REVERT_DATA_VERSIONS,
                           "runtime-call-graphs": m2.CALL_GRAPH_VERSIONS,
                           "runtime-call-graph-loops": m2.CALL_GRAPH_LOOP_VERSIONS,
                           "runtime-assembly-loops": m2.ASSEMBLY_LOOP_VERSIONS,
@@ -162,7 +164,7 @@ IDENTITY_FILTER_PROFILES = ("runtime-word", "runtime-primitives", "runtime-assem
                             "runtime-aggregates", "runtime-closures", "runtime-comptime", "runtime-modules",
                             "runtime-call-graphs", "runtime-aggregate-call-graphs", "runtime-enums",
                             "runtime-traits", "runtime-trait-hierarchies", "runtime-memory-values",
-                            "runtime-memory-calls")
+                            "runtime-memory-calls", "runtime-revert-data")
 # The case tool returns at most this many cases per generation request.
 MAX_CASES = 1024
 # Default random attempts with --functions: at least this many candidates per
@@ -405,14 +407,15 @@ def aggregate_shapes(case: dict) -> set[str]:
 def minimum_nodes(profile: str) -> int:
     return {"runtime-primitives": 8, "runtime-assembly-memory": 8, "runtime-call-graphs": 13, "runtime-call-graph-loops": 39, "runtime-assembly-loops": 39,
             "runtime-aggregate-call-graphs": 13, "runtime-enums": 256, "runtime-traits": 256,
-            "runtime-trait-hierarchies": 256, "runtime-memory-values": 256, "runtime-memory-calls": 256}.get(profile, 3)
+            "runtime-trait-hierarchies": 256, "runtime-memory-values": 256, "runtime-memory-calls": 256,
+            "runtime-revert-data": 256}.get(profile, 3)
 
 
 def maximum_nodes(profile: str) -> int:
     """The enum, trait and trait hierarchy budgets bound the applied reference, at most its 4,096-node case limit;
-    the memory value and memory call budgets bound the applied reference without its hash closure, at most
-    2,048 nodes."""
-    if profile in ("runtime-memory-values", "runtime-memory-calls"):
+    the memory value and memory call budgets bound the applied reference without its hash closure, and the
+    revert data budget the applied reference, at most 2,048 nodes."""
+    if profile in ("runtime-memory-values", "runtime-memory-calls", "runtime-revert-data"):
         return 2048
     return 4096 if profile in ("runtime-enums", "runtime-traits", "runtime-trait-hierarchies") else 512
 
@@ -726,6 +729,34 @@ def memory_call_requirements(manifest: dict) -> dict:
     return requirements
 
 
+REVERT_DATA_DIMENSIONS = ("Helpers", "Forms", "Errors", "Contexts", "Carriers", "Declarations", "Data", "Tests",
+                          "Words", "Lengths", "Hazards", "Steps")
+
+
+def revert_data_requirements(manifest: dict) -> dict:
+    requirements = manifest.get("revertDataRequirements", {key: [] for key in m2.REVERT_DATA_SHAPES})
+    if not isinstance(requirements, dict) or set(requirements) != set(m2.REVERT_DATA_SHAPES):
+        raise ValueError("revertDataRequirements requires helpers, forms, errors, contexts, carriers, declarations, "
+                         "data, tests, words, lengths, hazards and steps arrays")
+    for key, allowed in m2.REVERT_DATA_SHAPES.items():
+        values = requirements[key]
+        if (not isinstance(values, list) or any(not isinstance(v, str) or v not in allowed for v in values)
+                or len(values) != len(set(values))):
+            raise ValueError(f"invalid revert data {key} requirements")
+    if manifest.get("profile", "closed-g0") != "runtime-revert-data" and any(requirements.values()):
+        raise ValueError("only revert data corpora can require revert data shapes")
+    return requirements
+
+
+def specified_revert_data(case: dict) -> dict[str, set]:
+    """The plan's revert data shapes as native replay authenticates them in the
+    provenance; never measured revert traffic or opcode coverage."""
+    if case.get("schema") != m2.REVERT_DATA_CASE_SCHEMA:
+        return {dimension: set() for dimension in REVERT_DATA_DIMENSIONS}
+    shapes = m2.validate_revert_data_shapes(case.get("provenance", {}).get("revertDataShapes"))
+    return {dimension: set(shapes[dimension.lower()]) for dimension in REVERT_DATA_DIMENSIONS}
+
+
 def specified_memory_calls(case: dict) -> dict[str, set]:
     """The plan's memory call shapes as native replay authenticates them in the
     provenance; never measured memory traffic or opcode coverage."""
@@ -996,6 +1027,7 @@ def missing_coverage(summary: dict) -> bool:
         or any(summary["hierarchyCoverage"]["missing" + dimension] for dimension in HIERARCHY_DIMENSIONS)
         or any(summary["memoryValueCoverage"]["missing" + dimension] for dimension in MEMORY_DIMENSIONS)
         or any(summary["memoryCallCoverage"]["missing" + dimension] for dimension in MEMORY_CALL_DIMENSIONS)
+        or any(summary["revertDataCoverage"]["missing" + dimension] for dimension in REVERT_DATA_DIMENSIONS)
         or bool(summary["genericCoverage"]["missingInstantiations"])
         or bool(summary["closureCoverage"]["missingVariants"])
         or bool(summary["comptimeCoverage"]["missingVariants"])
@@ -1046,6 +1078,8 @@ def validate_manifest(manifest) -> dict:
         raise ValueError("memory value corpus must require all eight boundary inputs")
     if profile == "runtime-memory-calls" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("memory call corpus must require all eight boundary inputs")
+    if profile == "runtime-revert-data" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
+        raise ValueError("revert data corpus must require all eight boundary inputs")
     if profile == "runtime-call-graphs" and not set(PRIMITIVE_INPUTS) <= set(required_inputs):
         raise ValueError("call-graph corpus must require all eight boundary inputs")
     if profile == "runtime-call-graph-loops" and not set(LOOP_INPUTS) <= set(required_inputs):
@@ -1075,6 +1109,7 @@ def validate_manifest(manifest) -> dict:
     hierarchy_requirements(manifest)
     memory_requirements(manifest)
     memory_call_requirements(manifest)
+    revert_data_requirements(manifest)
     generic_requirements(manifest)
     closure_requirements(manifest)
     comptime_requirements(manifest)
@@ -1087,9 +1122,9 @@ def validate_manifest(manifest) -> dict:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"] or entry["id"] in ids:
             raise ValueError("corpus entries require unique nonempty IDs")
         ids.add(entry["id"])
-        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
+        if sum(key in entry for key in ("generation", "program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")) != 1:
             raise ValueError("corpus entry must specify exactly one generation request, program or plan")
-        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+        plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
         if "generation" not in entry and plan_key not in entry:
             raise ValueError("corpus program or plan differs from its profile")
         if profile != "closed-g0":
@@ -1150,6 +1185,8 @@ def validate_manifest(manifest) -> dict:
             m2.validate_memory_plan(entry["memoryValuePlan"])
         elif "memoryCallPlan" in entry:
             m2.validate_memory_call_plan(entry["memoryCallPlan"])
+        elif "revertDataPlan" in entry:
+            m2.validate_revert_data_plan(entry["revertDataPlan"])
         elif "genericPlan" in entry:
             m2.validate_generic_plan(entry["genericPlan"])
         elif "closurePlan" in entry:
@@ -1172,7 +1209,7 @@ def profile_inputs(profile: str) -> tuple[str, ...]:
         return RECURSION_INPUTS
     if profile in ("runtime-primitives", "runtime-assembly", "runtime-assembly-memory", "runtime-call-graphs",
                    "runtime-aggregate-call-graphs", "runtime-enums", "runtime-traits", "runtime-trait-hierarchies",
-                   "runtime-memory-values", "runtime-memory-calls"):
+                   "runtime-memory-values", "runtime-memory-calls", "runtime-revert-data"):
         return PRIMITIVE_INPUTS
     return INPUT_BOUNDARIES
 
@@ -1352,6 +1389,8 @@ class Campaign:
                 **{prefix + dimension: [] for dimension in MEMORY_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "memoryCallCoverage": {"classification": "memory call plan helper kinds and parameters, call forms and results, values passed on from calls, generic instances, data values, closures, observations, index kinds per access, indices that can leave the range, write-then-read hazards and step kinds the plan specifies; matched plans verified by native replay; not measured memory traffic or opcode coverage",
                 **{prefix + dimension: [] for dimension in MEMORY_CALL_DIMENSIONS for prefix in ("generated", "matched", "required")}},
+            "revertDataCoverage": {"classification": "revert data plan helper kinds, site forms, raised Error kinds, contexts where sites run, carriers of raised Errors, Error declarations, data values, condition tests and tested Words, payload length classes, message write and allocation hazards and step kinds the plan specifies; matched plans verified by native replay; not measured revert traffic or opcode coverage",
+                **{prefix + dimension: [] for dimension in REVERT_DATA_DIMENSIONS for prefix in ("generated", "matched", "required")}},
             "genericCoverage": {"classification": "prescribed generic variant and input parity; matched plans verified by native replay; not measured specialization or opcode coverage",
                 "generatedInstantiations": [], "matchedInstantiations": [], "requiredInstantiations": []},
             "closureCoverage": {"classification": "prescribed runtime Word capture recipes; matched plans verified by native replay; not measured closure or opcode coverage",
@@ -1429,6 +1468,9 @@ class Campaign:
         calls = self.summary["memoryCallCoverage"]
         for dimension in MEMORY_CALL_DIMENSIONS:
             calls["missing" + dimension] = sorted(set(calls["required" + dimension]) - set(calls["matched" + dimension]))
+        reverts = self.summary["revertDataCoverage"]
+        for dimension in REVERT_DATA_DIMENSIONS:
+            reverts["missing" + dimension] = sorted(set(reverts["required" + dimension]) - set(reverts["matched" + dimension]))
         generic = self.summary["genericCoverage"]
         generic["missingInstantiations"] = sorted(set(generic["requiredInstantiations"]) - set(generic["matchedInstantiations"]))
         closure = self.summary["closureCoverage"]
@@ -1508,6 +1550,11 @@ class Campaign:
         for dimension, values in specified_memory_values(case).items():
             key = ("matched" if matched else "generated") + dimension
             self.summary["memoryValueCoverage"][key] = sorted(set(self.summary["memoryValueCoverage"][key]) | values)
+
+    def record_revert_data(self, case: dict, *, matched: bool = False) -> None:
+        for dimension, values in specified_revert_data(case).items():
+            key = ("matched" if matched else "generated") + dimension
+            self.summary["revertDataCoverage"][key] = sorted(set(self.summary["revertDataCoverage"][key]) | values)
 
     def record_memory_calls(self, case: dict, *, matched: bool = False) -> None:
         for dimension, values in specified_memory_calls(case).items():
@@ -1851,6 +1898,9 @@ class Campaign:
         calls = memory_call_requirements(manifest)
         for dimension in MEMORY_CALL_DIMENSIONS:
             self.summary["memoryCallCoverage"]["required" + dimension] = sorted(calls[dimension.lower()])
+        reverts = revert_data_requirements(manifest)
+        for dimension in REVERT_DATA_DIMENSIONS:
+            self.summary["revertDataCoverage"]["required" + dimension] = sorted(reverts[dimension.lower()])
         self.summary["genericCoverage"]["requiredInstantiations"] = sorted(generic_requirements(manifest)["instantiations"])
         self.summary["closureCoverage"]["requiredVariants"] = sorted(closure_requirements(manifest)["variants"])
         self.summary["comptimeCoverage"]["requiredVariants"] = sorted(comptime_requirements(manifest)["variants"])
@@ -1894,9 +1944,9 @@ class Campaign:
                     self.checkpoint()
                     continue
                 case = generated[0]
-            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
+            elif any(key in entry for key in ("program", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan")):
                 program = self.work / "corpus-program.json"
-                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
+                plan_key = {"runtime-loops": "loopPlan", "runtime-call-graph-loops": "loopPlan", "runtime-nested-loops": "nestedLoopPlan", "runtime-recursion": "recursionPlan", "runtime-recursive-loops": "recursiveLoopPlan", "runtime-loop-closures": "loopClosurePlan", "runtime-assembly": "assemblyPlan", "runtime-assembly-memory": "assemblyMemoryPlan", "runtime-assembly-loops": "assemblyLoopPlan", "runtime-enums": "enumPlan", "runtime-traits": "traitPlan", "runtime-trait-hierarchies": "hierarchyPlan", "runtime-memory-values": "memoryValuePlan", "runtime-memory-calls": "memoryCallPlan", "runtime-revert-data": "revertDataPlan", "runtime-generics": "genericPlan", "runtime-closures": "closurePlan", "runtime-comptime": "comptimePlan", "runtime-modules": "modulePlan"}.get(profile, "program")
                 save_json(program, entry[plan_key])
                 try:
                     command = [emit_command, str(program)] + ([entry["input"]] if runtime_input else [])
@@ -1951,6 +2001,7 @@ class Campaign:
             self.record_hierarchies(case)
             self.record_memory_values(case)
             self.record_memory_calls(case)
+            self.record_revert_data(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -2014,6 +2065,7 @@ class Campaign:
             self.record_hierarchies(case)
             self.record_memory_values(case)
             self.record_memory_calls(case)
+            self.record_revert_data(case)
             self.record_generics(case)
             self.record_closures(case)
             self.record_comptime(case)
@@ -2052,6 +2104,7 @@ class Campaign:
                 self.record_hierarchies(case, matched=True)
                 self.record_memory_values(case, matched=True)
                 self.record_memory_calls(case, matched=True)
+                self.record_revert_data(case, matched=True)
                 self.record_generics(case, matched=True)
                 self.record_closures(case, matched=True)
                 self.record_comptime(case, matched=True)
@@ -2085,7 +2138,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--profile", choices=PROFILES,
                         help="generation profile; inferred from a saved case or corpus, otherwise closed-g0")
-    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 1024 for memory values and memory calls (at most 2048, without the hash closure), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
+    parser.add_argument("--nodes", type=int, help="node budget; default 2048 for enums, traits and trait hierarchies (at most 4096), 1024 for memory values and memory calls (at most 2048, without the hash closure) and revert data (at most 2048), 384 for plans, 256 for aggregates/call-graph loops, 192 for mutation/call graphs/aggregate call graphs, 96 for primitives, otherwise 32")
     parser.add_argument("--cases", type=int, help="case limit; default 16 or the full supplied corpus")
     parser.add_argument("--functions", type=int,
                         help="random runtime-input profiles only: generate this many accepted functions, each "
@@ -2173,7 +2226,7 @@ def main() -> int:
         if args.functions is not None:
             args.attempts = min(MAX_ATTEMPTS, max(args.attempts, ATTEMPTS_PER_FUNCTION * args.functions))
     if args.nodes is None:
-        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-memory-values": 1024, "runtime-memory-calls": 1024, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
+        args.nodes = {"runtime-call-graphs": 192, "runtime-call-graph-loops": 256, "runtime-assembly-loops": 256, "runtime-aggregate-call-graphs": 192, "runtime-primitives": 96, "runtime-assembly": 96, "runtime-assembly-memory": 96, "runtime-enums": 2048, "runtime-traits": 2048, "runtime-trait-hierarchies": 2048, "runtime-memory-values": 1024, "runtime-memory-calls": 1024, "runtime-revert-data": 1024, "runtime-mutation": 192, "runtime-aggregates": 256, "runtime-loops": 384, "runtime-nested-loops": 384, "runtime-recursion": 384, "runtime-recursive-loops": 384, "runtime-loop-closures": 384, "runtime-generics": 384, "runtime-closures": 384, "runtime-comptime": 384, "runtime-modules": 384}.get(args.profile, 32)
     if args.cases is None:
         try:
             args.cases = 1 if args.case else len(validate_manifest(m2.read_json(args.corpus))["cases"]) if args.corpus else 16

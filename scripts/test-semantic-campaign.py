@@ -430,6 +430,35 @@ def memory_call_policy_case(value=255, shapes=None):
     return case
 
 
+REVERT_DATA_PLAN = {'schema': 'solcore-lean.revert-data-plan.v1', 'helpers': [], 'steps': [
+    {'action': {'kind': 'bytes', 'build': 'to_bytes', 'parts': [{'part': 'word', 'operand': {'operand': 'input'}}]}},
+    {'site': {'form': 'when', 'cond': {'word': {'operand': 'input'}, 'test': {'test': 'eq', 'constant': 0}},
+              'payload': {'payload': 'none'}}},
+    {'action': {'kind': 'observe', 'fold': 'add', 'constant': 3, 'value': 'sc_b0', 'access': {'access': 'length'}}}]}
+
+
+def revert_data_shapes(**changes):
+    shapes = {key: [] for key in campaign.m2.REVERT_DATA_SHAPES}
+    shapes.update(forms=['revertEmpty'], contexts=['run'], tests=['eq'], words=['input'], lengths=['0'],
+                  steps=['action', 'site'])
+    shapes.update(changes)
+    return shapes
+
+
+def revert_data_policy_case(value=255, shapes=None):
+    """Revert data envelope/coverage fixture; no compiler or runtime is simulated."""
+    case = function_case(1)
+    case.update(schema=campaign.m2.REVERT_DATA_CASE_SCHEMA, input=str(value), revertDataPlan=copy.deepcopy(REVERT_DATA_PLAN))
+    case['contract'].update(name='SynthesizedRevertData', deployPath=['SynthesizedRevertDataDeploy'],
+        runtimePath=['SynthesizedRevertDataDeploy', 'SynthesizedRevertData'],
+        calldata='0xa444f5e9' + f'{value:064x}')
+    case['provenance'] = {**{key: 'test' for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                    *campaign.PROFILE_VERSION_FIELDS['runtime-revert-data'])},
+        'origin': {'kind': 'revert-data-generated', 'seed': '1', 'maxProgramNodes': 1024}, 'features': [],
+        'referenceNodes': 40, 'revertDataShapes': shapes or revert_data_shapes()}
+    return case
+
+
 def aggregate_call_graph_policy_case(value=255, helpers=2, shapes=('pair-component-call', 'case-branch-call')):
     """Aggregate call-graph envelope/coverage fixture; no compiler or runtime is simulated."""
     case = function_case(helpers)
@@ -1644,10 +1673,12 @@ class EnumCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
-        # Every profile but the trait, trait hierarchy and memory value profiles keeps the 512-node maximum.
+        # Every profile but the trait, trait hierarchy, memory value, memory call and revert data
+        # profiles keeps the 512-node maximum.
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
                           if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies',
-                                             'runtime-memory-values', 'runtime-memory-calls')}, {512})
+                                             'runtime-memory-values', 'runtime-memory-calls',
+                                             'runtime-revert-data')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -2116,7 +2147,8 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
         self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
         self.assertEqual(campaign.m2.REVERTING_SCHEMAS,
-                         (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA))
+                         (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA,
+                          campaign.m2.REVERT_DATA_CASE_SCHEMA))
         for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
             self.assertNotIn(self.PROFILE, group)
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
@@ -2479,6 +2511,174 @@ class MemoryCallCoverageTests(unittest.TestCase):
         self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
                             for entry in manifest['cases']))
         self.assertEqual(len(manifest['cases']), 328)
+
+
+class RevertDataCoverageTests(unittest.TestCase):
+    PROFILE = 'runtime-revert-data'
+    CORPUS = ROOT / 'scripts/semantic-revert-data-corpus.json'
+    REQUIRED = {**{key: [] for key in campaign.m2.REVERT_DATA_SHAPES}, 'forms': ['revertEmpty'], 'lengths': ['0']}
+
+    def manifest(self, generated=False):
+        case = revert_data_policy_case()
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': self.PROFILE,
+            **{key: case['provenance'][key] for key in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                       *campaign.PROFILE_VERSION_FIELDS[self.PROFILE])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            'revertDataRequirements': self.REQUIRED,
+            'cases': [{'id': 'revert-data', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 1024}} if generated
+                   else {'revertDataPlan': case['revertDataPlan']})}]}
+
+    def test_registration(self):
+        self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
+                         ('revert-data-generate', 'revert-data-emit', 'revert-data-generated'))
+        self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.REVERT_DATA_CASE_SCHEMA)
+        self.assertEqual(campaign.PROFILE_VERSION_FIELDS[self.PROFILE], ('profileVersion', 'boundaryVersion'))
+        self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
+        self.assertIn(campaign.m2.REVERT_DATA_CASE_SCHEMA, campaign.m2.REVERTING_SCHEMAS)
+        for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES,
+                      campaign.COMPACT_CASE_PROFILES):
+            self.assertNotIn(self.PROFILE, group)
+        self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
+        self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
+        self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 2048))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-revert-data-v1'}))
+        self.assertEqual({key: len(values) for key, values in campaign.m2.REVERT_DATA_SHAPES.items()},
+                         {'helpers': 5, 'forms': 5, 'errors': 4, 'contexts': 8, 'carriers': 7, 'declarations': 4,
+                          'data': 5, 'tests': 5, 'words': 5, 'lengths': 5, 'hazards': 3, 'steps': 9})
+        summary, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1')
+        self.assertEqual(seen, [['revert-data-generate', '1', '1024', '1', '256', '1000000',
+                                 campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+        self.assertEqual(summary['configuration']['acceptance'], campaign.RANDOM_ACCEPTANCE)
+        _, seen = CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', '2048')
+        self.assertEqual(seen[0][2], '2048')
+        for nodes in ('255', '2049'):
+            with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                CommandLine.run_main(self, '--profile', self.PROFILE, '--cases', '1', '--nodes', nodes)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = self.PROFILE
+            instance = campaign.Campaign(config)
+            self.assertEqual(instance.summary['revertDataCoverage']['requiredForms'], [])
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for generated in (False, True):
+            campaign.validate_manifest(self.manifest(generated))
+        value = self.manifest()
+        entry = value['cases'][0]
+        base = value['revertDataRequirements']
+        for invalid in (None, {}, {**base, 'forms': ['assert']}, {**base, 'errors': ['panic']},
+                        {**base, 'lengths': ['65']}, {**base, 'carriers': ['storage']}, {**base, 'data': ['pair'] * 2},
+                        {key: values for key, values in base.items() if key != 'hazards'}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'revertDataRequirements': invalid})
+        with self.assertRaises(ValueError):
+            campaign.revert_data_requirements({'profile': 'runtime-memory-calls', 'revertDataRequirements': base})
+        with self.assertRaises(ValueError):
+            campaign.memory_call_requirements({'profile': self.PROFILE,
+                                               'memoryCallRequirements': MemoryCallCoverageTests.REQUIRED})
+        plan = entry['revertDataPlan']
+        site = plan['steps'][1]
+        campaign.validate_manifest({**value, 'cases': [{**entry, 'revertDataPlan': {**plan, 'steps': plan['steps'] + [site]}}]})
+        for invalid in ({**plan, 'steps': []}, {**plan, 'steps': plan['steps'] * 5}, {**plan, 'extra': 1},
+                        {**plan, 'helpers': [{'kind': 'make', 'constant': 1}] * 4},
+                        {**plan, 'schema': 'solcore-lean.memory-call-plan.v1'}, {**plan, 'steps': [{'step': site}]},
+                        {**plan, 'helpers': [{'kind': 'free'}]},
+                        {**plan, 'steps': [{'loop': {}}, {'loop': {}}]},
+                        {**plan, 'steps': [{'action': {**plan['steps'][0]['action'], 'kind': 'slice'}}, site]}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'revertDataPlan': invalid}]})
+        for changed in ({**entry, 'program': {}}, {**entry, 'memoryCallPlan': entry['revertDataPlan']}):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [changed]})
+        with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+            campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+        for nodes in (256, 1024, 2048):
+            campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+        for nodes in (255, 2049):
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{'id': 'generated', 'input': '255',
+                    'generation': {'seed': '0', 'maxProgramNodes': nodes}, 'expectedFeatures': []}]})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        self.assertEqual(campaign.specified_revert_data(revert_data_policy_case()),
+            {'Helpers': set(), 'Forms': {'revertEmpty'}, 'Errors': set(), 'Contexts': {'run'}, 'Carriers': set(),
+             'Declarations': set(), 'Data': set(), 'Tests': {'eq'}, 'Words': {'input'}, 'Lengths': {'0'},
+             'Hazards': set(), 'Steps': {'action', 'site'}})
+        self.assertEqual(campaign.specified_revert_data(memory_call_policy_case()),
+                         {dimension: set() for dimension in campaign.REVERT_DATA_DIMENSIONS})
+        self.assertEqual(campaign.specified_memory_calls(revert_data_policy_case()),
+                         {dimension: set() for dimension in campaign.MEMORY_CALL_DIMENSIONS})
+        for invalid in ({'forms': ['revertEmpty']}, revert_data_shapes(forms=['assert']),
+                        revert_data_shapes(steps=['site', 'action']), revert_data_shapes(lengths=['0', '0']),
+                        revert_data_shapes(words=['storage'])):
+            with self.assertRaises(ValueError):
+                campaign.specified_revert_data(revert_data_policy_case(shapes=invalid))
+
+    def test_imported_plan_routes_to_revert_data_emit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 1, 0
+            value = self.manifest()
+            config.corpus = Path(directory) / 'manifest.json'; config.corpus.write_text(json.dumps(value))
+            instance = campaign.Campaign(config); calls = []
+            def tool(arguments, stage):
+                calls.append((arguments[0], json.loads(Path(arguments[1]).read_text()), arguments[2:], stage))
+                return revert_data_policy_case()
+            instance.tool = tool
+            def execute_case(case):
+                folder = instance.work / 'revert-data'
+                folder.mkdir()
+                report = reverted()
+                return folder, report, campaign.analyze(report, reverts=True)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            self.assertEqual(calls, [('revert-data-emit', value['cases'][0]['revertDataPlan'], ['255', '1000'],
+                                      'corpus-emission')])
+            # The retained case is indented JSON: revert data cases are small.
+            retained = (Path(directory) / 'cases' / '0000.json').read_bytes()
+            self.assertEqual(retained, campaign.m2.json_bytes(revert_data_policy_case()))
+            coverage = instance.summary['revertDataCoverage']
+            self.assertEqual((coverage['requiredForms'], coverage['generatedForms'], coverage['matchedForms']),
+                             (['revertEmpty'], ['revertEmpty'], ['revertEmpty']))
+            self.assertTrue(all(not coverage['missing' + dimension] for dimension in campaign.REVERT_DATA_DIMENSIONS))
+
+    def test_nonmatching_outcomes_cannot_satisfy_revert_data_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory)
+            config.profile, config.cases, config.shrink_attempts = self.PROFILE, 2, 0
+            instance = campaign.Campaign(config)
+            cases = [revert_data_policy_case(), revert_data_policy_case(shapes=revert_data_shapes(
+                forms=['revertLit'], lengths=['1-31'], hazards=['alias']))]
+            instance.summary['revertDataCoverage'].update(requiredForms=['revertEmpty', 'revertLit'],
+                                                          requiredHazards=['alias'])
+            instance.prepare_cases = lambda: {'schema': 'solcore-lean.semantic-corpus.v1', 'cases': cases,
+                'excluded': [], 'requested': 2, 'attempted': 2, 'status': 'complete'}
+            def execute_case(case):
+                folder = instance.work / case['provenance']['revertDataShapes']['forms'][0]
+                folder.mkdir()
+                report = matched()
+                if case['provenance']['revertDataShapes']['hazards'] == ['alias']:
+                    report['comparison'] = {'category': 'semantic-mismatch', 'pairs': {}}
+                return folder, report, campaign.analyze(report)
+            instance.execute_case = execute_case
+            with redirect_stdout(io.StringIO()):
+                instance.run()
+            coverage = instance.summary['revertDataCoverage']
+            self.assertEqual((coverage['generatedForms'], coverage['matchedForms']),
+                             (['revertEmpty', 'revertLit'], ['revertEmpty']))
+            self.assertEqual((coverage['missingForms'], coverage['missingHazards']), (['revertLit'], ['alias']))
+            self.assertTrue(campaign.missing_coverage(instance.summary))
+
+    def test_committed_corpus_requires_complete_coverage(self):
+        manifest = campaign.validate_manifest(json.loads(self.CORPUS.read_text()))
+        self.assertEqual(manifest['revertDataRequirements'],
+                         {key: list(values) for key, values in campaign.m2.REVERT_DATA_SHAPES.items()})
+        self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+        self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
+                            for entry in manifest['cases']))
+        self.assertEqual(len(manifest['cases']), 152)
 
 
 class AssemblyMemoryCoverageTests(unittest.TestCase):
@@ -4262,7 +4462,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 26)
+        self.assertEqual(len(campaign.PROFILES), 27)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -4960,7 +5160,7 @@ class G0VersionTests(CommandLine, unittest.TestCase):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
              'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values',
-             'runtime-memory-calls'})
+             'runtime-memory-calls', 'runtime-revert-data'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -5057,7 +5257,8 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-assembly-loops': 10, 'runtime-aggregate-call-graphs': 12, 'runtime-functions': 8, 'runtime-mutation': 8,
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
-              'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12}
+              'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12,
+              'runtime-revert-data': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))
