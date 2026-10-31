@@ -8876,6 +8876,166 @@ scripts and tools frozen:
     from eight transactions to one, all thirteen attempts accepted, until no
     candidate was left.
 
+**Derived ADT arguments in the fixture mutation run: probe and definitions.**
+The fixture mutation run above classifies a recorded call's words only by a
+standard-ABI signature. The 39 raw calls without a standard-ABI method kept
+unclassified words, so std's derived decoder of user data types got no
+boundary mutants from the fixtures. A probe read the eight fixtures that hold
+32 of those calls:
+- **Tool:** `scripts/rust-declaration-export.rs`, a sibling of the directive
+  extractor. `export-rust-declarations.py --build` builds it offline from the
+  same pinned parser crates and upstream lock, in its own crate under
+  `.upstream`, with its own receipt. For one source file it prints the
+  pinned HIR's data types with each constructor's field types, its type
+  aliases, and every function and contract method with its parameter and
+  return types, as written and before name resolution.
+- **Declarations** of every source file of the eight fixtures:
+  - `abi-sum-roundtrip`: `D2 = L(uint256) | R(memory<bytes>)`,
+    `D3 = X(uint256) | Y(uint256) | Z(memory<bytes>)`,
+    `S2 = P(uint256) | Q(uint256)` and
+    `S3 = A | B(uint256) | C(uint256, uint256, uint256)`, with `rtD2(x: D2)`,
+    `rtD3(x: D3)`, `rtS3(x: S3)` and `rtS2(x: S2)`;
+  - `abi-array-sum`: `Operation = Approve(uint256) | Reject(uint256)`, with
+    `count(ops: calldata<array<Operation>>)`, and `tagOf` and `amountOf` of
+    `(ops: calldata<array<Operation>>, i: uint256)`;
+  - `abi-batch-adt`: `Operation = AddSigner(address) | RemoveSigner(address)`,
+    `Signature = ECDSA(bytes32, bytes32) | Contract(address)` and
+    `Batch = Queue(Operation, Signature) | Execute(uint256, memory<bytes>)`,
+    with `queueSigner` and `execPayload` of
+    `(items: calldata<array<Batch>>, i: uint256)`;
+  - `storage-adt-abi`: `Option<a> = None | Some(a)`, with `setOpt` and `echo`
+    of `(o: Option<uint256>)` beside three standard methods;
+  - `abi-dyn-sum`: `DynSum = Small(uint256) | Blob(memory<bytes>)`, with
+    `smallOf` and `blobOf` of `(items: calldata<array<DynSum>>, i: uint256)`;
+  - `manual-sigstring-table`: only `hello()` in the contract. Its `table.sol`
+    declares `AnswerSig` and `UnusedAbi`, which no public method takes;
+  - `abi-unit-array`: the aliases `UnitAlias = ()` and
+    `Units = calldata<array<UnitAlias>>`, and no data type;
+  - `abi-tuple-array`: no data type or alias.
+- **std's structure,** from the pinned `std/dispatch.sol`,
+  `std/ABIGeneric.sol`, `std/std.sol`, `hir-ty/src/solver/derived_generic.rs`
+  and `specialize/src/specialize/derived_abi.rs`:
+  - A constructor's fields form a right-nested product, unit when it has
+    none. A type with two or more constructors is a sum of their products,
+    nested to the right. A type with one constructor is its product.
+  - `sigStr` gives the leaf names (`uint256`, `bytes32`, `bytes4`,
+    `address`, `bool`, `bytes`, `string`), the empty string for unit, `a,b`
+    for a product, `sum(l,r)` for a sum, and `T[]` for a calldata array. An
+    array element that is a unit or a product signs in parentheses.
+  - A method's selector is `keccak256(name + "(" + sigStr(arguments) + ")")`.
+    A constructor's tag is the Word `keccak256(Name + "(" + sigStr(fields) +
+    ")")`.
+  - A sum is static when every constructor's fields are. Its head is then
+    the tag and the widest constructor's fields, inline. Otherwise its head
+    is one offset Word, relative to the reader it is decoded from, to a body
+    of the tag and the fields, whose own offsets count from the body's
+    start.
+  - Products decode inline. A `bytes` or `string` value and an array sit
+    behind an offset. An array's elements follow its length Word by head
+    size, and a dynamic element's head is its own offset, counted from the
+    first element's position.
+  - The decoder compares the tag with each constructor's tag in declaration
+    order. No match reverts with empty data, as lane C's unit 4 recorded.
+- **Selectors and tags:** all 26 public methods compute their dispatched
+  selector. The 13 with a data type in their parameters do so by the
+  structural signature, for example `rtS3(sum(,sum(uint256,uint256,uint256,uint256)))`.
+  The 13 standard ones do too, for example `units(()[])` and
+  `wrapped((()[],uint256)[])`. Every tag in the recorded calls is a
+  constructor's.
+- **The 32 calls:**
+  - 26 classify, every word belonging to the layout: `abi-sum-roundtrip` 10,
+    `abi-array-sum` 6, `abi-batch-adt` 4, `storage-adt-abi` 3 and
+    `abi-dyn-sum` 3.
+  - 2 match a derived method but not its layout. `abi-sum-roundtrip`'s two
+    calls labelled "unknown variant tag must revert" carry tag `0`, which no
+    constructor of `D2` or `S2` has, so their fields have no layout. They stay
+    unclassified.
+  - 4 have no derived argument, since no public method has their selector:
+    `manual-sigstring-table`'s `answer()`, dispatched by hand from the
+    fallback without arguments, and its `0xdeadc0de`; and the former
+    `units([])` selector of `abi-unit-array` and the former flattened selector
+    of `abi-tuple-array`, which upstream keeps to check that they do not
+    dispatch. So 28 of the 32, not 32, carry derived ADT arguments.
+  - The other 7 of the 39, in `basic`, `fallback`, `payable` and `weth9`, are
+    unknown selectors or fallbacks without arguments.
+
+The definitions were fixed before any harness change:
+- **Declarations:** each admitted fixture's main source goes through the
+  declaration extractor with the exports. Its receipt joins the preparation's
+  directive builds and the harness's tool check.
+  - A method's type names resolve to the module's and the contract's own
+    data types and aliases, with their type arguments, and then to std's
+    leaves above, `memory<bytes>`, `memory<string>`, `calldata<array<T>>`,
+    tuples and unit.
+  - A method with any other type has no derived layout.
+- **Classification:** a call can match no standard-ABI method but the
+  structural selector of a public method of the fixture's contract that has a
+  data type in its parameters. It is then read under std's layout of that
+  method's arguments.
+  - It classifies when every offset is word-aligned and inside the
+    arguments, every tag is a constructor tag of its type, and every word
+    read exists and is read once.
+  - Its words are:
+    - typed leaves;
+    - tags;
+    - dynamic offsets, of a sum, a `bytes` value, an array or a tuple
+      element, each with its base;
+    - `bytes` lengths and array lengths;
+    - content;
+    - unused head words, the words of a static sum past its constructor's
+      fields.
+  - Words after the layout stay unclassified.
+  - Any other call keeps today's classification or reason. Deployments keep
+    their standard-ABI classification.
+- **Boundary mutants** of a classified call: the recorded call with one Word
+  changed, never to the recorded Word.
+  - A tag: each other constructor's tag in declaration order, `0`, the
+    recorded tag ± 1 and `2^256 - 1`.
+  - A dynamic offset with base `b`, the byte position within the arguments
+    that it counts from:
+    - `0` and `32`;
+    - one byte past the arguments' end, `length - b + 1`, which is
+      `size - 3` for the arguments' own base;
+    - `2^255`;
+    - the Word that wraps to the selector, `2^256 - 4 - b`, which is
+      `2^256 - 4` for the arguments' own base;
+    - the recorded offset ± 32.
+  - A `bytes` length whose content starts at byte `c`:
+    - one more than fits, `length - c + 1`;
+    - `2^256 - 1`;
+    - into the padding: the recorded length rounded up to a whole Word, when
+      that differs. It still fits.
+  - These are exhaustive: every such Word of every classified call of a
+    fixture, ordered by step, word and value, and numbered after the step's
+    other mutants.
+  - A fixture keeps at most 256 (`--derived-mutants`). Beyond that a seeded
+    uniform sample keeps 256 with their numbers, drawn from the root seed,
+    the fixture id and `derived-boundary`.
+- **Other mutants** of a classified call are drawn as for any step, up to 4:
+  - typed leaves, array lengths and content, by their standard boundary
+    Words;
+  - unused head words, by `0`, `1` and `2^256 - 1`;
+  - seeded Words and the frame.
+
+  Tags, dynamic offsets and `bytes` lengths are left to the exhaustive set.
+- **Comparison:** across the paths only (Hull, O0, O2 and Yul), with no
+  original Core reference, as for every mutant. Findings, reductions and
+  exclusions are as above. The fuzz driver's `--fixture-mutants` keeps its
+  sample of all of a fixture's mutants.
+- **Expected size:** the probe counts 519 boundary mutants in the five
+  fixtures with classified calls, at most 196 in one (`abi-batch-adt`), so the
+  cap does not bind on them.
+- **Runs:**
+  - a frozen mutation run of the eight fixtures on every path, with root
+    seed `20261111`;
+  - one fuzz-driver iteration of the `fixtures` run kind whose fixtures
+    include classified calls.
+
+  Any disagreement is a finding. It goes to `questions.md`, and joins the
+  fuzz driver's known findings only if its signature is a stable symptom.
+- **Epoch:** the harness and the readiness receipt change, so an existing
+  fuzz state needs `--accept-new-epoch`.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
