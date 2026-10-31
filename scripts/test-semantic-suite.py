@@ -1410,6 +1410,119 @@ class SuiteTests(unittest.TestCase):
                         with contextlib.suppress(ProcessLookupError):
                             os.kill(int(pidfile.read_text()), signal.SIGKILL)
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS reads the process table in-process")
+    def test_macos_reads_the_process_table_in_process_as_ps_lists_it(self):
+        child = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(30)"], start_new_session=True)
+        try:
+            self.assertIs(suite.table_source(), suite.kinfo_table)
+            started = time.time()
+            table, listed = suite.kinfo_table(), suite.ps_table()
+            self.assertEqual(table[os.getpid()][:2], (os.getppid(), os.getpgrp()))
+            self.assertEqual(table[child.pid][:2], (os.getpid(), child.pid))
+            common = set(table) & set(listed)
+            self.assertEqual([pid for pid in common if table[pid][:2] != listed[pid][:2]], [])
+            lstart = lambda identity: time.strftime("%a %b %e %H:%M:%S %Y", time.localtime(int(identity.split(".")[0])))
+            self.assertEqual([pid for pid in common if lstart(table[pid][2]) != listed[pid][2].strip()], [])
+            # `ps` lists only itself and processes started after the in-process read besides.
+            for pid in set(listed) - set(table):
+                self.assertGreaterEqual(time.mktime(time.strptime(listed[pid][2].strip(), "%a %b %d %H:%M:%S %Y")), int(started))
+        finally:
+            child.kill()
+            child.wait()
+
+    def test_other_platforms_and_unexpected_records_list_the_table_with_ps(self):
+        self.assertIs(suite.table_source("linux"), suite.ps_table)
+        with patch.object(suite, "kinfo_table", return_value={os.getpid(): (1, 1, "misread")}):
+            self.assertIs(suite.table_source("darwin"), suite.ps_table)
+        with patch.object(suite, "kinfo_table", side_effect=OSError("kinfo_proc records of an unexpected size")):
+            self.assertIs(suite.table_source("darwin"), suite.ps_table)
+        self.assertEqual(suite.ps_table()[os.getpid()][:2], (os.getppid(), os.getpgrp()))
+
+    def separate_session_descendant(self, go, pidfile, after):
+        """A campaign that starts a SIGTERM-ignoring child in its own session once `go`
+        exists, records both PIDs, then runs for `after` seconds and exits normally."""
+        child = "import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(60)"
+        return "\n".join(["import os, subprocess, sys, time", "from pathlib import Path",
+                          f"while not Path({str(go)!r}).exists(): time.sleep(.005)",
+                          f"p = subprocess.Popen([sys.executable, '-c', {child!r}], start_new_session=True)",
+                          f"t = Path({str(pidfile)!r} + '.writing'); t.write_text(f'{{os.getpid()}} {{p.pid}}'); t.replace({str(pidfile)!r})",
+                          f"time.sleep({after})"])
+
+    def reads_of(self, pidfile, starting):
+        """Records, at each read of the process table, whether the child was under the
+        campaign; `starting(reads)` runs after each read."""
+        reads, read = [], suite.process_table
+
+        def reading():
+            table = read()
+            if pidfile.exists():
+                campaign, child = map(int, pidfile.read_text().split())
+                reads.append(table.get(child, (None,))[0] == campaign)
+            else:
+                reads.append(None)
+            starting(reads)
+            return table
+        return reads, reading
+
+    def assert_stopped(self, pidfile):
+        pid = int(pidfile.read_text().split()[1])
+        for _ in range(40):
+            state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+            if not state or state.startswith("Z"):
+                break
+            time.sleep(.05)
+        self.assertTrue(not state or state.startswith("Z"), f"descendant survived: state {state!r}")
+
+    def kill_child(self, pidfile):
+        if pidfile.exists():
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(int(pidfile.read_text().split()[1]), signal.SIGKILL)
+
+    def test_descendant_started_between_two_reads_is_found_and_stopped_after_a_normal_exit(self):
+        args = self.args("--cleanup-seconds", ".1")
+        args.output.mkdir()
+        go, pidfile = self.directory / "go", self.directory / "between.pid"
+        # The child starts after the launch read and the first check's.
+        reads, reading = self.reads_of(pidfile, lambda reads: len(reads) == 2 and go.touch())
+        try:
+            with patch.object(suite, "process_table", side_effect=reading):
+                code, reason = suite.run_process([sys.executable, "-c", self.separate_session_descendant(go, pidfile, .4)],
+                                                 args, time.monotonic() + 5, args.output / "out.log", args.output / "err.log")
+            self.assertEqual((code, reason), (0, None))
+            self.assertEqual(reads[:2], [None, None])
+            # A later check found it under the campaign; the stop's reads see it orphaned.
+            self.assertIn(True, reads)
+            self.assertFalse(reads[-1])
+            self.assert_stopped(pidfile)
+        finally:
+            self.kill_child(pidfile)
+
+    def test_descendant_started_after_the_last_check_is_found_by_the_stop(self):
+        args = self.args("--cleanup-seconds", ".1")
+        args.output.mkdir()
+        go, pidfile = self.directory / "go", self.directory / "last.pid"
+
+        def starting(reads):
+            # The first check's table predates the child, and its deadline has passed.
+            if len(reads) == 2:
+                go.touch()
+                waited = time.monotonic() + 10
+                while not pidfile.exists() and time.monotonic() < waited:
+                    time.sleep(.005)
+
+        reads, reading = self.reads_of(pidfile, starting)
+        try:
+            with patch.object(suite, "process_table", side_effect=reading):
+                code, reason = suite.run_process([sys.executable, "-c", self.separate_session_descendant(go, pidfile, 30)],
+                                                 args, time.monotonic(), args.output / "out.log", args.output / "err.log")
+            self.assertEqual(reason, "time-limit")
+            self.assertNotEqual(code, 0)
+            self.assertEqual(reads[:2], [None, None])
+            self.assertTrue(reads[2])  # the stop's first read, before the campaign is signalled
+            self.assert_stopped(pidfile)
+        finally:
+            self.kill_child(pidfile)
+
     def test_pid_reuse_does_not_target_unrelated_process(self):
         with patch.object(suite, "process_table", return_value={123: (1, 123, "new identity")}), patch.object(os, "kill") as kill, patch.object(os, "killpg") as killpg:
             suite.signal_owned({123: "old identity"}, signal.SIGKILL)

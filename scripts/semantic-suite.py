@@ -10,6 +10,8 @@ The suite adds orchestration, not another execution oracle or reducer.
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import hashlib
 import importlib.util
 import json
@@ -18,6 +20,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -327,8 +330,7 @@ def classify(summary, profile, count, exit_code, stopped=None, backend="sonatina
     return "passed"
 
 
-def process_table():
-    """Record identities so forced cleanup cannot target a reused PID."""
+def ps_table():
     result = subprocess.run(["ps", "-axo", "pid=,ppid=,pgid=,lstart="], capture_output=True, text=True, timeout=5, check=True)
     table = {}
     for line in result.stdout.splitlines():
@@ -336,6 +338,68 @@ def process_table():
         if len(fields) == 4:
             table[int(fields[0])] = (int(fields[1]), int(fields[2]), fields[3])
     return table
+
+
+# macOS's sysctl(KERN_PROC_ALL) returns the kinfo_proc records `ps` itself reads: each
+# record holds p_starttime at byte 0, p_pid at 40, and e_ppid and e_pgid at 560.
+KINFO_PROC_BYTES = 648
+_sysctl = None
+
+
+def kinfo_table():
+    """The same table as `ps`, read in-process on macOS; identities are start times to
+    the microsecond."""
+    global _sysctl
+    if _sysctl is None:
+        _sysctl = ctypes.CDLL(None, use_errno=True).sysctl
+        _sysctl.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_uint, ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t),
+                            ctypes.c_void_p, ctypes.c_size_t]
+    sysctl = _sysctl
+    name = (ctypes.c_int * 3)(1, 14, 0)  # CTL_KERN, KERN_PROC, KERN_PROC_ALL
+    for _ in range(4):
+        size = ctypes.c_size_t()
+        if sysctl(name, 3, None, ctypes.byref(size), None, 0):
+            raise OSError(ctypes.get_errno(), "sysctl KERN_PROC_ALL")
+        size.value += size.value // 4  # processes started after the size query
+        records = ctypes.create_string_buffer(size.value)
+        if not sysctl(name, 3, records, ctypes.byref(size), None, 0):
+            break
+        if ctypes.get_errno() != errno.ENOMEM:
+            raise OSError(ctypes.get_errno(), "sysctl KERN_PROC_ALL")
+    else:
+        raise OSError(errno.ENOMEM, "sysctl KERN_PROC_ALL kept growing")
+    if size.value % KINFO_PROC_BYTES:
+        raise OSError(errno.EINVAL, "kinfo_proc records of an unexpected size")
+    table = {}
+    for offset in range(0, size.value, KINFO_PROC_BYTES):
+        seconds, micros = struct.unpack_from("=qi", records, offset)
+        pid, = struct.unpack_from("=i", records, offset + 40)
+        table[pid] = (*struct.unpack_from("=ii", records, offset + 560), f"{seconds}.{micros:06d}")
+    return table
+
+
+def table_source(platform=None):
+    """The in-process table on macOS when it places this process under its parent and
+    group, `ps` otherwise."""
+    if (platform or sys.platform) == "darwin":
+        try:
+            if kinfo_table().get(os.getpid(), ())[:2] == (os.getppid(), os.getpgrp()):
+                return kinfo_table
+        except (OSError, AttributeError):
+            pass
+    return ps_table
+
+
+_table = None
+
+
+def process_table():
+    """Record identities so forced cleanup cannot target a reused PID. The first read
+    fixes the source, so identities always compare across reads."""
+    global _table
+    if _table is None:
+        _table = table_source()
+    return _table()
 
 
 def remember_children(root_pid, owned, table):
