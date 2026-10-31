@@ -1046,9 +1046,8 @@ class SuiteTests(unittest.TestCase):
                                          "--profile", "closed-g0", "--profile", "runtime-word", "--functions", "2"])
                 args.output.mkdir()
 
-                def run(command, args, deadline, stdout, stderr):
+                def run(command, args, deadline, stdout, stderr, folder=None):
                     profile = command[command.index("--profile") + 1]
-                    folder = Path(command[command.index("--output") + 1])
                     folder.mkdir()
                     # Two runtime-word functions of eight inputs each, or closed-g0's four cases.
                     count = reported if "--functions" in command else int(command[command.index("--cases") + 1])
@@ -1111,9 +1110,10 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(suite.classify(summary, "closed-g0", 4, 1), "inconclusive-resource")
 
     def mock_campaign(self, statuses):
-        def run(command, args, deadline, stdout, stderr):
+        def run(command, args, deadline, stdout, stderr, folder=None):
             profile = command[command.index("--profile") + 1]
-            folder = Path(command[command.index("--output") + 1])
+            # The disk check walks the folder the campaign writes.
+            self.assertEqual(folder, Path(command[command.index("--output") + 1]))
             folder.mkdir()
             summary = completed(profile, suite.requested(args, profile))
             if suite.PROFILES[profile][1] == "pure":
@@ -1201,6 +1201,59 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(reason, "output-limit")
         self.assertNotEqual(code, 0)
         self.assertLessEqual(stdout.stat().st_size, 1024)
+
+    def finished_profile(self, args, size):
+        """A finished profile's folder of `size` bytes, as a sparse file."""
+        folder = args.output / "00-closed-g0"
+        folder.mkdir()
+        with (folder / "retained.bin").open("wb") as output:
+            output.truncate(size)
+        return args.output / "01-runtime-word"
+
+    def test_real_profile_writing_past_the_disk_limit_is_stopped_with_finished_profiles_counted(self):
+        # 32 MiB with a 4 MiB reserve stops at 28 MiB; a finished profile holds 20 of them.
+        for written, expected in ((10, "disk-limit"), (5, "time-limit")):
+            with self.subTest(written=written):
+                args = self.args("--disk-bytes", str(32 * 1024**2), "--cleanup-seconds", ".1")
+                args.output = args.output.with_name(f"run-{written}")
+                args.output.mkdir()
+                folder = self.finished_profile(args, 20 * 1024**2)
+                write = (f"import pathlib,time;f=pathlib.Path({str(folder)!r});f.mkdir();"
+                         f"(f/'case.bin').write_bytes(b'x'*({written}*1024**2));time.sleep(30)")
+                code, reason = suite.run_process([sys.executable, "-c", write], args, time.monotonic() + 3,
+                                                 args.output / "01.stdout.log", args.output / "01.stderr.log", folder=folder)
+                self.assertEqual(reason, expected)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(suite.directory_bytes(args.output), (20 + written) * 1024**2)
+
+    def test_real_profile_logs_count_toward_the_disk_limit(self):
+        args = self.args("--disk-bytes", str(32 * 1024**2), "--output-limit", str(16 * 1024**2), "--cleanup-seconds", ".1")
+        args.output.mkdir()
+        folder = self.finished_profile(args, 20 * 1024**2)
+        write = "import sys,time;sys.stdout.write('x'*(9*1024**2));sys.stdout.flush();time.sleep(30)"
+        code, reason = suite.run_process([sys.executable, "-c", write], args, time.monotonic() + 5,
+                                         args.output / "01.stdout.log", args.output / "01.stderr.log", folder=folder)
+        self.assertEqual(reason, "disk-limit")
+        self.assertEqual((args.output / "01.stdout.log").stat().st_size, 9 * 1024**2)
+
+    def test_disk_check_walks_only_the_running_profile_after_launch(self):
+        args = self.args("--cleanup-seconds", ".1")
+        args.output.mkdir()
+        folder = self.finished_profile(args, 1024)
+        walked, measure = [], suite.directory_bytes
+
+        def recording(directory):
+            walked.append(directory)
+            return measure(directory)
+
+        write = f"import pathlib,time;f=pathlib.Path({str(folder)!r});f.mkdir();(f/'case.json').write_text('{{}}');time.sleep(30)"
+        with patch.object(suite, "directory_bytes", side_effect=recording):
+            _, reason = suite.run_process([sys.executable, "-c", write], args, time.monotonic() + 1,
+                                          args.output / "01.stdout.log", args.output / "01.stderr.log", folder=folder)
+        self.assertEqual(reason, "time-limit")
+        self.assertEqual(walked[:2], [args.output, folder])
+        self.assertGreater(len(walked), 3)
+        self.assertEqual(set(walked[2:]), {folder})
 
     def test_unavailable_process_inventory_fails_before_launch(self):
         args = self.args()

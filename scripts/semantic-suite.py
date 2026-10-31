@@ -384,18 +384,29 @@ def stop_owned(process, owned, grace):
         process.wait(timeout=5)
 
 
-def run_process(argv, args, deadline, stdout_path, stderr_path):
+def run_process(argv, args, deadline, stdout_path, stderr_path, *, folder=None):
+    """Run one owned process within the time, disk and output limits. A profile's
+    campaign writes only its `folder` and the two logs, and finished profiles never
+    change again, so with `folder` the disk check walks that folder alone and adds
+    the logs' lengths to the rest of the output as it was at launch."""
     # Fail closed before spawning if descendant cleanup is unavailable.
     process_table()
     owned, stopped = {}, None
     with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+        settled = None if folder is None else directory_bytes(args.output) - directory_bytes(folder)
+
+        def retained():
+            if settled is None:
+                return directory_bytes(args.output)
+            return settled + directory_bytes(folder) + stdout.tell() + stderr.tell()
+
         process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
         try:
             while process.poll() is None:
                 remember_children(process.pid, owned, process_table())
                 if time.monotonic() >= deadline:
                     stopped = "time-limit"
-                elif directory_bytes(args.output) >= args.disk_bytes - args.reserve_bytes:
+                elif retained() >= args.disk_bytes - args.reserve_bytes:
                     stopped = "disk-limit"
                 elif stdout.tell() + stderr.tell() > args.output_limit:
                     stopped = "output-limit"
@@ -455,7 +466,8 @@ class Suite:
             self.checkpoint()
             profile_started = time.monotonic()
             exit_code, stopped = run_process(argv, args, min(self.deadline, time.monotonic() + seconds),
-                args.output / f"{index:02d}-{profile}.stdout.log", args.output / f"{index:02d}-{profile}.stderr.log")
+                args.output / f"{index:02d}-{profile}.stdout.log", args.output / f"{index:02d}-{profile}.stderr.log",
+                folder=folder)
             row.update(exitCode=exit_code, stop=stopped, elapsedSeconds=round(time.monotonic() - profile_started, 3))
             summary_path = folder / "summary.json"
             summary = None
