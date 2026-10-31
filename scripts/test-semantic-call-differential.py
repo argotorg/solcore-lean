@@ -773,6 +773,193 @@ class CallReturnTests(unittest.TestCase):
             adapter.hull_history(encode(rows[:2] + rows[3:]), 0, value, BINDINGS, runtimes)
 
 
+def sequence_plan(windows=((0, 32), (95, 1), (33, 31))):
+    return {"schema": "solcore-lean.call-sequence-plan.v1", "calls": len(windows),
+            "windows": [{"offset": offset, "width": width} for offset, width in windows], "stepProgram": {}}
+
+
+def sequence_input(calls, high=0, parent_reverts=False):
+    """An input whose class bytes give each call's (status, length)."""
+    value = sum((2 * length + (status == "reverted")) << (8 * index) for index, (status, length) in enumerate(calls))
+    return (high << 32) + (parent_reverts << 24) + value
+
+
+def sequence_case(plan=None, inputs=None):
+    """Envelope fixture only: native replay checks the actual programs; each
+    transaction's prescribed outcomes are the adapter's own."""
+    plan = plan or sequence_plan()
+    inputs = inputs or [sequence_input([("returned", 33), ("reverted", 0), ("returned", 96)], 7),
+                        sequence_input([("reverted", 64), ("returned", 1), ("reverted", 31)], 9),
+                        sequence_input([("returned", 32), ("returned", 0), ("reverted", 95)], 11, True)]
+    transactions = [{"id": f"tx-{index}", "input": str(value), "value": "0", "target": "parent", "callee": "child"}
+                    for index, value in enumerate(inputs)]
+    for tx in transactions:
+        tx["calls"], tx["parentReverts"] = adapter.sequence_prescribed(plan["calls"], tx)
+    return {"schema": adapter.SEQUENCE_CASE_SCHEMA, "callSequencePlan": plan,
+        "programs": {"parentCall": {}, "parentMiddles": [{}] * (plan["calls"] - 1), "parentLast": {}, "child": {}},
+        "sources": {"parent": "protocol fixture only", "child": "protocol fixture only"},
+        "contracts": adapter.return_contract_metadata(),
+        "observedSlots": {"parent": [str(slot) for slot in range(5 * plan["calls"] + 3)], "child": list(adapter.RETURN_CHILD_SLOTS)},
+        "initialState": {"accounts": [{"role": "parent", "balance": "0", "storage": []},
+            {"role": "child", "balance": "0", "storage": []}], "callerBalance": "0"},
+        "provenance": {key: "protocol-test" for key in ("generatorVersion", "emitterVersion", "wrapperVersion")},
+        "transactions": transactions}
+
+
+def sequence_history(value):
+    """Rows that follow the protocol, with the content reads (first Words,
+    windows and the re-read) zero and the child's step result its call count."""
+    slots = len(value["observedSlots"]["parent"])
+    parent, child = [0] * slots, [0, 0]
+    rows = []
+    for index, tx in enumerate(value["transactions"]):
+        written = [(parent[0] + int(tx["input"])) % WORD, 0] + [0] * (slots - 2)
+        count, previous = child[1], 0
+        for position, call in enumerate(tx["calls"], start=1):
+            ok = call["status"] == "returned"
+            written[5 * position - 3] = ok + 2 * call["length"]
+            written[5 * position - 1] = previous
+            written[5 * position] = call["length"]
+            previous = call["length"]
+            count += ok
+        output = word(sum(written) % WORD)
+        if tx["parentReverts"]:
+            status = "reverted"
+        else:
+            status = "returned"
+            parent = written
+            if count != child[1]:
+                child = [count, count]
+        rows.append({"id": tx["id"], "index": index, "status": status, "output": output,
+                     "committedAccounts": return_accounts(parent, child), "logs": []})
+    return with_whole({"schema": adapter.SEQUENCE_HISTORY_SCHEMA,
+        "initialAccounts": adapter.return_initial_accounts(BINDINGS, tuple(value["observedSlots"]["parent"])),
+        "transactions": rows, "finalAccounts": copy.deepcopy(rows[-1]["committedAccounts"]), "status": "complete",
+        "unexecuted": []})
+
+
+def sequence_histories(value):
+    return {path: sequence_history(value) for path in adapter.PATHS}
+
+
+class CallSequenceTests(unittest.TestCase):
+    def test_the_case_carries_its_plan_programs_and_prescribed_outcomes(self):
+        value = sequence_case()
+        adapter.validate_case(value)
+        self.assertTrue(adapter.sequences(value) and adapter.returns(value))
+        self.assertFalse(adapter.sequences(return_case()))
+        selected = adapter.profile(value)
+        self.assertEqual((selected["caseTool"], selected["coreRunner"]), ("semantic-call-sequence-tool", "rust-hull-call-return-scenario"))
+        self.assertEqual(adapter.return_parent_slots(value), tuple(str(slot) for slot in range(18)))
+        self.assertEqual(value["transactions"][0]["calls"], [{"length": 33, "status": "returned"},
+            {"length": 0, "status": "reverted"}, {"length": 96, "status": "returned"}])
+        self.assertEqual([tx["parentReverts"] for tx in value["transactions"]], [False, False, True])
+        # Class bytes above twice 96 name 96 bytes, and every byte of 2^256 - 1 reverts.
+        self.assertEqual(adapter.sequence_prescribed(3, {"input": str(2**256 - 1)}),
+                         ([{"length": 96, "status": "reverted"}] * 3, True))
+        self.assertEqual(adapter.sequence_prescribed(2, {"input": "0"}), ([{"length": 0, "status": "returned"}] * 2, False))
+        for change in (lambda v: v["transactions"][0].update(parentReverts=True),
+                       lambda v: v["transactions"][1]["calls"][0].update(length=63),
+                       lambda v: v["transactions"][2]["calls"].pop(),
+                       lambda v: v["transactions"][0].update(stdRejection=None),
+                       lambda v: v["programs"]["parentMiddles"].pop(),
+                       lambda v: v["callSequencePlan"]["windows"][0].update(offset=97),
+                       lambda v: v["callSequencePlan"]["windows"][1].update(width=33),
+                       lambda v: v["callSequencePlan"].update(calls=2),
+                       lambda v: v.update(contracts=adapter.contract_metadata())):
+            invalid = sequence_case()
+            change(invalid)
+            with self.assertRaises((ValueError, adapter.Finding)):
+                adapter.validate_case(invalid)
+        invalid = sequence_case()
+        invalid["observedSlots"] = {"parent": list(adapter.RETURN_PARENT_SLOTS), "child": ["0", "1"]}
+        with self.assertRaises(adapter.Finding):
+            adapter.validate_case(invalid)
+        self.assertEqual(adapter.resolve_backend(value, "yul"), "yul")
+
+    def test_matched_histories_follow_the_sizes_and_the_child_count(self):
+        value = sequence_case()
+        histories = sequence_histories(value)
+        result = adapter.compare(histories, value, BINDINGS)
+        self.assertEqual(result["category"], "matched")
+        self.assertEqual(result["selectorRows"], [])
+        # One path's preceding size differs: a pairwise mismatch.
+        changed = copy.deepcopy(histories)
+        changed["rustEvm"]["transactions"][0]["committedAccounts"][0]["storage"][9]["value"] = "34"
+        with_whole(changed["rustEvm"])
+        changed["rustEvm"]["finalAccounts"] = changed["rustEvm"]["transactions"][-1]["committedAccounts"]
+        result = adapter.compare(changed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-0"))
+        self.assertFalse(result["pairs"]["directCore/rustEvm"])
+        # Every path agrees on a size the input does not give: the protocol fails.
+        for slot, label in ((10, "a size"), (4, "the read before the first call")):
+            agreed = copy.deepcopy(histories)
+            for path in adapter.PATHS:
+                row = agreed[path]["transactions"][0]
+                row["committedAccounts"][0]["storage"][slot]["value"] = str(int(row["committedAccounts"][0]["storage"][slot]["value"]) + 1)
+                row["output"] = word((int(row["output"], 16) + 1) % WORD)
+                with_whole(agreed[path])
+            with self.subTest(label=label):
+                result = adapter.compare(agreed, value, BINDINGS)
+                self.assertEqual(result["category"], "semantic-mismatch")
+                self.assertIn("committedAccounts", result["fields"])
+        # An output that is not the slots' sum.
+        agreed = copy.deepcopy(histories)
+        for path in adapter.PATHS:
+            agreed[path]["transactions"][1]["output"] = word(1)
+        result = adapter.compare(agreed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertIn("output", result["fields"])
+
+    def test_a_parent_revert_keeps_both_storages_and_an_all_reverted_sequence_the_child(self):
+        value = sequence_case(inputs=[sequence_input([("returned", 64), ("returned", 0), ("returned", 1)], 3),
+                                      sequence_input([("reverted", 32), ("reverted", 0), ("reverted", 96)], 5)])
+        histories = sequence_histories(value)
+        self.assertEqual(adapter.compare(histories, value, BINDINGS)["category"], "matched")
+        # Every call of tx-1 reverted, so the child's storage must stay; a write is a rollback failure.
+        changed = copy.deepcopy(histories)
+        for path in adapter.PATHS:
+            row = changed[path]["transactions"][1]
+            row["committedAccounts"][1]["storage"][0]["value"] = "12345"
+            changed[path]["finalAccounts"] = row["committedAccounts"]
+            with_whole(changed[path])
+        result = adapter.compare(changed, value, BINDINGS)
+        self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", "tx-1"))
+        self.assertEqual(result["accountStorageRollbackPaths"], sorted(adapter.PATHS))
+        # A parent revert that commits a write.
+        value = sequence_case(inputs=[sequence_input([("returned", 64), ("returned", 0), ("returned", 1)], 3, True)])
+        changed = sequence_histories(value)
+        for path in adapter.PATHS:
+            row = changed[path]["transactions"][0]
+            row["committedAccounts"][0]["storage"][0]["value"] = "1"
+            changed[path]["finalAccounts"] = row["committedAccounts"]
+            with_whole(changed[path])
+        result = adapter.compare(changed, value, BINDINGS)
+        self.assertEqual(result["category"], "semantic-mismatch")
+        self.assertIn("accountStorage", result["fields"])
+
+    def test_the_hull_history_uses_the_sequence_schema_and_the_plan_slots(self):
+        value = sequence_case(plan=sequence_plan(((0, 0), (96, 32))),
+                              inputs=[sequence_input([("returned", 96), ("reverted", 17)], 1)])
+        runtimes = {"parent": b"\x60\x01", "child": b"\x60\x02"}
+        slots = tuple(value["observedSlots"]["parent"])
+        self.assertEqual(len(slots), 13)
+        rows = [{"stage": "deployment-" + role, "status": "returned", "output": "0x" + runtimes[role].hex(),
+                 "imageVerified": True, "codeBytes": 2} for role in ("child", "parent")]
+        rows += [{"stage": "initialization", "committedAccounts": adapter.return_initial_accounts(BINDINGS, slots),
+                  "accountStorage": whole(adapter.return_initial_accounts(BINDINGS, slots))}]
+        rows += [{**row, "stage": "execution"} for row in sequence_history(value)["transactions"]]
+        encode = lambda values: "\n".join(json.dumps(row) for row in values)
+        history = adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+        self.assertEqual((history["schema"], history["status"]), (adapter.SEQUENCE_HISTORY_SCHEMA, "complete"))
+        self.assertEqual(adapter.compare({**sequence_histories(value), "importedHull": history}, value, BINDINGS)["category"],
+                         "matched")
+        # The call-return profile's seven slots are not this plan's.
+        rows[2]["committedAccounts"] = adapter.return_initial_accounts(BINDINGS)
+        with self.assertRaises(ValueError):
+            adapter.hull_history(encode(rows), 0, value, BINDINGS, runtimes)
+
+
 class CallReturnYulTests(unittest.TestCase):
     """Backend policy and the Yul export boundary; mocked processes are not compiler or EVM results."""
 

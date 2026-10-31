@@ -7178,6 +7178,117 @@ the Rust driver, code-image exporter and directive tools frozen.
 
 There was no finding. Agreement is test evidence, not a preservation proof.
 
+## Compare call sequences
+
+The `stateful-call-sequences` profile compares a parent that calls a child
+method two or three times in one method and measures the latest return data
+around each call.
+- **What it targets:** each call replaces the return-data buffer, a reverted
+  call with its revert data or with nothing. A compiler that reads a stale
+  buffer, or moves `returndatasize` or `returndatacopy` across a later call,
+  shows only with several calls. Inline `assembly` blocks in user code read
+  both builtins, as std's own opcode wrappers do.
+- **Original Core** runs the parent through the call chain in
+  `Solcore/ContractRuntime/CallChainExecution.lean`: the call phase, then a
+  resume phase after each call, each through the public top-level runner and
+  committing as one transaction. Every resume phase but the last returns the
+  next call's request, and the chain without middle phases is
+  `CallResumeExecution`.
+- **Shared with `stateful-call-returns`:** the two wrapper names and methods,
+  so the profile runs on Yul too, the call adapter's two-source paths and
+  `rust-hull-call-return-scenario`.
+
+The [roadmap](../docs/design/next-implementation-roadmap.md) records the
+probe and the definitions.
+
+### Definitions
+
+- **Boundary:** two or three calls per transaction, each to the bound child, at
+  depth one, with zero value and no logs. Every call site runs once per
+  transaction, in program order.
+- **Child:** `o = slot 0`, `c = slot 1 + 1` and `r = step(x + o)`; it writes
+  `r` and `c`. With the class byte `b = x mod 256` and `L = min(b >> 1, 96)`,
+  its data are the first `L` bytes of `d0 ‖ d1 ‖ d2`, where `d0 = r·K`,
+  `d1 = (c·K) xor x` and `d2 = d0 xor d1`. It reverts with them through
+  `revert_` when `b` is odd, and otherwise returns them through `return_`.
+- **Parent,** for `n` calls with one window `(o_k, w_k)` each:
+  1. it writes `slot 0 + input` to slot 0;
+  2. before any call, in inline Yul, it copies zero bytes at offset 0 into a
+     zeroed scratch Word, keeping its Word `z`, and sets `mix = input >> 32`;
+  3. for call `k`, with `b_k` the input's byte `k - 1`, it reads
+     `p_k = returndatasize()` in inline Yul, calls
+     `raw_call(address(target), 0, 0x9507d39a ‖ mix·256 + b_k)`, keeps the
+     flag `ok_k`, the copy's length `m_k` and its first Word `f_k` when
+     `m_k >= 32`, then reads `n_k = returndatasize()` and the window `v_k`
+     with `returndatacopy(scratch, o_k, w_k)` when it lies inside the data.
+     From the second call on it re-reads call 1's copy's first Word into `a`.
+     `mix` then grows by `f_k + n_k + v_k`;
+  4. it writes `z` to slot 1, each call's `ok_k + 2·m_k`, `f_k`, `p_k`, `n_k`
+     and `v_k` to slots `5k - 3` to `5k + 1` and `a` to slot `5n + 2`, and
+     reverts with their sum with slot 0 under the input's bit 24, or returns
+     it.
+- **What each read must see:** `z = 0`, `p_1 = 0`, `p_k = m_(k-1)`,
+  `n_k = m_k`, `v_k` the window's bytes left-aligned in a zero Word when they
+  lie inside the data, and `a = (n - 1)·f_1` when `m_1 >= 32`.
+- **Original Core:**
+  - the child's convention is the new `rawOutcomeV1 2`, whose returned and
+    reverted data are both raw bytes;
+  - the call phase and the middle phases are under `wordTupleOutcomeV1 8`,
+    keeping seven Words, and the last phase under `wordOutcomeV1`. Each later
+    phase reads its call's data at base 256 and writes that call's slots.
+- **Prescribed outcomes:** each transaction records every call's status and
+  length and whether the parent reverts, computed by a Lean byte-level model.
+  The adapter recomputes them from the input's class bytes and bit 24.
+
+### Running and validation
+
+```sh
+lake build semanticCallSequenceTool rustHullCallReturnScenario
+python3 scripts/semantic-call-campaign.py --profile stateful-call-sequences \
+  --corpus scripts/semantic-call-sequence-corpus.json \
+  --output .upstream/semantic-call-sequence-ci --seconds 900
+python3 scripts/semantic-suite.py --mode random \
+  --profile stateful-call-sequences --cases 16 \
+  --output .upstream/semantic-call-sequence-random
+python3 scripts/semantic-suite.py --mode fixed --backend yul \
+  --profile stateful-call-sequences \
+  --output .upstream/semantic-call-sequence-yul
+```
+
+- **Schemas:**
+  - plans: `solcore-lean.call-sequence-plan.v1` under `callSequencePlan`, with
+    `calls`, one `windows` entry per call and `stepProgram`;
+  - cases: `solcore-lean.semantic-call-sequence-case.v1`, carrying `sources`
+    for both roles, the programs `parentCall`, `parentMiddles`, `parentLast`
+    and `child`, and each transaction's `calls` and `parentReverts`;
+  - histories: `solcore-lean.call-sequence-history.v1`.
+- **Node budget:** the child's shell takes 129 nodes inside the budget. The
+  call phase (91 nodes), the middle phases (235 and 230) and the last phase
+  (192) lie outside it.
+- **Paths:** as for `stateful-call-returns`; the Hull scenario names the
+  parent's slots 0 to `5n + 2`.
+- **Comparison:**
+  - every row's status and whole return data, the parent's slots 0 to
+    `5n + 2`, the child's slots 0 and 1, both balances, both contracts' whole
+    committed storage and empty logs, with no mapping between the paths;
+  - a returned parent's `z`, `ok_k + 2·m_k`, `p_k` and `n_k` must equal the
+    adapter's own values from the input, its output the sum of its slots, and
+    the child's count must grow by the returned calls;
+  - a parent revert keeps both prior storages, and a returned parent whose
+    calls all reverted keeps the child's.
+- **Campaign dimensions:** `SequenceCalls`, `SequenceTransitions` (the
+  status and empty data of consecutive calls, sixteen pairs),
+  `SequenceLengths` (the bank's lengths, returned and reverted apart),
+  `SequenceWindows` (inside, past the end, of width zero), `SequenceRollbacks`
+  and `SequenceNodeBudgets`, beside the call family's without log patterns.
+- **Corpus:** `scripts/semantic-call-sequence-corpus.json` holds 16 scenarios
+  and 39 transactions: 11 imported plans over the steps the call-return corpus
+  imports, among them every boundary input and a de Bruijn sequence of the
+  call states, and 5 generated at 384 and 512 nodes. Each entry records its
+  expected history, computed by the byte-level model, in which each step runs
+  alone in Core. The corpus check compares it with the chain's actual
+  history.
+
 ## Compare whole committed storage
 
 Every stateful profile compares the declared slots on all three paths. The twenty-five

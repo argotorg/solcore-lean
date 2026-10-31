@@ -118,6 +118,9 @@ PROFILES = {
     # The call-return child's shell takes 58 to 114 nodes of 384; the value it
     # returns and the parent's two phases lie outside the budget.
     "stateful-call-returns": ("semantic-call-return", "call", 384),
+    # The call-sequence child's shell takes the same nodes for every plan; the
+    # parent's phases lie outside the budget.
+    "stateful-call-sequences": ("semantic-call-sequence", "call", 384),
 }
 # Profiles that declare their observed slots share the declared-slot Hull runner.
 DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "stateful-logs", "stateful-bytes", "stateful-mapping",
@@ -128,9 +131,10 @@ DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "s
                           "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns",
                           "stateful-bytes-returns", "stateful-enum-returns", "stateful-enum-arguments",
                           "stateful-enum-array-arguments", "stateful-array-returns", "stateful-constructor-arguments")
-# The Yul exporter admits the call-return profile's two single-contract sources;
-# the other call profiles' sources each compile both contracts and stay on Sonatina.
-YUL_CALL_PROFILES = ("stateful-call-returns",)
+# The Yul exporter admits the two single-contract wrappers of the call-return and
+# call-sequence profiles; the other call profiles' sources each compile both
+# contracts and stay on Sonatina.
+YUL_CALL_PROFILES = ("stateful-call-returns", "stateful-call-sequences")
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
 
@@ -218,7 +222,7 @@ def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
     attempts = profile_attempts(args, profile)
     if args.backend == "yul" and family == "call" and profile not in YUL_CALL_PROFILES:
-        raise ValueError("Yul is restricted to the pure, storage-family and call-return profiles")
+        raise ValueError("Yul is restricted to the pure, storage-family, call-return and call-sequence profiles")
     storage_tools = {"stateful-keyed-storage": args.keyed_case_tool, "stateful-dynamic-array": args.array_case_tool,
                      "stateful-logs": args.log_case_tool, "stateful-call-value": args.value_case_tool,
                      "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool,
@@ -241,9 +245,10 @@ def command(args, profile, output, seconds, disk_bytes):
                      "stateful-array-returns": args.array_return_case_tool,
                      "stateful-constructor-arguments": args.constructor_argument_case_tool}
     forwarded = profile == "stateful-forwarded-value"
-    returning = profile == "stateful-call-returns"
+    returning = profile in ("stateful-call-returns", "stateful-call-sequences")
     tool = {"pure": args.case_tool, "storage": args.rollback_case_tool if profile.endswith("-rollback") else
             storage_tools.get(profile, args.storage_case_tool), "call": args.forward_case_tool if forwarded else
+            args.call_sequence_case_tool if profile == "stateful-call-sequences" else
             args.call_return_case_tool if returning else args.call_case_tool}[family]
     runner = {"pure": args.core_runner, "storage": args.value_core_runner if profile == "stateful-call-value" else
               args.ledger_core_runner if profile == "stateful-ledger" else
@@ -566,7 +571,8 @@ def parse_args(argv=None):
                 "array_return_case_tool": "semantic-array-return-tool",
                 "constructor_argument_case_tool": "semantic-constructor-argument-tool",
                 "call_return_case_tool": "semantic-call-return-tool",
-                "call_return_core_runner": "rust-hull-call-return-scenario"}
+                "call_return_core_runner": "rust-hull-call-return-scenario",
+                "call_sequence_case_tool": "semantic-call-sequence-tool"}
     for key in binaries:
         parser.add_argument("--" + key.replace("_", "-"), type=Path)
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
@@ -581,7 +587,8 @@ def parse_args(argv=None):
     args.cases = args.cases if args.cases is not None else 4
     if args.backend == "yul":
         if args.profile and any(PROFILES[profile][1] == "call" and profile not in YUL_CALL_PROFILES for profile in args.profile):
-            parser.error("--backend yul supports the pure, storage-family and call-return profiles; the other call profiles must use Sonatina")
+            parser.error("--backend yul supports the pure, storage-family, call-return and call-sequence profiles; "
+                         "the other call profiles must use Sonatina")
         args.profile = args.profile or [profile for profile, (_, family, _) in PROFILES.items() if family == "pure"]
     else:
         args.profile = args.profile or list(PROFILES)

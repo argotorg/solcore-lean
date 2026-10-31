@@ -5,6 +5,7 @@ import Solcore.Synthesis.Core.EnumReturn
 import Solcore.Synthesis.Core.StdDispatch
 import Solcore.Core.Wire.Codec.Program
 import Solcore.ContractRuntime.CallResumeExecution
+import Solcore.Synthesis.Core.CallBuilder
 
 /-! Three checked contracts for a parent that calls a child method and decodes
 its return data with std. The child `get(uint256 x)` reads `o = slot 0` and
@@ -35,6 +36,7 @@ open Solcore.Core.Wire
 open Solcore.ContractRuntime
 open Solcore.Synthesis.Core.EnumReturn (Constructor Shape)
 open Solcore.Synthesis.Core.StdDispatch (truncatedError)
+open Solcore.Synthesis.Core.CallBuilder
 
 def childVersion : String := "core-call-return-child-v1"
 def parentVersion : String := "core-call-return-parent-v1"
@@ -261,48 +263,6 @@ def Returned.valid (returned : Returned) : Bool :=
   (match returned.delivery with
     | .typed => true
     | .raw malformation => malformation.valid returned)
-
-/-! ### A binder-level builder for de Bruijn Core expressions -/
-
-/-- An expression at a binder depth. -/
-private abbrev B := Nat → Expr
-
-private def bvar (level : Nat) : B := fun depth => .var (depth - 1 - level)
-private def bword (value : Nat) : B := fun _ => .word (w value)
-private def bconst (value : Word) : B := fun _ => .word value
-private def bunit : B := fun _ => .unit
-private def bhost (index : Nat) (argument : B) : B := fun depth => .apply (.var (index + depth)) (argument depth)
-private def bapply (function argument : B) : B := fun depth => .apply (function depth) (argument depth)
-private def blet (value : B) (body : Nat → B) : B := fun depth => .letE (value depth) (body depth (depth + 1))
-private def bcond (condition yes no : B) : B := fun depth => .ifE (condition depth) (yes depth) (no depth)
-private def bcase (scrutinee : B) (left right : Nat → B) : B := fun depth =>
-  .caseE (scrutinee depth) (left depth (depth + 1)) (right depth (depth + 1))
-private def bbinary (operator : BinaryOp) (left right : B) : B := fun depth =>
-  .binary operator (left depth) (right depth)
-private def bpair (left right : B) : B := fun depth => .pair (left depth) (right depth)
-private def binLeft (type : Ty) (value : B) : B := fun depth => .inLeft type (value depth)
-private def binRight (type : Ty) (value : B) : B := fun depth => .inRight type (value depth)
-private def bfirst (value : B) : B := fun depth => .first (value depth)
-private def bsecond (value : B) : B := fun depth => .second (value depth)
-
-private def badd (left right : B) : B := bbinary .wordAdd left right
-private def bsub (left right : B) : B := bbinary .wordSub left right
-private def bgt (left right : B) : B := bbinary .wordGt left right
-private def beq (left right : B) : B := bbinary .wordEq left right
-private def bbitSet (value : B) (bit : Nat) : B := beq (bbinary .wordAnd value (bword bit)) (bword bit)
-
-private def sload (slot : Nat) : B := bhost 0 (bword slot)
-private def sstore (slot : Nat) (value : B) : B := bhost 1 (bpair (bword slot) value)
-private def inputSize : B := bhost 7 bunit
-/-- The input Word at a byte offset; an absent Word reads as zero, which the
-checks before every read never reach. -/
-private def readAt (offset : B) : B := bcase (bhost 8 offset) (fun _ => bword 0) (fun value => bvar value)
-
-/-- Right-nested pairs of the values. -/
-private def btuple : List B → B
-  | [] => bunit
-  | [value] => value
-  | value :: rest => bpair value (btuple rest)
 
 /-! ### The child -/
 

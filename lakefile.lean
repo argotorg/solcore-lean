@@ -132,6 +132,10 @@ lean_exe rustHullCallReturnScenario where
   root := `Tests.RustHullCallReturnScenarioRun
   exeName := "rust-hull-call-return-scenario"
 
+lean_exe semanticCallSequenceTool where
+  root := `Tests.SemanticCallSequenceTool
+  exeName := "semantic-call-sequence-tool"
+
 lean_exe semanticEventLogTool where
   root := `Tests.SemanticEventLogTool
   exeName := "semantic-log-tool"

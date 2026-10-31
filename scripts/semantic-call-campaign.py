@@ -66,6 +66,16 @@ RETURN_DIMENSIONS = DIMENSIONS[:-1] + RETURN_EXTRA
 RETURN_CORPUS_SCHEMA = "solcore-lean.semantic-call-return-corpus.v1"
 RETURN_ROLLBACKS = ("child-reverted-parent-returned", "child-reverted-parent-reverted",
                     "child-returned-parent-reverted", "rejected")
+# The call-sequence profile's own dimensions: the call count, the statuses and
+# empty data of consecutive calls, the data lengths by status, where each
+# window lies, the rollback patterns and the node budgets.
+SEQUENCE_EXTRA = ("SequenceCalls", "SequenceTransitions", "SequenceLengths", "SequenceWindows", "SequenceRollbacks",
+                  "SequenceNodeBudgets")
+SEQUENCE_DIMENSIONS = DIMENSIONS[:-1] + SEQUENCE_EXTRA
+SEQUENCE_CORPUS_SCHEMA = "solcore-lean.semantic-call-sequence-corpus.v1"
+SEQUENCE_ROLLBACKS = ("child-reverted-parent-returned", "child-reverted-parent-reverted", "children-returned-parent-reverted")
+SEQUENCE_WINDOWS = ("inside", "outside", "empty")
+SEQUENCE_STATES = tuple(f"{status}-{data}" for status in ("returned", "reverted") for data in ("data", "empty"))
 # Profile rules; the adapter selects schemas, programs and protocols by case schema.
 PROFILES = {
     "stateful-calls": {"dimensions": DIMENSIONS, "modeMask": 7, "corpusSchema": CORPUS_SCHEMA, "originKind": "call-generated",
@@ -75,6 +85,9 @@ PROFILES = {
     "stateful-call-returns": {"dimensions": RETURN_DIMENSIONS, "modeMask": 3, "corpusSchema": RETURN_CORPUS_SCHEMA,
         "originKind": "call-return-generated",
         "scope": "one child method call through std's raw_call; its tuple, bytes or enum return data, typed or raw with one malformation, decoded by std's MemoryWordReader; unfunded accounts; the parent's slots0-6 and the child's slots0/1, both contracts' whole committed storage, balances and empty logs; zero value; no gas/nonce or arbitrary-world equivalence"},
+    "stateful-call-sequences": {"dimensions": SEQUENCE_DIMENSIONS, "modeMask": 1, "corpusSchema": SEQUENCE_CORPUS_SCHEMA,
+        "originKind": "call-sequence-generated",
+        "scope": "two or three child method calls through std's raw_call; raw return and revert data of 0 to 96 bytes measured by inline Yul returndatasize and returndatacopy around each call; unfunded accounts; the parent's slots0-(5n+2) and the child's slots0/1, both contracts' whole committed storage, balances and empty logs; zero value; no gas/nonce or arbitrary-world equivalence"},
 }
 
 
@@ -92,6 +105,8 @@ def helper_count(case):
 
 def generated_kind(case):
     """The origin kind of a profile's generated cases."""
+    if adapter.sequences(case):
+        return "call-sequence-generated"
     if adapter.returns(case):
         return "call-return-generated"
     return "forward-generated" if adapter.forwarding(case) else "call-generated"
@@ -163,10 +178,117 @@ def return_coverage(case, statuses=None):
     return values
 
 
+def sequence_coverage(case, statuses=None):
+    """The call-sequence dimensions of a case, from each transaction's
+    prescribed outcomes and the plan's windows; with statuses, only the
+    transactions whose matched outcome is the prescribed one count."""
+    plan = case["callSequencePlan"]
+    values = {"SequenceCalls": {plan["calls"]}, "SequenceTransitions": set(), "SequenceLengths": set(),
+              "SequenceWindows": set(), "SequenceRollbacks": set(),
+              "SequenceNodeBudgets": {case["provenance"]["origin"]["maxProgramNodes"]}
+              if case["provenance"]["origin"].get("kind") == "call-sequence-generated" else set()}
+    for index, tx in enumerate(case["transactions"]):
+        if statuses is not None and statuses[index] != adapter.return_expected_status(tx):
+            continue
+        states = [call["status"] + ("-data" if call["length"] else "-empty") for call in tx["calls"]]
+        values["SequenceTransitions"] |= {first + ":" + second for first, second in zip(states, states[1:])}
+        values["SequenceLengths"] |= {f"{call['status']}:{call['length']}" for call in tx["calls"]}
+        for call, window in zip(tx["calls"], plan["windows"]):
+            end = window["offset"] + window["width"]
+            values["SequenceWindows"].add("outside" if end > call["length"] else "inside" if window["width"] else "empty")
+        reverted = any(call["status"] == "reverted" for call in tx["calls"])
+        if tx["parentReverts"]:
+            if reverted:
+                values["SequenceRollbacks"].add("child-reverted-parent-reverted")
+            if any(call["status"] == "returned" for call in tx["calls"]):
+                values["SequenceRollbacks"].add("children-returned-parent-reverted")
+        elif reverted:
+            values["SequenceRollbacks"].add("child-reverted-parent-returned")
+    return values
+
+
+def validate_sequence_manifest(manifest):
+    """The call-sequence corpus: the call family's requirements but its log
+    patterns, and its own dimensions."""
+    if manifest.get("coverageKind") != "step-core-ast-features":
+        raise ValueError("call corpus coverage must name the step AST")
+    for key in VERSIONS:
+        if not isinstance(manifest.get(key), str) or not manifest[key]:
+            raise ValueError(f"missing corpus {key}")
+    for key in ("requiredFeatures", "requiredInputs"):
+        values = manifest.get(key)
+        if not isinstance(values, list) or any(not isinstance(value, str) for value in values) or len(set(values)) != len(values):
+            raise ValueError(f"{key} must contain unique strings")
+    for value in manifest["requiredInputs"]:
+        common.word(value)
+    for key in ("requiredHelperCounts", "requiredTransactionCounts"):
+        values = manifest.get(key)
+        if not isinstance(values, list) or any(type(v) is not int or v not in (1, 2, 3) for v in values) or len(set(values)) != len(values):
+            raise ValueError(f"invalid {key}")
+    requirements = manifest.get("generationRecipeRequirements")
+    if not isinstance(requirements, dict) or set(requirements) != {"templates"}:
+        raise ValueError("call recipe requirements must contain templates only")
+    values = requirements["templates"]
+    if not isinstance(values, list) or any(type(v) is not int or v not in range(4) for v in values) or len(set(values)) != len(values):
+        raise ValueError("invalid call template requirements")
+    modes = manifest.get("requiredCallModes")
+    if not isinstance(modes, list) or any(type(v) is not int or v not in range(2) for v in modes) or len(set(modes)) != len(modes):
+        raise ValueError("requiredCallModes must name unique prescribed input-bit combinations")
+    if manifest.get("requiredOutcomes") is None or sorted(manifest["requiredOutcomes"]) != ["returned", "reverted"]:
+        raise ValueError("call coverage requires returned and reverted root outcomes")
+    if "requiredLogPatterns" in manifest or any("required" + dimension in manifest for dimension in VALUE_DIMENSIONS + RETURN_EXTRA):
+        raise ValueError("the call-sequence profile commits no logs, forwards no value and decodes no typed value")
+    lengths = {f"{status}:{length}" for status in ("returned", "reverted") for length in range(97)}
+    allowed = {"SequenceCalls": {2, 3}, "SequenceTransitions": {first + ":" + second for first in SEQUENCE_STATES for second in SEQUENCE_STATES},
+               "SequenceLengths": lengths, "SequenceWindows": set(SEQUENCE_WINDOWS), "SequenceRollbacks": set(SEQUENCE_ROLLBACKS)}
+    for dimension in SEQUENCE_EXTRA:
+        values = manifest.get("required" + dimension)
+        if not isinstance(values, list) or not values or len({json.dumps(v) for v in values}) != len(values):
+            raise ValueError(f"call-sequence coverage requires unique required{dimension}")
+        if dimension in allowed and any(v not in allowed[dimension] for v in values):
+            raise ValueError(f"invalid required{dimension}")
+        if dimension == "SequenceNodeBudgets" and any(type(v) is not int or not 1 <= v <= 512 for v in values):
+            raise ValueError("required node budgets lie in 1 to 512")
+    if not isinstance(manifest.get("cases"), list):
+        raise ValueError("corpus cases must be an array")
+    ids = set()
+    for entry in manifest["cases"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", entry["id"]) or entry["id"] in ids:
+            raise ValueError("corpus IDs must be unique bounded identifiers")
+        ids.add(entry["id"])
+        generated = "generation" in entry
+        if generated == ("callSequencePlan" in entry) or ("transactions" in entry) == generated:
+            raise ValueError("corpus entry requires generation XOR callSequencePlan+transactions")
+        if any(key in entry for key in ("program", "programs", "storagePlan", "loopPlan", "input", "callPlan", "forwardPlan",
+                                        "callReturnPlan")):
+            raise ValueError("call-sequence corpus uses a plan and transaction sequence")
+        expected = entry.get("expectedFeatures")
+        if not isinstance(expected, list) or any(not isinstance(v, str) for v in expected) or len(set(expected)) != len(expected):
+            raise ValueError("expectedFeatures must contain unique strings")
+        if generated:
+            request = entry["generation"]
+            if not isinstance(request, dict) or set(request) != {"seed", "maxProgramNodes"}:
+                raise ValueError("invalid call generation request")
+            seed = common.word(request["seed"], "seed")
+            nodes = request["maxProgramNodes"]
+            if int(seed) >= 2**64 or type(nodes) is not int or not 1 <= nodes <= 512:
+                raise ValueError("call generation request exceeds bounds")
+        else:
+            if not isinstance(entry["callSequencePlan"], dict) or entry["callSequencePlan"].get("schema") != "solcore-lean.call-sequence-plan.v1":
+                raise ValueError("invalid imported call-sequence plan")
+            # Full source/host checking is native.
+            if not isinstance(entry["transactions"], list) or not 1 <= len(entry["transactions"]) <= 3 or \
+                    any(not isinstance(tx, dict) or set(tx) != {"id", "input"} for tx in entry["transactions"]):
+                raise ValueError("invalid imported transaction count or fields")
+    return manifest
+
+
 def validate_manifest(manifest):
     if not isinstance(manifest, dict) or manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("profile") not in PROFILES:
         raise ValueError("unsupported call corpus manifest")
     forwards = manifest["profile"] == "stateful-forwarded-value"
+    if manifest["profile"] == "stateful-call-sequences":
+        return validate_sequence_manifest(manifest)
     if manifest["profile"] == "stateful-call-returns":
         return validate_return_manifest(manifest)
     plan_key, plan_schema = ("forwardPlan", "solcore-lean.forward-plan.v1") if forwards else ("callPlan", "solcore-lean.call-plan.v1")
@@ -330,11 +452,26 @@ def resolve_backend(explicit, returning, saved=None):
     return (common.resolve_backend if returning else common.resolve_sonatina_backend)(explicit, saved)
 
 
+TWO_SOURCE_HISTORIES = (adapter.RETURN_HISTORY_SCHEMA, adapter.SEQUENCE_HISTORY_SCHEMA)
+
+
 def analysis_returns(analysis):
-    """A call-return analysis: one of its histories has the call-return schema."""
+    """A two-source analysis: one of its histories has the call-return or call-sequence schema."""
     histories = analysis.get("histories", {})
-    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") == adapter.RETURN_HISTORY_SCHEMA
+    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") in TWO_SOURCE_HISTORIES
                                                for history in histories.values())
+
+
+def history_parent_slots(histories):
+    """The parent's observed slots a call-sequence history's initial accounts
+    list, or the call-return profile's 0 to 6."""
+    for history in histories.values():
+        try:
+            if history.get("schema") == adapter.SEQUENCE_HISTORY_SCHEMA:
+                return tuple(entry["slot"] for entry in history["initialAccounts"][0]["storage"])
+        except (AttributeError, KeyError, IndexError, TypeError):
+            continue
+    return adapter.RETURN_PARENT_SLOTS
 
 
 def analyze(report, case, path=None, transaction_id=None, field="output"):
@@ -426,7 +563,7 @@ def fingerprint(analysis):
         storage = account.get("storage", [])
         return next((slot.get("value") for slot in storage if isinstance(slot, dict) and slot.get("slot") == field), None) if isinstance(storage, list) else None
     forwards = any(isinstance(history, dict) and history.get("schema") == adapter.FORWARD_HISTORY_SCHEMA for history in histories.values())
-    returning = any(isinstance(history, dict) and history.get("schema") == adapter.RETURN_HISTORY_SCHEMA for history in histories.values())
+    returning = any(isinstance(history, dict) and history.get("schema") in TWO_SOURCE_HISTORIES for history in histories.values())
     differences = set()
     for role in adapter.ROLES:
         for field in ("balance", *adapter.SLOTS):
@@ -436,7 +573,8 @@ def fingerprint(analysis):
                 if comparison.get("stage") == "initial-accounts" and isinstance(bindings, dict):
                     try:
                         adapter.validate_bindings(bindings)
-                        expected = adapter.return_initial_accounts(bindings) if returning else adapter.initial_accounts(bindings, forwards)
+                        expected = adapter.return_initial_accounts(bindings, history_parent_slots(histories)) if returning else \
+                            adapter.initial_accounts(bindings, forwards)
                     except ValueError:
                         continue
                 elif rows[path].get("status") == "reverted":
@@ -602,7 +740,7 @@ class Campaign:
                   "HelperCounts": {helper_count(case)}, "TransactionCounts": {len(case["transactions"])}, "Templates": recipes(case),
                   "CallModes": {int(tx["input"]) & self.specification["modeMask"] for tx in case["transactions"]}, "Outcomes": set()}
         forwards = self.profile == "stateful-forwarded-value"
-        returning = self.profile == "stateful-call-returns"
+        returning = self.profile in ("stateful-call-returns", "stateful-call-sequences")
         if not forwards and not returning:
             values["LogPatterns"] = set()
         if prefix == "matched":
@@ -617,8 +755,10 @@ class Campaign:
             statuses = [adapter.expected_status(tx) for tx in case["transactions"]]
         if forwards:
             values.update(value_coverage(case, statuses))
-        if returning:
+        if self.profile == "stateful-call-returns":
             values.update(return_coverage(case, statuses if prefix == "matched" else None))
+        if self.profile == "stateful-call-sequences":
+            values.update(sequence_coverage(case, statuses if prefix == "matched" else None))
         for dimension, observed in values.items():
             key = prefix + dimension
             self.summary["coverage"][key] = sorted(set(self.summary["coverage"][key]) | observed, key=int if dimension in NUMERIC_DIMENSIONS else None)
@@ -677,7 +817,8 @@ class Campaign:
             self.summary["coverage"]["required" + dimension] = manifest["required" + dimension]
         self.summary["coverage"]["requiredTemplates"] = manifest["generationRecipeRequirements"]["templates"]
         extra = VALUE_DIMENSIONS if self.profile == "stateful-forwarded-value" else RETURN_EXTRA \
-            if self.profile == "stateful-call-returns" else ("LogPatterns",)
+            if self.profile == "stateful-call-returns" else SEQUENCE_EXTRA \
+            if self.profile == "stateful-call-sequences" else ("LogPatterns",)
         for dimension in ("CallModes", "Outcomes") + extra:
             self.summary["coverage"]["required" + dimension] = manifest.get("required" + dimension, [])
         self.checkpoint()
@@ -898,7 +1039,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0",
-                        help="yul, for stateful-call-returns only, runs each scenario's EVM path on the pinned solc's Yul output; "
+                        help="yul, for stateful-call-returns and stateful-call-sequences only, runs each scenario's EVM path on the pinned solc's Yul output; "
                              "imported Hull keeps Sonatina O0")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; used only by --backend yul")
     selection = parser.add_mutually_exclusive_group()
@@ -934,7 +1075,7 @@ def main():
     args = parser.parse_args()
     selected = adapter.PROFILES[args.profile]
     if args.backend == "yul" and not selected.get("returns"):
-        parser.error("--backend yul supports only stateful-call-returns; the other call profiles must use Sonatina")
+        parser.error("--backend yul supports only stateful-call-returns and stateful-call-sequences; the other call profiles must use Sonatina")
     args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
     args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
     recorded = None

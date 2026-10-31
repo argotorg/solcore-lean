@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Compare bounded parent/child calls, committed accounts and logs on three paths.
 
-Three profiles share this adapter: `stateful-calls` (zero-value transactions and
+Four profiles share this adapter: `stateful-calls` (zero-value transactions and
 a fixed eight-unit parent), `stateful-forwarded-value` (payable transactions
-whose parent forwards bank amounts to the child) and `stateful-call-returns`
-(a parent that decodes a child method's return data with std, each contract
-compiled from its own source). The original checked Core
+whose parent forwards bank amounts to the child), `stateful-call-returns` (a
+parent that decodes a child method's return data with std, each contract
+compiled from its own source) and `stateful-call-sequences` (the same two
+wrappers, the parent calling the child two or three times and measuring the
+latest return data around each call). The original checked Core
 contracts execute through the public nested runtime.
-Only `stateful-call-returns` also runs with `--backend yul`: the EVM path deploys
+The two two-source profiles also run with `--backend yul`: the EVM path deploys
 each source's Yul through the pinned solc and imported Hull keeps Sonatina O0, as
 for the storage family; the other call profiles' sources each compile both
 contracts, which the Yul exporter does not admit.
@@ -48,6 +50,8 @@ FORWARD_HISTORY_SCHEMA = "solcore-lean.forward-history.v2"
 FORWARD_SELECTOR = "0x24b912e5"
 RETURN_CASE_SCHEMA = "solcore-lean.semantic-call-return-case.v1"
 RETURN_HISTORY_SCHEMA = "solcore-lean.call-return-history.v1"
+SEQUENCE_CASE_SCHEMA = "solcore-lean.semantic-call-sequence-case.v1"
+SEQUENCE_HISTORY_SCHEMA = "solcore-lean.call-sequence-history.v1"
 # The forwarding parent's endowment covers every generated forward: a generated
 # sequence forwards at most the endowment in total. Original Core and Hull fund
 # the caller with 2^80.
@@ -66,6 +70,11 @@ PROFILES = {
         "coreRunner": "rust-hull-call-return-scenario", "scenarioSchema": "solcore-lean.call-return-scenario.v1",
         "forwarding": False, "returns": True,
         "scope": "one depth-one call through std's raw_call to a child method whose tuple, bytes or enum return data, typed or raw with one malformation, the parent decodes with std's MemoryWordReader; zero value; the parent's slots0-6 and the child's slots0/1, balances, root outcome under the selector and empty-revert rules and empty logs; both accounts' whole committed storage; the adapter's own decoding of the child's bytes; no gas/nonce equivalence"},
+    "stateful-call-sequences": {"caseSchema": SEQUENCE_CASE_SCHEMA, "historySchema": SEQUENCE_HISTORY_SCHEMA,
+        "planKey": "callSequencePlan", "planSchema": "solcore-lean.call-sequence-plan.v1",
+        "caseTool": "semantic-call-sequence-tool", "coreRunner": "rust-hull-call-return-scenario",
+        "scenarioSchema": "solcore-lean.call-return-scenario.v1", "forwarding": False, "returns": True, "sequences": True,
+        "scope": "two or three depth-one calls through std's raw_call to a child method returning or reverting raw data of 0 to 96 bytes; the parent's inline Yul returndatasize reads before and after each call, in-bounds returndatacopy windows and re-reads of call 1's memory copy; zero value; the parent's slots0-(5n+2) and the child's slots0/1, balances, root outcome and empty logs; both accounts' whole committed storage; the adapter's own sizes and call counts from the inputs; no gas/nonce equivalence"},
 }
 
 
@@ -129,6 +138,8 @@ def contract_metadata(forwards=False):
 
 def validate_case(case):
     selected = profile(case)
+    if selected.get("sequences"):
+        return validate_sequence_case(case)
     if selected.get("returns"):
         return validate_return_case(case)
     forwards = selected["forwarding"]
@@ -265,7 +276,7 @@ def normalize_history(history, case, bindings):
 
 
 def expected_status(tx):
-    if "stdRejection" in tx:
+    if "stdRejection" in tx or "parentReverts" in tx:
         return return_expected_status(tx)
     return "reverted" if int(tx["input"]) & 2 else "returned"
 
@@ -406,7 +417,7 @@ def trace_result(mined, trace):
 
 
 def resolve_backend(case, explicit, saved_report=None):
-    """Only the call-return profile, whose two sources the Yul exporter admits, runs on Yul."""
+    """Only the two-source profiles, whose two wrappers the Yul exporter admits, run on Yul."""
     if returns(case):
         return common.resolve_backend(explicit, saved_report)
     return common.resolve_sonatina_backend(explicit, saved_report)
@@ -415,7 +426,8 @@ def resolve_backend(case, explicit, saved_report=None):
 def verify_archive(directory, report):
     if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported call archive schema")
-    if common.resolve_backend(None, report) == "yul" and report.get("scope") == PROFILES["stateful-call-returns"]["scope"]:
+    if common.resolve_backend(None, report) == "yul" and report.get("scope") in (
+            PROFILES["stateful-call-returns"]["scope"], PROFILES["stateful-call-sequences"]["scope"]):
         return return_verify_yul_archive(directory, report)
     common.resolve_sonatina_backend(None, report)
     common.verify_archive(directory, {**report, "schema": common.REPORT_SCHEMA})
@@ -646,6 +658,16 @@ def returns(case):
     return profile(case).get("returns", False)
 
 
+def sequences(case):
+    return profile(case).get("sequences", False)
+
+
+def return_parent_slots(case):
+    """The parent's observed slots: 0 to 6 for call returns, 0 to 5n + 2 for
+    call sequences."""
+    return tuple(case["observedSlots"]["parent"]) if sequences(case) else RETURN_PARENT_SLOTS
+
+
 def return_contract_metadata():
     parent, child = "SynthesizedReturnCaller", "SynthesizedReturnCallee"
     return {
@@ -859,17 +881,109 @@ def validate_return_case(case):
             raise ValueError("a prescribed rejection differs from the adapter's own decision")
 
 
-def return_initial_accounts(bindings):
+SEQUENCE_PROGRAMS = ("parentCall", "parentMiddles", "parentLast", "child")
+SEQUENCE_CAPACITY = 96
+
+
+def sequence_prescribed(calls, tx):
+    """Each call's outcome and the parent's revert from the input alone: call
+    k's argument ends in the input's byte k, whose bit 0 reverts and whose rest
+    halves to the data's length, at most 96; bit 24 reverts the parent."""
+    x = int(tx["input"])
+    rows = []
+    for call in range(calls):
+        byte = x >> (8 * call) & 255
+        rows.append({"length": min(byte >> 1, SEQUENCE_CAPACITY), "status": "reverted" if byte & 1 else "returned"})
+    return rows, bool(x >> 24 & 1)
+
+
+def validate_sequence_case(case):
+    plan = case.get("callSequencePlan")
+    if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-sequence-plan.v1" or \
+            not isinstance(plan.get("stepProgram"), dict) or plan.get("calls") not in (2, 3):
+        raise ValueError("call-sequence case requires its checked plan")
+    windows = plan.get("windows")
+    if not isinstance(windows, list) or len(windows) != plan["calls"] or any(
+            not isinstance(window, dict) or set(window) != {"offset", "width"} or
+            type(window["offset"]) is not int or not 0 <= window["offset"] <= SEQUENCE_CAPACITY or
+            type(window["width"]) is not int or not 0 <= window["width"] <= 32 for window in windows):
+        raise ValueError("call-sequence plan has one window inside the bounds per call")
+    programs = case.get("programs")
+    if not isinstance(programs, dict) or set(programs) != set(SEQUENCE_PROGRAMS) or \
+            not isinstance(programs["parentMiddles"], list) or len(programs["parentMiddles"]) != plan["calls"] - 1 or \
+            any(not isinstance(program, dict) for program in programs["parentMiddles"]) or \
+            any(not isinstance(programs[role], dict) for role in ("parentCall", "parentLast", "child")):
+        raise ValueError("call-sequence case requires its original Core programs")
+    sources = case.get("sources")
+    if not isinstance(sources, dict) or set(sources) != set(ROLES) or any(not isinstance(sources[role], str) for role in ROLES):
+        raise ValueError("call-sequence case requires one source per contract")
+    if case.get("contracts") != return_contract_metadata():
+        raise ValueError("call-sequence contract metadata changed")
+    initial = {"accounts": [{"role": role, "balance": "0", "storage": []} for role in ROLES], "callerBalance": "0"}
+    if case.get("initialState") != initial or case.get("observedSlots") != \
+            {"parent": [str(slot) for slot in range(5 * plan["calls"] + 3)], "child": list(RETURN_CHILD_SLOTS)}:
+        raise Finding("unsupported-scope", "input", "call-sequence profile requires unfunded empty accounts and its observed slots")
+    provenance = case.get("provenance")
+    if not isinstance(provenance, dict) or any(not isinstance(provenance.get(key), str) or not provenance[key]
+            for key in ("generatorVersion", "emitterVersion", "wrapperVersion")):
+        raise ValueError("missing versioned call-sequence provenance")
+    transactions = case.get("transactions")
+    if not isinstance(transactions, list) or not 1 <= len(transactions) <= MAX_TRANSACTIONS:
+        raise ValueError(f"call-sequence case requires 1 to {MAX_TRANSACTIONS} transactions")
+    ids = set()
+    for tx in transactions:
+        if not isinstance(tx, dict) or set(tx) != {"id", "input", "value", "target", "callee", "calls", "parentReverts"}:
+            raise ValueError("call-sequence transactions retain symbolic roles and their prescribed outcomes")
+        if not isinstance(tx["id"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", tx["id"]) or tx["id"] in ids:
+            raise ValueError("transaction IDs must be unique bounded identifiers")
+        ids.add(tx["id"])
+        common.word(tx["input"], "transaction input")
+        if (tx["target"], tx["callee"], tx["value"]) != ("parent", "child", "0"):
+            raise Finding("unsupported-scope", "input", "call-sequence transactions must use the fixed roles and zero value")
+        if (tx["calls"], tx["parentReverts"]) != sequence_prescribed(plan["calls"], tx):
+            raise ValueError("a prescribed outcome differs from the adapter's own")
+
+
+def sequence_protocol_fields(case, tx, row, prior):
+    """Fields that break the protocol, against the adapter's own sizes from the
+    input: before any call nothing, around each call its data's size, and the
+    child's count growing by the returned calls; the sum is the slots'."""
+    calls = case["callSequencePlan"]["calls"]
+    parent, child = (return_slots(account) for account in row["committedAccounts"])
+    before_parent, before_child = (return_slots(account) for account in prior)
+    if row["status"] == "reverted":
+        return ([] if tx["parentReverts"] else ["status"]) + ([] if row["committedAccounts"] == prior else ["committedAccounts"])
+    if tx["parentReverts"]:
+        return ["status"]
+    expected = {0: (before_parent[0] + int(tx["input"])) % WORD_MODULUS, 1: 0}
+    previous = 0
+    for index, call in enumerate(tx["calls"], start=1):
+        ok = 1 if call["status"] == "returned" else 0
+        expected.update({5 * index - 3: ok + 2 * call["length"], 5 * index - 1: previous, 5 * index: call["length"]})
+        previous = call["length"]
+    fields = []
+    returned = sum(call["status"] == "returned" for call in tx["calls"])
+    if any(parent[slot] != value for slot, value in expected.items()) or \
+            child[1] != (before_child[1] + returned) % WORD_MODULUS or (not returned and child != before_child):
+        fields.append("committedAccounts")
+    if int.from_bytes(common.hex_bytes(row["output"], "output"), "big") != sum(parent) % WORD_MODULUS:
+        fields.append("output")
+    if len(parent) != 5 * calls + 3:
+        fields.append("committedAccounts")
+    return fields
+
+
+def return_initial_accounts(bindings, parent_slots=RETURN_PARENT_SLOTS):
     return [{"role": role, "address": bindings[role], "balance": "0",
              "storage": [{"slot": slot, "value": "0"} for slot in slots]}
-            for role, slots in (("parent", RETURN_PARENT_SLOTS), ("child", RETURN_CHILD_SLOTS))]
+            for role, slots in (("parent", parent_slots), ("child", RETURN_CHILD_SLOTS))]
 
 
-def return_accounts(rows, bindings):
+def return_accounts(rows, bindings, parent_slots=RETURN_PARENT_SLOTS):
     if not isinstance(rows, list) or len(rows) != 2:
         raise ValueError("both committed contract accounts are required")
     result = []
-    for (role, slots), row in zip((("parent", RETURN_PARENT_SLOTS), ("child", RETURN_CHILD_SLOTS)), rows):
+    for (role, slots), row in zip((("parent", parent_slots), ("child", RETURN_CHILD_SLOTS)), rows):
         if not isinstance(row, dict) or row.get("role") != role or row.get("address") != bindings[role]:
             raise ValueError("committed account identity changed")
         result.append({"role": role, "address": address(row["address"]),
@@ -878,9 +992,10 @@ def return_accounts(rows, bindings):
 
 
 def return_normalize_history(history, case, bindings):
-    if not isinstance(history, dict) or history.get("schema") != RETURN_HISTORY_SCHEMA:
+    if not isinstance(history, dict) or history.get("schema") != profile(case)["historySchema"]:
         raise ValueError("unsupported call-return history")
-    initial = return_accounts(history.get("initialAccounts"), bindings)
+    slots = return_parent_slots(case)
+    initial = return_accounts(history.get("initialAccounts"), bindings, slots)
     initial_whole = whole_storage(history.get("initialAccountStorage"), bindings, "initial account storage")
     rows = history.get("transactions")
     if not isinstance(rows, list) or len(rows) > len(case["transactions"]):
@@ -893,7 +1008,7 @@ def return_normalize_history(history, case, bindings):
         if not isinstance(status, str):
             raise ValueError("missing call-return status")
         normalized = {"id": row["id"], "index": index, "status": status,
-                      "committedAccounts": return_accounts(row.get("committedAccounts"), bindings),
+                      "committedAccounts": return_accounts(row.get("committedAccounts"), bindings, slots),
                       "accountStorage": whole_storage(row.get("accountStorage"), bindings)}
         if status in ("returned", "reverted"):
             normalized.update(output="0x" + common.hex_bytes(row.get("output"), "call output").hex(), logs=logs(row.get("logs")))
@@ -911,7 +1026,7 @@ def return_normalize_history(history, case, bindings):
         raise ValueError("invalid unknown transaction completion")
     if history.get("unexecuted") != remaining[len(unobserved):]:
         raise ValueError("unexecuted transaction identities changed")
-    final = None if unobserved else return_accounts(history.get("finalAccounts"), bindings)
+    final = None if unobserved else return_accounts(history.get("finalAccounts"), bindings, slots)
     if unobserved and history.get("finalAccounts") is not None:
         raise ValueError("unknown completion cannot claim a final committed world")
     if not unobserved and final != (result[-1]["committedAccounts"] if result else initial):
@@ -926,6 +1041,8 @@ def return_normalize_history(history, case, bindings):
 
 
 def return_expected_status(tx):
+    if "parentReverts" in tx:
+        return "reverted" if tx["parentReverts"] else "returned"
     return "reverted" if tx["stdRejection"] is not None or int(tx["input"]) & 2 else "returned"
 
 
@@ -934,7 +1051,7 @@ def return_comparable(tx, rows):
     the transaction's prescribed rejection is that rejection: the selector
     rule for `0x08638556`, the empty-revert rule for `0x`. Hull and the EVM
     are never changed."""
-    rejection, core = tx["stdRejection"], rows.get("directCore")
+    rejection, core = tx.get("stdRejection"), rows.get("directCore")
     if rejection is None or not isinstance(core, dict) or core.get("status") != "reverted":
         return rows
     word = int(rejection, 16).to_bytes(32, "big").hex() if rejection != RETURN_EMPTY else bytes(32).hex()
@@ -950,6 +1067,8 @@ def return_slots(account):
 def return_protocol_fields(case, tx, row, prior):
     """Fields that break the protocol, against the adapter's own decoding of
     the child's bytes rebuilt from its committed slots and the input."""
+    if sequences(case):
+        return sequence_protocol_fields(case, tx, row, prior)
     plan = case["callReturnPlan"]
     parent, child = (return_slots(account) for account in row["committedAccounts"])
     before_parent, before_child = (return_slots(account) for account in prior)
@@ -993,9 +1112,10 @@ def return_compare(histories, case, bindings):
         return {"category": "adapter-error", "stage": "comparison", "detail": str(error), "pairs": {}}
     initial = {path: values[path]["initialAccounts"] for path in PATHS}
     whole = {path: values[path]["initialAccountStorage"] for path in PATHS}
-    changed = any(state != return_initial_accounts(bindings) for state in initial.values())
+    slots = return_parent_slots(case)
+    changed = any(state != return_initial_accounts(bindings, slots) for state in initial.values())
     # Both empty constructors leave the whole storage of both contracts empty.
-    differences = storage.account_storage_differences(whole, RETURN_PARENT_SLOTS, deployment=True)
+    differences = storage.account_storage_differences(whole, slots, deployment=True)
     if changed or differences:
         mismatch = {"category": "semantic-mismatch", "stage": "initial-accounts",
                     "fields": (["committedAccounts"] if changed else []) + (["accountStorage"] if differences else []),
@@ -1020,15 +1140,16 @@ def return_compare(histories, case, bindings):
             prior = values[path]["transactions"][index - 1]["committedAccounts"] if index else initial[path]
             expected = return_expected_status(tx)
             output = common.hex_bytes(row["output"], "output")
+            rejection = tx.get("stdRejection")
             if row["status"] != expected or row["logs"] != [] or \
-                    (tx["stdRejection"] is not None and row["output"] != tx["stdRejection"]) or \
-                    (tx["stdRejection"] is None and len(output) != 32):
+                    (rejection is not None and row["output"] != rejection) or \
+                    (rejection is None and len(output) != 32):
                 if "status" not in fields:
                     fields.append("status")
             for field in return_protocol_fields(case, tx, row, prior):
                 if field not in fields:
                     fields.append(field)
-        differences = storage.account_storage_differences({path: row["accountStorage"] for path, row in rows.items()}, RETURN_PARENT_SLOTS)
+        differences = storage.account_storage_differences({path: row["accountStorage"] for path, row in rows.items()}, slots)
         rolled = sorted(path for path, row in rows.items() if not return_rolled_back(tx, row,
             values[path]["transactions"][index - 1]["accountStorage"] if index else values[path]["initialAccountStorage"]))
         if (differences or rolled) and "accountStorage" not in fields:
@@ -1045,17 +1166,20 @@ def return_compare(histories, case, bindings):
 
 def return_rolled_back(tx, row, prior):
     """A parent revert keeps both contracts' whole storage, and a child revert
-    under a returned parent keeps the child's."""
+    under a returned parent keeps the child's: in a sequence, when every call
+    reverted."""
     if row["status"] == "reverted":
         return row["accountStorage"] == prior
     child = ROLES.index("child")
+    if "calls" in tx:
+        return any(call["status"] == "returned" for call in tx["calls"]) or row["accountStorage"][child] == prior[child]
     return not int(tx["input"]) & 1 or row["accountStorage"][child] == prior[child]
 
 
-def return_evm_accounts(rpc, bindings, block):
+def return_evm_accounts(rpc, bindings, block, parent_slots=RETURN_PARENT_SLOTS):
     storage.quantity(block, "account snapshot block")
     result = []
-    for role, slots in (("parent", RETURN_PARENT_SLOTS), ("child", RETURN_CHILD_SLOTS)):
+    for role, slots in (("parent", parent_slots), ("child", RETURN_CHILD_SLOTS)):
         target = "0x" + f"{int(bindings[role]):040x}"
         balance = storage.quantity(rpc.call("eth_getBalance", [target, block]), "contract balance")
         result.append({"role": role, "address": bindings[role], "balance": common.word(str(balance)),
@@ -1081,7 +1205,7 @@ def return_hull_history(stdout, exit_code, case, bindings, runtimes):
             raise ValueError("Hull constructor output differs from the linked runtime image")
     if len(rows) < 3 or rows[2].get("stage") != "initialization":
         raise ValueError("missing initialized Hull account world")
-    initial = return_accounts(rows[2].get("committedAccounts"), bindings)
+    initial = return_accounts(rows[2].get("committedAccounts"), bindings, return_parent_slots(case))
     initial_whole = rows[2].get("accountStorage")
     calls = rows[3:]
     if any(row.get("stage") != "execution" for row in calls):
@@ -1089,7 +1213,7 @@ def return_hull_history(stdout, exit_code, case, bindings, runtimes):
     complete = len(calls) == len(case["transactions"]) and all(row.get("status") in ("returned", "reverted") for row in calls)
     if complete and exit_code:
         raise ValueError("unexplained Hull failure after complete call-return history")
-    history = {"schema": RETURN_HISTORY_SCHEMA, "initialAccounts": initial, "transactions": calls,
+    history = {"schema": profile(case)["historySchema"], "initialAccounts": initial, "transactions": calls,
         "finalAccounts": calls[-1].get("committedAccounts") if calls else initial,
         "initialAccountStorage": initial_whole, "finalAccountStorage": calls[-1].get("accountStorage") if calls else initial_whole,
         "status": "complete" if complete else "incomplete", "unexecuted": [tx["id"] for tx in case["transactions"][len(calls):]]}
@@ -1309,7 +1433,7 @@ def execute_returns(args, report, previous, runner, case):
             "parentHull": str(hulls["parent"]), "parentImages": str(image_paths["parent"]),
             "childHull": str(hulls["child"]), "childImages": str(image_paths["child"]),
             "bindings": bindings, "initialBalances": {"parent": "0", "child": "0"},
-            "observedSlots": {"parent": list(RETURN_PARENT_SLOTS), "child": list(RETURN_CHILD_SLOTS)},
+            "observedSlots": {"parent": list(return_parent_slots(case)), "child": list(RETURN_CHILD_SLOTS)},
             "fuel": args.core_fuel, "availableGas": str(args.gas),
             **{role + field[0].upper() + field[1:]: case["contracts"][role][field] for role in ROLES for field in ("deployPath", "runtimePath")},
             "calls": [{"id": tx["id"], "input": tx["input"], "calldata": calldata(bindings, tx), "value": "0", "persist": True}
@@ -1318,7 +1442,7 @@ def execute_returns(args, report, previous, runner, case):
         save(scenario_path, scenario)
         imported = runner.process("imported-hull", [str(args.core_runner), str(scenario_path)])
         report["histories"]["importedHull"] = return_hull_history(imported["stdout"], imported["returncode"], case, bindings, runtimes)
-        initial = return_evm_accounts(rpc, bindings, initial_block)
+        initial = return_evm_accounts(rpc, bindings, initial_block, return_parent_slots(case))
         observed_accounts = [(role, bindings[role]) for role in ROLES]
         initial_whole = storage.evm_account_storage(rpc, observed_accounts, touched, initial_block)
         report["initialBlock"] = initial_block
@@ -1327,7 +1451,7 @@ def execute_returns(args, report, previous, runner, case):
         def checkpoint(pending=None):
             complete = len(evm_rows) == len(case["transactions"]) and all(row["status"] in ("returned", "reverted") for row in evm_rows)
             remaining = [tx["id"] for tx in case["transactions"][len(evm_rows):]]
-            report["histories"]["rustEvm"] = {"schema": RETURN_HISTORY_SCHEMA, "initialAccounts": initial,
+            report["histories"]["rustEvm"] = {"schema": selected["historySchema"], "initialAccounts": initial,
                 "transactions": list(evm_rows), "finalAccounts": None if pending else evm_rows[-1]["committedAccounts"] if evm_rows else initial,
                 "initialAccountStorage": initial_whole,
                 "finalAccountStorage": None if pending else evm_rows[-1]["accountStorage"] if evm_rows else initial_whole,
@@ -1350,7 +1474,7 @@ def execute_returns(args, report, previous, runner, case):
             trace = rpc.call("debug_traceTransaction", [tx_hash, {"disableStorage": True, "disableStack": True, "enableMemory": False}])
             record["trace"] = trace
             outcome = trace_result(mined, trace)
-            state = return_evm_accounts(rpc, bindings, mined["blockNumber"])
+            state = return_evm_accounts(rpc, bindings, mined["blockNumber"], return_parent_slots(case))
             committed_logs = evm_logs(mined) if outcome["status"] in ("returned", "reverted") else None
             diff = rpc.call("debug_traceTransaction", [tx_hash, storage.PRESTATE_DIFF])
             record["storageDiff"] = diff
@@ -1383,7 +1507,7 @@ def main():
     choice.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=common.BACKENDS,
-        help="default sonatina-o0; yul, for stateful-call-returns only, runs the EVM path on the pinned solc's Yul output; "
+        help="default sonatina-o0; yul, for stateful-call-returns and stateful-call-sequences only, runs the EVM path on the pinned solc's Yul output; "
              "exact replay inherits its saved backend")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")
     parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")

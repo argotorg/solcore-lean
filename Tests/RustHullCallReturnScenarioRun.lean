@@ -6,6 +6,7 @@ import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute the fixed call-return protocol from actual linked Hull: the child
 and the parent each come from their own checked Hull program and code images,
+the parent's observed slots are the scenario's prefix of its slots,
 deploy with zero value and must return their exact runtime images with empty
 storage and logs, and every transaction runs the parent through linked Hull's
 actual nested call. Transaction rows use the complete shared world on success
@@ -71,8 +72,10 @@ private structure Config where
   fuel : Nat
   availableGas : Core.Word
   calls : List Call
+  /-- The parent's observed slots: `stateful-call-returns` observes 0 to 6,
+  `stateful-call-sequences` 0 to `5n + 2`. -/
+  parentSlots : List Nat
 
-private def parentSlots : List Nat := List.range 7
 private def childSlots : List Nat := List.range 2
 
 private def fixedPath (json : Json) (key : String) (expected : List String) : Except String Unit := do
@@ -100,9 +103,11 @@ private def decodeConfig (json : Json) : Except String Config := do
     throw "initial contract balances must be zero"
   let slots ← json.getObjVal? "observedSlots"
   exactFields slots ["parent", "child"]
+  let parentSlots := List.range (← slots.getObjValAs? (List String) "parent").length
   unless (← slots.getObjValAs? (List String) "parent") == parentSlots.map toString &&
+      1 ≤ parentSlots.length && parentSlots.length ≤ 32 &&
       (← slots.getObjValAs? (List String) "child") == childSlots.map toString do
-    throw "observedSlots must be the parent's 0 to 6 and the child's 0 and 1"
+    throw "observedSlots must be the parent's 0 to n - 1, for n from 1 to 32, and the child's 0 and 1"
   fixedPath json "parentDeployPath" ["SynthesizedReturnCallerDeploy"]
   fixedPath json "parentRuntimePath" ["SynthesizedReturnCallerDeploy", "SynthesizedReturnCaller"]
   fixedPath json "childDeployPath" ["SynthesizedReturnCalleeDeploy"]
@@ -133,7 +138,7 @@ private def decodeConfig (json : Json) : Except String Config := do
     parentImages := ← json.getObjValAs? String "parentImages"
     childHull := ← json.getObjValAs? String "childHull"
     childImages := ← json.getObjValAs? String "childImages"
-    bindings, fuel, availableGas, calls
+    bindings, fuel, availableGas, calls, parentSlots
   }
 
 private def outcomeFields : Contract.Outcome → List (String × Json)
@@ -159,7 +164,7 @@ private def accountJson (role : String) (account : AccountState.Account) (balanc
     ("balance", toJson (toString (Core.WordMapping.lookupEntries account.address balances).val)),
     ("storage", storageJson account.storage slots)]
 
-private def snapshot (bindings : Bindings) (world : List AccountState.Account)
+private def snapshot (bindings : Bindings) (parentSlots : List Nat) (world : List AccountState.Account)
     (balances : Core.WordMapping.Entries) : Except String Json := do
   let some parent := world.find? (·.address == bindings.parent) | throw "committed parent account missing"
   let some child := world.find? (·.address == bindings.child) | throw "committed child account missing"
@@ -269,7 +274,7 @@ private def execute (json : Json) : IO UInt32 := do
   unless deployedChild.code == some childImage.bytes do throw (IO.userError "child runtime image changed during parent deployment")
   let mut world := deployedWorld
   let mut balances := deployedLedger
-  let mut committed ← get (snapshot config.bindings world balances)
+  let mut committed ← get (snapshot config.bindings config.parentSlots world balances)
   let mut whole := wholeStorage config.bindings world
   report "initialization" [("committedAccounts", committed), ("accountStorage", whole)]
   for (call, index) in config.calls.zipIdx do
@@ -282,7 +287,7 @@ private def execute (json : Json) : IO UInt32 := do
     let identity := [("id", toJson call.id), ("index", toJson index)]
     match receipt.outcome with
     | .returned _ _ =>
-        match snapshot config.bindings receipt.world receipt.balances with
+        match snapshot config.bindings config.parentSlots receipt.world receipt.balances with
         | .error error =>
             report "execution" (identity ++ [("status", toJson "export-error"), ("detail", toJson error),
               ("committedAccounts", committed), ("accountStorage", whole), ("logs", Json.null)])

@@ -716,11 +716,12 @@ class FuzzTests(unittest.TestCase):
         self.assertEqual((sonatina["backend"], sonatina["profiles"]), ("sonatina-o0", []))
         self.assertEqual(yul["backend"], "yul")
         self.assertEqual(yul["profiles"], [profile for profile, family in families.items()
-                                           if family != "call" or profile == "stateful-call-returns"])
+                                           if family != "call" or profile in ("stateful-call-returns", "stateful-call-sequences")])
         self.assertEqual(sorted({families[profile] for profile in yul["profiles"]}), ["call", "pure", "storage"])
         self.assertEqual(len([profile for profile in yul["profiles"] if families[profile] == "storage"]), 27)
-        # Of the call profiles only the call-return one, whose two sources the exporter admits.
-        self.assertEqual([profile for profile in yul["profiles"] if families[profile] == "call"], ["stateful-call-returns"])
+        # Of the call profiles only the two whose sources the exporter admits.
+        self.assertEqual([profile for profile in yul["profiles"] if families[profile] == "call"],
+                         ["stateful-call-returns", "stateful-call-sequences"])
         # The suite parses the explicit selection; its own default for Yul stays the pure profiles.
         config = json.loads((self.state / "config.json").read_text())
         argv = fuzz.suite_command(config, 0, "yul", self.directory / "unused")

@@ -927,5 +927,82 @@ class CallReturnCampaignTests(unittest.TestCase):
                     self.assertEqual(campaign.common.read_json(output / "summary.json")["backend"], "yul")
 
 
+
+def sequence_case(plan=None, inputs=None, budget=None):
+    value = fixtures.sequence_case(plan, inputs)
+    function = lambda body: {"tag": "lambda", "parameterType": "word", "resultType": "word", "body": body}
+    body = {"tag": "let", "initializer": function({"tag": "var", "index": 0}), "body": function({"tag": "var", "index": 0})}
+    value["callSequencePlan"]["stepProgram"] = {"dataDefinitions": [], "resultType": {
+        "tag": "function", "parameter": "word", "result": "word"}, "body": body}
+    value["provenance"].update({key: "policy-test" for key in campaign.VERSIONS})
+    origin = {"kind": "imported"} if budget is None else {"kind": "call-sequence-generated", "maxProgramNodes": budget,
+        "stepOrigin": {"kind": "aggregate-generated", "helpers": [{"template": 3}]}}
+    value["provenance"].update(features=["local"], origin=origin)
+    return value
+
+
+class CallSequenceCampaignTests(unittest.TestCase):
+    def test_the_fixed_corpus_validates_and_its_requirements_are_checked(self):
+        manifest = json.loads((ROOT / "scripts/semantic-call-sequence-corpus.json").read_text())
+        self.assertIs(campaign.validate_manifest(manifest), manifest)
+        self.assertEqual(campaign.PROFILES["stateful-call-sequences"]["dimensions"][-len(campaign.SEQUENCE_EXTRA):],
+                         campaign.SEQUENCE_EXTRA)
+        self.assertNotIn("LogPatterns", campaign.PROFILES["stateful-call-sequences"]["dimensions"])
+        self.assertEqual(len(manifest["requiredSequenceTransitions"]), 16)
+        changes = [lambda m: m.update(requiredLogPatterns=[""]), lambda m: m.update(requiredSequenceCalls=[4]),
+                   lambda m: m.update(requiredSequenceWindows=["middle"]), lambda m: m.update(requiredSequenceLengths=["returned:97"]),
+                   lambda m: m.update(requiredReturnKinds=["bytes"]), lambda m: m.update(requiredSequenceNodeBudgets=[513]),
+                   lambda m: m.update(requiredCallModes=[2]), lambda m: m["cases"][0].update(callReturnPlan={}),
+                   lambda m: m["cases"][0].update(transactions=[{"id": f"tx-{i}", "input": "0"} for i in range(4)]),
+                   lambda m: m["cases"][0].pop("callSequencePlan")]
+        for index, change in enumerate(changes):
+            invalid = copy.deepcopy(manifest)
+            change(invalid)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                campaign.validate_manifest(invalid)
+
+    def test_coverage_follows_prescribed_outcomes_and_windows(self):
+        value = sequence_case(fixtures.sequence_plan(((0, 32), (95, 1), (0, 0))), budget=512, inputs=[
+            fixtures.sequence_input([("returned", 32), ("reverted", 0), ("returned", 1)]),
+            fixtures.sequence_input([("reverted", 96), ("returned", 96), ("reverted", 0)], 5, True)])
+        coverage = campaign.sequence_coverage(value)
+        self.assertEqual(coverage["SequenceCalls"], {3})
+        self.assertEqual(coverage["SequenceTransitions"], {"returned-data:reverted-empty", "reverted-empty:returned-data",
+            "reverted-data:returned-data", "returned-data:reverted-empty"})
+        self.assertEqual(coverage["SequenceLengths"], {"returned:32", "reverted:0", "returned:1", "reverted:96", "returned:96"})
+        self.assertEqual(coverage["SequenceWindows"], {"inside", "outside", "empty"})
+        self.assertEqual(coverage["SequenceRollbacks"], {"child-reverted-parent-returned", "child-reverted-parent-reverted",
+                                                         "children-returned-parent-reverted"})
+        self.assertEqual(coverage["SequenceNodeBudgets"], {512})
+        self.assertEqual(campaign.recipes(value), {3})
+        # Only the transactions whose matched outcome is the prescribed one count.
+        matched = campaign.sequence_coverage(value, ["returned", "returned"])
+        self.assertEqual(matched["SequenceRollbacks"], {"child-reverted-parent-returned"})
+        self.assertEqual(matched["SequenceLengths"], {"returned:32", "reverted:0", "returned:1"})
+
+    def test_a_campaign_records_sequence_coverage_and_runs_on_yul(self):
+        value = sequence_case()
+        raw = {"schema": campaign.adapter.REPORT_SCHEMA, "histories": fixtures.sequence_histories(value),
+               "bindings": copy.deepcopy(fixtures.BINDINGS)}
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)
+        self.assertEqual(raw["comparison"]["category"], "matched")
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-call-sequences", backend="yul",
+                                                 solc=Path("/chosen/solc")))
+            self.assertEqual(instance.backend, "yul")
+            instance.record_coverage(value, "generated")
+            instance.record_coverage(value, "matched", raw["histories"], raw["bindings"])
+            coverage = instance.summary["coverage"]
+            self.assertEqual(coverage["matchedSequenceCalls"], [3])
+            self.assertEqual(coverage["matchedOutcomes"], ["returned", "reverted"])
+            self.assertNotIn("matchedLogPatterns", coverage)
+            self.assertNotIn("matchedReturnKinds", coverage)
+            counts = campaign.transaction_counts(raw["histories"], value, raw["bindings"])
+            self.assertEqual(counts, {"executed": 3, "completed": 3, "matched": 3})
+        analysis = campaign.analyze({**raw, "backend": "yul"}, value)
+        fingerprint = campaign.fingerprint(analysis)
+        self.assertEqual((analysis["backend"], fingerprint["backend"], fingerprint["category"]), ("yul", "yul", "matched"))
+
+
 if __name__ == "__main__":
     unittest.main()
