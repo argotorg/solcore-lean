@@ -7692,15 +7692,38 @@ this section describes how to run them.
     words are drawn as above.
   - A call with an unknown tag, or for a method with a type outside the
     model, keeps the reason it was not classified.
+- **Sequence mutants:** after a fixture's single-change and deployment
+  mutants, a mutation run carries one change forward, from a fresh deployment
+  on every path.
+  - The operators: `commit`, a drawn single-change mutant persisting in
+    place of its step, or a deployment mutant followed by every recorded
+    call; `persist`, a rolled-back directive committed as recorded; and
+    `drop`, `duplicate` and `swap`, a persisting step left out, run twice, or
+    exchanged with the next.
+  - A candidate runs only if the steps after it start from a state that
+    neither the recorded run nor an earlier candidate reached before the same
+    step, as the recorded and single-change observations show. So a step that
+    changes no state is never dropped, repeated or swapped, and a commit of a
+    reverting mutant is its step's drop.
+  - Candidates are numbered `s1`, `s2`, … by position, over every operator.
+    A fixture keeps at most `--sequence-mutants` (default 64; 0 runs none),
+    a seeded sample, and `--run-sequence-mutants` splits a cap evenly over
+    the run's fixtures with a recorded call.
+  - The recorded steps before the change keep their expectations. Every step
+    from the change on is compared across the paths only, each path until its
+    first step that it did not complete, and nothing after the first
+    disagreement. A sequence finding reduces to a shortest prefix with its
+    operator.
 - **Exclusions and findings:** an unsupported directive, a compile failure, an
   export refusal or a resource limit excludes the paths that need it, with its
   stage and reason. A path mismatch, an unmet recorded expectation, a path
   failure or a compiler crash is a finding. A harness error fails the run.
 - **Budgets** (optional, for the fuzz driver): at most `--fixture-mutants`
-  mutants per fixture, a seeded sample that keeps draw order and numbers;
-  `--fixture-seconds` per fixture and `--seconds` per run. An entry that a
-  path reaches after a deadline or a stop signal has the status `budget`, and
-  a fixture not started before the run's deadline is unexecuted. Neither is a
+  single-change mutants per fixture, a seeded sample that keeps draw order and
+  numbers; `--fixture-seconds` per fixture and `--seconds` per run. An entry
+  that a path reaches after a deadline or a stop signal has the status
+  `budget`, and so does a sequence mutant not started before a deadline. A
+  fixture not started before the run's deadline is unexecuted. Neither is a
   resource limit or a finding. The EVM paths run before Hull, so a budget
   spent on Hull leaves them compared.
 - **Hull memory range:** Hull memory fails, before changing memory or its
@@ -7743,7 +7766,10 @@ invocation after the sends before it, within `--hull-entry-timeout` (120
 seconds). A raw scenario runs in one invocation within `--hull-timeout` (600
 seconds), and after a limit resumes past the entries reported so far,
 replaying the persisting steps. An entry that still stalls when run alone is a
-resource limit on the Hull path.
+resource limit on the Hull path. A sequence mutant runs in one invocation
+within `--hull-timeout`, a method fixture's included, and is not resumed: the
+steps after a limit would start from an unknown state, so Hull leaves the
+sequence there.
 
 `report.json` has schema `solcore-lean.semantic-fixtures.v1`, states the
 comparison and `coreReference: false`, and records the environment, the
@@ -7754,13 +7780,20 @@ totals. A stop signal ends the run at the next entry and still writes the
 report, with exit status 130. `fixtures/<id>.json` keeps every
 step and mutant: one observation when
 the paths agree, every path's otherwise, and each path's expectation verdict
-for recorded steps. Each distinct finding carries its reduction. The command
-returns 1 for any finding, harness error or changed tool.
+for recorded steps. Its `sequences` keep each sequence mutant's operator,
+step order and change position, each path's expectation verdicts before the
+change, and each compared step's agreement, with whether it observed what the
+recorded step or the committed mutant did. `sequenceMutants` counts the
+candidates, the redundant ones and those kept. Each distinct finding carries
+its reduction. The command returns 1 for any finding, harness error or changed
+tool.
 
 `python3 scripts/test-semantic-fixtures.py` checks the inventory, the stream,
 the classification, std's derived structures, selectors, tags and layouts on
 recorded calls, the derived boundary Words and their cap, the mutation
-operators and sampling, the mutant budget,
+operators and sampling, the mutant budget, the sequence operators, their
+redundancy, numbering and caps, the paths leaving a sequence, the sequence
+comparison and reduction, Lean Core's single sequence invocation,
 the observation normalization, the memory-range rule, the `budget` status, the
 comparisons, the Lean result order and its deadlines, the reduction, the export
 lock, the run budget, a stop signal, `--check` and the totals, without a

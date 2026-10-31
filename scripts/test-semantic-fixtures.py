@@ -438,6 +438,192 @@ class DerivedArgumentTests(unittest.TestCase):
         self.assertEqual(totals["derivedBoundaries"], 6)
 
 
+class SequenceTests(unittest.TestCase):
+    PATHS = ["hull", "sonatina-o0", "yul"]
+    FIVE = {"10": {"0": "5"}}
+
+    def steps(self, kind="raw", count=3):
+        return [step(kind="deploy", index=0)] + [step(kind=kind, index=index, calldata="0x" + (selector("k(uint256)") + word(index)).hex())
+                                                for index in range(1, count + 1)]
+
+    def held(self, storage=None, **extra):
+        """The same observation on every path."""
+        return {path: observation(storage=storage, **extra) for path in self.PATHS}
+
+    def run_for(self, steps, observe, **args):
+        run = fixtures.FixtureRun.__new__(fixtures.FixtureRun)
+        run.args = SimpleNamespace(**{"seed": 5, "sequence_mutants": 64, "reduction_runs": 40, "reduction_seconds": 60, **args})
+        run.fixture, run.raw, run.admitted, run.steps = {"id": "f", "mode": "raw"}, True, list(self.PATHS), steps
+        run.record = {"findings": [], "statuses": {}, "counts": {}}
+        run.deadline = run.run_deadline = None
+        run.draws, run.seen, run.reference, run.recorded_findings = {}, {}, {}, set()
+        run.observe = observe
+        return run
+
+    def test_operators_change_exactly_one_thing_and_mark_where_the_change_starts(self):
+        steps = self.steps()
+        mutant = {"operator": "word", "class": "leaf:uint256", "word": 0, "recorded": hex(2), "value": hex(9)}
+        cases = {"commit": ({"operator": "commit", "step": 2, "of": "2.1", "mutant": mutant}, ["1", "2.1", "3"], 2),
+                 "drop": ({"operator": "drop", "step": 2}, ["1", "3"], 2),
+                 "duplicate": ({"operator": "duplicate", "step": 2}, ["1", "2", "2", "3"], 3),
+                 "swap": ({"operator": "swap", "step": 1}, ["2", "1", "3"], 1)}
+        for name, (candidate, order, change) in cases.items():
+            deploy, items, at = fixtures.sequence_items(steps, candidate)
+            self.assertEqual(([item["id"] for item in items], at), (order, change), name)
+            self.assertEqual(fixtures.change_position(deploy, items), change, name)
+            self.assertTrue(all(item["role"] == "prefix" for item in items[:change - 1]), name)
+            self.assertTrue(all(item["persist"] for item in items), name)
+        _, items, _ = fixtures.sequence_items(steps, cases["commit"][0])
+        self.assertEqual((items[1]["calldata"], items[1]["mutant"]), ("0x" + (selector("k(uint256)") + word(9)).hex(), mutant))
+        _, items, _ = fixtures.sequence_items(steps, cases["duplicate"][0])
+        self.assertEqual([item["role"] for item in items], ["prefix", "prefix", "change", "tail"])
+        # A rolled-back directive commits as recorded, and every other step keeps its persistence.
+        _, items, at = fixtures.sequence_items(self.steps(kind="call"), {"operator": "persist", "step": 1})
+        self.assertEqual(([item["persist"] for item in items], at), ([True, False, False], 1))
+        # A deployment's commit changes the deployment, and every recorded call follows it.
+        value = {"operator": "value", "recorded": 0, "value": 1}
+        deploy, items, at = fixtures.sequence_items(steps, {"operator": "commit", "step": 0, "of": "0.1", "mutant": value})
+        self.assertEqual((deploy["id"], deploy["value"], at, [item["id"] for item in items]), ("0.1", 1, 0, ["1", "2", "3"]))
+        self.assertEqual(fixtures.change_position(deploy, items), 0)
+        with self.assertRaisesRegex(ValueError, "unknown sequence operator"):
+            fixtures.sequence_items(steps, {"operator": "reverse", "step": 1})
+
+    def test_candidates_are_numbered_over_every_operator_and_kept_only_for_a_new_continuation(self):
+        def mutant(value):
+            return {"operator": "word", "class": "leaf:uint256", "word": 0, "recorded": "0x1", "value": hex(value)}
+        draws = {1: [(number, mutant(number + 6)) for number in (1, 2, 3, 4)], 2: [(1, mutant(11))], 3: [(1, mutant(12))]}
+        six, seven = {"10": {"0": "6"}}, {"10": {"0": "7"}}
+        seen = {"0": self.held(), "1": self.held(self.FIVE), "2": self.held(self.FIVE), "3": self.held(six),
+                "1.1": self.held(seven), "1.2": self.held(status="reverted"), "1.4": dict(self.held(seven), hull={"status": "timeout"}),
+                "2.1": self.held(self.FIVE)}
+        kept, counts = fixtures.sequence_candidates(self.steps(), draws, seen, self.PATHS)
+        # Step 1 writes, step 2 leaves the state as it found it, and step 3 writes again.
+        self.assertEqual([(item["id"], item["operator"], item["step"]) for item in kept],
+                         [("s1", "drop", 1), ("s2", "commit", 1), ("s6", "duplicate", 1), ("s7", "swap", 1),
+                          ("s11", "swap", 2), ("s12", "duplicate", 3)])
+        self.assertEqual((kept[1]["of"], kept[1]["mutant"]), ("1.1", draws[1][0][1]))
+        # 1.2 reverts, so it is step 1's drop; 1.3 did not run; 1.4 did not complete; 2.1 leaves the recorded state.
+        self.assertEqual(counts, {"structural": 12, "redundant": 4, "unobserved": 1, "incomplete": 1, "candidates": 6})
+        self.assertEqual(fixtures.sequence_candidates(self.steps(), draws, seen, self.PATHS), (kept, counts))
+
+    def test_a_committed_directive_or_deployment_counts_only_when_it_changes_the_state(self):
+        seen = {"0": self.held(), "1": self.held(self.FIVE), "2": self.held(), "3": self.held(self.FIVE)}
+        kept, counts = fixtures.sequence_candidates(self.steps(kind="call"), {}, seen, self.PATHS)
+        # Only the first directive writes and has a later one; nothing persists, so nothing drops, repeats or swaps.
+        self.assertEqual([(item["id"], item["operator"], item["step"]) for item in kept], [("s1", "persist", 1)])
+        self.assertEqual(counts, {"structural": 2, "redundant": 1, "unobserved": 0, "incomplete": 0, "candidates": 1})
+        value = {"operator": "value", "recorded": 0, "value": 1}
+        draws = {0: [(1, value), (2, {**value, "value": 2})]}
+        seen = {"0": self.held(), "1": self.held(self.FIVE), "0.1": self.held(balances={"1": "1"}), "0.2": self.held(status="reverted")}
+        kept, counts = fixtures.sequence_candidates(self.steps(count=1), draws, seen, self.PATHS)
+        self.assertEqual([(item["id"], item["operator"], item["step"]) for item in kept], [("s1", "commit", 0), ("s3", "duplicate", 1)])
+        self.assertEqual(counts["redundant"], 1)
+        # Without a completed deployment nothing can continue.
+        failed = {"0": self.held(status="reverted"), "1": {path: {"status": "not-executed"} for path in self.PATHS}}
+        self.assertEqual(fixtures.sequence_candidates(self.steps(count=1), draws, failed, self.PATHS)[0], [])
+
+    def test_a_path_leaves_a_sequence_after_a_step_it_did_not_complete(self):
+        same, live = self.held(), set(self.PATHS)
+        self.assertEqual(fixtures.sequence_agreement(same, live, False)["status"], "agree")
+        result = fixtures.sequence_agreement(same, live - {"hull"}, False)
+        self.assertEqual((result["status"], result["left"]), ("incomplete", ["hull"]))
+        self.assertEqual(fixtures.sequence_agreement(dict(same, yul=observation(output="0x01")), live - {"hull"}, False)["status"],
+                         "disagree")
+        self.assertEqual(fixtures.sequence_agreement({path: dict(fixtures.BUDGET) for path in self.PATHS}, live, False)["status"],
+                         "budget")
+        self.assertEqual(fixtures.sequence_agreement(same, set(), False)["status"], "unobserved")
+        observed = {"hull": [observation(), {"status": "timeout"}, observation()], "sonatina-o0": [observation()] * 3,
+                    "yul": [observation()] * 3}
+        self.assertEqual([alive for _, _, alive in fixtures.walk(self.PATHS, observed, 2)],
+                         [live, live, {"sonatina-o0", "yul"}])
+
+    def test_a_sequence_checks_its_prefix_by_expectations_and_compares_the_rest_across_paths(self):
+        def observe(deploy, items, sequence=False):
+            self.assertTrue(sequence)
+            order = [item["id"] for item in items]
+            rows = {path: [observation()] + [observation(storage=self.FIVE) for _ in items] for path in self.PATHS}
+            if order == ["2", "1", "3"]:
+                rows["hull"][1] = {"status": "timeout"}
+            if order == ["1", "2", "2", "3"]:
+                rows["yul"][3] = observation(storage=self.FIVE, output="0x01")
+            return rows
+
+        run = self.run_for(self.steps(), observe)
+        recorded = [{**item, "id": str(item["index"]), "step": item["index"]} for item in run.steps[1:]]
+        run.compare(recorded, {path: [observation(), observation(storage=self.FIVE), observation(storage=self.FIVE), observation()]
+                               for path in self.PATHS})
+        self.assertEqual(sorted(run.seen), ["0", "1", "2", "3"])
+        self.assertEqual(run.reference["2"], fixtures.comparable(observation(storage=self.FIVE), False))
+        tallies = dict.fromkeys(fixtures.SEQUENCE_COUNTS, 0)
+        rows = [run.sequence({"id": f"s{number}", **candidate}, tallies) for number, candidate in enumerate(
+            ({"operator": "drop", "step": 1}, {"operator": "swap", "step": 1}, {"operator": "duplicate", "step": 2}), 1)]
+        self.assertEqual([[line["agreement"]["status"] for line in row["rows"]] for row in rows],
+                         [["agree", "agree"], ["incomplete"] * 3, ["disagree"]])
+        # The dropped step's successor reaches the recorded state; the last step then observes something new.
+        self.assertEqual([line["same"] for line in rows[0]["rows"]], [True, False])
+        self.assertEqual(rows[1]["rows"][1]["agreement"]["left"], ["hull"])
+        self.assertEqual((rows[2]["change"], rows[2]["stop"], rows[2]["prefix"]["yul"]["match"]), (3, 3, 3))
+        self.assertEqual(tallies, {"mutants": 3, "unrun": 0, "steps": 6, "agree": 2, "disagree": 1, "incomplete": 3,
+                                   "unobserved": 0, "budget": 0, "stopped": 1, "changed": 1, "prefixSteps": 5})
+        found = run.record["findings"]
+        self.assertEqual([(item["category"], item["entry"], item["sequence"], item["operator"], item["position"], item["step"])
+                          for item in found], [("path-mismatch", "s3@3", "s3", "duplicate", 3, 2)])
+        self.assertEqual(run.record["statuses"]["hull"]["timeout"], 1)
+        run.deadline = time.monotonic() - 1
+        self.assertEqual(run.sequence({"id": "s9", "operator": "drop", "step": 1}, tallies)["status"], "budget")
+        self.assertEqual((tallies["unrun"], tallies["budget"], tallies["steps"]), (1, 2, 8))
+
+    def test_a_fixture_keeps_a_seeded_sample_within_its_cap_and_the_runs_share(self):
+        candidates = [{"id": f"s{number}", "operator": "drop", "step": 1} for number in range(1, 11)]
+        counts = {"structural": 12, "redundant": 2, "unobserved": 0, "incomplete": 0, "candidates": 10}
+
+        def kept(limit, share=None):
+            run, ran = self.run_for(self.steps(), None, sequence_mutants=limit, sequence_share=share), []
+            with patch.object(fixtures, "sequence_candidates", return_value=(candidates, counts)), \
+                    patch.object(fixtures.FixtureRun, "sequence", lambda self, candidate, tallies: ran.append(candidate["id"]) or {}):
+                run.sequence_mutants()
+            return ran, run.record
+        ran, record = kept(4)
+        self.assertEqual((len(ran), ran), (4, sorted(ran, key=lambda name: int(name[1:]))))
+        self.assertGreaterEqual(record["sequenceMutants"].pop("seconds"), 0)
+        self.assertEqual(record["sequenceMutants"], {"limit": 4, **counts, "kept": 4})
+        self.assertEqual(kept(4)[0], ran)
+        self.assertEqual(kept(64)[0], [item["id"] for item in candidates])
+        self.assertEqual((len(kept(4, share=2)[0]), kept(4, share=2)[1]["sequenceMutants"]["limit"]), (2, 2))
+        self.assertEqual(kept(0), ([], {"findings": [], "statuses": {}, "counts": {}}))
+        totals = fixtures.summarize([{**record, "id": "f", "admitted": [], "exclusions": [],
+                                      "counts": {"sequence": dict.fromkeys(fixtures.SEQUENCE_COUNTS, 2)}}] * 2)
+        self.assertEqual((totals["sequence"]["agree"], totals["sequenceMutants"]["kept"]), (4, 8))
+
+    def test_a_sequence_finding_reduces_to_a_shortest_prefix_with_its_operator(self):
+        mutant = {"operator": "word", "class": "leaf:uint256", "word": 0, "recorded": hex(3), "value": hex(2**200)}
+        candidate = {"id": "s1", "operator": "commit", "step": 3, "of": "3.1", "mutant": mutant}
+
+        def observe(deploy, items, sequence=False):
+            ids = [item["id"] for item in items]
+            committed = next((int(item["calldata"][10:], 16) for item in items if "mutant" in item), 0)
+            rows = {path: [observation()] * (1 + len(items)) for path in self.PATHS}
+            # Yul differs on step 4 only after step 2 and a committed word of at least 1000.
+            if "2" in ids[:-1] and committed >= 1000 and ids[-1] == "4":
+                rows["yul"] = rows["yul"][:-1] + [observation(output="0x01")]
+            return rows
+
+        run = self.run_for(self.steps(count=4), observe)
+        run.candidates = {"s1": candidate}
+        deploy, items, change = fixtures.sequence_items(run.steps, candidate)
+        last = {path: rows[-1] for path, rows in observe(deploy, items).items()}
+        result = fixtures.sequence_agreement(last, set(self.PATHS), False)
+        finding = {"sequence": "s1", "operator": "commit", "change": change, "position": len(items), "step": 4,
+                   "entry": "s1@4", "category": "path-mismatch", "signature": ["path-mismatch", result["fields"], result["groups"]]}
+        reduction = run.reduce(finding)
+        self.assertEqual((reduction["status"], reduction["operator"], reduction["position"]), ("reduced", "commit", 3))
+        self.assertEqual([(item["step"], "mutant" in item) for item in reduction["sequence"]],
+                         [(0, False), (2, False), (3, True), (4, False)])
+        self.assertEqual(int(reduction["mutant"]["value"], 16), 1000)
+        self.assertEqual(run.reduce({**finding, "signature": ["path-mismatch", ["logs"], []]}),
+                         {"status": "not-reproduced", "runs": 1})
+
+
 class ObservationTests(unittest.TestCase):
     chain = {"address": "0x" + "00" * 19 + "0a", "accounts": [("0x" + "00" * 19 + "0b", 5)]}
 
@@ -632,6 +818,22 @@ class HullRunnerTests(unittest.TestCase):
             self.assertEqual(fixtures.run_hull(args, raw, exports, self.chain, deploy, entries, time.monotonic() - 1),
                              [fixtures.BUDGET] * 4)
 
+    def test_a_sequence_runs_in_one_invocation_and_is_not_resumed_after_a_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, exports = self.prepare(Path(directory), self.ECHO)
+            fixture = {"mode": "methods", "contract": "C", "fuel": 10, "availableGas": None}
+            entries = [step(kind="call", calldata="0x01"), {**step(kind="call", calldata="0x02"), "persist": True},
+                       step(kind="call", calldata="0xdead"), step(kind="call", calldata="0x03")]
+            # Long enough for a loaded machine to start the runner and report the rows before the stall.
+            args.hull_timeout = 3
+            deploy = step(kind="deploy", index=0)
+            observed = fixtures.run_hull_sequence(args, fixture, exports, self.chain, deploy, entries)
+            self.assertEqual([item["status"] for item in observed], ["returned", "returned", "returned", "timeout", "timeout"])
+            invocations = [json.loads(line) for line in Path(str(args.hull_runner) + ".log").read_text().splitlines()]
+            self.assertEqual(invocations, [["0x01", "0x02", "0xdead", "0x03"]])
+            self.assertEqual(fixtures.run_hull_sequence(args, fixture, exports, self.chain, deploy, entries, time.monotonic() - 1),
+                             [fixtures.BUDGET] * 5)
+
     def test_a_buffering_runner_that_reports_nothing_is_resumed_entry_by_entry(self):
         with tempfile.TemporaryDirectory() as directory:
             args, exports = self.prepare(Path(directory), self.ECHO.replace(", flush=True", ""))
@@ -728,8 +930,15 @@ class RunTests(unittest.TestCase):
         self.assertEqual((report["bounds"]["fixtureMutants"], report["bounds"]["fixtureSeconds"], report["bounds"]["runSeconds"]),
                          (8, 30.0, 0.05))
         self.assertEqual((report["mutantsPerStep"], report["derivedMutants"]), (4, fixtures.DERIVED_MUTANTS))
+        self.assertEqual((report["sequenceMutants"], report["runSequenceMutants"], report["sequenceShare"]),
+                         (fixtures.SEQUENCE_MUTANTS, None, None))
         self.output = self.output.with_name("capped")
         self.assertEqual(self.main("--derived-mutants", "8", "--seconds", "0.01", delay=0.05)[1]["derivedMutants"], 8)
+        self.output = self.output.with_name("shared")
+        report = self.main("--sequence-mutants", "16", "--run-sequence-mutants", "40", "--seconds", "0.01", delay=0.05)[1]
+        recorded = [item for item in fixtures.inventory() if item["id"].startswith("abi-") and item["calls"]]
+        self.assertEqual((report["sequenceMutants"], report["runSequenceMutants"], report["sequenceShare"]),
+                         (16, 40, max(1, 40 // len(recorded))))
 
     def test_a_stop_signal_ends_the_run_with_its_report(self):
         def run(self):
@@ -771,7 +980,10 @@ class CommandLineTests(unittest.TestCase):
                       ["--jobs", "0"], ["--fixture-mutants", "4"], ["--mode", "mutation", "--seed", "1", "--fixture-mutants", "0"],
                       ["--seconds", "0"], ["--fixture-seconds", "-1"],
                       ["--mode", "mutation", "--seed", "1", "--derived-mutants", "-1"],
-                      ["--mode", "mutation", "--seed", "1", "--derived-mutants", "4097"]):
+                      ["--mode", "mutation", "--seed", "1", "--derived-mutants", "4097"],
+                      ["--mode", "mutation", "--seed", "1", "--sequence-mutants", "-1"],
+                      ["--mode", "mutation", "--seed", "1", "--sequence-mutants", "4097"],
+                      ["--mode", "mutation", "--seed", "1", "--run-sequence-mutants", "0"], ["--run-sequence-mutants", "4"]):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 fixtures.main(["--output", "/nonexistent/out", *extra])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):

@@ -11,7 +11,10 @@ from the recorded calls and compares those across the paths only. A call's
 words are classified by its method's standard ABI signature or, for a method
 taking user data types, by std's derived layout of the pinned declarations;
 every tag, dynamic offset and `bytes` length of such a call gets all of its
-boundary Words.
+boundary Words. Sequence mutants then carry one change forward: a committed
+single-change mutant or directive, a dropped, duplicated or swapped step, run
+from a fresh deployment with the recorded steps after it, which are compared
+across the paths only, each path until a step it did not complete.
 
 No original Core reference exists for these programs. Agreement here is
 agreement among compiled paths and with upstream's recorded expectations; it is
@@ -97,6 +100,9 @@ U256 = 2**256
 MASK64 = 2**64 - 1
 MUTANTS_PER_STEP = 4
 DERIVED_MUTANTS = 256
+SEQUENCE_MUTANTS = 64
+SEQUENCE_COUNTS = ("mutants", "unrun", "steps", "agree", "disagree", "incomplete", "unobserved", "budget", "stopped",
+                   "changed", "prefixSteps")
 REDUCTION_RUNS = 48
 REDUCTION_SECONDS = 900
 MAX_ARRAY_ELEMENTS = 4096
@@ -1146,6 +1152,15 @@ def run_hull(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entr
     return [deployment] + result
 
 
+def run_hull_sequence(args, fixture: dict, exports: dict, chain: dict, deploy: dict, entries: list[dict],
+                      deadline: float | None = None) -> list[dict]:
+    """A sequence mutant's deployment and entries on Lean Core in one invocation within --hull-timeout, a method
+    fixture's included. Nothing resumes after a limit: the steps after it would start from an unknown state."""
+    if stopped(deadline):
+        return unrun(1 + len(entries))
+    return hull_invocation(args, fixture, exports, chain, deploy, entries, args.hull_timeout, deadline)[0]
+
+
 class Chain:
     """One local Anvil for one fixture; every backend starts from the same snapshot."""
 
@@ -1417,6 +1432,164 @@ def entry_findings(fixture: dict, entry: dict, observations: dict[str, dict]) ->
     return found
 
 
+# Sequence mutants: one change to the recorded sequence, the steps after it starting from the state it leaves.
+
+def leaves(observation: dict, before):
+    """The state one step leaves on one path: its storage and balances when it returned, else the state it found."""
+    if observation.get("status") == "returned":
+        return json.dumps([observation.get("storage"), observation.get("balances")], sort_keys=True)
+    return before
+
+
+def sequence_candidates(steps: list[dict], draws: dict, seen: dict[str, dict], paths: list[str]) -> tuple[list[dict], dict]:
+    """Every sequence mutant of a fixture, numbered in order, and the non-redundant ones among them: those whose later
+    steps start from a state that neither the recorded run nor an earlier candidate reached before the same step.
+
+    `draws` holds each step's single-change draw before any budget, and `seen` the observations of the recorded steps
+    and of the mutants that ran, by entry id. A step changes the state when, on some path, it did not complete or left
+    other storage or balances than it found."""
+    calls, recorded = len(steps) - 1, seen.get("0") or {}
+    deployed = [path for path in paths if (recorded.get(path) or {}).get("status") == "returned"]
+    before, changes = {1: tuple(leaves(recorded[path], None) for path in deployed)}, {}
+    for k in range(1, calls + 1):
+        observations = seen.get(str(k)) or {}
+        after = tuple(leaves(observations.get(path) or {}, state) for path, state in zip(deployed, before[k]))
+        changes[k] = after != before[k] or any((observations.get(path) or {}).get("status") not in COMPLETED
+                                               for path in deployed)
+        before[k + 1] = after if steps[k]["persist"] else before[k]
+    reached = set(before.items())
+    kept, counts = [], {"structural": 0, "redundant": 0, "unobserved": 0, "incomplete": 0}
+
+    def add(candidate: dict, verdict: str, key=None) -> None:
+        counts["structural"] += 1
+        candidate = {"id": f"s{counts['structural']}", **candidate}
+        if verdict == "kept" and key is not None:
+            verdict = "redundant" if key in reached else verdict
+            reached.add(key)
+        if verdict == "kept":
+            kept.append(candidate)
+        else:
+            counts[verdict] += 1
+
+    def agreed(entry_id: str, deploy: bool) -> tuple[str, dict | None]:
+        observations = seen.get(entry_id)
+        if observations is None:
+            return "unobserved", None
+        if not deployed or agreement(observations, deploy)["status"] != "agree":
+            return "incomplete", None
+        return "kept", observations
+
+    def continues(observations: dict, k: int) -> tuple:
+        return k + 1, tuple(leaves(observations[path], state) for path, state in zip(deployed, before[k]))
+
+    if calls:
+        for number, mutant in draws.get(0, []):
+            verdict, observations = agreed(f"0.{number}", True)
+            key = None
+            if verdict == "kept" and any(observations[path]["status"] != "returned" for path in deployed):
+                verdict = "redundant"
+            elif verdict == "kept":
+                key = (1, tuple(leaves(observations[path], None) for path in deployed))
+            add({"operator": "commit", "step": 0, "of": f"0.{number}", "mutant": mutant}, verdict, key)
+    for k in range(1, calls + 1):
+        persist, later = steps[k]["persist"], k < calls
+        if persist and later:
+            add({"operator": "drop", "step": k}, "kept" if changes[k] else "redundant", (k + 1, before[k]))
+        if not persist and later:
+            verdict, observations = agreed(str(k), False)
+            add({"operator": "persist", "step": k}, verdict, continues(observations, k) if observations else None)
+        if later:
+            for number, mutant in draws.get(k, []):
+                verdict, observations = agreed(f"{k}.{number}", False)
+                add({"operator": "commit", "step": k, "of": f"{k}.{number}", "mutant": mutant}, verdict,
+                    continues(observations, k) if observations else None)
+        if persist:
+            add({"operator": "duplicate", "step": k}, "kept" if deployed and changes[k] else "redundant")
+        if later and (persist or steps[k + 1]["persist"]):
+            useful = (persist and changes[k]) or (steps[k + 1]["persist"] and changes[k + 1])
+            add({"operator": "swap", "step": k}, "kept" if deployed and useful else "redundant")
+    return kept, {**counts, "candidates": len(kept)}
+
+
+def sequence_items(steps: list[dict], candidate: dict) -> tuple[dict, list[dict], int]:
+    """A sequence mutant's deployment, its calls in order with their roles (prefix, change or tail), and the position
+    of its change, the deployment being position 0."""
+    def item(step: dict, role: str, **extra) -> dict:
+        return {**step, "id": str(step["index"]), "step": step["index"], "role": role, **extra}
+
+    operator, k = candidate["operator"], candidate["step"]
+    if operator == "commit" and k == 0:
+        deploy = {**item(apply(steps[0], candidate["mutant"]), "change"), "id": candidate["of"], "mutant": candidate["mutant"]}
+        return deploy, [item(step, "tail") for step in steps[1:]], 0
+    before, after = [item(step, "prefix") for step in steps[1:k]], [item(step, "tail") for step in steps[k + 1:]]
+    if operator == "commit":
+        changed = [{**item(apply(steps[k], candidate["mutant"]), "change", persist=True), "id": candidate["of"],
+                    "mutant": candidate["mutant"]}]
+    elif operator == "persist":
+        changed = [item(steps[k], "change", persist=True)]
+    elif operator == "drop":
+        changed = []
+    elif operator == "duplicate":
+        before, changed = before + [item(steps[k], "prefix")], [item(steps[k], "change")]
+    elif operator == "swap":
+        changed, after = [item(steps[k + 1], "change"), item(steps[k], "change")], after[1:]
+    else:
+        raise ValueError("unknown sequence operator: " + operator)
+    return item(steps[0], "prefix"), before + changed + after, len(before) + 1
+
+
+def change_position(deploy: dict, items: list[dict]) -> int:
+    """The first position from which a sequence is compared across the paths only."""
+    if deploy["role"] != "prefix":
+        return 0
+    return next((position for position, item in enumerate(items, 1) if item["role"] != "prefix"), len(items) + 1)
+
+
+def sequence_agreement(observations: dict[str, dict], live: set, deploy: bool) -> dict:
+    """One step from a sequence's change on, compared among the paths still in the sequence; while some admitted path
+    has left it at an earlier step, a step on which the others agree is incomplete."""
+    present = {path: observation for path, observation in observations.items() if path in live}
+    left = sorted(set(observations) - set(live))
+    if present and all(observation.get("status") == "budget" for observation in present.values()):
+        result = {"status": "budget", "fields": [], "groups": [], "inconclusive": [], "failed": []}
+    elif present:
+        result = agreement(present, deploy)
+    else:
+        result = {"status": "unobserved", "fields": [], "groups": [], "inconclusive": [], "failed": []}
+    if left:
+        result = {**result, "left": left, "status": "incomplete" if result["status"] == "agree" else result["status"]}
+    return result
+
+
+def sequence_findings(base: dict, observations: dict[str, dict], live: set, result: dict, deploy: bool) -> list[dict]:
+    """A path failure of a path still in the sequence, and a disagreement among those paths."""
+    found = []
+    for path in sorted(live):
+        status = observations[path].get("status")
+        if status not in COMPLETED + RESOURCE + UNRUN:
+            found.append({**base, "category": "path-failure", "path": path, "signature": ["path-failure", path, status],
+                          "detail": observations[path].get("detail")})
+    if result["status"] == "disagree":
+        found.append({**base, "category": "path-mismatch", "signature": ["path-mismatch", result["fields"], result["groups"]],
+                      "observations": {path: comparable(value, deploy) or value for path, value in observations.items()
+                                       if path in live}})
+    return found
+
+
+def walk(admitted: list[str], observed: dict[str, list[dict]], until: int):
+    """Each position of a run sequence up to `until`, with its observations and the paths still in the sequence:
+    a path leaves after its first step that did not complete there."""
+    live = set(admitted)
+    for position in range(until + 1):
+        observations = {path: observed[path][position] for path in admitted}
+        yield position, observations, set(live)
+        live -= {path for path in admitted if observations[path].get("status") not in COMPLETED}
+
+
+def descriptor(item: dict) -> dict:
+    return {"step": item["step"], "persist": item["persist"], **({"mutant": item["mutant"]} if "mutant" in item else {})}
+
+
 class FixtureRun:
     """One fixture: exports, the recorded steps and mutants on every admitted path."""
 
@@ -1498,6 +1671,7 @@ class FixtureRun:
             self.bytecode["yul"] = (prepared["yul"]["init"], prepared["yul"]["runtime"])
         if not self.admitted:
             return
+        self.draws, self.seen, self.reference = {}, {}, {}
         self.mutants = self.draw_mutants() if self.args.mode == "mutation" else {}
         entries = self.entries(self.steps[1:], self.mutants)
         self.record["steps"] = [{key: step[key] for key in ("index", "kind", "label", "calldata", "value", "caller",
@@ -1508,6 +1682,7 @@ class FixtureRun:
             self.compare(entries, observed)
             if self.args.mode == "mutation":
                 self.deploy_mutants()
+                self.sequence_mutants()
             if not self.args.no_reduce:
                 self.reduce_findings()
         finally:
@@ -1540,6 +1715,8 @@ class FixtureRun:
                                                                             "derived-boundary")))
             for index, number, mutant in boundaries:
                 drawn[index].append((number, mutant))
+        # Sequence mutants number their commits over the whole draw, before the budget.
+        self.draws = {index: list(items) for index, items in drawn.items()}
         limit, order = self.args.fixture_mutants, [(index, number) for index, items in drawn.items() for number, _ in items]
         if limit is not None:
             self.record["mutantBudget"] = {"limit": limit, "drawn": len(order), "kept": min(limit, len(order))}
@@ -1557,15 +1734,15 @@ class FixtureRun:
             result.append({**step, "id": str(step["index"]), "step": step["index"]})
         return result
 
-    def observe(self, deploy: dict, entries: list[dict]) -> dict[str, list[dict]]:
+    def observe(self, deploy: dict, entries: list[dict], sequence: bool = False) -> dict[str, list[dict]]:
         """Run a deployment and its entries on every admitted path, the EVM paths before Hull, so that a time
         budget spent on Hull leaves them compared; a Hull memory-range failure is classified against the
-        EVM paths' observations of the same entry."""
+        EVM paths' observations of the same entry. A sequence mutant runs on Hull in one invocation."""
         observed = {}
         for path in sorted(self.admitted, key=lambda path: path == "hull"):
             if path == "hull":
-                observed[path] = run_hull(self.args, self.fixture, self.prepared, self.chain, deploy, entries,
-                                          self.deadline)
+                observed[path] = (run_hull_sequence if sequence else run_hull)(
+                    self.args, self.fixture, self.prepared, self.chain, deploy, entries, self.deadline)
             else:
                 init, runtime = self.bytecode[path]
                 observed[path] = run_evm(self.evm, path, init, runtime, deploy, entries, self.deadline)
@@ -1596,11 +1773,17 @@ class FixtureRun:
             else:
                 row["observations"] = observations
             rows.append(row)
+            self.note(entry["id"], observations, row.get("observation"))
             self.record["findings"] += entry_findings(self.fixture, entry, observations)
         self.record["entries"] = rows
         self.record["counts"] = {**counts, "recorded": len(self.steps), "mutants": len(entries) + 1 - len(self.steps),
                                  "derivedBoundaries": sum(derived_boundary(entry.get("mutant")) for entry in entries)}
         self.record["expectations"] = expectations
+
+    def note(self, entry_id: str, observations: dict[str, dict], agreed: dict | None) -> None:
+        """Keep an entry's observations, which sequence mutants start from, and its agreed observation."""
+        if hasattr(self, "seen"):
+            self.seen[entry_id], self.reference[entry_id] = observations, agreed
 
     def tally(self, observations: dict[str, dict]) -> None:
         """Count each path's observed statuses, so that every resource limit stays visible."""
@@ -1623,8 +1806,91 @@ class FixtureRun:
             row["observation" if result["status"] == "agree" else "observations"] = \
                 comparable(observations[self.admitted[0]], True) if result["status"] == "agree" else observations
             rows.append(row)
+            self.note(entry["id"], observations, row.get("observation"))
             self.record["findings"] += entry_findings(self.fixture, entry, observations)
         self.record["entries"] += rows
+
+    def sequence_mutants(self) -> None:
+        """The fixture's non-redundant sequence mutants, at most --sequence-mutants and the run's share of
+        --run-sequence-mutants, a seeded sample keeping numbers and order, each run and compared in turn."""
+        share = getattr(self.args, "sequence_share", None)
+        limit = self.args.sequence_mutants if share is None else min(self.args.sequence_mutants, share)
+        if not limit:
+            return
+        started = time.monotonic()
+        candidates, counts = sequence_candidates(self.steps, self.draws, self.seen, self.admitted)
+        kept = candidates if len(candidates) <= limit else \
+            seeded_subset(candidates, limit, Stream(derive(self.args.seed, self.fixture["id"], "sequence")))
+        self.record["sequenceMutants"] = {"limit": limit, **counts, "kept": len(kept)}
+        self.candidates = {candidate["id"]: candidate for candidate in kept}
+        # A recorded step's own finding is not repeated by each sequence that runs it before its change.
+        self.recorded_findings = {(finding["entry"], json.dumps(finding["signature"])) for finding in self.record["findings"]
+                                  if "signature" in finding and "mutant" not in finding}
+        tallies, rows = dict.fromkeys(SEQUENCE_COUNTS, 0), []
+        for candidate in kept:
+            rows.append(self.sequence(candidate, tallies))
+        self.record["sequences"] = rows
+        self.record["counts"]["sequence"] = tallies
+        self.record["sequenceMutants"]["seconds"] = round(time.monotonic() - started, 3)
+
+    def sequence(self, candidate: dict, tallies: dict) -> dict:
+        """One sequence mutant on every admitted path: the recorded steps before its change by their expectations and
+        across the paths, every step from the change on across the paths only, each path until its first step that
+        did not complete there, and nothing after the first disagreement."""
+        deploy, items, change = sequence_items(self.steps, candidate)
+        row = {**{key: candidate[key] for key in ("id", "operator", "step", "of") if key in candidate},
+               "order": [item["id"] for item in items], "change": change}
+        if stopped(self.deadline):
+            tallies["unrun"] += 1
+            for key in ("steps", "budget"):
+                tallies[key] += 1 + len(items) - change
+            return {**row, "status": "budget"}
+        tallies["mutants"] += 1
+        observed = self.observe(deploy, items, True)
+        base = {"fixture": self.fixture["id"], "sequence": candidate["id"], "operator": candidate["operator"],
+                "change": change}
+        prefix, compared, stop = {path: dict.fromkeys(VERDICTS, 0) for path in self.admitted}, [], None
+        entries = [deploy] + items
+        for position, observations, live in walk(self.admitted, observed, len(items)):
+            entry = entries[position]
+            self.tally(observations)
+            # An entry id names a file of the fuzz driver's findings, so it holds no path separator.
+            where = {**base, "entry": f"{candidate['id']}@{position}", "step": entry["step"], "label": entry["label"],
+                     "position": position}
+            if position < change:
+                tallies["prefixSteps"] += 1
+                for path in self.admitted:
+                    prefix[path][expectation(entry, observations[path], self.raw)] += 1
+                self.record["findings"] += [{**finding, **where} for finding in entry_findings(self.fixture, entry, observations)
+                                            if (entry["id"], json.dumps(finding["signature"])) not in self.recorded_findings]
+                continue
+            if stop is not None:
+                tallies["stopped"] += 1
+                continue
+            result = sequence_agreement(observations, live, position == 0)
+            tallies["steps"] += 1
+            tallies[result["status"]] += 1
+            line = {"position": position, "step": entry["step"], "agreement": result}
+            if result["status"] == "agree":
+                # Whether the step observed what the recorded step, or the committed mutant, did; unknown when that
+                # entry itself did not agree.
+                seen, reference = comparable(observations[self.admitted[0]], position == 0), self.reference.get(entry["id"])
+                line["same"] = None if reference is None else seen == reference
+                tallies["changed"] += line["same"] is False
+                if not line["same"]:
+                    line["observation"] = seen
+            else:
+                line["observations"] = observations
+            compared.append(line)
+            self.record["findings"] += sequence_findings(
+                {**where, **({"mutant": candidate["mutant"]} if "mutant" in candidate else {})}, observations, live,
+                result, position == 0)
+            if result["status"] == "disagree":
+                stop = position
+        row.update(prefix=prefix, rows=compared)
+        if stop is not None:
+            row["stop"] = stop
+        return row
 
     def reduce_findings(self) -> None:
         """Reduce each distinct finding within the run's deadline, not the fixture's own."""
@@ -1649,6 +1915,12 @@ class FixtureRun:
 
     def reduce(self, finding: dict) -> dict:
         """Fewer directives first, then the mutated input back toward the recorded one."""
+        if "sequence" in finding:
+            if finding["position"] >= finding["change"]:
+                return self.reduce_sequence(finding)
+            # A recorded step that a sequence ran before its change reduces as that recorded step.
+            finding = {key: value for key, value in finding.items()
+                       if key not in ("sequence", "operator", "change", "position", "mutant")}
         started, runs = time.monotonic(), 0
         step = self.steps[finding["step"]]
         target = {**(apply(step, finding["mutant"]) if "mutant" in finding else step), "id": finding["entry"],
@@ -1702,6 +1974,85 @@ class FixtureRun:
                 "seconds": round(time.monotonic() - started, 3), "steps": [item["index"] for item in prefix],
                 "calldata": target["calldata"], "value": target["value"], "mutant": mutant}
 
+    def reduce_sequence(self, finding: dict) -> dict:
+        """A sequence finding toward a shortest prefix with its single operator: the sequence ends at the finding's
+        step; of the steps before the change only the persisting ones stay and each is dropped, last first, then the
+        steps between the change and the finding's step, while the finding recurs; a commit's mutated word or length
+        then moves toward the recorded one."""
+        started, runs = time.monotonic(), 0
+        candidate = self.candidates[finding["sequence"]]
+        deploy, items, _ = sequence_items(self.steps, candidate)
+        sequence = items[:finding["position"]]
+
+        def holds(head: dict, trial: list[dict]) -> bool:
+            nonlocal runs
+            runs += 1
+            change, until = change_position(head, trial), len(trial)
+            if until < change:
+                return False
+            observed = self.observe(head, trial, True)
+            for position, observations, live in walk(self.admitted, observed, until):
+                if position < change:
+                    continue
+                result = sequence_agreement(observations, live, position == 0)
+                if position == until:
+                    found = sequence_findings({}, observations, live, result, position == 0)
+                    return any(item["category"] == finding["category"] and item["signature"] == finding["signature"]
+                               for item in found)
+                if result["status"] == "disagree":
+                    return False
+            return False
+
+        def spent() -> bool:
+            return runs >= self.args.reduction_runs or time.monotonic() - started >= self.args.reduction_seconds or \
+                stopped(self.run_deadline)
+
+        def without(trial: list[dict], removed: list[dict]) -> list[dict]:
+            return [item for item in trial if all(item is not other for other in removed)]
+
+        if not holds(deploy, sequence):
+            return {"status": "stopped" if stopped(self.run_deadline) else "not-reproduced", "runs": runs}
+        # The finding's step stays, and so does the step a duplicate repeats.
+        kept = [sequence[-1]] if sequence else []
+        if candidate["operator"] == "duplicate":
+            kept.append(items[candidate["step"] - 1])
+        for role in ("prefix", "tail"):
+            # Steps that do not persist leave no state, so they go first, together; then each persisting one.
+            removable = [item for item in sequence if item["role"] == role and all(item is not other for other in kept)]
+            rolled = [item for item in removable if not item["persist"]]
+            if rolled and not spent() and holds(deploy, without(sequence, rolled)):
+                sequence = without(sequence, rolled)
+            for item in reversed([item for item in removable if item["persist"]]):
+                if spent():
+                    break
+                if holds(deploy, without(sequence, [item])):
+                    sequence = without(sequence, [item])
+        mutant = candidate.get("mutant")
+        if mutant and mutant["operator"] in ("word", "seeded-word", "truncate", "extend-zero", "extend-ones"):
+            words = mutant["operator"] in ("word", "seeded-word")
+            key, step = ("value" if words else "bytes"), self.steps[candidate["step"]]
+
+            def attempt(value: int) -> bool:
+                nonlocal mutant, sequence, deploy
+                trial = {**mutant, key: hex(value) if words else value}
+                if candidate["step"] == 0:
+                    head, changed = {**deploy, **apply(step, trial), "mutant": trial}, sequence
+                else:
+                    head = deploy
+                    changed = [{**item, **apply(step, trial), "persist": True, "mutant": trial} if item["role"] == "change"
+                               else item for item in sequence]
+                if not holds(head, changed):
+                    return False
+                mutant, sequence, deploy = trial, changed, head
+                return True
+
+            toward(int(mutant["recorded"], 16) if words else 0, int(mutant["value"], 16) if words else mutant["bytes"],
+                   attempt, spent)
+        return {"status": "stopped" if stopped(self.run_deadline) else "budget-exhausted" if spent() else "reduced",
+                "runs": runs, "seconds": round(time.monotonic() - started, 3), "operator": candidate["operator"],
+                "sequence": [descriptor(item) for item in [deploy] + sequence], "position": len(sequence),
+                "mutant": mutant}
+
 
 def check_tools(args) -> dict:
     """The pinned compiler checkout, tool receipts and binaries this run requires."""
@@ -1719,7 +2070,14 @@ def summarize(records: list[dict]) -> dict:
               "incomplete": 0, "unobserved": 0, "recorded": 0, "mutants": 0, "derivedBoundaries": 0, "findings": {},
               "exclusions": {}, "statuses": {}, "unexecuted": 0, "budgetStopped": 0}
     expectations = {path: dict.fromkeys(VERDICTS, 0) for path in PATHS}
+    totals["sequence"] = dict.fromkeys(SEQUENCE_COUNTS, 0)
+    totals["sequenceMutants"] = dict.fromkeys(("structural", "candidates", "kept", "redundant", "unobserved", "incomplete",
+                                               "seconds"), 0)
     for record in records:
+        for key, value in ((record.get("counts") or {}).get("sequence") or {}).items():
+            totals["sequence"][key] += value
+        for key in totals["sequenceMutants"]:
+            totals["sequenceMutants"][key] += (record.get("sequenceMutants") or {}).get(key, 0)
         if record.get("unexecuted"):
             totals["unexecuted"] += 1
         elif record.get("stop"):
@@ -1752,6 +2110,10 @@ def main(argv=None) -> int:
     parser.add_argument("--mutants", type=int, default=MUTANTS_PER_STEP, help="mutants drawn per recorded step")
     parser.add_argument("--derived-mutants", type=int, default=DERIVED_MUTANTS,
                         help="at most this many boundary mutants of derived layouts per fixture, a seeded sample")
+    parser.add_argument("--sequence-mutants", type=int, default=SEQUENCE_MUTANTS,
+                        help="at most this many sequence mutants per fixture, a seeded sample of the non-redundant ones; 0 runs none")
+    parser.add_argument("--run-sequence-mutants", type=int,
+                        help="at most this many sequence mutants per run, split evenly over its fixtures with a recorded call")
     parser.add_argument("--fixture", action="append", default=[], help="fixture id glob; repeatable")
     parser.add_argument("--fixture-mutants", type=int, help="at most this many mutants per fixture, a seeded sample of those drawn")
     parser.add_argument("--fixture-seconds", type=float, help="wall time per fixture; entries reached later are not run")
@@ -1781,12 +2143,15 @@ def main(argv=None) -> int:
         parser.error("a mutation run requires --seed")
     if args.mode == "fixed" and args.seed is not None:
         parser.error("--seed applies only to a mutation run")
-    if not 1 <= args.mutants <= 64 or not 0 <= args.derived_mutants <= 4096 or not 1 <= args.jobs <= 16 or \
+    if not 1 <= args.mutants <= 64 or not 0 <= args.derived_mutants <= 4096 or not 0 <= args.sequence_mutants <= 4096 or \
+            not 1 <= args.jobs <= 16 or \
             args.reduction_runs < 1 or \
             min(args.timeout, args.hull_timeout, args.hull_entry_timeout, args.reduction_seconds) <= 0:
         parser.error("invalid mutation, job, time or reduction bounds")
     if args.fixture_mutants is not None and (args.mode != "mutation" or args.fixture_mutants < 1):
         parser.error("--fixture-mutants needs a mutation run and a positive budget")
+    if args.run_sequence_mutants is not None and (args.mode != "mutation" or args.run_sequence_mutants < 1):
+        parser.error("--run-sequence-mutants needs a mutation run and a positive budget")
     if any(value is not None and value <= 0 for value in (args.fixture_seconds, args.seconds)):
         parser.error("time budgets must be positive")
     if args.output is None and not (args.list or args.check):
@@ -1797,6 +2162,9 @@ def main(argv=None) -> int:
     fixtures = [item for item in inventory() if not args.fixture or
                 any(fnmatch.fnmatchcase(item["id"], pattern) for pattern in args.fixture)]
     require(fixtures, "no pinned fixture matched")
+    # The run's sequence mutants are shared evenly by its fixtures that record a call.
+    args.sequence_share = None if args.run_sequence_mutants is None else \
+        max(1, args.run_sequence_mutants // max(1, sum(1 for item in fixtures if item["calls"])))
     if args.list:
         for item in fixtures:
             print(item["id"], item["mode"], item["contract"], item["calls"])
@@ -1820,6 +2188,8 @@ def main(argv=None) -> int:
               "environment": ENVIRONMENT, "mode": args.mode, "seed": args.seed,
               "mutantsPerStep": args.mutants if args.mode == "mutation" else 0,
               "derivedMutants": args.derived_mutants if args.mode == "mutation" else 0,
+              "sequenceMutants": args.sequence_mutants if args.mode == "mutation" else 0,
+              "runSequenceMutants": args.run_sequence_mutants, "sequenceShare": args.sequence_share,
               "bounds": {"exportSeconds": args.timeout, "hullSeconds": args.hull_timeout,
                          "hullEntrySeconds": args.hull_entry_timeout, "reductionRuns": args.reduction_runs,
                          "reductionSeconds": args.reduction_seconds, "fixtureMutants": args.fixture_mutants,
@@ -1834,13 +2204,16 @@ def main(argv=None) -> int:
         with lock:
             (args.output / "fixtures" / (fixture["id"] + ".json")).write_text(json.dumps(record, indent=1) + "\n")
             counts = record.get("counts", {})
+            sequence = counts.get("sequence") or {}
             print(f"{fixture['id']}: admitted {','.join(record['admitted']) or '-'}; agree {counts.get('agree', 0)}, "
                   f"disagree {counts.get('disagree', 0)}, incomplete {counts.get('incomplete', 0)}; "
+                  f"sequences {sequence.get('mutants', 0)} ({sequence.get('agree', 0)} of {sequence.get('steps', 0)} steps agree); "
                   f"findings {len(record['findings'])}; {record.get('seconds', 0)} s"
                   + (f"; stopped by the {record['stop']}" if record.get("stop") else ""), flush=True)
         return {key: record.get(key) for key in ("id", "mode", "contract", "admitted", "exclusions", "findings", "counts",
                                                  "expectations", "statuses", "errors", "seconds", "exportSeconds",
-                                                 "exportsReused", "mutantBudget", "derivedMutants", "stop", "unexecuted")}
+                                                 "exportsReused", "mutantBudget", "derivedMutants", "sequenceMutants", "stop",
+                                                 "unexecuted")}
 
     # A stop signal ends the run at the next entry and still writes the report.
     STOP.clear()
@@ -1862,7 +2235,8 @@ def main(argv=None) -> int:
     (args.output / "report.json").write_text(json.dumps(report, indent=1) + "\n")
     totals = report["totals"]
     print(f"{totals['fixtures']} fixtures; admitted {totals['admitted']}; {totals['agree']} agree, "
-          f"{totals['disagree']} disagree, {totals['incomplete']} incomplete; findings {totals['findings']}; "
+          f"{totals['disagree']} disagree, {totals['incomplete']} incomplete; sequences {totals['sequence']['mutants']}, "
+          f"{totals['sequence']['agree']} of {totals['sequence']['steps']} steps agree; findings {totals['findings']}; "
           f"harness errors {len(report['errors'])}; budget-stopped {totals['budgetStopped']}, "
           f"unexecuted {totals['unexecuted']}; tools unchanged: {report['toolsUnchanged']}")
     if STOP.is_set():
