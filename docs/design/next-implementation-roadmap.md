@@ -3418,6 +3418,136 @@ averages of 5 to 8 from other work on the machine:
 The matrices found no mismatch, crash or rejection, so they recorded nothing;
 the probe's two departures are recorded upstream symptoms, seen again.
 
+**Exceptional halts.** No pure profile compares a halt. std's `assert(c)`
+calls std.opcodes' `invalid()`, whose inline Yul `invalid()` is the EVM's
+designated INVALID instruction (0xFE), and a case that halts was excluded or
+incomplete. An optimizer that treats `invalid()` as unreachable could drop the
+condition or the halt, and only a compared halt would show that. One new pure
+profile, `runtime-halts`, generates `runtime-revert-data`'s plans whose sites
+can also halt.
+
+Before any code, a probe ran every path:
+- Raw runtime bytecode on Anvil through `eth_call`: INVALID fails with the
+  JSON-RPC error -32603 `EVM error InvalidFEOpcode`, also after a memory
+  write; an undefined opcode with `OpcodeNotFound`, a `JUMP` on an empty stack
+  with `StackUnderflow`, a jump to a non-`JUMPDEST` with `InvalidJump`, a
+  growing stack with `StackOverflow`, an endless loop with `OutOfGas`, and an
+  `MLOAD` at `2^256 − 1` with `InvalidOperandOOG`, which the adapter's gas
+  pattern does not name. As transactions every one of them fails with all its
+  gas used, and reverts and returns keep their data. So the adapter can tell
+  INVALID from every other halt and from gas exhaustion by revm's name alone.
+- Ten hand-written sources through checked Hull export, Sonatina O0 and O2
+  and Yul, on Anvil and in the Lean Hull runner, against a Python model at
+  twelve inputs: `assert` with conditions from the input, std.opcodes'
+  `invalid()` called from Solcore, and inline Yul `invalid()` under a Solcore
+  `if` and under a Yul `if`; in `run`, helpers (directly, two deep and through
+  a function value), closures (one capturing a local), matches of a std sum
+  and a user enum, and a bounded loop halting at an iteration that depends on
+  the input; halts before and after a byte write and revert data sites of a
+  selector, a message of the written value and literals, where the first site
+  reached decides; a check the `assert` implies, a helper whose halting result
+  is unused and a Yul block without outputs, where treating INVALID as
+  unreachable would change the result; and the same function with `assert`
+  and with inline Yul. All ten matched the model on every path, 720
+  outcomes, 282 of them halts.
+- Every path reports a halt as INVALID's: the EVM with `InvalidFEOpcode`, and
+  the Lean Hull runner with the status `invalid`, since the importer lowers
+  Hull's `invalid` to its termination kind 3. O0, O2 and Yul keep every
+  condition and every halt, and the compiled runtimes keep INVALID. `assert`
+  and inline Yul differ only in the Solcore source: `assert` reaches Hull's
+  `invalid` through std's wrapper, inline Yul in place, and no path reports
+  them differently.
+- Original Core has no halt primitive: the pure profiles' reference is built
+  from the plan, so it carries the halt as an outcome of its own (below).
+- The generator below, in drafts, then ran on every path at the eight boundary
+  inputs and four seeded inputs: the 12 seeds that cover every shape value
+  below, seed 490, the second plan halting two helpers deep, and the first 20
+  plans after seed 100 that halt outside `run`'s straight-line code. All 33
+  matched on every path, 2,376 outcomes, 864 of them halts. A separate Python
+  model of the plans agreed with the Lean reference on the 647 accepted plans
+  of the first 1,000 seeds at twelve inputs, 7,764 outcomes, 2,880 of them
+  halts.
+
+Core, the Hull importer and runner, both EVM backends and `export-rust-yul.py`
+need no change, and no shared runtime code or proof changes. The pure adapter
+`semantic-differential.py` adds a halt classification beside `evm_failure`,
+which other adapters can reuse, and a halt outcome to `compare`, both used
+only for this profile's schema; the other profiles' observations and
+categories stay as they are. `runtime-revert-data`'s modules take the halt
+site additively: its plans admit no halt, and its sources, references,
+shapes, draws, reductions, corpus and recorded results stay unchanged. The
+definitions were fixed before execution:
+
+- Plans (`core-halt-v1`, plan schema `solcore-lean.halt-plan.v1`):
+  `runtime-revert-data`'s plans, whose helpers, sites, steps, scope and
+  bounds they keep, with a fifth kind of site that halts on `C`:
+  - `assert(C);`, std's, which halts when `C` does not hold;
+  - `if (C) { invalid(); }` through std.opcodes' `invalid()`, which the
+    source imports;
+  - `if (C) { assembly { invalid() } }`;
+  - `assembly { if C' { invalid() } }`, `C'` the same test in Yul (`lt`,
+    `gt`, `eq`, `iszero(eq(…))`, `eq(and(…), k)`) of the same Word in Yul:
+    `sc_x`, `add(sc_x, c)`, `mul(sc_x, c)` and `xor(sc_x, c)`, `sc_r` and
+    `sc_counter`, and a helper's `sc_w` or a closure's `sc_j` in their place.
+
+  A halt site may run wherever a revert site runs: in `run`, its loop, a
+  `raise` helper called directly, through a function value or two helpers
+  deep, a closure, and the `Error` arm of a match of a pair, a sum or an
+  enum. The contract is `SynthesizedHalts`. A plan reaches a halt site, has
+  a fold, and keeps every other bound of `runtime-revert-data`.
+- Draws come from the case seed by a SplitMix64 stream with its own domain
+  (`0x68616c7400000001`) and `runtime-revert-data`'s weights, except that
+  every site is a halt half the time, its form drawn evenly; an `assert`'s
+  test holds for most inputs and the other forms' for few, as for `require`
+  and `if` sites; a plan that reaches no halt site ends with one in `run`.
+- Core reference: `runtime-revert-data`'s, of the same type. A halt site
+  raises the right injection with the length `2^256 − 1`, which no revert
+  data has (at most 64 bytes), and no bytes, so the first site whose
+  condition decides, a revert or a halt, decides the outcome. A case observes
+  it as INVALID's halt.
+- Comparison: original Core reports a halt as `invalid`, the Lean Hull runner
+  as `invalid`, and the EVM as `InvalidFEOpcode`, which the adapter's halt
+  classification makes `invalid`; it makes `OutOfGas` and every name ending
+  in `OOG` `out-of-gas`, and leaves every other halt `evm-exceptional`. Three
+  `invalid` observations match; a halt on one or two paths is a semantic
+  mismatch, so a halt matches only where the reference prescribes it, and
+  exhausted gas or fuel on any path stays inconclusive. Revert data are
+  compared exactly, as for `runtime-revert-data`.
+- Bounds: `runtime-revert-data`'s node budget, default 1,024, minimum 256 and
+  at most 2,048, and its 4,096-node case limit. Of the first 400 seeds at the
+  default budget, the accepted references had a median of 189 and at most 494
+  nodes.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stage `halt-profile`: a plan still over the budget or
+  not admitted; then, at the eight boundary inputs, fuel exhaustion (an
+  inconclusive resource exclusion), a result other than a Word, revert data
+  or a halt, no halt, or the same outcome for all eight. Of the first 400
+  seeds, 135 halted at no boundary input and 15 had one outcome; the 250
+  accepted plans' 2,000 boundary cases halted 727 times, reverted 437 times
+  and returned 836 times.
+- Identity filter: none. Every accepted plan halts at a boundary input, so no
+  plan returns all its inputs, and random campaigns apply no identity filter,
+  as for the loop profiles.
+- Reductions: `runtime-revert-data`'s, which keep a halt site's form and lower
+  its test and Word, and a halt through std.opcodes' `invalid()` or a Yul `if`
+  lowered to inline Yul under an `if`; in plan size `assert` and inline Yul
+  weigh nothing and the other two one. A reduction must still reach a halt.
+- Specified halt shapes, from the plan, never measured, 26 values: `halts`
+  (`assert`, `invalid`, `inline`, `yul`), `haltContexts` where halt sites run
+  (`run`, `loop`, `helper`, `call` two helpers deep, `closure`, `pair`, `sum`,
+  `enum`), `haltTests` (`lt`, `gt`, `eq`, `ne`, `bits`), the tested
+  `haltWords` (`input`, `constant`, `acc`, `counter`, `local`), and
+  `haltOrders` in the order sites run (`revert-before` and `revert-after`: a
+  revert site before or after a halt site; `write-before` and `write-after`:
+  a write before or after one). `call` is the rarest value: none of the 250
+  plans accepted from the first 400 seeds drew it, and seeds up to 1,600 drew
+  it 13 times, first at seed 415.
+- Fixed corpus: from seed 1 upwards at the default budget, every accepted plan
+  that covers a missing value, until nothing is missing, each at the eight
+  boundary inputs; every value is required. The draft generator needs 12
+  seeds: 2, 4, 5, 7, 8, 12, 17, 47, 61, 80, 98 and 415.
+
 **Minimal emitter proof:** begin with the actual emitted Word/Bool fragment,
 fresh local bindings and conditionals. Define the relevant Rust-dialect source
 meaning independently and connect the real emitter and wrapper to it. State
