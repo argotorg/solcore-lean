@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Export Yul EVM bytes for the bounded generated pure and storage-family wrappers.
+"""Export Yul EVM bytes for the bounded generated pure, storage-family and call-return wrappers.
 
 This is a separate EVM artifact, not a Hull CodeImage or a linker map. One real
 solc compilation supplies both deployment and runtime bytes. The checked Hull,
 original Yul and exact standard-JSON request/response remain available for replay.
 The pinned compiler tools must already be built; this exporter never builds them.
 Wrapper names and object shape do not establish scope: the differential adapter
-must replay a canonical pure or storage-family case before using this exporter
+must replay a canonical pure, storage-family or call-return case before using this exporter
 as its EVM path. `--fixture` instead admits one pinned upstream end-to-end
 fixture's own contract from its pinned source, under the same object-shape,
 link and immutable checks; its caller compares the compiled paths.
@@ -41,15 +41,19 @@ def load(name, filename):
 hull = load("yul_checked_hull", "export-rust-hull.py")
 common = load("yul_differential", "semantic-differential.py")
 storage = load("yul_storage_differential", "semantic-storage-differential.py")
+calls = load("yul_call_differential", "semantic-call-differential.py")
 SCHEMA = "solcore-rs.yul-evm.v1"
 SOLC_VERSION = "0.8.35+commit.47b9dedd"
 BACKEND = {"name": "solc-yul", "version": SOLC_VERSION,
            "optimizer": {"enabled": True}, "evmVersion": "osaka"}
 PURE_CONTRACTS = tuple(common.CASE_CONTRACTS.values())
 # Each storage-family profile installs one creation/runtime pair; the malformed
-# profiles reuse three wrappers. The call profiles' two-contract sources are not admitted.
+# profiles reuse three wrappers. The call-return profile compiles its parent and
+# child each from its own one-pair source; the other call profiles' two-contract
+# sources are not admitted.
 STORAGE_CONTRACTS = tuple(dict.fromkeys(value["contract"] for value in storage.PROFILES.values()))
-CONTRACTS = PURE_CONTRACTS + STORAGE_CONTRACTS
+CALL_CONTRACTS = tuple(value["name"] for value in calls.return_contract_metadata().values())
+CONTRACTS = PURE_CONTRACTS + STORAGE_CONTRACTS + CALL_CONTRACTS
 YUL_SOURCE = "checked.yul"
 # A pinned end-to-end fixture admits only its own contract, from its pinned source.
 FIXTURE_MANIFESTS = ("rust-scenario-parity.json", "rust-method-parity.json")
@@ -73,7 +77,7 @@ def fixture_pins():
 
 def validate_contract(contract, fixture=None):
     if fixture is None:
-        require(contract in CONTRACTS, "only the generated pure and storage-family contract wrappers are supported")
+        require(contract in CONTRACTS, "only the generated pure, storage-family and call-return contract wrappers are supported")
     else:
         pin = fixture_pins().get(fixture)
         require(pin is not None and pin["contract"] == contract, "only a pinned fixture's own contract is supported")
@@ -84,7 +88,7 @@ def scope(contract, fixture=None):
     if fixture is not None:
         return (f"pinned end-to-end fixture {fixture}; one creation object with one runtime object; "
                 "caller compares compiled paths; EVM bytes only; no Hull linker map")
-    family = "pure" if contract in PURE_CONTRACTS else "storage-family"
+    family = "pure" if contract in PURE_CONTRACTS else "storage-family" if contract in STORAGE_CONTRACTS else "call-return"
     return f"generated two-object wrapper shape; caller validates canonical {family} case; EVM bytes only; no Hull linker map"
 
 

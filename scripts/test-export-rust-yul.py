@@ -41,8 +41,9 @@ class YulProtocolTests(unittest.TestCase):
     def test_pure_and_storage_family_wrappers_are_admitted_but_call_wrappers_are_not(self):
         self.assertEqual(len(exporter.PURE_CONTRACTS), 27)
         self.assertEqual(len(exporter.STORAGE_CONTRACTS), 24)
-        self.assertEqual(len(set(exporter.CONTRACTS)), 51)
-        self.assertEqual(exporter.CONTRACTS, exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS)
+        self.assertEqual(len(exporter.CALL_CONTRACTS), 2)
+        self.assertEqual(len(set(exporter.CONTRACTS)), 53)
+        self.assertEqual(exporter.CONTRACTS, exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS + exporter.CALL_CONTRACTS)
         self.assertIn("SynthesizedAssembly", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedRecursiveLoops", exporter.PURE_CONTRACTS)
         self.assertIn("SynthesizedLoopClosures", exporter.PURE_CONTRACTS)
@@ -148,6 +149,40 @@ class YulProtocolTests(unittest.TestCase):
                          "EVM bytes only; no Hull linker map")
         with self.assertRaises(ValueError):
             exporter.scope("SynthesizedCaller")
+
+    def test_call_return_contracts_each_keep_their_own_source_pair_and_record_their_scope(self):
+        # Derived from the call adapter's metadata: the parent and the child, each compiled from its own source.
+        metadata = exporter.calls.return_contract_metadata()
+        self.assertEqual(exporter.CALL_CONTRACTS, ("SynthesizedReturnCaller", "SynthesizedReturnCallee"))
+        self.assertEqual(exporter.CALL_CONTRACTS, (metadata["parent"]["name"], metadata["child"]["name"]))
+        self.assertTrue(set(exporter.CALL_CONTRACTS).isdisjoint(exporter.PURE_CONTRACTS + exporter.STORAGE_CONTRACTS))
+        arguments = ["policy.sol", "--output", "policy.json", "--solc", "/policy/solc"]
+        for contract, other in zip(exporter.CALL_CONTRACTS, reversed(exporter.CALL_CONTRACTS)):
+            with self.subTest(contract=contract):
+                artifact = exporter.artifact_from_output(solc_output(contract), contract)
+                self.assertEqual((artifact["selectedObject"], artifact["runtimeObject"]), (contract + "Deploy", contract))
+                exporter.validate_artifact(artifact, contract)
+                exporter.validate_hull(hull_output(contract), contract)
+                self.assertEqual(exporter.parse_args([*arguments, "--contract", contract]).contract, contract)
+                self.assertEqual(exporter.scope(contract), "generated two-object wrapper shape; caller validates canonical "
+                                 "call-return case; EVM bytes only; no Hull linker map")
+                # The other contract's objects cannot be exported under this name.
+                with self.assertRaises(ValueError):
+                    exporter.artifact_from_output(solc_output(other), contract)
+                with self.assertRaises(ValueError):
+                    exporter.validate_hull(hull_output(other), contract)
+                # A source that compiles both contracts, as the other call profiles' sources do, is refused.
+                both = hull_output(contract)
+                both["program"]["objects"].append({"name": other + "Deploy", "inners": [{"name": other, "inners": []}]})
+                with self.assertRaises(ValueError):
+                    exporter.validate_hull(both, contract)
+                paired = solc_output(contract)
+                paired["contracts"]["checked.yul"][other + "Deploy"] = solc_output(other)["contracts"]["checked.yul"][other + "Deploy"]
+                with self.assertRaises(ValueError):
+                    exporter.artifact_from_output(paired, contract)
+        for rejected in ("SynthesizedReturnCall", "SynthesizedReturnCallerDeploy", "synthesizedreturncallee", "SynthesizedReturnCallee "):
+            with self.subTest(rejected=rejected), self.assertRaises(ValueError):
+                exporter.validate_contract(rejected)
 
     def test_only_pinned_release_accepts_linux_and_macos_suffixes(self):
         for suffix in ('', '.Linux.g++', '.Darwin.appleclang'):

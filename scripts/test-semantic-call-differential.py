@@ -284,11 +284,14 @@ class BackendTests(unittest.TestCase):
             self.assertFalse((directory / "run").exists())
 
     def test_yul_programmatic_execution_and_saved_archive_have_no_fallback(self):
-        args = SimpleNamespace(replay=None, backend="yul")
-        with patch.object(adapter.common, "Runner") as execution:
-            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
-                adapter.execute(args, {})
-            execution.assert_not_called()
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "case.json"
+            source.write_text(json.dumps(case()))
+            args = SimpleNamespace(case=source, replay=None, backend="yul")
+            with patch.object(adapter.common, "Runner") as execution:
+                with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                    adapter.execute(args, {})
+                execution.assert_not_called()
         with patch.object(adapter.common, "verify_archive") as archive:
             with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
                 adapter.verify_archive(Path("unused"), {"schema": adapter.REPORT_SCHEMA, "backend": "yul"})
@@ -768,6 +771,182 @@ class CallReturnTests(unittest.TestCase):
         self.assertEqual(adapter.compare({**return_histories(value), "importedHull": history}, value, BINDINGS)["category"], "matched")
         with self.assertRaises(ValueError):
             adapter.hull_history(encode(rows[:2] + rows[3:]), 0, value, BINDINGS, runtimes)
+
+
+class CallReturnYulTests(unittest.TestCase):
+    """Backend policy and the Yul export boundary; mocked processes are not compiler or EVM results."""
+
+    def test_only_the_call_return_profile_resolves_yul(self):
+        self.assertEqual(adapter.resolve_backend(return_case(), "yul"), "yul")
+        self.assertEqual(adapter.resolve_backend(return_case(), None, {"backend": "yul"}), "yul")
+        self.assertEqual(adapter.resolve_backend(return_case(), None), "sonatina-o0")
+        with self.assertRaisesRegex(ValueError, "exact replay retains the saved backend"):
+            adapter.resolve_backend(return_case(), "sonatina-o0", {"backend": "yul"})
+        for other in (case(), forward_case()):
+            with self.subTest(schema=other["schema"]):
+                self.assertEqual(adapter.resolve_backend(other, "sonatina-o2"), "sonatina-o2")
+                with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                    adapter.resolve_backend(other, "yul")
+                with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                    adapter.resolve_backend(other, None, {"backend": "yul"})
+
+    def test_the_cli_runs_a_call_return_case_on_yul_with_its_compiler(self):
+        for value, admitted in ((return_case(), True), (case(), False), (forward_case(), False)):
+            with self.subTest(schema=value["schema"]), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                source, output = directory / "case.json", directory / "run"
+                source.write_text(json.dumps(value))
+                captured = []
+                def executed(args, report):
+                    captured.append((args.backend, report["backend"], args.solc))
+                    report["comparison"] = {"category": "matched", "pairs": {}}
+                arguments = ["adapter", "--case", str(source), "--output", str(output), "--backend", "yul", "--solc", "/chosen/solc"]
+                with patch.object(sys, "argv", arguments), patch.object(adapter, "execute", side_effect=executed), \
+                        redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                    if admitted:
+                        self.assertEqual(adapter.main(), 0)
+                    else:
+                        with self.assertRaises(SystemExit) as caught:
+                            adapter.main()
+                        self.assertEqual(caught.exception.code, 2)
+                if admitted:
+                    self.assertEqual(captured, [("yul", "yul", Path("/chosen/solc").resolve())])
+                    self.assertEqual(json.loads((output / "report.json").read_text())["backend"], "yul")
+                else:
+                    self.assertEqual((captured, output.exists()), ([], False))
+
+    def test_yul_exports_each_contract_beside_its_main_hull_and_keeps_o0_images(self):
+        value = return_case()
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source, output = directory / "case.json", directory / "run"
+            source.write_text(json.dumps(value)); output.mkdir()
+            args = SimpleNamespace(case=source, replay=None, backend="yul", solc=Path("/chosen/solc"), output=output,
+                artifact_limit=1 << 20, case_tool=Path("unused-case"), core_runner=Path("unused-core"),
+                anvil=Path("unused-anvil"), direct_fuel=1000, timeout=1,
+                upstream=directory / "upstream", target_dir=directory / "target")
+            fake = Mock()
+            fake.identity.return_value = {"sha256": "0" * 64}
+            fake.process.return_value = {"returncode": 0, "stdout": "revision"}
+            commands, receipts = [], {}
+            def checked(_runner, stage, command, *_limits):
+                commands.append((stage, command))
+                if stage.startswith("rust-checked-source-"):
+                    role = stage.removeprefix("rust-checked-source-")
+                    entry = output / f"{role}.sol"
+                    receipts[role] = {"sources": {entry.as_uri(): adapter.common.file_digest(entry)}}
+                    (output / f"{role}-hull.json.provenance.json").write_text(json.dumps(receipts[role]))
+                if stage.startswith("rust-code-images-"):
+                    (output / f"{stage.removeprefix('rust-code-images-')}-images.json").write_text("{}")
+                return {"stdout": json.dumps(value) if stage == "direct-core-replay" else ""}
+            exported = []
+            def validate(hull, images, entry, limit, backend):
+                exported.append(backend)
+                return {"hull": receipts[entry.stem], "images": {}}
+            stops = []
+            def transport(operation, *arguments):
+                stops.append((operation, arguments))
+                raise ValueError("test stops before execution")
+            report = {"processes": [], "histories": {}}
+            with patch.object(adapter.common, "Runner", return_value=fake), \
+                 patch.object(adapter.common, "checked_process", side_effect=checked), \
+                 patch.object(adapter.common, "validate_export", side_effect=validate), \
+                 patch.object(adapter.common, "image_bytes", return_value=b"\x00"), \
+                 patch.object(adapter.common, "yul_transport", side_effect=transport):
+                with self.assertRaisesRegex(ValueError, "test stops before execution"):
+                    adapter.execute(args, report)
+            self.assertEqual(report["backend"], "yul")
+            self.assertEqual(report["pathBackends"], adapter.common.path_backends("yul"))
+            self.assertLessEqual({"solc", "yulExporterSha256", "yulTransportSha256"}, set(report["tools"]))
+            # Imported Hull keeps Sonatina O0 images for both contracts.
+            images = [command for stage, command in commands if stage.startswith("rust-code-images-")]
+            self.assertEqual([command[command.index("--optimization") + 1] for command in images], ["O0", "O0"])
+            self.assertEqual(exported, ["sonatina-o0", "sonatina-o0"])
+            # The child's Yul is exported first, under its own prefix, beside its main checked Hull.
+            stage, command = commands[-1]
+            self.assertEqual(stage, "rust-yul-evm-child")
+            self.assertEqual(Path(command[1]).name, "export-rust-yul.py")
+            self.assertEqual(Path(command[2]), output / "child.sol")
+            for option, expected in (("--output", str(output / "child-yul.json")), ("--contract", "SynthesizedReturnCallee"),
+                                     ("--solc", "/chosen/solc"), ("--root", str(output))):
+                self.assertEqual(command[command.index(option) + 1], expected)
+            self.assertEqual(stops, [("validate_export", (output, "SynthesizedReturnCallee", receipts["child"], 1 << 20, "child-"))])
+
+    def archive(self, directory, value=None, roles=adapter.ROLES):
+        """A Yul call-return archive whose exports a fake transport accepts."""
+        value = value or return_case()
+        (directory / "case.json").write_text(json.dumps(value))
+        records = {role: {"role": role, "compiler": {}} for role in roles}
+        names = ["case.json"]
+        for role in roles:
+            for name in adapter.common.yul_transport("evidence", role + "-"):
+                (directory / name).write_text(role + name)
+                names.append(name)
+        report = {"schema": adapter.REPORT_SCHEMA, "backend": "yul", "pathBackends": adapter.common.path_backends("yul"),
+            "scope": adapter.PROFILES["stateful-call-returns"]["scope"], "caseSha256": adapter.common.file_digest(directory / "case.json"),
+            "artifacts": {name: adapter.common.file_digest(directory / name) for name in names},
+            "exportProvenance": {role: {"hull": {"role": role}} for role in adapter.ROLES},
+            "yulExportProvenance": records, "tools": {}}
+        return report
+
+    def check(self, directory, report, used=True):
+        real, calls = adapter.common.yul_transport, []
+        def transport(operation, *arguments):
+            if operation == "validate_export":
+                calls.append((arguments[1], arguments[2], arguments[4]))
+                return report["yulExportProvenance"][arguments[4].removesuffix("-")]
+            if operation == "validate_tool_record":
+                return None
+            if operation == "used_yul_execution":
+                return used
+            return real(operation, *arguments)
+        with patch.object(adapter.common, "yul_transport", side_effect=transport), \
+                patch.object(adapter.common, "verify_archive") as shared:
+            adapter.verify_archive(directory, report)
+            shared.assert_not_called()
+        return calls
+
+    def test_a_yul_archive_binds_each_contract_export_under_its_prefix(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            report = self.archive(directory)
+            self.assertEqual(self.check(directory, report), [
+                ("SynthesizedReturnCaller", {"role": "parent"}, "parent-"), ("SynthesizedReturnCallee", {"role": "child"}, "child-")])
+            # A run that stopped before the EVM may keep one accepted export.
+            partial = self.archive(directory, roles=("child",))
+            self.assertEqual(len(self.check(directory, partial, used=False)), 1)
+            with self.assertRaisesRegex(ValueError, "missing an accepted export"):
+                self.check(directory, partial)
+            with self.assertRaisesRegex(ValueError, "missing an accepted export"):
+                self.check(directory, {**partial, "evmDeployments": {}}, used=False)
+
+    def test_a_yul_archive_refuses_relabelled_changed_or_unlisted_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            report = self.archive(directory)
+            for change, message in (
+                    (lambda r: r.update(pathBackends=adapter.common.path_backends("sonatina-o0")), "relabelled"),
+                    (lambda r: r["artifacts"].pop("child-yul.yul"), "omits or changes Yul evidence"),
+                    (lambda r: r["artifacts"].update({"case.json": "0" * 64}), "missing its case"),
+                    (lambda r: r["artifacts"].update({"../child.sol": "0" * 64}), "invalid saved artifact entry"),
+                    (lambda r: r["yulExportProvenance"].update(other={}), "malformed saved Yul export provenance")):
+                changed = copy.deepcopy(report)
+                change(changed)
+                with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                    self.check(directory, changed)
+            (directory / "parent-yul.json").write_text("edited")
+            with self.assertRaisesRegex(ValueError, "missing or changed: parent-yul.json"):
+                self.check(directory, report)
+
+    def test_a_yul_archive_of_another_call_profile_is_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            report = self.archive(directory, value=case())
+            with self.assertRaisesRegex(ValueError, "only a call-return archive runs on Yul"):
+                self.check(directory, report)
+            # Without the call-return scope a Yul report never reaches the archive check.
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                self.check(directory, {**report, "scope": adapter.PROFILES["stateful-calls"]["scope"]})
 
 
 if __name__ == "__main__":

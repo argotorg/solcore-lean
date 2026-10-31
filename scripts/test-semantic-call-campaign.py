@@ -869,6 +869,63 @@ class CallReturnCampaignTests(unittest.TestCase):
             fingerprint = campaign.fingerprint(campaign.analyze(raw, value))
             self.assertEqual(fingerprint["category"], "matched")
 
+    def test_only_the_call_return_campaign_runs_on_yul_and_passes_its_compiler(self):
+        value = return_case()
+        raw = {"schema": campaign.adapter.REPORT_SCHEMA, "backend": "yul", "histories": fixtures.return_histories(value),
+               "bindings": copy.deepcopy(fixtures.BINDINGS)}
+        raw["comparison"] = campaign.adapter.compare(raw["histories"], value, fixtures.BINDINGS)
+        with tempfile.TemporaryDirectory() as directory:
+            instance = campaign.Campaign(options(directory, profile="stateful-call-returns", backend="yul",
+                                                 solc=Path("/chosen/solc")))
+            self.assertEqual((instance.backend, instance.summary["backend"], instance.summary["configuration"]["backend"]),
+                             ("yul", "yul", "yul"))
+            self.assertEqual(instance.summary["tools"]["solc"], str(Path("/chosen/solc").resolve()))
+            args = instance.case_args(Path(directory) / "case.json", Path(directory) / "run")
+            self.assertEqual((args.backend, args.solc), ("yul", Path("/chosen/solc").resolve()))
+        # A call-return analysis keeps its Yul identity through reduction; the other call profiles' cannot take one.
+        analysis = campaign.analyze(raw, value)
+        expected = campaign.fingerprint(analysis)
+        self.assertEqual((analysis["backend"], expected["backend"]), ("yul", "yul"))
+        self.assertTrue(campaign.same_failure({**expected, "category": "semantic-mismatch"},
+                                              {**analysis, "comparison": {**analysis["comparison"], "category": "semantic-mismatch"}}))
+        self.assertFalse(campaign.same_failure({**expected, "backend": "sonatina-o0", "category": "semantic-mismatch"},
+                                               {**analysis, "comparison": {**analysis["comparison"], "category": "semantic-mismatch"}}))
+        ordinary = campaign.analyze(report(case()), case(), "rustEvm", "tx-1")
+        for change in (lambda: campaign.analyze({**report(case()), "backend": "yul"}, case()),
+                       lambda: campaign.fingerprint({**ordinary, "backend": "yul"}),
+                       lambda: campaign.same_failure({**campaign.fingerprint(ordinary), "backend": "yul"}, ordinary)):
+            with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                change()
+        for profile in ("stateful-calls", "stateful-forwarded-value"):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(ValueError, "stateful comparisons require a Sonatina backend"):
+                    campaign.Campaign(options(directory, profile=profile, backend="yul"))
+                self.assertFalse((Path(directory) / ".work").exists())
+
+    def test_the_cli_admits_yul_for_the_call_return_profile_only(self):
+        for profile, admitted in (("stateful-call-returns", True), ("stateful-forwarded-value", False), ("stateful-calls", False)):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / "campaign"
+                seen = []
+                def run(instance):
+                    seen.append((instance.backend, instance.solc))
+                    instance.summary["status"] = "complete"
+                    instance.summary["counts"].update(generated=1, executed=1, completed=1, matched=1)
+                arguments = ["campaign", "--output", str(output), "--profile", profile, "--backend", "yul",
+                             "--solc", "/chosen/solc", "--cases", "1"]
+                with patch.object(sys, "argv", arguments), patch.object(campaign.Campaign, "run", run), \
+                        redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                    if admitted:
+                        campaign.main()
+                    else:
+                        with self.assertRaises(SystemExit) as caught:
+                            campaign.main()
+                        self.assertEqual(caught.exception.code, 2)
+                self.assertEqual(seen, [("yul", Path("/chosen/solc").resolve())] if admitted else [])
+                self.assertEqual(output.exists(), admitted)
+                if admitted:
+                    self.assertEqual(campaign.common.read_json(output / "summary.json")["backend"], "yul")
+
 
 if __name__ == "__main__":
     unittest.main()

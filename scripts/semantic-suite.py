@@ -128,6 +128,9 @@ DECLARED_SLOT_PROFILES = ("stateful-keyed-storage", "stateful-dynamic-array", "s
                           "stateful-storage-loops", "stateful-keccak-loops", "stateful-tuple-returns",
                           "stateful-bytes-returns", "stateful-enum-returns", "stateful-enum-arguments",
                           "stateful-enum-array-arguments", "stateful-array-returns", "stateful-constructor-arguments")
+# The Yul exporter admits the call-return profile's two single-contract sources;
+# the other call profiles' sources each compile both contracts and stay on Sonatina.
+YUL_CALL_PROFILES = ("stateful-call-returns",)
 CAMPAIGNS = {"pure": "semantic-campaign.py", "storage": "semantic-storage-campaign.py", "call": "semantic-call-campaign.py"}
 CAMPAIGN_SCHEMAS = {"pure": "solcore-lean.semantic-campaign.v1", "storage": "solcore-lean.semantic-storage-campaign.v1", "call": "solcore-lean.semantic-call-campaign.v1"}
 
@@ -214,8 +217,8 @@ def node_budget(args, profile):
 def command(args, profile, output, seconds, disk_bytes):
     _, family, nodes = PROFILES[profile]
     attempts = profile_attempts(args, profile)
-    if args.backend == "yul" and family == "call":
-        raise ValueError("Yul is restricted to the pure and storage-family profiles")
+    if args.backend == "yul" and family == "call" and profile not in YUL_CALL_PROFILES:
+        raise ValueError("Yul is restricted to the pure, storage-family and call-return profiles")
     storage_tools = {"stateful-keyed-storage": args.keyed_case_tool, "stateful-dynamic-array": args.array_case_tool,
                      "stateful-logs": args.log_case_tool, "stateful-call-value": args.value_case_tool,
                      "stateful-bytes": args.bytes_case_tool, "stateful-mapping": args.mapping_case_tool,
@@ -577,8 +580,8 @@ def parse_args(argv=None):
         parser.error("--cases, --functions, --nodes and --nodes-scale apply only to random mode; fixed corpora must remain complete")
     args.cases = args.cases if args.cases is not None else 4
     if args.backend == "yul":
-        if args.profile and any(PROFILES[profile][1] == "call" for profile in args.profile):
-            parser.error("--backend yul supports the pure and storage-family profiles; call profiles must use Sonatina")
+        if args.profile and any(PROFILES[profile][1] == "call" and profile not in YUL_CALL_PROFILES for profile in args.profile):
+            parser.error("--backend yul supports the pure, storage-family and call-return profiles; the other call profiles must use Sonatina")
         args.profile = args.profile or [profile for profile, (_, family, _) in PROFILES.items() if family == "pure"]
     else:
         args.profile = args.profile or list(PROFILES)

@@ -701,7 +701,9 @@ class SuiteTests(unittest.TestCase):
                          ["stateful-constructor-arguments"])
 
     def test_explicit_yul_call_profiles_are_errors_instead_of_silent_omissions(self):
-        for profile in ('stateful-calls', 'stateful-forwarded-value', 'stateful-call-returns'):
+        # The call-return profile's two single-contract sources are admitted; the other two compile both contracts.
+        self.assertEqual(suite.YUL_CALL_PROFILES, ('stateful-call-returns',))
+        for profile in ('stateful-calls', 'stateful-forwarded-value'):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.args('--backend', 'yul', '--profile', 'closed-g0', '--profile', profile)
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -712,6 +714,24 @@ class SuiteTests(unittest.TestCase):
                          ['stateful-calls', 'stateful-forwarded-value', 'stateful-call-returns'])
         selected = self.args('--backend', 'yul', '--profile', 'runtime-modules')
         self.assertEqual(selected.profile, ['runtime-modules'])
+
+    def test_yul_runs_the_call_return_profile_when_selected_with_its_compiler(self):
+        profile = 'stateful-call-returns'
+        # The default Yul selection stays the pure profiles.
+        self.assertNotIn(profile, self.args('--backend', 'yul').profile)
+        for mode in ('fixed', 'random'):
+            args = self.args('--mode', mode, '--backend', 'yul', '--solc', '/chosen/pinned-solc', '--profile', 'closed-g0',
+                             '--profile', profile)
+            self.assertEqual(args.profile, ['closed-g0', profile])
+            command = suite.command(args, profile, self.directory / mode / profile, 30, 64 * 1024**2)
+            self.assertEqual(Path(command[1]).name, 'semantic-call-campaign.py')
+            self.assertEqual(command[command.index('--backend') + 1], 'yul')
+            self.assertEqual(command[command.index('--solc') + 1], '/chosen/pinned-solc')
+            # Apart from the backend and its compiler, the Sonatina command is unchanged.
+            other = suite.command(self.args('--mode', mode, '--profile', profile), profile, self.directory / mode / profile, 30, 64 * 1024**2)
+            position = command.index('--solc')
+            self.assertEqual(command[:position] + command[position + 2:],
+                             [value if value != 'sonatina-o0' else 'yul' for value in other])
 
     def test_yul_runs_the_selected_storage_family_profiles_with_its_compiler(self):
         storage = [profile for profile, (_, family, _) in suite.PROFILES.items() if family == 'storage']

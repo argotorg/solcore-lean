@@ -7035,8 +7035,10 @@ method and decodes its multi-Word return data with std.
   each through the public top-level runner and committing as one
   transaction. The resume phase reads the kept input, the child's status
   Word and its returned or reverted bytes through the input-data requests.
-- **Each contract compiles from its own source** on every path, so a later
-  Yul path needs only the exporter's admission of the two wrapper names.
+- **Each contract compiles from its own source** on every path, so the Yul
+  exporter admits the two wrapper names and the profile also runs on Yul. The
+  other two call profiles compile both contracts from one source and stay on
+  Sonatina.
 
 The [roadmap](../docs/design/next-implementation-roadmap.md) records the
 probe and the definitions.
@@ -7086,6 +7088,8 @@ python3 scripts/semantic-call-campaign.py --profile stateful-call-returns \
   --output .upstream/semantic-call-return-ci --seconds 900
 python3 scripts/semantic-suite.py --mode random --profile stateful-call-returns \
   --cases 16 --output .upstream/semantic-call-return-random
+python3 scripts/semantic-suite.py --mode fixed --backend yul \
+  --profile stateful-call-returns --output .upstream/semantic-call-return-yul
 ```
 
 - **Schemas:**
@@ -7101,7 +7105,12 @@ python3 scripts/semantic-suite.py --mode random --profile stateful-call-returns 
   budget. The value it returns and the parent's two phases lie outside it,
   and every contract is bounded by 1,024 nodes.
 - **Paths:**
-  - **EVM:** both images deploy with zero value, the child first.
+  - **EVM:** both images deploy with zero value, the child first. With
+    `--backend yul` each source's own solc compilation deploys instead, and
+    imported Hull keeps Sonatina O0 images. Each export carries its role's
+    prefix, `child-yul.json` and `parent-yul.json` with their evidence,
+    beside `child-hull.json` and `parent-hull.json`; exact replay checks
+    both exports.
   - **Hull:** `rust-hull-call-return-scenario` deploys both from their own
     checked Hull and images. It links the parent with the child's linked
     runtime added to the code catalog its calls resolve, as one compilation

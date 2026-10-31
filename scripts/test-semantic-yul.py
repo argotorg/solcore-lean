@@ -109,6 +109,28 @@ class YulEvidenceTests(unittest.TestCase):
         self.assertEqual(yul.validate_export(self.directory, CONTRACT, hp, LIMIT), record)
         self.assertEqual(yul.validate_archive(self.directory, report, LIMIT), record)
 
+    def test_a_prefixed_export_binds_its_own_files_and_main_hull(self):
+        # A case with several contracts keeps each export under its role's prefix.
+        record, hp, _ = self.fixture(self.directory / 'plain')
+        self.assertEqual(yul.evidence(), yul.FILES + yul.MAIN_FILES)
+        self.assertEqual(yul.evidence('child-'), tuple('child-' + name for name in yul.FILES + yul.MAIN_FILES))
+        folder = self.directory / 'prefixed'
+        folder.mkdir()
+        for name in yul.FILES + yul.MAIN_FILES:
+            shutil.copyfile(self.directory / 'plain' / name, folder / ('child-' + name))
+        prefixed = copy.deepcopy(record)
+        for key, name in yul.EVIDENCE.items():
+            prefixed['artifacts'][key]['file'] = 'child-' + name
+        save(folder / ('child-' + yul.PROVENANCE), prefixed)
+        self.assertEqual(yul.validate_export(folder, CONTRACT, hp, LIMIT, 'child-'), prefixed)
+        for prefix in ('', 'parent-'):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                yul.validate_export(folder, CONTRACT, hp, LIMIT, prefix)
+        # The record must name the prefixed files, not the plain ones.
+        save(folder / ('child-' + yul.PROVENANCE), record)
+        with self.assertRaises(ValueError):
+            yul.validate_export(folder, CONTRACT, hp, LIMIT, 'child-')
+
     def test_relocation_does_not_resolve_former_source_or_compiler_paths(self):
         old = self.directory / 'old'
         record, _, report = self.fixture(old)

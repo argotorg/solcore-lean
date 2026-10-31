@@ -7,7 +7,10 @@ Imported Hull continues to use its independently exported Sonatina O0 images.
 This module provides no execution oracle, source purity proof or Yul linker map.
 Its dynamically loaded common.Finding class is local to this module. The calling
 adapter must translate those exceptions to its own Finding at the lazy boundary
-so resource, compiler and replay classifications remain intact.
+so resource, compiler and replay classifications remain intact. A case with
+several contracts, the call-return profile's, keeps each contract's export and
+main checked Hull under its own file prefix; its adapter validates the case and
+each export.
 """
 from __future__ import annotations
 
@@ -62,18 +65,23 @@ def valid_hash(value):
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
-def file_path(directory, name, limit):
+def evidence(prefix=""):
+    """One export's files and its main checked Hull, under the contract's prefix."""
+    return tuple(prefix + name for name in FILES + MAIN_FILES)
+
+
+def file_path(directory, name, limit, prefix=""):
     require(name in FILES + MAIN_FILES, "unknown Yul evidence filename")
-    path = directory / name
-    require(not path.is_symlink() and path.is_file(), "missing or nonregular Yul evidence: " + name)
+    path = directory / (prefix + name)
+    require(not path.is_symlink() and path.is_file(), "missing or nonregular Yul evidence: " + prefix + name)
     if path.stat().st_size > limit:
-        raise common.Finding("inconclusive-resource", "yul-evidence", "Yul evidence exceeds artifact limit: " + name)
+        raise common.Finding("inconclusive-resource", "yul-evidence", "Yul evidence exceeds artifact limit: " + prefix + name)
     return path
 
 
-def validate_export(directory, contract, expected_hull_provenance, limit):
+def validate_export(directory, contract, expected_hull_provenance, limit, prefix=""):
     """Bind saved EVM bytes to both the exact solc response and checked Hull."""
-    paths = {name: file_path(directory, name, limit) for name in FILES}
+    paths = {name: file_path(directory, name, limit, prefix) for name in FILES}
     artifact = common.read_json(paths[ARTIFACT], limit)
     exporter.validate_artifact(artifact, contract)
     record = common.read_json(paths[PROVENANCE], limit)
@@ -89,7 +97,7 @@ def validate_export(directory, contract, expected_hull_provenance, limit):
     require(isinstance(inventory, dict) and set(inventory) == set(EVIDENCE), "Yul evidence inventory is incomplete or unknown")
     for key, name in EVIDENCE.items():
         entry = inventory[key]
-        require(isinstance(entry, dict) and set(entry) == {"file", "sha256"} and entry["file"] == name and
+        require(isinstance(entry, dict) and set(entry) == {"file", "sha256"} and entry["file"] == prefix + name and
                 valid_hash(entry["sha256"]) and entry["sha256"] == common.file_digest(paths[name]),
                 "Yul evidence filename or hash differs: " + key)
     expected = expected_hull_provenance
@@ -99,8 +107,8 @@ def validate_export(directory, contract, expected_hull_provenance, limit):
             expected["patches"] and all(valid_hash(value) for value in expected["patches"].values()) and
             isinstance(expected.get("sources"), dict) and expected["sources"] and
             all(valid_hash(value) for value in expected["sources"].values()), "invalid main checked Hull provenance")
-    main_hull = file_path(directory, MAIN_FILES[0], limit)
-    main_receipt = file_path(directory, MAIN_FILES[1], limit)
+    main_hull = file_path(directory, MAIN_FILES[0], limit, prefix)
+    main_receipt = file_path(directory, MAIN_FILES[1], limit, prefix)
     require(common.file_digest(main_hull) == expected["outputSha256"] and
             common.read_json(main_receipt, limit) == expected, "main Hull bytes or on-disk provenance changed")
     hp = common.read_json(paths[EVIDENCE["hullProvenance"]], limit)

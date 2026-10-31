@@ -325,6 +325,18 @@ def validate_return_manifest(manifest):
     return manifest
 
 
+def resolve_backend(explicit, returning, saved=None):
+    """Only the call-return profile runs on Yul; the other call profiles stay on Sonatina."""
+    return (common.resolve_backend if returning else common.resolve_sonatina_backend)(explicit, saved)
+
+
+def analysis_returns(analysis):
+    """A call-return analysis: one of its histories has the call-return schema."""
+    histories = analysis.get("histories", {})
+    return isinstance(histories, dict) and any(isinstance(history, dict) and history.get("schema") == adapter.RETURN_HISTORY_SCHEMA
+                                               for history in histories.values())
+
+
 def analyze(report, case, path=None, transaction_id=None, field="output"):
     actual = copy.deepcopy(report.get("comparison", {"category": "adapter-error", "stage": "missing-report", "pairs": {}}))
     histories, bindings = copy.deepcopy(report.get("histories", {})), copy.deepcopy(report.get("bindings"))
@@ -363,7 +375,7 @@ def analyze(report, case, path=None, transaction_id=None, field="output"):
                         histories[path]["finalAccounts"] = copy.deepcopy(row["committedAccounts"])
                 synthetic = True
     result = adapter.compare(histories, case, bindings) if synthetic else actual
-    return {"schema": ANALYSIS_SCHEMA, "backend": common.resolve_sonatina_backend(None, report), "synthetic": synthetic, "bindings": bindings,
+    return {"schema": ANALYSIS_SCHEMA, "backend": resolve_backend(None, adapter.returns(case), report), "synthetic": synthetic, "bindings": bindings,
             "testAdapter": {"name": TEST_ADAPTER, "path": path, "transactionId": selected, "field": field,
                             "applied": synthetic} if path else None,
             "actualComparison": actual, "comparison": result, "histories": histories}
@@ -450,7 +462,7 @@ def fingerprint(analysis):
                 log_differences.append(f"{index}:{field}")
     if any(rows[path].get("status") == "reverted" and events[path] for path in PATHS):
         log_differences.append("nonempty-after-root-revert")
-    return {"backend": common.resolve_sonatina_backend(None, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
+    return {"backend": resolve_backend(None, returning, analysis), "category": comparison.get("category"), "stage": comparison.get("stage"), "transactionId": txid,
             "disagreeingPairs": sorted(pair for pair, same in comparison.get("pairs", {}).items() if same is False),
             "fields": sorted(comparison.get("fields", [])), "accountFields": sorted(differences),
             "logFields": log_differences, "logShapes": {path: log_shape(events[path], bindings) for path in PATHS},
@@ -460,7 +472,7 @@ def fingerprint(analysis):
 
 
 def same_failure(expected, analysis):
-    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": common.resolve_sonatina_backend(None, expected)}
+    return expected["category"] in SHRINKABLE and fingerprint(analysis) == {**expected, "backend": resolve_backend(None, analysis_returns(analysis), expected)}
 
 
 def transaction_counts(histories, case, bindings):
@@ -517,8 +529,10 @@ def count_outcome(counts, analysis, case):
 class Campaign:
     def __init__(self, args):
         self.args, self.started = args, time.monotonic()
-        self.backend = common.resolve_sonatina_backend(getattr(args, "backend", None))
         self.profile = getattr(args, "profile", "stateful-calls")
+        self.backend = resolve_backend(getattr(args, "backend", None), adapter.PROFILES[self.profile].get("returns", False))
+        # The pinned solc compiles the EVM path only under --backend yul.
+        self.solc = Path(getattr(args, "solc", None) or shutil.which("solc") or "solc").resolve()
         self.specification = PROFILES[self.profile]
         self.dimensions = self.specification["dimensions"]
         self.deadline = self.started + args.seconds
@@ -530,7 +544,8 @@ class Campaign:
         self.summary = {"schema": SCHEMA, "backend": self.backend, "status": "running", "synthetic": args.test_perturb_path is not None,
             "configuration": {"profile": self.profile, "backend": self.backend, **{key: getattr(args, key) for key in ("seed", "nodes", "cases", "attempts", "seconds", "disk_bytes", "shrink_attempts", "shrink_candidates", "direct_fuel", "core_fuel", "gas", "case_timeout")}},
             "testAdapter": {"name": TEST_ADAPTER, "path": args.test_perturb_path, "transactionId": args.test_transaction_id, "field": args.test_field} if args.test_perturb_path else None,
-            "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-call-differential.py"), "caseTool": str(args.case_tool)},
+            "tools": {"campaignSha256": common.file_digest(Path(__file__)), "differentialSha256": common.file_digest(ROOT / "scripts/semantic-call-differential.py"), "caseTool": str(args.case_tool),
+                      **({"solc": str(self.solc)} if self.backend == "yul" else {})},
             "counts": {key: 0 for key in ("generated", "excluded", "generationResourceExclusions", "executed", "completed", "matched", "mismatched", "inconclusive", "errors", "sourceRejected", "compilationRejected", "syntheticMismatches")},
             "transactionCounts": {"kind": "observed on any path; completed on all three; matched ordered prefixes; shrink executions excluded", "planned": 0, "executed": 0, "completed": 0, "matched": 0, "actualMatched": 0},
             "coverage": {"kind": f"step AST features and declared helpers; native-verified recipes; call modes are prescribed input&{self.specification['modeMask']}, not internal traces; outcome/log-pattern coverage only from complete actual matched scenarios",
@@ -703,7 +718,7 @@ class Campaign:
 
     def case_args(self, case_path, folder):
         left = max(.001, self.deadline - time.monotonic())
-        return SimpleNamespace(case=case_path, replay=None, backend=self.backend, output=folder, case_tool=self.args.case_tool,
+        return SimpleNamespace(case=case_path, replay=None, backend=self.backend, solc=self.solc, output=folder, case_tool=self.args.case_tool,
             core_runner=self.args.core_runner, anvil=self.args.anvil, upstream=self.args.upstream, target_dir=self.args.target_dir,
             direct_fuel=self.args.direct_fuel, core_fuel=self.args.core_fuel, gas=self.args.gas,
             timeout=min(self.args.case_timeout, left), startup_timeout=min(30, left), total_timeout=min(self.args.case_timeout, left),
@@ -882,7 +897,10 @@ def missing_coverage(summary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--backend", choices=common.SONATINA_BACKENDS, default="sonatina-o0")
+    parser.add_argument("--backend", choices=common.BACKENDS, default="sonatina-o0",
+                        help="yul, for stateful-call-returns only, runs each scenario's EVM path on the pinned solc's Yul output; "
+                             "imported Hull keeps Sonatina O0")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc; used only by --backend yul")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--corpus", type=Path)
     selection.add_argument("--case", type=Path)
@@ -915,6 +933,8 @@ def main():
     parser.add_argument("--test-field", choices=TEST_FIELDS, default="output")
     args = parser.parse_args()
     selected = adapter.PROFILES[args.profile]
+    if args.backend == "yul" and not selected.get("returns"):
+        parser.error("--backend yul supports only stateful-call-returns; the other call profiles must use Sonatina")
     args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
     args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
     recorded = None
@@ -948,7 +968,7 @@ def main():
     for key, (lower, upper) in limits.items():
         if not math.isfinite(getattr(args, key)) or not lower <= getattr(args, key) <= upper:
             parser.error(f"{key} must be between {lower} and {upper}")
-    for key in ("output", "case_tool", "core_runner", "anvil", "upstream", "target_dir", "case", "corpus"):
+    for key in ("output", "case_tool", "core_runner", "anvil", "upstream", "target_dir", "case", "corpus", "solc"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)

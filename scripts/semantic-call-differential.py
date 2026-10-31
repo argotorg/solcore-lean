@@ -7,6 +7,10 @@ whose parent forwards bank amounts to the child) and `stateful-call-returns`
 (a parent that decodes a child method's return data with std, each contract
 compiled from its own source). The original checked Core
 contracts execute through the public nested runtime.
+Only `stateful-call-returns` also runs with `--backend yul`: the EVM path deploys
+each source's Yul through the pinned solc and imported Hull keeps Sonatina O0, as
+for the storage family; the other call profiles' sources each compile both
+contracts, which the Yul exporter does not admit.
 Rust supplies independently compiled Hull and linked EVM images. Every EVM
 observation belongs to an actual mined transaction; no Python transition model
 or saved expected output supplies the reference result. Both contracts' whole
@@ -401,9 +405,18 @@ def trace_result(mined, trace):
     return storage.trace_result(mined, trace)
 
 
+def resolve_backend(case, explicit, saved_report=None):
+    """Only the call-return profile, whose two sources the Yul exporter admits, runs on Yul."""
+    if returns(case):
+        return common.resolve_backend(explicit, saved_report)
+    return common.resolve_sonatina_backend(explicit, saved_report)
+
+
 def verify_archive(directory, report):
     if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise ValueError("unsupported call archive schema")
+    if common.resolve_backend(None, report) == "yul" and report.get("scope") == PROFILES["stateful-call-returns"]["scope"]:
+        return return_verify_yul_archive(directory, report)
     common.resolve_sonatina_backend(None, report)
     common.verify_archive(directory, {**report, "schema": common.REPORT_SCHEMA})
 
@@ -449,11 +462,11 @@ def execute(args, report):
     if args.replay:
         previous = common.read_json(args.replay / "report.json", args.artifact_limit)
         verify_archive(args.replay, previous)
-    args.backend = common.resolve_sonatina_backend(getattr(args, "backend", None), previous)
-    report["backend"] = args.backend
-    runner = common.Runner(args, report)
     case = common.read_json(args.replay / "case.json" if args.replay else args.case)
     validate_case(case)
+    args.backend = resolve_backend(case, getattr(args, "backend", None), previous)
+    report["backend"] = args.backend
+    runner = common.Runner(args, report)
     selected = profile(case)
     if selected.get("returns"):
         return execute_returns(args, report, previous, runner, case)
@@ -1084,11 +1097,94 @@ def return_hull_history(stdout, exit_code, case, bindings, runtimes):
     return history
 
 
+def return_used_evm(report):
+    """Whether a call-return run reached the EVM, which deploys only after both exports."""
+    return "evmDeployments" in report or common.yul_transport("used_yul_execution", report)
+
+
+def return_yul_export(args, runner, case, role, source, report, previous):
+    """One contract's Yul EVM bytes, exported beside its main checked Hull under
+    its role's prefix and bound to that Hull and the reported tools."""
+    contract, prefix = case["contracts"][role]["name"], role + "-"
+    hull_path = args.output / (prefix + "hull.json")
+    expected = report["exportProvenance"][role]["hull"]
+    if common.read_json(hull_path.with_suffix(".json.provenance.json"), args.artifact_limit) != expected or \
+            expected.get("sources", {}).get(source.as_uri()) != common.file_digest(source):
+        raise ValueError("main Hull receipt or entry source changed before Yul export")
+    runner.guard()
+    command = [sys.executable, str(ROOT / "scripts/export-rust-yul.py"), str(source), "--output", str(args.output / (prefix + "yul.json")),
+        "--contract", contract, "--solc", str(args.solc), "--root", str(args.output), "--upstream", str(args.upstream),
+        "--target-dir", str(args.target_dir), "--timeout", str(args.timeout), "--output-limit", str(min(args.artifact_limit, 64 * 1024**2))]
+    common.checked_process(runner, "rust-yul-evm-" + role, command, args.timeout * 3)
+    runner.guard()
+    record = common.yul_transport("validate_export", args.output, contract, expected, args.artifact_limit, prefix)
+    common.yul_transport("validate_tool_record", record, report["tools"])
+    if record["exporterSha256"] != common.file_digest(ROOT / "scripts/export-rust-yul.py") or \
+            report["tools"]["yulTransportSha256"] != common.file_digest(ROOT / "scripts/semantic-yul.py"):
+        raise ValueError("Yul tools changed during export")
+    report["yulExportProvenance"][role] = record
+    old = (previous or {}).get("yulExportProvenance")
+    old = old.get(role) if isinstance(old, dict) else None
+    if previous is not None and old is None and return_used_evm(previous):
+        raise Finding("adapter-error", "replay", "saved Yul execution is missing provenance")
+    if old is not None:
+        if not isinstance(old, dict) or not isinstance(old.get("compiler"), dict):
+            raise ValueError("malformed saved Yul compiler provenance")
+        for key in ("backend", "exporterSha256", "toolBuild", "outputSha256"):
+            if old.get(key) != record[key]:
+                raise Finding("adapter-error", "replay", "Yul " + key + " changed since the saved run")
+        if old["compiler"].get("sha256") != record["compiler"]["sha256"] or \
+                str(old["compiler"].get("versionOutput", "")).strip() != record["compiler"]["versionOutput"].strip():
+            raise Finding("adapter-error", "replay", "solc binary or full version changed since the saved run")
+    artifact = common.read_json(args.output / (prefix + "yul.json"), args.artifact_limit)
+    return common.hex_bytes(artifact["initCode"], "Yul init code"), common.hex_bytes(artifact["runtimeCode"], "Yul runtime code")
+
+
+def return_verify_yul_archive(directory, report):
+    """A Yul call-return archive: its inventory as the shared check reads it, then
+    each contract's accepted export under its role's prefix."""
+    limit = 64 * 1024 * 1024
+    if report.get("pathBackends") != common.path_backends("yul"):
+        raise ValueError("Yul archive relabelled an execution path")
+    artifacts = report.get("artifacts")
+    if not isinstance(artifacts, dict) or "case.json" not in artifacts or artifacts["case.json"] != report.get("caseSha256"):
+        raise ValueError("saved artifact inventory is missing its case")
+    for name, expected in artifacts.items():
+        if not isinstance(name, str) or name in {"", ".", "..", "report.json"} or Path(name).name != name or \
+                not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise ValueError(f"invalid saved artifact entry: {name}")
+        path = directory / name
+        if path.is_symlink() or not path.is_file() or common.file_digest(path) != expected:
+            raise ValueError(f"saved artifact is missing or changed: {name}")
+    case = common.read_json(directory / "case.json", limit)
+    validate_case(case)
+    if not returns(case):
+        raise ValueError("only a call-return archive runs on Yul")
+    saved = report.get("yulExportProvenance")
+    if not isinstance(saved, dict) or not set(saved) <= set(ROLES):
+        raise ValueError("malformed saved Yul export provenance")
+    if set(saved) != set(ROLES) and return_used_evm(report):
+        raise ValueError("Yul execution archive is missing an accepted export")
+    for role, record in saved.items():
+        prefix = role + "-"
+        for name in common.yul_transport("evidence", prefix):
+            if artifacts.get(name) != common.file_digest(directory / name):
+                raise ValueError("archive omits or changes Yul evidence: " + name)
+        hull = report.get("exportProvenance", {}).get(role, {}).get("hull")
+        if common.yul_transport("validate_export", directory, case["contracts"][role]["name"], hull, limit, prefix) != record:
+            raise ValueError("saved Yul provenance differs from its sidecar")
+        common.yul_transport("validate_tool_record", record, report.get("tools"))
+
+
 def execute_returns(args, report, previous, runner, case):
     """The call-return profile: each contract compiles from its own source on
     every path, the Hull runner links both, and the EVM paths deploy the
-    child, then the parent, with zero value."""
+    child, then the parent, with zero value. On Yul the EVM deploys each
+    source's own solc compilation and imported Hull keeps Sonatina O0 images."""
     selected = profile(case)
+    yul, linked = args.backend == "yul", common.image_backend(args.backend)
+    if yul:
+        report["pathBackends"] = common.path_backends(args.backend)
     case_path = args.output / "case.json"
     save(case_path, case)
     sources = {role: args.output / f"{role}.sol" for role in ROLES}
@@ -1106,13 +1202,21 @@ def execute_returns(args, report, previous, runner, case):
         "python": {"path": sys.executable, "version": sys.version},
         "exporters": {name: common.file_digest(ROOT / "scripts" / name) for name in
             ("export-rust-hull.py", "export-rust-code-image.py", "rust-hull-export.rs", "rust-code-image-export.rs")}}
+    if yul:
+        report["tools"].update(solc=runner.identity(args.solc, version=True),
+            yulExporterSha256=common.file_digest(ROOT / "scripts/export-rust-yul.py"),
+            yulTransportSha256=common.file_digest(ROOT / "scripts/semantic-yul.py"))
     if previous:
-        for key in ("runnerSha256", "sharedRunnerSha256", "storageTransportSha256", "exporters", "leanToolchain"):
+        transport = ("yulExporterSha256", "yulTransportSha256") if yul else ()
+        for key in ("runnerSha256", "sharedRunnerSha256", "storageTransportSha256", "exporters", "leanToolchain", *transport):
             if report["tools"][key] != previous.get("tools", {}).get(key):
                 raise Finding("adapter-error", "replay", f"saved tool identity changed: {key}")
         for key in ("caseTool", "coreRunner", "anvil"):
             if report["tools"][key]["sha256"] != previous.get("tools", {}).get(key, {}).get("sha256"):
                 raise Finding("adapter-error", "replay", f"saved executable changed: {key}")
+        for key in ("sha256", "version") if yul else ():
+            if report["tools"]["solc"][key] != previous.get("tools", {}).get("solc", {}).get(key):
+                raise Finding("adapter-error", "replay", f"saved executable changed: solc {key}")
     revision = runner.process("repository-revision", ["git", "rev-parse", "HEAD"], 10)
     diff = runner.process("repository-diff", ["git", "diff", "--binary", "HEAD"], 10)
     if revision["returncode"] or diff["returncode"]:
@@ -1132,10 +1236,10 @@ def execute_returns(args, report, previous, runner, case):
         common.checked_process(runner, f"rust-checked-source-{role}", [sys.executable, str(ROOT / "scripts/export-rust-hull.py"), *export_args,
             "--output", str(hulls[role])])
         common.checked_process(runner, f"rust-code-images-{role}", [sys.executable, str(ROOT / "scripts/export-rust-code-image.py"), *export_args,
-            "--optimization", common.optimization_for_backend(args.backend),
+            "--optimization", common.optimization_for_backend(linked),
             "--output", str(image_paths[role]), "--hull-output", str(hulls[role]), "--timeout", str(args.timeout)], args.timeout * 3)
         report["exportProvenance"][role] = common.validate_export(hulls[role], image_paths[role], sources[role], args.artifact_limit,
-                                                                  backend=args.backend)
+                                                                  backend=linked)
     if previous and "exportProvenance" in previous:
         for role in ROLES:
             old, new = previous["exportProvenance"].get(role, {}), report["exportProvenance"][role]
@@ -1148,6 +1252,11 @@ def execute_returns(args, report, previous, runner, case):
                 raise Finding("adapter-error", "replay", "imported library hashes changed")
     images = {role: common.read_json(image_paths[role], args.artifact_limit) for role in ROLES}
     runtimes = {role: common.image_bytes(images[role], case["contracts"][role]["runtimePath"]) for role in ROLES}
+    # The EVM deploys each image's init code, or on Yul each source's solc bytes.
+    codes = {role: (common.image_bytes(images[role], case["contracts"][role]["deployPath"]), runtimes[role]) for role in ROLES}
+    if yul:
+        report["yulExportProvenance"] = {}
+        codes = {role: return_yul_export(args, runner, case, role, sources[role], report, previous) for role in ("child", "parent")}
     with common.anvil(runner, args.anvil, steps_tracing=True) as rpc:
         senders = rpc.call("eth_accounts", [])
         if not senders or not re.fullmatch(r"0x[0-9a-fA-F]{40}", senders[0]):
@@ -1158,8 +1267,7 @@ def execute_returns(args, report, previous, runner, case):
         initial_block = None
         touched = {}
         for role in ("child", "parent"):
-            contract = case["contracts"][role]
-            init = common.image_bytes(images[role], contract["deployPath"])
+            init, runtime = codes[role]
             record = report["evmDeployments"][role] = {}
             tx_hash = storage.submit(rpc, {"from": sender, "data": "0x" + init.hex(), "value": "0x0", "gas": gas}, record)
             deployed = storage.receipt(rpc, tx_hash, runner)
@@ -1172,8 +1280,9 @@ def execute_returns(args, report, previous, runner, case):
             target = deployed.get("contractAddress")
             if not isinstance(target, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", target):
                 raise ValueError("invalid deployed contract address")
-            if common.hex_bytes(rpc.call("eth_getCode", [target, deployed["blockNumber"]]), "deployed runtime") != runtimes[role]:
-                raise Finding("adapter-error", "evm-deployment-" + role, "installed runtime differs from exported image")
+            if common.hex_bytes(rpc.call("eth_getCode", [target, deployed["blockNumber"]]), "deployed runtime") != runtime:
+                raise Finding("adapter-error", "evm-deployment-" + role, "installed runtime differs from " +
+                              ("the exported Yul runtime bytes" if yul else "exported image"))
             if evm_logs(deployed):
                 raise Finding("semantic-mismatch", "evm-deployment-" + role, "fixed empty constructor emitted logs")
             diff = rpc.call("debug_traceTransaction", [tx_hash, storage.PRESTATE_DIFF])
@@ -1273,8 +1382,10 @@ def main():
     choice.add_argument("--case", type=Path)
     choice.add_argument("--replay", type=Path)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--backend", choices=common.SONATINA_BACKENDS,
-        help="default sonatina-o0; exact replay inherits its saved backend")
+    parser.add_argument("--backend", choices=common.BACKENDS,
+        help="default sonatina-o0; yul, for stateful-call-returns only, runs the EVM path on the pinned solc's Yul output; "
+             "exact replay inherits its saved backend")
+    parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")
     parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
     parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
@@ -1286,14 +1397,15 @@ def main():
         parser.add_argument("--" + key.replace("_", "-"), type=float if "timeout" in key else int)
     args = parser.parse_args()
     try:
-        selected = profile(common.read_json(args.replay / "case.json" if args.replay else args.case))
-        validate_case(common.read_json(args.replay / "case.json" if args.replay else args.case))
+        case = common.read_json(args.replay / "case.json" if args.replay else args.case)
+        selected = profile(case)
+        validate_case(case)
         args.case_tool = args.case_tool or ROOT / ".lake/build/bin" / selected["caseTool"]
         args.core_runner = args.core_runner or ROOT / ".lake/build/bin" / selected["coreRunner"]
         saved_report = common.read_json(args.replay / "report.json", defaults["artifact_limit"]) if args.replay else None
         if args.replay and not isinstance(saved_report, dict):
             raise ValueError("saved report must be an object")
-        args.backend = common.resolve_sonatina_backend(args.backend, saved_report)
+        args.backend = resolve_backend(case, args.backend, saved_report)
         saved = saved_report.get("budgets", {}) if saved_report is not None else {}
         if not isinstance(saved, dict):
             raise ValueError("saved budgets must be an object")
@@ -1309,7 +1421,7 @@ def main():
         if args.replay and explicit is not None and value != saved.get(key):
             parser.error("exact replay retains saved budgets; use --case for changed budgets")
         setattr(args, key, value)
-    for key in ("case", "replay", "output", "case_tool", "core_runner", "anvil", "upstream", "target_dir"):
+    for key in ("case", "replay", "output", "case_tool", "core_runner", "anvil", "upstream", "target_dir", "solc"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
     args.output.mkdir(parents=True, exist_ok=False)
