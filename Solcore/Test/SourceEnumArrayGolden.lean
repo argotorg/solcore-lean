@@ -9,7 +9,7 @@ tags and selectors come from `cast keccak`. The steps add a known constant `c`,
 so an accepted transaction computes `r = slot 0 + L + both elements' index and
 Words + c`, writes `r`, the length and both elements to slots 0 to 9, and
 returns `r`; odd decoded flags revert with `r` and keep the prior slots. A
-rejection is std's revert data: an error selector, `ArrayOutOfBounds()` among
+rejection is std's revert data: an error selector, `Panic(0x32)` among
 them, or nothing for an unknown tag. The scenarios cover static and dynamic
 element types, every field kind with the struct, empty and three-element
 arrays, indices past the length and at `2^256 - 1`, unread malformed elements,
@@ -45,7 +45,8 @@ private def step (c : Nat) : IO Aggregates.CheckedDAG := do
   return dag
 
 /-- The expected row: status, std's whole return or revert data as hexadecimal
-text, empty for an unknown tag, and slots zero to nine. -/
+text, empty for an unknown tag, and slots zero to nine. An index past the
+length is std's `Panic(0x32)`. -/
 private structure Expected where
   status : String
   output : String
@@ -99,7 +100,7 @@ private def staticWordsRows : List (Transaction × Expected) := [
   (tx 5 0 [el 2 5 0 0] 0 0 (.count (w 2)),
     ⟨"reverted", "08638556", [62, 2, 3, 4, 0, 0, 3, 4, 0, 0]⟩),
   (tx 6 0 [] 0 0 .none,
-    ⟨"reverted", "7f52b2bf", [62, 2, 3, 4, 0, 0, 3, 4, 0, 0]⟩),
+    ⟨"reverted", "4e487b710000000000000000000000000000000000000000000000000000000000000032", [62, 2, 3, 4, 0, 0, 3, 4, 0, 0]⟩),
   (tx 7 2 [el 0 6 8 0] 0 0 (.retag 0 2),
     ⟨"returned", "0000000000000000000000000000000000000000000000000000000000000056", [86, 1, 3, 6, 0, 0, 3, 6, 0, 0]⟩),
   (tx 8 0 [el 0 1 2 0] 0 0 (.truncate 131),
@@ -107,7 +108,7 @@ private def staticWordsRows : List (Transaction × Expected) := [
   (tx 9 0 [el 1 0 0 0] 0 0 (.short 3),
     ⟨"reverted", "4924aef0", [86, 1, 3, 6, 0, 0, 3, 6, 0, 0]⟩),
   (tx 10 0 [el 2 4 0 0, el 0 1 1 0] 1 (2 ^ 256 - 1) .none,
-    ⟨"reverted", "7f52b2bf", [86, 1, 3, 6, 0, 0, 3, 6, 0, 0]⟩)]
+    ⟨"reverted", "4e487b710000000000000000000000000000000000000000000000000000000000000032", [86, 1, 3, 6, 0, 0, 3, 6, 0, 0]⟩)]
 
 private def dynamicWordsRows : List (Transaction × Expected) := [
   (tx 0 0 [el 0 1 2 33, el 2 3 7 0, el 3 0 0 0] 0 1 .none,
@@ -155,7 +156,7 @@ private def structFieldsRows : List (Transaction × Expected) := [
   (tx 3 0 [el 0 3 4 0] 0 0 (.truncate 244),
     ⟨"reverted", "08638556", [10440966173162903011917676687689568402695856741602633618718639110637867761732, 1, 3, 0, 0, 0, 3, 0, 0, 0]⟩),
   (tx 4 0 [el 1 0 0 0] 1 0 .none,
-    ⟨"reverted", "7f52b2bf", [10440966173162903011917676687689568402695856741602633618718639110637867761732, 1, 3, 0, 0, 0, 3, 0, 0, 0]⟩)]
+    ⟨"reverted", "4e487b710000000000000000000000000000000000000000000000000000000000000032", [10440966173162903011917676687689568402695856741602633618718639110637867761732, 1, 3, 0, 0, 0, 3, 0, 0, 0]⟩)]
 
 private def tagsOnlyRows : List (Transaction × Expected) := [
   (tx 0 0 [el 0 0 0 0, el 1 0 0 0, el 0 0 0 0] 2 1 .none,
@@ -163,7 +164,7 @@ private def tagsOnlyRows : List (Transaction × Expected) := [
   (tx 1 0 [el 1 0 0 0] 0 0 (.count (w 3618502788666131106986593281521497120414687020801267626233049500247285301248)),
     ⟨"reverted", "08638556", [10, 3, 1, 0, 0, 0, 2, 0, 0, 0]⟩),
   (tx 2 0 [el 1 0 0 0] 0 0 (.count (w 0)),
-    ⟨"reverted", "7f52b2bf", [10, 3, 1, 0, 0, 0, 2, 0, 0, 0]⟩),
+    ⟨"reverted", "4e487b710000000000000000000000000000000000000000000000000000000000000032", [10, 3, 1, 0, 0, 0, 2, 0, 0, 0]⟩),
   (tx 3 0 [el 1 0 0 0, el 0 0 0 0] 1 0 (.tag 0 (w (2 ^ 256 - 8108102160884874896242699696681862164538485728477310456048732216610957744293))),
     ⟨"reverted", "", [10, 3, 1, 0, 0, 0, 2, 0, 0, 0]⟩),
   (tx 4 0 [el 0 0 0 0] 0 0 (.offset (w 32)),
@@ -182,9 +183,11 @@ private def scenarios : List (String × Nat × List Constructor × String × Str
       "run(uint256,sum(,)[],uint256,uint256)", selectorTagsOnly, tagsOnlyRows)]
 
 /-- Original Core reverts with one Word: an error selector stands for std's
-four bytes and the Word zero for its empty revert data. -/
+four bytes, the panic's selector for its selector and code, and the Word zero
+for its empty revert data. -/
 private def coreOutput (output : String) : String :=
-  "0x" ++ if output.length == 8 then String.ofList (List.replicate 56 '0') ++ output
+  "0x" ++ if output.length == 8 || output.length == 72 then
+      String.ofList (List.replicate 56 '0') ++ String.ofList (output.toList.take 8)
     else if output.isEmpty then String.ofList (List.replicate 64 '0') else output
 
 private def check (name : String) (row : Json) (model : EnumArrayExecution.ModelRow) (expected : Expected) :
@@ -232,7 +235,7 @@ private def orderRows (shape : Shape) : List (String × ByteArray × String × S
   [("aliased table entry", put (put (put (put canonical (164 + 32) rejected) 164 (w 32)) 68 (w 0)) 100 (w 0),
       "returned", "000000000000000000000000000000000000000000000000000000000000000b"),
     ("first out of bounds before the second's unknown tag", put (put canonical 68 (w 2)) 324 (w 7),
-      "reverted", "7f52b2bf"),
+      "reverted", "4e487b710000000000000000000000000000000000000000000000000000000000000032"),
     ("unknown tag, fields cut", (put canonical 228 (w 7)).extract 0 276, "reverted", ""),
     ("array offset past the end, index out of bounds", put (put canonical 36 (w (canonical.size - 3))) 68 (w 5),
       "reverted", "08638556"),

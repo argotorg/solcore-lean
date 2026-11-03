@@ -6,8 +6,9 @@ import Solcore.Synthesis.Core.MemoryCallsShrink
 plan's complete original Core reference at the case input. The reference is
 `runtime-memory-values`' byte-list model with every call inlined, built from
 the plan, never from the source. Its right injection is an out-of-range
-access, observed as std's `OutOfBounds()` revert data. Saved observations
-never supply the oracle. -/
+access's failure code, observed as std's revert data: `OutOfBounds()` for a
+value's Words and bytes and `Panic(0x32)` for an array element. Saved
+observations never supply the oracle. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.MemoryCalls
@@ -19,6 +20,7 @@ def caseSchema : String := "solcore-lean.semantic-memory-call-case.v1"
 def planSchema : String := "solcore-lean.memory-call-plan.v1"
 def profileVersion : String := "runtime-memory-calls-v1/plan-seed-v1"
 def outOfBounds : String := MemoryValues.outOfBounds
+def arrayOutOfBounds : String := MemoryValues.arrayOutOfBounds
 
 /-- The node budget, which bounds the applied reference without the hash
 closure, and the decode bound of a saved reference. -/
@@ -210,8 +212,10 @@ def observe (plan : CheckedPlan) (input : Word) (fuel : Nat) : Json :=
   let fields := match (plan.program input).toCore.runStateful fuel with
     | .done (.inLeft _ (.word word)) _ =>
         [("status", toJson "returned"), ("word", toJson (toString word.val))]
-    | .done (.inRight _ .unit) _ =>
-        [("status", toJson "reverted"), ("output", toJson outOfBounds)]
+    | .done (.inRight _ (.word code)) _ =>
+        match MemoryValues.failureOutput? code with
+        | some output => [("status", toJson "reverted"), ("output", toJson output)]
+        | none => [("status", toJson "invalid-result"), ("detail", toJson s!"failure code {code.val}")]
     | .done value _ =>
         [("status", toJson "invalid-result"), ("detail", toJson (reprStr value))]
     | .outOfFuel _ => [("status", toJson "out-of-fuel")]
@@ -258,7 +262,9 @@ def boundaryOutcomes (plan : CheckedPlan) (fuel : Nat) : Except String (List Out
   Primitive.boundaryInputs.mapM fun input =>
     match (plan.program input).toCore.runStateful fuel with
     | .done (.inLeft _ (.word value)) _ => .ok (.word value)
-    | .done (.inRight _ .unit) _ => .ok .outOfRange
+    | .done (.inRight _ (.word code)) _ =>
+        if (MemoryValues.failureOutput? code).isSome then .ok .outOfRange
+        else .error "boundary observation failed with an unknown code"
     | .done _ _ => .error "boundary observation did not return a Word or an out-of-range access"
     | .outOfFuel _ => .error "boundary observation exhausted Core fuel"
     | .fault _ _ => .error "boundary observation produced a Core fault"

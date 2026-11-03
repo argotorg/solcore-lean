@@ -806,18 +806,18 @@ class FixtureRunTests(unittest.TestCase):
     def test_each_cycle_runs_every_fixture_once_from_the_base_seed(self):
         config = {"base_seed": 7, "shard_index": 0, "shard_count": 1, "fixture_count": 8}
         pool = fuzz.fixture_pool(config)
-        self.assertEqual(len(pool), 168)
+        self.assertEqual(len(pool), 182)
         self.assertFalse(any(set(name) & set("*?[") for name in pool))  # ids pass to --fixture as exact globs
-        cycle = [fuzz.fixture_selection(config, iteration) for iteration in range(21)]
+        cycle = [fuzz.fixture_selection(config, iteration) for iteration in range(23)]
         self.assertEqual(sorted(sum(cycle, [])), pool)
-        self.assertEqual({len(selection) for selection in cycle}, {8})
+        self.assertEqual([len(selection) for selection in cycle], [8] * 22 + [6])
         self.assertEqual(fuzz.fixture_selection(config, 3), cycle[3])
-        self.assertNotEqual(fuzz.fixture_selection(config, 21), cycle[0])
+        self.assertNotEqual(fuzz.fixture_selection(config, 23), cycle[0])
         self.assertNotEqual(fuzz.fixture_selection({**config, "base_seed": 8}, 0), cycle[0])
         shard = {**config, "shard_index": 1, "shard_count": 5}
         self.assertEqual(fuzz.fixture_pool(shard), pool[1::5])
         slices = [fuzz.fixture_selection(shard, iteration) for iteration in range(5)]
-        self.assertEqual(([len(selection) for selection in slices], sorted(sum(slices, []))), ([8, 8, 8, 8, 2], pool[1::5]))
+        self.assertEqual(([len(selection) for selection in slices], sorted(sum(slices, []))), ([8, 8, 8, 8, 5], pool[1::5]))
 
     def test_the_command_carries_the_root_seed_budgets_selection_and_paths(self):
         config = {**fuzz.CONFIG_DEFAULTS, "base_seed": 10, "bin_dir": "/b", "cast": "/c/cast", "anvil": "/c/anvil"}

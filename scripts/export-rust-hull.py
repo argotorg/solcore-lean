@@ -19,7 +19,7 @@ from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
-COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
+COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 SCHEMA = "solcore-rs.hull.v1"
 
 
@@ -36,12 +36,12 @@ def prepare(upstream: Path) -> dict[str, str]:
         raise ValueError("the exporter may only patch a checkout inside this repository's .upstream directory")
     if git(upstream, "rev-parse", "HEAD").strip() != COMMIT:
         raise ValueError(f"the exporter requires upstream commit {COMMIT}")
-    allowed = {"crates/driver/src/main.rs", "crates/driver/src/emit.rs"}
+    allowed = {"crates/driver/src/lib.rs", "crates/driver/src/emit.rs"}
     changed = set(git(upstream, "diff", "--name-only", "HEAD").splitlines())
     if changed - allowed:
         raise ValueError(f"upstream compiler has unrelated tracked changes: {sorted(changed - allowed)}")
     replacements = {
-        "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
+        "crates/driver/src/lib.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
         "crates/driver/src/emit.rs": (
             "&hull::pretty_program(db, &program)", "&crate::lean_export::export(db, &program)"
         ),
@@ -89,7 +89,7 @@ def source_hashes(value: object) -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="?")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--build", action="store_true", help="build only the pinned compiler driver")

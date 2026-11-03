@@ -2225,7 +2225,7 @@ def main() -> int:
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-case-tool")
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--test-perturb-path", choices=PATHS,
                         help="SYNTHETIC TEST ONLY: change a copied observation after real three-way agreement")

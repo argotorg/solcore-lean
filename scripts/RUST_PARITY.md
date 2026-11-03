@@ -1,7 +1,7 @@
 # Rust runtime compatibility checks
 
-The reference checkout is `.upstream/solcore-rs-20261023` at
-`2a745e12974c373c3799fec81b48a53c7dce2ab4`. All manifests pin both the revision
+The reference checkout is `.upstream/solcore-rs-20261102` at
+`e2eef19409fc8879cd4a9cc342ed60e3152f72c0`. All manifests pin both the revision
 and each fixture's source hash. The tools reject a different revision or an
 unexpected tracked edit to that checkout. They do not modify the sibling Rust
 repository.
@@ -39,10 +39,10 @@ python3 scripts/rust-method-parity.py --reuse-exports --output .upstream/methods
 
 - The first gate has 172 calls from 22 fixtures. Each starts with fresh storage
   and does not execute a constructor.
-- The raw scenario gate covers 72 fixtures, with 72 constructors and 626 ordered
+- The raw scenario gate covers 77 fixtures, with 77 constructors and 697 ordered
   transactions. Successful calls retain state; reverts discard changes.
-- The method gate covers the remaining 96 fixtures, with 96 constructors and
-  618 directives. Ordinary directives discard state changes, matching upstream
+- The method gate covers the remaining 105 fixtures, with 105 constructors and
+  820 directives. Ordinary directives discard state changes, matching upstream
   `eth_call`; `send` directives retain state and require success. Constructor
   and send callers match the standard Anvil account. Ordinary calls use zero
   because the upstream JSON-RPC request omits `from`.
@@ -62,10 +62,12 @@ Reports record constructor and call results separately. Returned and reverted
 payloads must match exactly unless the upstream directive explicitly permits
 any payload. Code bytes returned by constructors must match the selected linked
 runtime image. Available gas is supplied only by explicit manifest entries and
-is not an EVM gas meter. Two fixtures use explicit Core-step limits: `basic`
-uses 15,000,000 after its constructor measured 11,032,131 transitions, and
-`deposit` uses 25,000,000 after 16,525,108 transitions. Other fixtures retain
-the 10,000,000-step default. Missing account behavior remains an explicit failure.
+is not an EVM gas meter. Three fixtures use explicit Core-step limits: `basic`
+uses 15,000,000 after its constructor measured 11,032,131 transitions,
+`deposit` uses 25,000,000 after 16,525,108 transitions, and
+`closure-parameters` uses 15,000,000 after its constructor needed between
+10,000,000 and 10,500,000 transitions at `e2eef194`, which added 13 of its 49
+calls. Other fixtures retain the 10,000,000-step default. Missing account behavior remains an explicit failure.
 
 ## Execute the Rust EVM reference
 
@@ -114,9 +116,10 @@ driver's output: each fixture's checked Hull, its Sonatina O0 and O2 code
 images and its Yul. It compares the recorded steps and seeded mutants across
 those four paths
 ([pinned fixtures across paths](SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
-On that route the code-image tool crashes at O2 on `ignored-builtin-effects`,
-which the in-memory upstream harness above passes; the crash is a recorded
-finding. The fuzz driver can run that comparison as an opt-in run kind
+On that route the code-image tool crashed at O2 on `ignored-builtin-effects`
+at `2a745e12`, which the in-memory upstream harness passed; the crash is a
+recorded finding. At `e2eef194`, whose Sonatina carries upstream's fix of that
+fixture, all 182 fixtures compile on every path. The fuzz driver can run that comparison as an opt-in run kind
 ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
 ## Check the harness itself
@@ -171,10 +174,14 @@ pinned exporter and removes its temporary files after execution.
 The account reference gate uses actual solc/Anvil Osaka execution. Its 67
 observations and 11 address vectors are checked in under
 `Tests/Fixtures/EvmAccounts/`; the Lean tests use the same exact target/init
-images and expected account behavior. The recursive gate checks the pinned
-finite layouts, an executable dynamic constructor/relay/match fixture, and two
-checked-Hull cases that fail in both upstream backends. It records those
-failures as layout inconsistencies rather than counting them as execution.
+images and expected account behavior. Since solcore-rs #130 the checked
+compiler refuses every concrete recursive layout that would need boxing with
+`SC0420`, before backend emission. The recursive gate therefore checks that
+refusal: the checked export refuses the dynamic constructor/relay/match fixture,
+the two cases that once failed in both upstream backends, and the two upstream
+layouts that `2a745e12` still exported as finite, and with `--evm-reference`
+Sonatina and Yul emission refuse the three local fixtures too. Lean's recursive
+Hull representation stays covered by `Tests.RustHullRecursiveCorrespondence`.
 
 Successful contract compilation, including explicit code catalogues, is checked
 under `AccountState.definitions`. Public initialization typing covers the actual

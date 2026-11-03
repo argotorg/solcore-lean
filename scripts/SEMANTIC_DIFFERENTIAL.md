@@ -2,7 +2,8 @@
 
 The implementation plan and completion criteria are in
 [Semantic differential testing milestones](../docs/design/semantic-differential-testing.md).
-The reference Rust revision remains `2a745e12974c373c3799fec81b48a53c7dce2ab4`.
+The reference Rust revision is `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`, upstream main of 2026-11-02;
+until then it was `2a745e12`.
 
 For pinned tool preparation, all-profile fixed and random suites, CI scheduling
 and retained findings, see [Running the semantic test suite](SEMANTIC_CI.md).
@@ -2529,8 +2530,10 @@ out of range. One closure computes Keccak-256 of every length up to 128 bytes
 from the Core permutation and digest of the Hull import path. A loop is a
 closure over its position and state, chained over the ordinals below its mask
 behind guards. The result is the left injection of `sc_r`, or the right
-injection, which a case observes as std's `OutOfBounds()` revert data
-`0xb4120f14`.
+injection of the failure's code, which a case observes as std's revert data:
+`OutOfBounds()`, `0xb4120f14`, for a value's Words and bytes, and since
+solcore-rs `e2eef194` `Panic(0x32)`, `0x4e487b71` and the code Word `0x32`, for
+an array element.
 
 For this profile alone, `semantic-differential.py` matches three paths that
 reverted with the same data; every other profile still needs three returned
@@ -2656,9 +2659,9 @@ call inlined where it is made, never reading the source: a written argument
 is returned as the same value, a view as a slice of it, a copy as a new value,
 and a write in a helper is seen through every variable, slice, data value and
 closure that holds the value. An out-of-range access inside a helper is the
-right injection, observed as std's `OutOfBounds()` revert data `0xb4120f14`,
-and three paths that revert with the same data match, as for
-`runtime-memory-values`.
+right injection of its failure's code, observed as std's `OutOfBounds()` or
+`Panic(0x32)` revert data, and three paths that revert with the same data
+match, as for `runtime-memory-values`.
 
 ```sh
 python3 scripts/semantic-campaign.py \
@@ -2735,8 +2738,8 @@ No mismatch, crash or rejection was found.
 
 ## Compare Solcore revert data
 
-The memory profiles revert only with std's `OutOfBounds()`, a single
-selector. `runtime-revert-data` computes std `Error` values as data and
+The memory profiles revert only with std's `OutOfBounds()` and
+`Panic(0x32)`, two fixed payloads. `runtime-revert-data` computes std `Error` values as data and
 reverts with them on input-dependent paths: `Error(W)` with a selector Word
 computed from the input, `Error.Empty`, `Error.Msg(memory(Typedef.rep(sc_b<n>)))`
 over a bytes value built from the input, `require(C, E)`, `require(C, "…")`
@@ -5049,8 +5052,9 @@ std's checks on the actual calldata, in std's order, through `inputDataSize`,
    are not checked and trailing bytes are ignored.
 
 A std rejection reverts with exactly its four selector bytes and keeps every
-slot. `ArrayOutOfBounds()` cannot arise, since the protocol guards every index
-by the length, nor can `NonPayableReceivedValue()`, since no transaction
+slot. An index past the length, which std rejects with `Panic(0x32)` and
+before solcore-rs `e2eef194` with `ArrayOutOfBounds()`, cannot arise, since
+the protocol guards every index by the length, nor can `NonPayableReceivedValue()`, since no transaction
 carries value. Core contracts return or revert one Word, so the wrapper
 reverts with the selector as its Word payload.
 
@@ -5169,8 +5173,9 @@ std's checks on the actual calldata through the same input host functions:
 4. Overlaps between table entries, rows and the head are not checked, and
    trailing bytes are ignored.
 
-`ArrayOutOfBounds()` cannot arise, since the protocol guards every row index
-by the outer length and every element index by the row length.
+An index past a length, std's `Panic(0x32)`, cannot arise, since the protocol
+guards every row index by the outer length and every element index by the row
+length.
 `NonPayableReceivedValue()` cannot arise either, since no transaction carries
 value. Canonical values have up to four rows of up to three elements, one row
 and one element more than the protocol reads. The shared modules
@@ -6700,8 +6705,9 @@ definitions and records std's array decoder as the probe found it.
   - the array's offset `o` above `size - 4`, fewer than 32 bytes at
     `p = 4 + o`, a length `L > ~0 / s` or `L s` bytes missing after the length
     Word, for the stride `s`: `0x08638556`;
-  - for `first`, then `second`, an index of at least `L`: `0x7f52b2bf`,
-    `ArrayOutOfBounds()`;
+  - for `first`, then `second`, an index of at least `L`: `Panic(0x32)`,
+    `0x4e487b71` and the code Word `0x32`, which before solcore-rs `e2eef194`
+    was `ArrayOutOfBounds()`, `0x7f52b2bf`;
   - a dynamic element's offset Word `e` at `R + 32 i`, relative to the region
     `R = p + 32`, above `size - R`, or fewer than 32 bytes at `R + e`:
     `0x08638556`;
@@ -6717,10 +6723,12 @@ definitions and records std's array decoder as the probe found it.
 - **Original Core:** one host contract that reads the calldata through
   `inputDataSize`, `inputDataByte?` and `inputDataWordBE?` and makes std's
   decisions above; the element decoder is one Core function, applied to
-  `first` and then to `second`. A rejection reverts with its error selector as
-  the Word, and an unknown tag with the Word zero.
-- **Comparison:** the selector rule, with `0x7f52b2bf` beside std's other
-  error selectors, and the empty-revert rule, each only when that is the
+  `first` and then to `second`. A rejection reverts with its error selector,
+  the panic's for the panic, as the Word, and an unknown tag with the Word
+  zero.
+- **Comparison:** the selector rule, with the panic beside std's error
+  selectors, the Word of a rejection's first four bytes standing for its whole
+  revert data, and the empty-revert rule, each only when that is the
   transaction's prescribed `stdRejection`. Hull against the EVM stays exact.
 - **Transactions:** `{id, flags, elements, first, second, malformation,
   calldata, stdRejection, value}`, with up to three elements `{choice, a, b,

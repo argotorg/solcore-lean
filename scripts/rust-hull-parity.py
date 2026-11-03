@@ -49,7 +49,7 @@ def normalized_scalar(value: dict, expected: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--manifest", type=Path, default=ROOT / "scripts/rust-parity.json")
     parser.add_argument("--cache", type=Path, default=ROOT / ".upstream/hull-fixtures/scalars")
     parser.add_argument("--case", action="append", default=[], help="case ID glob; repeatable")

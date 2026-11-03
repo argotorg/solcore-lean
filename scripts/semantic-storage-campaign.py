@@ -1678,7 +1678,7 @@ def main():
     parser.add_argument("--case-tool", type=Path)
     parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--test-perturb-path", choices=PATHS)
     parser.add_argument("--test-transaction-id")

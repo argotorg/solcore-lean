@@ -324,9 +324,9 @@ PROFILES = {
     # One method that takes a calldata array of up to three values of a user
     # enum of two to four constructors and two indices, canonically or
     # malformed. Original Core decodes the array's head and both indexed
-    # elements itself; a std rejection, ArrayOutOfBounds() among them, is
-    # compared by its selector, and an unknown tag's empty revert data by the
-    # Word zero. The signature and selector follow the plan's shape. A case
+    # elements itself; a std rejection, an index past the length's
+    # Panic(0x32) among them, is compared by its selector, and an unknown tag's
+    # empty revert data by the Word zero. The signature and selector follow the plan's shape. A case
     # reaches about 140 KB, so a native shrink response carries at most 16
     # candidates.
     "stateful-enum-array-arguments": {"caseSchema": ENUM_ARRAY_CASE_SCHEMA, "planSchema": "solcore-lean.enum-array-plan.v1",
@@ -403,7 +403,8 @@ MAPPING_COUNTER, MAPPING_BASE = 0, 1
 # The malformed-calldata profile. Its original Core contract reverts with one of
 # std's error selectors as a Word exactly where the pinned std's dispatcher or
 # decoder rejects: `NoSelectorMatchedWithoutFallback()` and `ABIInputTruncated()`.
-# `ArrayOutOfBounds()` and `NonPayableReceivedValue()` cannot arise there.
+# An index past the length, std's `Panic(0x32)`, and `NonPayableReceivedValue()`
+# cannot arise there.
 STD_NO_SELECTOR, STD_TRUNCATED = "0x4924aef0", "0x08638556"
 STD_ERRORS = (STD_NO_SELECTOR, STD_TRUNCATED)
 MAX_CALLDATA = 1024
@@ -480,11 +481,11 @@ STD_EMPTY_REVERT = "0x"
 # The enum-array profile: slots 0 to 9, the accumulator, the length and both
 # decoded elements' index and three Words; up to three elements of the
 # enum-argument shapes, and an index past the length reverts with std's
-# ArrayOutOfBounds() selector.
+# Panic(0x32): the panic's selector, then the code as a Word.
 ENUM_ARRAY_SLOTS = [str(slot) for slot in range(10)]
 ENUM_ARRAY_KINDS = ("none", "short", "selector", "truncate", "trailing", "offset", "count", "tag", "retag", "entry",
                     "share", "unused", "tail", "length", "padding")
-STD_OUT_OF_BOUNDS = "0x7f52b2bf"
+STD_OUT_OF_BOUNDS = "0x4e487b71" + (0x32).to_bytes(32, "big").hex()
 MAX_ARRAY_ELEMENTS = 3
 # The array-return profile: the tuple profile's slots; a plan returns up to
 # three elements of one of these element types, each `bytes` or `uint256[]`
@@ -1374,7 +1375,7 @@ def enum_array_input(case: dict, tx: dict) -> bytes:
 def enum_array_element(case: dict, data: bytes, region: int, length: int, index: int) -> tuple:
     """`abiArrayGet` of element `index` once std accepted the array's head: the
     revert data of a rejection, or None with the one-based index and three
-    Words. An index past the length reverts with `0x7f52b2bf`; a dynamic
+    Words. An index past the length reverts with `Panic(0x32)`; a dynamic
     element's offset is relative to the region."""
     constructors = enum_constructors(case)
     static, _, stride = enum_array_layout(case)
@@ -2572,7 +2573,8 @@ def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
     prescribed outcome acceptance, so it is compared exactly too. For enum
     arguments, original Core's Word zero likewise stands for an unknown tag's
     empty revert data, `0x`, when that is the prescribed outcome. Enum arrays
-    take both rules, with `ArrayOutOfBounds()` among the selectors."""
+    take both rules, with `Panic(0x32)` among the rejections: its selector as a
+    Word stands for its selector and code."""
     selector = tx.get("stdRejection")
     core = rows.get("directCore")
     if (has_enum_arguments(case) or has_enum_arrays(case)) and selector == STD_EMPTY_REVERT and isinstance(core, dict):
@@ -2583,14 +2585,15 @@ def selector_rule(case: dict, tx: dict, rows: dict) -> str | None:
     if profile(case)["abi"] not in ("malformed", "methods", "enum-arguments", "enum-arrays") or selector not in errors or \
             not isinstance(core, dict):
         return None
-    if core.get("status") != "reverted" or core.get("output") != "0x" + int(selector, 16).to_bytes(32, "big").hex():
+    if core.get("status") != "reverted" or core.get("output") != "0x" + int(selector[:10], 16).to_bytes(32, "big").hex():
         return None
     return selector
 
 
 def comparable(case: dict, tx: dict, rows: dict) -> dict:
     """The rows as compared: under the selector rule, original Core's selector
-    Word stands for std's four revert bytes. Hull and EVM are never changed."""
+    Word stands for std's revert bytes, four for an error and the selector and
+    code for a panic. Hull and EVM are never changed."""
     selector = selector_rule(case, tx, rows)
     if selector is None:
         return rows
@@ -3656,7 +3659,7 @@ def execute(args, report: dict) -> None:
     validate_case(case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
     save(case_path, case)
-    source.write_text(case["source"])
+    source.write_text(common.compiler_source(case["source"]))
     report.update(caseSha256=common.file_digest(case_path), sourceSha256=common.file_digest(source),
         programSha256=common.digest(common.json_bytes(case["program"])), provenance=case["provenance"],
         replayOf=str(args.replay) if args.replay else None)
@@ -3899,7 +3902,7 @@ def main() -> int:
     parser.add_argument("--case-tool", type=Path)
     parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     defaults = {"direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000, "timeout": 300,
         "startup_timeout": 30, "total_timeout": 900, "output_limit": 4 * 1024 * 1024, "artifact_limit": 64 * 1024 * 1024}

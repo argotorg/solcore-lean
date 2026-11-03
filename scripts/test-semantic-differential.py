@@ -1758,7 +1758,8 @@ class SharedCompilationTests(unittest.TestCase):
                 report["tools"].update(solc={"sha256": "solc", "version": "0.8.35"},
                                        yulExporterSha256="exporter", yulTransportSha256="transport")
                 entry = self.compile(args, report, case, "yul")
-                self.assertEqual((args.output / "yul.json").read_text(), "yul of contract A {}")
+                # The compiler reads the emitted text after the mandatory pragma.
+                self.assertEqual((args.output / "yul.json").read_text(), "yul of pragma solcore;\ncontract A {}")
         directory = entry["directory"]
         self.assertEqual(calls, [("execute", directory, directory / "case.sol", directory / "hull.json", exported)])
         self.assertEqual(entry["yul"], {"record": "yul"})

@@ -271,7 +271,7 @@ def checked_build(upstream, target, args):
         return run_process(["git", "-C", str(upstream), *command], args).decode()
 
     require(git("rev-parse", "HEAD").strip() == hull.COMMIT, "unexpected checked Rust compiler revision")
-    replacements = {"crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
+    replacements = {"crates/driver/src/lib.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
         "crates/driver/src/emit.rs": ("&hull::pretty_program(db, &program)", "&crate::lean_export::export(db, &program)")}
     require(set(git("diff", "--name-only", "HEAD").splitlines()) <= set(replacements),
             "checked Rust compiler has unrelated tracked changes")
@@ -375,7 +375,7 @@ def parse_args(argv=None):
     parser.add_argument("--fixture-edit", type=Path,
                         help="with --fixture: a JSON single-site edit of the pinned sources that SOURCE's directory holds")
     parser.add_argument("--solc", type=Path, required=True, help="preinstalled solc " + SOLC_VERSION)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--hull-output", type=Path, help="fresh checked Hull sibling; default OUTPUT.hull.json")

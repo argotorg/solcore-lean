@@ -10,8 +10,8 @@ fallback; calldata shorter than the arguments' 128-byte head is truncated. The
 array's offset `o` at 36 must satisfy `o <= size - 4`, its length Word `L` must
 exist at `p = 4 + o`, and its `L` elements of stride `s` must fit after it,
 with `L <= ~0 / s`; `s` is the body head of a static enum and 32 for a dynamic
-one. Each index `i` must be below `L`, else the call reverts with
-`ArrayOutOfBounds()`. A static element's body is inline at `R + i s`, where
+one. Each index `i` must be below `L`, else std panics with `Panic(0x32)`.
+A static element's body is inline at `R + i s`, where
 `R = p + 32`; a dynamic one's is at `R + e` for the offset `e` at `R + 32 i`,
 with `e <= size - R` and its tag Word present. The tag must equal one
 constructor's `keccak256("Name(fields)")`, otherwise the call reverts with
@@ -20,7 +20,7 @@ for one enum argument. The protocol then writes
 `r = step(prior + L + index + w0 + w1 + w2 + index' + w0' + w1' + w2')` to slot
 0, the length to slot 1 and each element's one-based index and Words to slots 2
 to 5 and 6 to 9, and odd flags revert with `r`. A std rejection reverts with its
-error selector as the Word payload. -/
+error selector, or for the panic the panic's selector, as the Word payload. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Core.EnumArray
@@ -31,14 +31,18 @@ open Solcore.ContractRuntime
 open Solcore.Synthesis.Core.StdDispatch
 open Solcore.Synthesis.Core.EnumArgument (Payload Constructor Shape fieldsType maxPayloadLength emptyRevert tag)
 
-def version : String := "core-enum-array-argument-contract-v1"
+def version : String := "core-enum-array-argument-contract-v2"
 def resultType : Ty := .sum .word (.sum .word .word)
 
 /-- Slot zero, the length and two elements' index and three Words. -/
 def slotCount : Nat := 10
 
-/-- std's `ArrayOutOfBounds()` selector. -/
-def outOfBoundsError : Nat := 0x7f52b2bf
+/-- std's `Panic(uint256)` selector: since solcore-rs `e2eef194`, an index past
+the length is `out_of_bounds()`, which panics with `outOfBoundsPanic`. -/
+def outOfBoundsError : Nat := 0x4e487b71
+
+/-- The panic code of an array index past the length. -/
+def outOfBoundsPanic : Nat := 0x32
 
 /-- The flags, the array's offset and the two indices. -/
 def argumentsHead : Nat := 128

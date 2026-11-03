@@ -1,3 +1,5 @@
+pragma solcore;
+
 enum Chain {
     End(word),
     Link(word, Chain)

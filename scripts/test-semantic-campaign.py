@@ -2189,7 +2189,7 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 2048))
-        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-memory-values-v1'}))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-memory-values-v2'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.MEMORY_SHAPES.items()},
                          {'values': 6, 'parts': 8, 'cuts': 6, 'writes': 10, 'observations': 10, 'indices': 18,
                           'hazards': 4, 'loops': 6, 'body': 5, 'hashes': 9})
@@ -2396,7 +2396,7 @@ class MemoryCallCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 2048))
-        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-memory-calls-v1'}))
+        self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-memory-calls-v2'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.MEMORY_CALL_SHAPES.items()},
                          {'helpers': 25, 'calls': 10, 'passes': 4, 'instances': 3, 'data': 5, 'closures': 9,
                           'observations': 23, 'indices': 12, 'ranges': 2, 'hazards': 4, 'steps': 10})

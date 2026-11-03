@@ -17,7 +17,10 @@ from, and a second variable names the same value, so writes are seen through
 every variable and slice of a value and never through a copy. An array is its
 elements. No address, length header, free-memory pointer or std function
 appears in the reference. An out-of-range access makes it return the right
-injection, std's `OutOfBounds()` revert. Nothing here reads source text. -/
+injection of its failure's code: std's `OutOfBounds()` revert for a value's
+Words and bytes, read and written through `slice_` and `truncate`, and since
+solcore-rs `e2eef194` std's `Panic(0x32)` for an array element. Nothing here
+reads source text. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Core.MemoryValues
@@ -27,7 +30,7 @@ open Solcore.Core.Wire
 open Solcore.Synthesis.Core.Enums (Gen draw drawWeighted)
 open Solcore.Frontend.RustHull
 
-def memoryVersion : String := "core-memory-values-v1"
+def memoryVersion : String := "core-memory-values-v2"
 
 /-- A Word of the source: the input, the input with a constant, the
 accumulator `sc_r`, or the loop's position. -/
@@ -465,12 +468,24 @@ def hashNodes : Nat := exprNodes hashClosure
 parameter; a reference to a position is valid in later initializers, checks
 and the final body of the scope that bound it and of scopes it encloses. -/
 
-/-- A binding, a check that returns the scope's abort value when its
-condition holds, or a case that continues with a left injection's payload
-and aborts on a right one. -/
+/-- An out-of-range access's failure, which std observes as `OutOfBounds()`
+for a value's Words and bytes and as `Panic(0x32)` for an array element. -/
+inductive Failure where
+  | bytes
+  | array
+  deriving BEq, Repr
+
+/-- The Word a failure returns in the right injection. -/
+def Failure.code : Failure → Nat
+  | .bytes => 0
+  | .array => 1
+
+/-- A binding, a check that returns its failure's code in the scope's right
+injection when its condition holds, or a case that continues with a left
+injection's payload and forwards a right one's. -/
 inductive Item where
   | bind (value : Expr)
-  | fail (condition : Expr)
+  | fail (condition : Expr) (failure : Failure)
   | unpack (scrutinee : Expr)
 
 structure Builder where
@@ -481,17 +496,19 @@ namespace Builder
 
 def ref (builder : Builder) (position : Nat) : Expr := .var (builder.size - 1 - position)
 
-def close (builder : Builder) (body abort : Expr) : Expr :=
+/-- The scope's items around `body`, in a scope whose result is the sum of
+`left` and what its right injections carry, a failure code here. -/
+def close (builder : Builder) (body : Expr) (left : Ty) : Expr :=
   builder.items.foldr (fun item rest => match item with
     | .bind value => .letE value rest
-    | .fail condition => .ifE condition abort rest
-    | .unpack scrutinee => .caseE scrutinee rest abort) body
+    | .fail condition failure => .ifE condition (.inRight left (num failure.code)) rest
+    | .unpack scrutinee => .caseE scrutinee rest (.inRight left (.var 0))) body
 
 end Builder
 
 /-- The compiler's state: the builder, the static scope, the positions of
 every value's Words or elements, the accumulator, the input, the hash
-closure, the loop's position and the scope's abort value. -/
+closure, the loop's position and the left type of the scope's result. -/
 structure State where
   builder : Builder
   scope : Scope := {}
@@ -500,7 +517,7 @@ structure State where
   input : Nat := 0
   hash : Option Nat := none
   counter : Option Nat := none
-  abort : Expr := .inRight .word .unit
+  left : Ty := .word
 
 namespace State
 
@@ -511,8 +528,8 @@ def bind (state : State) (value : Expr) : State × Nat :=
                                               items := state.builder.items.push (.bind value)}},
    state.builder.size)
 
-def fail (state : State) (condition : Expr) : State :=
-  {state with builder := {state.builder with items := state.builder.items.push (.fail condition)}}
+def fail (state : State) (condition : Expr) (failure : Failure) : State :=
+  {state with builder := {state.builder with items := state.builder.items.push (.fail condition failure)}}
 
 def unpack (state : State) (scrutinee : Expr) : State × Nat :=
   ({state with builder := {state.builder with size := state.builder.size + 1,
@@ -621,9 +638,9 @@ def select (state : State) (positions : List Nat) (key : Expr) : Expr :=
   positions.zipIdx.foldr (fun (position, index) rest => .ifE (eq key (num index)) (state.ref position) rest) (num 0)
 
 /-- Fail when `index` is not below `valid`; return the bound index. -/
-def checked (state : State) (index : Expr) (valid : Nat) : State × Nat :=
+def checked (state : State) (index : Expr) (valid : Nat) (failure : Failure) : State × Nat :=
   let (state, position) := state.bind index
-  (state.fail (gt (state.ref position) (num (valid - 1))), position)
+  (state.fail (gt (state.ref position) (num (valid - 1))) failure, position)
 
 /-- An observation's Word. -/
 def access (state : State) (var : Var) : Access → State × Expr
@@ -633,7 +650,7 @@ def access (state : State) (var : Var) : Access → State × Expr
       let offset := var.start + value
       (state, .binary .wordByte (num (offset % 32)) (state.wordAt var.object (offset / 32)))
   | .word index =>
-      let (state, checkedIndex) := state.checked (state.index index) (var.length - 31)
+      let (state, checkedIndex) := state.checked (state.index index) (var.length - 31) .bytes
       let (state, offset) := state.bind (add (state.ref checkedIndex) (num var.start))
       let (state, word) := state.bind (shr (state.ref offset) (num 5))
       let (state, bits) := state.bind (shl (band (state.ref offset) (num 31)) (num 3))
@@ -642,7 +659,7 @@ def access (state : State) (var : Var) : Access → State × Expr
       (state, bor (shl (state.select positions (state.ref word)) (state.ref bits))
         (shr (state.select positions (state.ref next)) (sub (num 256) (state.ref bits))))
   | .byte index =>
-      let (state, checkedIndex) := state.checked (state.index index) var.length
+      let (state, checkedIndex) := state.checked (state.index index) var.length .bytes
       let (state, offset) := state.bind (add (state.ref checkedIndex) (num var.start))
       (state, .binary .wordByte (band (state.ref offset) (num 31))
         (state.select (state.wordsOf var.object) (shr (state.ref offset) (num 5))))
@@ -654,7 +671,7 @@ def access (state : State) (var : Var) : Access → State × Expr
       | none => (state, num 0)
   | .element (.literal value) _ => (state, state.wordAt var.object value)
   | .element index _ =>
-      let (state, checkedIndex) := state.checked (state.index index) var.length
+      let (state, checkedIndex) := state.checked (state.index index) var.length .array
       (state, state.select (state.wordsOf var.object) (state.ref checkedIndex))
 
 /-- Rebind the Words of a value after a write. -/
@@ -667,7 +684,7 @@ def write (state : State) (target : Ref) (var : Var) (index : Index) (value : Ex
         let (state, rebound) := state.bind (state.ref written)
         state.setValue var.object (positions.set element rebound)
     | _ =>
-        let (state, checkedIndex) := state.checked (state.index index) var.length
+        let (state, checkedIndex) := state.checked (state.index index) var.length .array
         let (state, rebound) := state.bindAll (positions.zipIdx.map fun (position, element) state =>
           .ifE (eq (state.ref checkedIndex) (num element)) (state.ref written) (state.ref position))
         state.setValue var.object rebound
@@ -693,7 +710,7 @@ def write (state : State) (target : Ref) (var : Var) (index : Index) (value : Ex
           (shl (band (state.ref written) (num 255)) (num bits)))
         state.setValue var.object (positions.set (offset / 32) rebound)
     | .word, _ =>
-        let (state, checkedIndex) := state.checked (state.index index) (var.length - 31)
+        let (state, checkedIndex) := state.checked (state.index index) (var.length - 31) .bytes
         let (state, offset) := state.bind (add (state.ref checkedIndex) (num var.start))
         let (state, word) := state.bind (shr (state.ref offset) (num 5))
         let (state, bits) := state.bind (shl (band (state.ref offset) (num 31)) (num 3))
@@ -707,7 +724,7 @@ def write (state : State) (target : Ref) (var : Var) (index : Index) (value : Ex
               (state.ref position)))
         state.setValue var.object rebound
     | .byte, _ =>
-        let (state, checkedIndex) := state.checked (state.index index) var.length
+        let (state, checkedIndex) := state.checked (state.index index) var.length .bytes
         let (state, offset) := state.bind (add (state.ref checkedIndex) (num var.start))
         let (state, word) := state.bind (shr (state.ref offset) (num 5))
         let (state, bits) := state.bind (sub (num 248) (shl (band (state.ref offset) (num 31)) (num 3)))
@@ -782,32 +799,33 @@ def unpackState (state : State) (count : Nat) (source : Nat) : State × List Nat
 
 /-- `fun (counter, state) => body`: the body's Core over the components,
 returning the left injection of the new state or, out of range, the right
-one. `enter` binds the loop's position from the counter. -/
+one of the failure's code. `enter` binds the loop's position from the
+counter. -/
 def iteration (state : State) (objects : List Nat) (enter : State → Nat → State × Nat)
     (body : State → State) : State × Nat :=
   let count := (state.components objects).length
   let stateType := words count
   let outer := state.builder
   let parameter := outer.size
-  let inner : State := {state with builder := {size := outer.size + 1}, abort := .inRight stateType .unit}
+  let inner : State := {state with builder := {size := outer.size + 1}, left := stateType}
   let (inner, position) := enter inner parameter
   let (inner, source) := inner.bind (.second (inner.ref parameter))
   let (inner, positions) := inner.unpackState count source
   let inner := body {inner.restore objects positions with counter := some position}
-  let result := Expr.inLeft .unit (packet ((inner.components objects).map inner.ref))
-  let lambda := Expr.lambda (.product .word stateType) (.sum stateType .unit) (inner.builder.close result inner.abort)
+  let result := Expr.inLeft .word (packet ((inner.components objects).map inner.ref))
+  let lambda := Expr.lambda (.product .word stateType) (.sum stateType .word) (inner.builder.close result inner.left)
   {state with builder := outer, scope := inner.scope}.bind lambda
 
 /-- `st_{k+1} = case st_k of inl s => if limit > k then closure (k, s) else
-inl s | inr _ => inr ()` for every ordinal below `trips`. -/
+inl s | inr c => inr c` for every ordinal below `trips`. -/
 def chain (state : State) (stateType : Ty) (limit closure start trips : Nat) : State × Nat := Id.run do
   let mut state := state
   let mut current := start
   for ordinal in List.range trips do
     let under := fun (position : Nat) => Expr.var (state.builder.size - position)
     let (next, position) := state.bind (.caseE (state.ref current)
-      (.ifE (gt (under limit) (num ordinal)) (.apply (under closure) (.pair (num ordinal) (.var 0))) (.inLeft .unit (.var 0)))
-      (.inRight stateType .unit))
+      (.ifE (gt (under limit) (num ordinal)) (.apply (under closure) (.pair (num ordinal) (.var 0))) (.inLeft .word (.var 0)))
+      (.inRight stateType (.var 0)))
     state := next
     current := position
   return (state, current)
@@ -821,7 +839,7 @@ def nestedIteration (state : State) (objects : List Nat) (bound : Bound) (innerM
   let stateType := words count
   let outer := state.builder
   let parameter := outer.size
-  let inner : State := {state with builder := {size := outer.size + 1}, abort := .inRight stateType .unit}
+  let inner : State := {state with builder := {size := outer.size + 1}, left := stateType}
   let (inner, outerCounter) := inner.bind (.first (inner.ref parameter))
   let (inner, innerLimit) := inner.bind (band (match bound with
     | .input => inner.ref inner.input
@@ -831,10 +849,10 @@ def nestedIteration (state : State) (objects : List Nat) (bound : Bound) (innerM
       let (deepest, innerCounter) := deepest.bind (.first (deepest.ref innerParameter))
       deepest.bind (add (deepest.ref outerCounter) (deepest.ref innerCounter)))
     body
-  let (inner, start) := inner.bind (.inLeft .unit (.second (inner.ref parameter)))
+  let (inner, start) := inner.bind (.inLeft .word (.second (inner.ref parameter)))
   let (inner, final) := inner.chain stateType innerLimit innerClosure start innerMask
-  let lambda := Expr.lambda (.product .word stateType) (.sum stateType .unit)
-    (inner.builder.close (inner.ref final) inner.abort)
+  let lambda := Expr.lambda (.product .word stateType) (.sum stateType .word)
+    (inner.builder.close (inner.ref final) inner.left)
   {state with builder := outer, scope := inner.scope}.bind lambda
 
 /-- A loop: its limit, its closure and chain from the left injection of the
@@ -857,7 +875,7 @@ def loop (state : State) (loop : Loop) (body : List Action) : State :=
         let (state, limit) := state.bind (band (state.ref state.input) (num outerMask))
         let (state, closure) := state.nestedIteration objects bound innerMask compileBody
         (state, closure, outerMask, limit)
-  let (state, start) := state.bind (.inLeft .unit (packet (initial.map state.ref)))
+  let (state, start) := state.bind (.inLeft .word (packet (initial.map state.ref)))
   let (state, final) := state.chain stateType limit closure start trips
   let (state, payload) := state.unpack (state.ref final)
   let (state, positions) := state.unpackState count payload
@@ -884,9 +902,10 @@ def expression (plan : Plan) : Expr :=
     else state
   let (state, acc) := state.bind (num 0)
   let state := plan.steps.foldl State.step {state with acc}
-  .lambda .word (.sum .word .unit) (state.builder.close (.inLeft .unit (state.ref state.acc)) state.abort)
+  .lambda .word (.sum .word .word) (state.builder.close (.inLeft .word (state.ref state.acc)) state.left)
 
-def resultType : Ty := .sum .word .unit
+/-- The accumulator, or an out-of-range access's failure code. -/
+def resultType : Ty := .sum .word .word
 
 def program (plan : Plan) : Program := {
   resultType := .function .word resultType, dataDefinitions := [], body := plan.expression}

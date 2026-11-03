@@ -22,7 +22,7 @@ _spec = importlib.util.spec_from_file_location("hull_export", ROOT / "scripts/ex
 assert _spec and _spec.loader
 hull = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hull)
-BACKEND = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
+BACKEND = "6bd0ce661ea327c149429b00fee3c8608616040f"
 SCHEMA = "solcore-rs.code-images.v1"
 SOURCE = ROOT / "scripts/rust-code-image-export.rs"
 TOOL = ROOT / ".upstream/rust-code-image-tool"
@@ -72,7 +72,7 @@ def validate_backend(document: object, optimization: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="?")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--hull-output", type=Path, help="matching checked Hull; default OUTPUT.hull.json")

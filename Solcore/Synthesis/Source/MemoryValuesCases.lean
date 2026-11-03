@@ -6,8 +6,9 @@ import Solcore.Synthesis.Core.MemoryValuesShrink
 plan's complete original Core reference at the case input. The reference
 models every value as its byte list, never std's layout, and is built from
 the plan, never from the source. Its right injection is an out-of-range
-access, observed as std's `OutOfBounds()` revert data. Saved observations
-never supply the oracle. -/
+access's failure code, observed as std's revert data: `OutOfBounds()` for a
+value's Words and bytes and `Panic(0x32)` for an array element. Saved
+observations never supply the oracle. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.MemoryValues
@@ -18,9 +19,20 @@ def caseSchema : String := "solcore-lean.semantic-memory-value-case.v1"
 def planSchema : String := "solcore-lean.memory-value-plan.v1"
 def profileVersion : String := "runtime-memory-values-v1/plan-seed-v1"
 
-/-- std's `OutOfBounds()` selector, the whole revert data of `slice_`,
-`truncate` and `IndexAccess` past a value's end. -/
+/-- std's `OutOfBounds()` selector, the whole revert data of `slice_` and
+`truncate` past a value's end. -/
 def outOfBounds : String := "0xb4120f14"
+
+/-- std's `Panic(0x32)`, the whole revert data of a memory array's element
+access past its length, through `IndexAccess` or `a[i]`, since solcore-rs
+`e2eef194`. -/
+def arrayOutOfBounds : String := "0x4e487b71" ++ String.ofList (List.replicate 62 '0') ++ "32"
+
+/-- The revert data of an out-of-range access's failure code. -/
+def failureOutput? (code : Word) : Option String :=
+  if code.val = Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code then some outOfBounds
+  else if code.val = Solcore.Synthesis.Core.MemoryValues.Failure.array.code then some arrayOutOfBounds
+  else none
 
 /-- The node budget, which bounds the applied reference without the hash
 closure, and the decode bound of a saved reference: the largest budget and
@@ -258,8 +270,10 @@ def observe (plan : CheckedPlan) (input : Word) (fuel : Nat) : Json :=
   let fields := match (plan.program input).toCore.runStateful fuel with
     | .done (.inLeft _ (.word word)) _ =>
         [("status", toJson "returned"), ("word", toJson (toString word.val))]
-    | .done (.inRight _ .unit) _ =>
-        [("status", toJson "reverted"), ("output", toJson outOfBounds)]
+    | .done (.inRight _ (.word code)) _ =>
+        match failureOutput? code with
+        | some output => [("status", toJson "reverted"), ("output", toJson output)]
+        | none => [("status", toJson "invalid-result"), ("detail", toJson s!"failure code {code.val}")]
     | .done value _ =>
         [("status", toJson "invalid-result"), ("detail", toJson (reprStr value))]
     | .outOfFuel _ => [("status", toJson "out-of-fuel")]
@@ -306,7 +320,8 @@ def boundaryOutcomes (plan : CheckedPlan) (fuel : Nat) : Except String (List Out
   Primitive.boundaryInputs.mapM fun input =>
     match (plan.program input).toCore.runStateful fuel with
     | .done (.inLeft _ (.word value)) _ => .ok (.word value)
-    | .done (.inRight _ .unit) _ => .ok .outOfRange
+    | .done (.inRight _ (.word code)) _ =>
+        if (failureOutput? code).isSome then .ok .outOfRange else .error "boundary observation failed with an unknown code"
     | .done _ _ => .error "boundary observation did not return a Word or an out-of-range access"
     | .outOfFuel _ => .error "boundary observation exhausted Core fuel"
     | .fault _ _ => .error "boundary observation produced a Core fault"

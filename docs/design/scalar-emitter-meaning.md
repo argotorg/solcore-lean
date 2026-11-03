@@ -206,7 +206,7 @@ Values. A word is a natural number below `2^256`; there are also Booleans,
 more has no meaning.
 
 Operators follow the pinned standard library (`std/std.sol` and
-`std/opcodes.sol` at solcore-rs `2a745e12974c373c3799fec81b48a53c7dce2ab4`).
+`std/opcodes.sol` at solcore-rs `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`).
 The Rust frontend desugars `+` to `Add.add`, `==` to `Eq.eq`, `>` to `Ord.gt`,
 `~` to `BitNot.bnot` and `!` to the function `not`.
 

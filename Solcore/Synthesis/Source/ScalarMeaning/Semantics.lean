@@ -3,7 +3,7 @@ import Solcore.Synthesis.Source.ScalarMeaning.Syntax
 /-! Independent meaning of the emitted Rust-dialect fragment. Words are
 natural numbers below `2^256`; operators follow the EVM instruction that the
 pinned standard library (`std/std.sol` and `std/opcodes.sol` at solcore-rs
-`2a745e12974c373c3799fec81b48a53c7dce2ab4`) selects for `word` operands. Pairs,
+`e2eef19409fc8879cd4a9cc342ed60e3152f72c0`) selects for `word` operands. Pairs,
 `sum`, `inl` and `inr` are frontend builtins at the same revision
 (`crates/hir/src/nameres/builtins.rs`); this fragment has pairs of words and
 sums of two words. Locals live in a stack of lexical scopes: `let` declares in

@@ -184,7 +184,7 @@ def main() -> int:
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-storage-tool")
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-storage-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--fuel", type=int, default=1000000)
     parser.add_argument("--core-fuel", type=int, default=10000000)

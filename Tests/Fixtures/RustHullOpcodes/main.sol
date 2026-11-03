@@ -1,3 +1,5 @@
+pragma solcore;
+
 import {
     origin, gasprice, coinbase, timestamp, number, prevrandao, gaslimit,
     chainid, basefee, blobbasefee, blockhash, blobhash,

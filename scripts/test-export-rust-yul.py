@@ -382,7 +382,7 @@ class YulProtocolTests(unittest.TestCase):
 class FixtureAdmissionTests(unittest.TestCase):
     def test_a_pinned_fixture_admits_only_its_own_contract_under_the_same_object_checks(self):
         pins = exporter.fixture_pins()
-        self.assertEqual((len(pins), pins['00answer']['contract']), (168, 'Answer'))
+        self.assertEqual((len(pins), pins['00answer']['contract']), (182, 'Answer'))
         exporter.validate_contract('Answer', '00answer')
         for contract, fixture in (('Answer', '01id'), ('Other', '00answer'), ('Answer', 'missing'), (CONTRACT, '00answer')):
             with self.assertRaises(ValueError):
@@ -432,7 +432,7 @@ class FixtureAdmissionTests(unittest.TestCase):
 
     def test_a_fixture_edit_admits_a_copy_that_differs_from_the_pin_by_exactly_that_edit(self):
         pin = exporter.fixture_pins()['00answer']
-        pinned = (ROOT / '.upstream/solcore-rs-20261023' / pin['source']).resolve()
+        pinned = (ROOT / '.upstream/solcore-rs-20261102' / pin['source']).resolve()
         if not pinned.is_file():
             self.skipTest('the pinned upstream checkout is not present')
         original = pinned.read_bytes()

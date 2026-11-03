@@ -26,7 +26,7 @@ open Solcore.Core.Wire
 open Solcore.Synthesis.Core.Enums (Gen draw drawWeighted)
 open Solcore.Synthesis.Core.MemoryValues (Operand Index Ref Width Fold Var Scope State)
 
-def callsVersion : String := "core-memory-calls-v1"
+def callsVersion : String := "core-memory-calls-v2"
 
 /-- A helper's parameter: `memory<bytes>`, `memory_ref`, a type `a` bounded
 by `MemorySize`, `MemoryPointer` and `MemoryEncode`, `memory<DynArray<uint256>>`,
@@ -549,9 +549,10 @@ def expression (plan : Plan) : Expr :=
   let compiler := plan.steps.foldl (fun compiler step => compiler.step plan.helpers step)
     ({state := {state with acc}} : Compiler)
   let state := compiler.state
-  .lambda .word (.sum .word .unit) (state.builder.close (.inLeft .unit (state.ref state.acc)) state.abort)
+  .lambda .word (.sum .word .word) (state.builder.close (.inLeft .word (state.ref state.acc)) state.left)
 
-def resultType : Ty := .sum .word .unit
+/-- The accumulator, or an out-of-range access's failure code. -/
+def resultType : Ty := .sum .word .word
 
 def program (plan : Plan) : Program := {
   resultType := .function .word resultType, dataDefinitions := [], body := plan.expression}

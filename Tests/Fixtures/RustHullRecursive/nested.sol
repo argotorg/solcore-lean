@@ -1,5 +1,7 @@
 // The pinned Hull checker accepts this, but Sonatina has no conversion from
 // a complete Chain aggregate to the opaque word in its recursive Link field.
+pragma solcore;
+
 enum Chain {
     End(word),
     Link(word, Chain)

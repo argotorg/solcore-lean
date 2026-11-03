@@ -28,8 +28,8 @@ def resultType : Ty := .sum .word (.sum .word .word)
 /-- The selector of `run(uint256,uint256[][])`. -/
 def selector : Nat := 0x7095aff8
 
-/-- The std rejections this contract produces. `ArrayOutOfBounds()` cannot
-arise, since the protocol guards every row index by the outer length and every
+/-- The std rejections this contract produces. An index past a length, std's
+`Panic(0x32)`, cannot arise, since the protocol guards every row index by the outer length and every
 element index by the row length, and the non-payable check cannot fail, since
 no transaction carries value. -/
 def stdErrors : List Nat := [noSelectorError, truncatedError]

@@ -243,7 +243,7 @@ def record_result(observation: dict, actual: dict, exit_code: int, count: int) -
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--manifest", type=Path, default=ROOT / "scripts/rust-contract-parity.json")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--cache", type=Path, default=ROOT / ".upstream/hull-fixtures/contracts")

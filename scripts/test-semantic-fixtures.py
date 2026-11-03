@@ -101,12 +101,12 @@ QUEUE_SIGNER = ("0x773db49a" + word(64).hex() + word(0).hex() + word(2).hex() + 
 
 
 class InventoryAndStreamTests(unittest.TestCase):
-    def test_the_two_parity_manifests_pin_all_168_fixtures_once(self):
+    def test_the_two_parity_manifests_pin_all_182_fixtures_once(self):
         inventory = fixtures.inventory()
         raw = [item for item in inventory if item["mode"] == "raw"]
-        self.assertEqual((len(inventory), len(raw)), (168, 72))
-        self.assertEqual((sum(item["calls"] for item in raw), sum(item["calls"] for item in inventory) - 626), (626, 618))
-        self.assertEqual(len({item["id"] for item in inventory}), 168)
+        self.assertEqual((len(inventory), len(raw)), (182, 77))
+        self.assertEqual((sum(item["calls"] for item in raw), sum(item["calls"] for item in inventory) - 697), (697, 820))
+        self.assertEqual(len({item["id"] for item in inventory}), 182)
         basic = next(item for item in inventory if item["id"] == "basic")
         self.assertEqual((basic["fuel"], basic["availableGas"]), (15000000, "30000000"))
         self.assertEqual(next(item for item in inventory if item["id"] == "00answer")["fuel"], fixtures.DEFAULT_FUEL)
@@ -1178,7 +1178,7 @@ class RunTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()) as printed:
             self.assertEqual(fixtures.main(["--check"]), 0)
         checked = json.loads(printed.getvalue())
-        self.assertEqual((checked["status"], checked["tools"], len(checked["fixtures"])), ("ready", {"tools": 1}, 168))
+        self.assertEqual((checked["status"], checked["tools"], len(checked["fixtures"])), ("ready", {"tools": 1}, 182))
         self.assertEqual(sorted(checked["manifests"]), ["rust-method-parity.json", "rust-scenario-parity.json"])
 
     def test_a_fixture_lock_holds_off_a_second_run_of_the_same_fixture(self):

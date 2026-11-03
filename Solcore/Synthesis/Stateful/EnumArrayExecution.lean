@@ -18,7 +18,7 @@ namespace Solcore.Synthesis.Stateful.EnumArrayExecution
 open Lean Solcore.Core Solcore.ContractRuntime
 open Solcore.Synthesis.Core
 open Solcore.Synthesis.Core.EnumArgument (Constructor Payload Shape)
-open Solcore.Synthesis.Core.EnumArray (CheckedPlan outOfBoundsError)
+open Solcore.Synthesis.Core.EnumArray (CheckedPlan outOfBoundsError outOfBoundsPanic)
 open Solcore.Synthesis.Core.StdDispatch (noSelectorError truncatedError)
 
 def historySchema : String := "solcore-lean.enum-array-history.v1"
@@ -126,6 +126,10 @@ def bodyStart (shape : Shape) (tx : Transaction) (index : Nat) : Nat :=
 private def selectorBytes (selector : Nat) : ByteArray :=
   ByteArray.mk #[(selector / 2 ^ 24 % 256).toUInt8, (selector / 2 ^ 16 % 256).toUInt8,
     (selector / 2 ^ 8 % 256).toUInt8, (selector % 256).toUInt8]
+
+/-- std's `Panic(code)` revert data: the panic's selector, then the code as a Word. -/
+private def panicBytes (code : Nat) : ByteArray :=
+  selectorBytes outOfBoundsError ++ encodeWordBytesBE (Word.ofNatModulo code)
 
 private def words (values : List Nat) : ByteArray :=
   values.foldl (fun bytes value => bytes ++ encodeWordBytesBE (Word.ofNatModulo value)) ByteArray.empty
@@ -267,7 +271,7 @@ def decodeElement (shape : Shape) (input : ByteArray) (region length index : Nat
     Except ByteArray DecodedElement := do
   let size := input.size
   let fail := fun (error : Nat) => (Except.error (selectorBytes error) : Except ByteArray DecodedElement)
-  if index ≥ length then fail outOfBoundsError
+  if index ≥ length then .error (panicBytes outOfBoundsPanic)
   else
     let start? : Option Nat :=
       if shape.dynamic then
@@ -314,7 +318,7 @@ uint256 second)` over raw calldata, written from `do_exec`, the bounded calldata
 reader, the lazy calldata-array decoder, `checkArrayHead`, `abiArrayGet` and
 the derived decoder. The fallback reverts with `0x4924aef0`, a missing or
 out-of-range read with `0x08638556`, an index past the length with
-`0x7f52b2bf` and an unknown tag with empty data. The array's head is checked at
+`Panic(0x32)` and an unknown tag with empty data. The array's head is checked at
 dispatch, then `first` and `second` are decoded in turn; unread elements are
 never checked. -/
 def stdDecode (shape : Shape) (input : ByteArray) : Decision := do

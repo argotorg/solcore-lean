@@ -752,14 +752,14 @@ def iteration (state : State) (objects : List Nat) (body : State → State) : St
   let stateType := MemoryValues.words count
   let outer := state.builder
   let parameter := outer.size
-  let inner : State := {state with builder := {size := outer.size + 1}, abort := .inRight stateType (.var 0)}
+  let inner : State := {state with builder := {size := outer.size + 1}, left := stateType}
   let (inner, position) := inner.bind (.first (inner.ref parameter))
   let (inner, source) := inner.bind (.second (inner.ref parameter))
   let (inner, positions) := inner.unpackState count source
   let inner := body {inner.restore objects positions with counter := some position}
   let result := Expr.inLeft payloadType (MemoryValues.packet ((inner.components objects).map inner.ref))
   let lambda := Expr.lambda (.product .word stateType) (.sum stateType payloadType)
-    (inner.builder.close result inner.abort)
+    (inner.builder.close result inner.left)
   {state with builder := outer, scope := inner.scope}.bind lambda
 
 def chain (state : State) (stateType : Ty) (limit closure start trips : Nat) : State × Nat := Id.run do
@@ -834,12 +834,12 @@ namespace Plan
 closures inlined, then the left injection of the accumulator; a site's right
 injection is forwarded by every scope. -/
 def expression (plan : Plan) : Expr :=
-  let state : State := {builder := {size := 1}, input := 0, abort := .inRight .word (.var 0)}
+  let state : State := {builder := {size := 1}, input := 0, left := .word}
   let (state, acc) := state.bind (num 0)
   let compiler := plan.steps.foldl (fun compiler step => compiler.step plan.helpers step)
     ({state := {state with acc}} : Compiler)
   let state := compiler.state
-  .lambda .word resultType (state.builder.close (.inLeft payloadType (state.ref state.acc)) state.abort)
+  .lambda .word resultType (state.builder.close (.inLeft payloadType (state.ref state.acc)) state.left)
 
 def program (plan : Plan) : Program := {
   resultType := .function .word resultType, dataDefinitions := [], body := plan.expression}

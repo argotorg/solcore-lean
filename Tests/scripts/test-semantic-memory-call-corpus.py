@@ -50,7 +50,7 @@ NAME = "SynthesizedMemoryCalls"
 NODES = 1024
 CASE_LIMIT = 5120
 SHRINK_BYTES = 1_500_000
-OUT_OF_BOUNDS = memory.OUT_OF_BOUNDS
+OUT_OF_BOUNDS, ARRAY_OUT_OF_BOUNDS = memory.OUT_OF_BOUNDS, memory.ARRAY_OUT_OF_BOUNDS
 M = 1 << 256
 FOLD_CONSTANTS = memory.FOLD_CONSTANTS
 PARAMS = ("bytes", "slice", "generic", "array", "pair", "sum", "enum")
@@ -722,7 +722,7 @@ class Machine(memory.Machine):
             self.check(length, position, 1)
             return self.values[value][start + position]
         if position >= length:
-            raise OutOfBounds
+            raise OutOfBounds(ARRAY_OUT_OF_BOUNDS)
         return self.values[value][start + position]
 
     def put(self, entry, position, word, width):
@@ -745,7 +745,7 @@ class Machine(memory.Machine):
             value, start, length = argument[1]
             if argument[0] == "array":
                 if position >= length:
-                    raise OutOfBounds
+                    raise OutOfBounds(ARRAY_OUT_OF_BOUNDS)
                 self.values[value][start + position] = word
             else:
                 self.put(argument[1], position, word, helper["width"])
@@ -822,8 +822,8 @@ def model_outcome(plan, x):
     try:
         for s in plan["steps"]:
             machine.step(s)
-    except OutOfBounds:
-        return {"stage": "execution", "status": "reverted", "output": OUT_OF_BOUNDS}
+    except OutOfBounds as failure:
+        return {"stage": "execution", "status": "reverted", "output": failure.output}
     return {"stage": "execution", "status": "returned", "word": str(machine.acc)}
 
 
@@ -838,8 +838,8 @@ def check_case(case, fuel):
     number = canonical_word(case["input"])
     program = case["program"]
     require(program.get("schema") == "solcore-semantic-core" and program.get("dataDefinitions") == []
-            and program.get("resultType") == {"tag": "sum", "left": "word", "right": "unit"},
-            "the memory call reference is a closed program returning a Word or an out-of-range access")
+            and program.get("resultType") == {"tag": "sum", "left": "word", "right": "word"},
+            "the memory call reference is a closed program returning a Word or an out-of-range access's code")
     require(generic.complexity(program["body"])[0] <= CASE_LIMIT, "reference exceeds the case limit")
     require(1 <= case["provenance"]["referenceNodes"] <= CASE_LIMIT, "recorded reference size exceeds the case limit")
     require(case["contract"] == {"name": NAME, "method": "run", "signature": "run(uint256)",

@@ -95,6 +95,8 @@ def saved_execution(instance, value, raw, analysis):
     campaign.save_json(folder / "analysis.json", analysis)
     return folder, raw, analysis
 
+# std's Panic(0x32), the revert data of an array index past the length.
+PANIC = "0x4e487b71" + "00" * 31 + "32"
 
 class AnalysisTests(unittest.TestCase):
     def test_normal_analysis_and_copy_only_injection_leave_raw_report_immutable(self):
@@ -2486,13 +2488,13 @@ class EnumArrayCampaignTests(unittest.TestCase):
         self.assertEqual(campaign.enum_arrays_coverage(static),
                          {"ArrayElementCounts": {1, 2}, "ArrayPositions": {"2:0"}, "ArrayFields": {"static:pair"},
                           "ArrayBytesLengths": set(), "ArrayBytesConstructors": {0},
-                          "ArrayMalformations": {"none", "tag"}, "ArrayRejections": {"0x7f52b2bf", "accepted"},
+                          "ArrayMalformations": {"none", "tag"}, "ArrayRejections": {PANIC, "accepted"},
                           "ArrayAccepted": {"tag"}, "ArrayCarries": {"rejection"}, "ArrayNodeBudgets": {512}})
         with tempfile.TemporaryDirectory() as directory:
             instance = campaign.Campaign(options(directory, profile="stateful-enum-array-arguments"))
             instance.summary["coverage"].update(requiredArrayBytesLengths=[0, 1, 31, 32, 33, 63, 64],
                                                 requiredArrayNodeBudgets=[384, 512],
-                                                requiredArrayRejections=["0x4924aef0", "0x08638556", "0x7f52b2bf", "0x"])
+                                                requiredArrayRejections=["0x4924aef0", "0x08638556", PANIC, "0x"])
             histories = fixtures.enum_array_histories(value)
             instance.record_coverage(value, "matched", histories)
             instance.checkpoint()
@@ -2502,7 +2504,7 @@ class EnumArrayCampaignTests(unittest.TestCase):
                              (["1:0", "2:0", "2:1"], ["accepted"], ["committed", "rollback"]))
             self.assertEqual((coverage["missingArrayBytesLengths"], coverage["missingArrayNodeBudgets"],
                               coverage["missingArrayRejections"]),
-                             ([0, 1, 31, 32, 63, 64], [384, 512], ["0x", "0x08638556", "0x4924aef0", "0x7f52b2bf"]))
+                             ([0, 1, 31, 32, 63, 64], [384, 512], ["0x", "0x08638556", "0x4924aef0", PANIC]))
             # The selector rows are recorded in the analysis: here none.
             report = {"comparison": campaign.adapter.compare(histories, value), "histories": histories}
             self.assertEqual(report["comparison"]["selectorRows"], [])
@@ -2516,7 +2518,7 @@ class EnumArrayCampaignTests(unittest.TestCase):
         for dimension in ("ArrayElementCounts", "ArrayPositions", "ArrayFields", "ArrayBytesConstructors",
                           "ArrayMalformations"):
             self.assertEqual(manifest["required" + dimension], list(campaign.ENUM_ARRAY_EXTRA[dimension]))
-        self.assertEqual(manifest["requiredArrayRejections"], ["0x4924aef0", "0x08638556", "0x7f52b2bf", "0x"])
+        self.assertEqual(manifest["requiredArrayRejections"], ["0x4924aef0", "0x08638556", PANIC, "0x"])
         for key, changed in (("requiredArrayElementCounts", [4]), ("requiredArrayPositions", ["3:3"]),
                              ("requiredArrayFields", ["static:bytes"]), ("requiredArrayBytesLengths", [1025]),
                              ("requiredArrayBytesLengths", [True]), ("requiredArrayBytesConstructors", [3]),

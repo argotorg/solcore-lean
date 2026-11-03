@@ -47,7 +47,7 @@ for values, handles, snapshots, and execution options.
 ## Running solcore-rs output
 
 The [Rust Hull importer](Solcore/Frontend/RustHull/) accepts typed output from
-`argotorg/solcore-rs` at commit `2a745e12974c373c3799fec81b48a53c7dce2ab4`.
+`argotorg/solcore-rs` at commit `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`.
 It checks the imported annotations, translates Hull and inline Yul into Core,
 and checks the resulting Core expression before execution.
 

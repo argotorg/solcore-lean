@@ -16,7 +16,7 @@ use hir::{
 use serde_json::{Value, json};
 use std::{env, fs, path::Path};
 
-const COMMIT: &str = "2a745e12974c373c3799fec81b48a53c7dce2ab4";
+const COMMIT: &str = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0";
 
 #[salsa::db]
 #[derive(Default, Clone)]
@@ -44,6 +44,14 @@ fn binary(op: BinOp) -> Option<(&'static str, &'static str)> {
         BinOp::Mul => ("mul", "*"),
         BinOp::Div => ("div", "/"),
         BinOp::Mod => ("mod", "%"),
+        BinOp::Shl => ("shl", "<<"),
+        BinOp::Shr => ("shr", ">>"),
+        // An `unchecked` block substitutes these for the arithmetic operators; the token is unchanged.
+        BinOp::UncheckedAdd => ("unchecked-add", "+"),
+        BinOp::UncheckedSub => ("unchecked-sub", "-"),
+        BinOp::UncheckedMul => ("unchecked-mul", "*"),
+        BinOp::UncheckedDiv => ("unchecked-div", "/"),
+        BinOp::UncheckedMod => ("unchecked-mod", "%"),
         BinOp::BitAnd => ("bit-and", "&"),
         BinOp::BitXor => ("bit-xor", "^"),
         BinOp::BitOr => ("bit-or", "|"),

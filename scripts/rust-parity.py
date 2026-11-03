@@ -63,7 +63,7 @@ def load_cases(manifest: dict, upstream: Path, patterns: list[str]) -> list[dict
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--manifest", type=Path, default=ROOT / "scripts/rust-parity.json")
     parser.add_argument("--case", action="append", default=[], help="case ID glob; repeatable")
     parser.add_argument("--output", type=Path, help="write the complete JSON result report")

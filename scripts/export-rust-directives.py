@@ -38,7 +38,7 @@ rust-version = "1.97.0"
 
 [dependencies]
 serde_json = "=1.0.151"
-salsa = "=0.27.2"
+salsa = "=0.28.5"
 url = "=2.5.8"
 hir = {dependency("solcore-hir", "hir")}
 parser = {dependency("solcore-parser", "parser")}
@@ -55,7 +55,7 @@ def pins(path: Path) -> set[tuple]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", nargs="?", type=Path)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--build", action="store_true")
@@ -72,7 +72,8 @@ def main() -> int:
         (TOOL / "src").mkdir(parents=True, exist_ok=True)
         (TOOL / "Cargo.toml").write_text(package)
         (TOOL / "src/main.rs").write_bytes(SOURCE.read_bytes())
-        if not (TOOL / "Cargo.lock").exists():
+        # A lock left by another pin is reseeded from the pinned upstream lock.
+        if not (TOOL / "Cargo.lock").exists() or pins(TOOL / "Cargo.lock") - pins(upstream / "Cargo.lock"):
             (TOOL / "Cargo.lock").write_bytes((upstream / "Cargo.lock").read_bytes())
         command = ["cargo", "build", "--manifest-path", str(TOOL / "Cargo.toml"), "--target-dir", str(target)]
         if not args.allow_network:

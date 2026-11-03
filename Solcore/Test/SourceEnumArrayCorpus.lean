@@ -57,7 +57,7 @@ def fieldKinds : List String :=
 
 /-- std's four rejections: the fallback, a truncated read, an index past the
 length and an unknown tag. -/
-def rejections : List String := ["0x4924aef0", "0x08638556", "0x7f52b2bf", "0x"]
+def rejections : List String := ["0x4924aef0", "0x08638556", "0x4e487b710000000000000000000000000000000000000000000000000000000000000032", "0x"]
 
 /-- The malformations that std accepts in some case: changes it never reads,
 another constructor's tag, a shared body, a longer length that still fits. -/
@@ -89,10 +89,10 @@ private def templates (saved : Json) : Except String (List Nat) := do
   let helpers ← (← origin.getObjVal? "stepOrigin").getObjValAs? (List Json) "helpers"
   helpers.mapM fun helper => helper.getObjValAs? Nat "template"
 
-/-- Original Core's output for std's data: the selector Word for four bytes,
-the Word zero for none. -/
+/-- Original Core's output for std's data: the selector Word for an error's
+four bytes or a panic's selector and code, the Word zero for none. -/
 private def coreOutput (output : ByteArray) : String :=
-  if output.size == 4 then
+  if output.size == 4 || output.size == 36 then
     Solcore.ContractRuntime.encodeBytesText (Solcore.ContractRuntime.encodeWordBytesBE
       (Word.ofNatModulo (Solcore.Synthesis.Stateful.StdCalldata.bigEndian output 0 4)))
   else if output.size == 0 then

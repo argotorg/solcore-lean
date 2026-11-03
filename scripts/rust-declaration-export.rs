@@ -10,7 +10,7 @@ use hir::{
 use serde_json::{Value, json};
 use std::{env, fs, path::Path};
 
-const COMMIT: &str = "2a745e12974c373c3799fec81b48a53c7dce2ab4";
+const COMMIT: &str = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0";
 
 #[salsa::db]
 #[derive(Default, Clone)]
@@ -47,6 +47,7 @@ fn ty<'db>(db: &'db dyn hir::Db, ty: TypeRef<'db>) -> Value {
             json!({"fn":{"params":all(params.atom()), "ret":self::ty(db, *ret)}})
         }
         TypeRefKind::Comptime { inner, .. } => json!({"comptime":self::ty(db, *inner)}),
+        TypeRefKind::Array { elem, .. } => json!({"array":self::ty(db, *elem)}),
         TypeRefKind::Error { .. } => json!({"error":true}),
     }
 }

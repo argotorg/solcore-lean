@@ -51,7 +51,7 @@ def checked_identity(upstream: Path, target: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     args = parser.parse_args()
     upstream, target = args.upstream.resolve(), args.target_dir.resolve()
@@ -61,7 +61,8 @@ def main() -> int:
     (TOOL / "src").mkdir(parents=True, exist_ok=True)
     (TOOL / "Cargo.toml").write_text(manifest(upstream))
     (TOOL / "src/main.rs").write_bytes(SOURCE.read_bytes())
-    if not (TOOL / "Cargo.lock").exists():
+    # A lock left by another pin is reseeded from the pinned upstream lock.
+    if not (TOOL / "Cargo.lock").exists() or export.pins(TOOL / "Cargo.lock") - export.pins(upstream / "Cargo.lock"):
         (TOOL / "Cargo.lock").write_bytes((upstream / "Cargo.lock").read_bytes())
     subprocess.run(["cargo", "build", "--offline", "--manifest-path", str(TOOL / "Cargo.toml"),
         "--target-dir", str(target)], check=True, cwd=ROOT)

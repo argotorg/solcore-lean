@@ -40,11 +40,11 @@ private def cases (corpus : Json) : IO (Array Json) :=
 
 private def provenance (case : Json) : IO Json := expect (case.getObjVal? "provenance")
 
-/-- A returned Word, or `none` for an out-of-range access. -/
-private def run (program : Solcore.Core.Wire.Program) : IO (Option Nat) :=
+/-- A returned Word, or an out-of-range access's failure code. -/
+private def run (program : Solcore.Core.Wire.Program) : IO (Nat ⊕ Nat) :=
   match program.toCore.runStateful fuel with
-  | .done (.inLeft _ (.word value)) _ => pure (some value.val)
-  | .done (.inRight _ .unit) _ => pure none
+  | .done (.inLeft _ (.word value)) _ => pure (.inl value.val)
+  | .done (.inRight _ (.word code)) _ => pure (.inr code.val)
   | _ => throw (IO.userError "a reference program returned neither a Word nor an out-of-range access")
 
 /-! A direct interpreter of a plan: bytes values as byte lists and arrays as
@@ -61,10 +61,13 @@ private structure Machine where
   acc : Nat := 0
   position : Nat := 0
 
-/-- The only failure of an admitted plan is an out-of-range access. -/
+/-- The only failure of an admitted plan is an out-of-range access: of a
+value's Words or bytes, or of an array element. -/
 private abbrev Interp := StateT Machine (Except String)
 
 private def outOfRange {α : Type} : Interp α := throw "out of range"
+
+private def elementOutOfRange {α : Type} : Interp α := throw "element out of range"
 
 private def operand (value : Operand) : Interp Nat := do
   let machine ← getThe Machine
@@ -137,7 +140,7 @@ private def access (ref : Ref) : Access → Interp Nat
   | .element position _ => do
       let (value, _, length) ← entryOf ref
       let offset ← index position
-      if offset ≥ length then outOfRange
+      if offset ≥ length then elementOutOfRange
       return ((← getThe Machine).values[value]!)[offset]!
 
 private def act : Action → Interp Unit
@@ -168,7 +171,7 @@ private def act : Action → Interp Unit
       let offset ← index position
       let word ← operand written
       if target.isArray then
-        if offset ≥ length then outOfRange
+        if offset ≥ length then elementOutOfRange
         store value (·.set! offset word)
       else match width with
         | .word =>
@@ -221,11 +224,12 @@ private def step : Step → Interp Unit
       modify fun machine => {machine with counts := ["bytes", "slice", "array"].map fun kind =>
         (kind, (before.lookup kind).getD 0 + declared actions kind)}
 
-/-- The returned Word, or `none` for an out-of-range access. -/
-private def interpret (plan : Plan) (input : Nat) : Option (Option Nat) :=
+/-- The returned Word, or an out-of-range access's failure code. -/
+private def interpret (plan : Plan) (input : Nat) : Option (Nat ⊕ Nat) :=
   match ((plan.steps.forM step).run {input}) with
-  | .ok ((), machine) => some (some machine.acc)
-  | .error "out of range" => some none
+  | .ok ((), machine) => some (.inl machine.acc)
+  | .error "out of range" => some (.inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code)
+  | .error "element out of range" => some (.inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code)
   | .error _ => none
 
 private def boundary : List Nat := [0, 1, 2, 255, 256, 2 ^ 256 - 1, 2 ^ 255, 2 ^ 255 - 1]
@@ -244,7 +248,7 @@ private def modelChecks : IO Unit := do
           ensure (interpret checked.plan input == some core)
             s!"seed {seed + 1} input {input}: the reference differs from the interpreter"
           compared := compared + 1
-          if core.isNone then outOfRanges := outOfRanges + 1
+          if let .inr _ := core then outOfRanges := outOfRanges + 1
   ensure (compared = 2400) "fewer than 200 generated plans compared with the interpreter"
   ensure (outOfRanges ≥ 200) "fewer than 200 compared outcomes were out of range"
 
@@ -269,20 +273,21 @@ private def fixturePlan : Plan := {steps := [
   .action (.observe .add 9 (.bytes 0) (.word (.input 3 40)))]}
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-value-corpus.py`;
-`none` is an out-of-range access. -/
-private def fixtureResults : List (Nat × Option Nat) := [
-  (0, some 21608449789222171400017857054612460352274887628236327849281298773463202112237),
-  (1, some 37159832601512557076352362437260036118380150560180980217316581885928113078806),
-  (2, some 7070914082375865400419380607351947518286818568728180506878057915024197659755),
-  (255, none),
-  (256, some 81253762954073271886094364441350933743392128171845494974348576044161271819597),
-  (2 ^ 256 - 1, none),
-  (2 ^ 255, some 115241369297029195970935126769825421674642356010695457834697403420591494212405),
-  (2 ^ 255 - 1, none),
-  (3, none),
-  (5, some 58359939051907315747778763232000840318553681460026901230101664618625926483649),
-  (77, some 59898808143498259735179537305375289661228902309705880128859437858850088642590),
-  (1001, some 13800937350835242282643099520518083362978033394498188391394767143433918975331)]
+each out-of-range input fails at the loop's element read at position three,
+`Panic(0x32)`. -/
+private def fixtureResults : List (Nat × (Nat ⊕ Nat)) := [
+  (0, .inl 21608449789222171400017857054612460352274887628236327849281298773463202112237),
+  (1, .inl 37159832601512557076352362437260036118380150560180980217316581885928113078806),
+  (2, .inl 7070914082375865400419380607351947518286818568728180506878057915024197659755),
+  (255, .inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code),
+  (256, .inl 81253762954073271886094364441350933743392128171845494974348576044161271819597),
+  (2 ^ 256 - 1, .inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code),
+  (2 ^ 255, .inl 115241369297029195970935126769825421674642356010695457834697403420591494212405),
+  (2 ^ 255 - 1, .inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code),
+  (3, .inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code),
+  (5, .inl 58359939051907315747778763232000840318553681460026901230101664618625926483649),
+  (77, .inl 59898808143498259735179537305375289661228902309705880128859437858850088642590),
+  (1001, .inl 13800937350835242282643099520518083362978033394498188391394767143433918975331)]
 
 private def fixtureSource : String := String.intercalate "\n" [
   "import * from std;",
@@ -359,7 +364,8 @@ private def fixtureChecks : IO Unit := do
     | .error _ => false) "the fixture plan JSON does not round-trip"
   let observed := MemoryValues.observe checked (Word.ofNatModulo 255) fuel
   ensure (observed == Json.mkObj [("stage", toJson "execution"), ("status", toJson "reverted"),
-    ("output", toJson "0xb4120f14")]) "an out-of-range fixture input is not observed as std's OutOfBounds() revert"
+    ("output", toJson ("0x4e487b71" ++ String.ofList (List.replicate 62 '0') ++ "32"))])
+    "an out-of-range element of the fixture is not observed as std's Panic(0x32) revert"
 
 private def withStep (index : Nat) (replacement : Step) : Plan :=
   {steps := fixturePlan.steps.set index replacement}
@@ -465,7 +471,8 @@ private def generationChecks : IO Unit := do
     ensure ((← expect (MemoryValues.replayCase case fuel)) == case) "a generated case failed exact replay"
     let direct ← expect (case.getObjVal? "directCore")
     if (direct.getObjValAs? String "status").toOption == some "reverted" then
-      ensure ((direct.getObjValAs? String "output").toOption == some "0xb4120f14") "a reverted case has other data"
+      ensure ([some MemoryValues.outOfBounds, some MemoryValues.arrayOutOfBounds].contains
+        (direct.getObjValAs? String "output").toOption) "a reverted case has other data"
       reverted := reverted + 1
   ensure (reverted ≥ 8) "fewer than eight of 64 generated cases were out of range"
   let seeded ← cases (MemoryValues.generateCases (Seed.ofNat 7) MemoryValues.defaultNodes 12 4 fuel .seeded .nonIdentity)

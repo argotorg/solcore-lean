@@ -4,7 +4,7 @@
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
   "emitterVersion": "solcore-source-memory-calls-v1",
-  "generatorVersion": "core-memory-calls-v1",
+  "generatorVersion": "core-memory-calls-v2",
   "profileVersion": "runtime-memory-calls-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-memory-calls-contract-v1",
   "requiredFeatures": [],

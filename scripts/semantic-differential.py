@@ -34,6 +34,7 @@ _bundle_spec = importlib.util.spec_from_file_location("semantic_source_bundle", 
 assert _bundle_spec and _bundle_spec.loader
 bundle_transport = importlib.util.module_from_spec(_bundle_spec)
 _bundle_spec.loader.exec_module(bundle_transport)
+compiler_source = bundle_transport.compiler_source
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 CALL_GRAPH_CASE_SCHEMA = "solcore-lean.semantic-call-graph-case.v1"
@@ -215,8 +216,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData",
                   HALT_CASE_SCHEMA: "SynthesizedHalts"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
-UPSTREAM_COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
-BACKEND_COMMIT = "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
+UPSTREAM_COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
+BACKEND_COMMIT = "6bd0ce661ea327c149429b00fee3c8608616040f"
 SONATINA_BACKENDS = ("sonatina-o0", "sonatina-o2")
 BACKENDS = (*SONATINA_BACKENDS, "yul")
 MAX_CASE_BYTES = 4 * 1024 * 1024
@@ -1461,7 +1462,7 @@ class CompileCache:
         if receipt is not None:
             receipt = {**bundle_transport.write(directory, case), "libraries": receipt["libraries"]}
         else:
-            source.write_text(case["source"])
+            source.write_text(compiler_source(case["source"]))
         first, failure, yul = len(report["processes"]), None, None
         try:
             export_sources(args, runner, directory, source, linked_backend, lambda: audit(directory))
@@ -1553,7 +1554,7 @@ def execute(args, report: dict) -> None:
         if args.replay and bundle_receipt["libraries"] != previous["sourceBundleReceipt"]["libraries"]:
             raise Finding("adapter-error", "replay", "pinned standard-library inventory or hashes changed")
     else:
-        source.write_text(case["source"])
+        source.write_text(compiler_source(case["source"]))
 
     def audit_bundle(directory=None):
         if bundle_receipt is not None:
@@ -1717,7 +1718,7 @@ def main() -> int:
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-case-tool")
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--backend", choices=BACKENDS, help="default Sonatina O0; exact replay inherits its saved backend")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")

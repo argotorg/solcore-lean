@@ -496,7 +496,7 @@ def execute(args, report):
         return execute_returns(args, report, previous, runner, case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
     save(case_path, case)
-    source.write_text(case["source"])
+    source.write_text(common.compiler_source(case["source"]))
     report.update(caseSha256=common.file_digest(case_path), sourceSha256=common.file_digest(source),
         programsSha256=common.digest(common.json_bytes(case["programs"])), provenance=case["provenance"],
         replayOf=str(args.replay) if args.replay else None)
@@ -1462,7 +1462,7 @@ def execute_returns(args, report, previous, runner, case):
     save(case_path, case)
     sources = {role: args.output / f"{role}.sol" for role in ROLES}
     for role in ROLES:
-        sources[role].write_text(case["sources"][role])
+        sources[role].write_text(common.compiler_source(case["sources"][role]))
     report.update(caseSha256=common.file_digest(case_path),
         sourceSha256={role: common.file_digest(sources[role]) for role in ROLES},
         programsSha256=common.digest(common.json_bytes(case["programs"])), provenance=case["provenance"],
@@ -1662,7 +1662,7 @@ def main():
     parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
     parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     defaults = {"direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000, "timeout": 300,
         "startup_timeout": 30, "total_timeout": 900, "output_limit": 4 * 1024 * 1024, "artifact_limit": 64 * 1024 * 1024}

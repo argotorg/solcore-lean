@@ -26,7 +26,7 @@ structure Image where
   deriving Repr, BEq
 
 def schema : String := "solcore-rs.code-images.v1"
-def backendRevision : String := "8ee24814ea9b32c762df8ef80c796e7d48797c0f"
+def backendRevision : String := "6bd0ce661ea327c149429b00fee3c8608616040f"
 
 private def unique {α : Type} [BEq α] (values : List α) : Bool :=
   (values.eraseDups).length == values.length

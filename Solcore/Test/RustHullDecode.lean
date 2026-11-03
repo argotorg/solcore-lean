@@ -10,7 +10,7 @@ private def require (condition : Bool) (message : String) : IO Unit :=
 
 private def sample : String := r#"{
   "schema":"solcore-rs.hull.v1",
-  "upstreamCommit":"2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "upstreamCommit":"e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
   "program":{
     "entryPoints":["entry"],
     "span":{"file":"main.sol","start":0,"end":120},

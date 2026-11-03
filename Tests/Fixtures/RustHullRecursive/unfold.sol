@@ -1,5 +1,7 @@
 // The pinned Hull checker accepts the tail binding as a full Chain, while
 // the backend representation supplies only its opaque recursive word.
+pragma solcore;
+
 enum Chain {
     End(word),
     Link(word, Chain)

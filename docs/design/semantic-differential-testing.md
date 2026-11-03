@@ -11,9 +11,9 @@ The [next implementation roadmap](next-implementation-roadmap.md) orders the
 remaining operational and proof work. CI scheduling and generated O2/Yul
 comparisons are not part of the delivered baseline.
 
-The initial reference is `argotorg/solcore-rs` at
-`2a745e12974c373c3799fec81b48a53c7dce2ab4`, matching the existing exporters and
-fixture manifests. Pin compiler, backend, standard library and EVM versions in
+The reference is `argotorg/solcore-rs` at
+`e2eef19409fc8879cd4a9cc342ed60e3152f72c0`, matching the existing exporters and
+fixture manifests; the initial one was `2a745e12`. Pin compiler, backend, standard library and EVM versions in
 every campaign. Updating the reference revision is a separate, explicit change.
 
 The initial test domain is a closed, terminating Word/Bool fragment. It does

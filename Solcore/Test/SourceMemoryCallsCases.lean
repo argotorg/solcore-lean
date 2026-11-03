@@ -41,11 +41,11 @@ private def cases (corpus : Json) : IO (Array Json) :=
 
 private def provenance (case : Json) : IO Json := expect (case.getObjVal? "provenance")
 
-/-- A returned Word, or `none` for an out-of-range access. -/
-private def run (program : Solcore.Core.Wire.Program) : IO (Option Nat) :=
+/-- A returned Word, or an out-of-range access's failure code. -/
+private def run (program : Solcore.Core.Wire.Program) : IO (Nat ⊕ Nat) :=
   match program.toCore.runStateful fuel with
-  | .done (.inLeft _ (.word value)) _ => pure (some value.val)
-  | .done (.inRight _ .unit) _ => pure none
+  | .done (.inLeft _ (.word value)) _ => pure (.inl value.val)
+  | .done (.inRight _ (.word code)) _ => pure (.inr code.val)
   | _ => throw (IO.userError "a reference program returned neither a Word nor an out-of-range access")
 
 /-! A direct interpreter of a plan: bytes values as byte lists and arrays as
@@ -84,6 +84,8 @@ private structure Machine where
 private abbrev Interp := StateT Machine (Except String)
 
 private def outOfRange {α : Type} : Interp α := throw "out of range"
+
+private def elementOutOfRange {α : Type} : Interp α := throw "element out of range"
 
 private def operand (value : Operand) : Interp Nat := do
   let machine ← getThe Machine
@@ -151,7 +153,7 @@ private def observeEntry (entry : Entry) (obs : Obs) (offset : Nat) : Interp Nat
       check length offset 1
       return ((← getThe Machine).values[value]!)[start + offset]!
   | .element =>
-      if offset ≥ length then outOfRange
+      if offset ≥ length then elementOutOfRange
       return ((← getThe Machine).values[value]!)[start + offset]!
 
 private def putEntry (entry : Entry) (offset word : Nat) : Width → Interp Unit
@@ -166,7 +168,7 @@ private def putEntry (entry : Entry) (offset word : Nat) : Width → Interp Unit
 
 private def putElement (entry : Entry) (offset word : Nat) : Interp Unit := do
   let (value, start, length) := entry
-  if offset ≥ length then outOfRange
+  if offset ≥ length then elementOutOfRange
   store value (·.set! (start + offset) word)
 
 private def accumulate (fold : Fold) (constant observed : Nat) : Interp Unit := modify fun machine =>
@@ -291,11 +293,12 @@ private def step (helpers : List Helper) : Step → Interp Unit
       let (entry, obs) := (← getThe Machine).closures[number]!
       accumulate fold constant (← observeEntry entry obs (← index position))
 
-/-- The returned Word, or `none` for an out-of-range access. -/
-private def interpret (plan : Plan) (input : Nat) : Option (Option Nat) :=
+/-- The returned Word, or an out-of-range access's failure code. -/
+private def interpret (plan : Plan) (input : Nat) : Option (Nat ⊕ Nat) :=
   match ((plan.steps.forM (step plan.helpers)).run {input}) with
-  | .ok ((), machine) => some (some machine.acc)
-  | .error "out of range" => some none
+  | .ok ((), machine) => some (.inl machine.acc)
+  | .error "out of range" => some (.inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code)
+  | .error "element out of range" => some (.inr Solcore.Synthesis.Core.MemoryValues.Failure.array.code)
   | .error _ => none
 
 private def boundary : List Nat := [0, 1, 2, 255, 256, 2 ^ 256 - 1, 2 ^ 255, 2 ^ 255 - 1]
@@ -314,7 +317,7 @@ private def modelChecks : IO Unit := do
           ensure (interpret checked.plan input == some core)
             s!"seed {seed + 1} input {input}: the reference differs from the interpreter"
           compared := compared + 1
-          if core.isNone then outOfRanges := outOfRanges + 1
+          if let .inr _ := core then outOfRanges := outOfRanges + 1
   ensure (compared = 2400) "fewer than 200 generated plans compared with the interpreter"
   ensure (outOfRanges ≥ 200) "fewer than 200 compared outcomes were out of range"
 
@@ -363,34 +366,34 @@ private def fixtureB : Plan := {
     .action (.observe .xor 7 (.slice 0) (.byte (.input 8 31)))]}
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-call-corpus.py`;
-`none` is an out-of-range access. -/
-private def fixtureAResults : List (Nat × Option Nat) := [
-  (0, some 72242028008843834408630760672861491772646845153315677968046753082743170501259),
-  (1, some 28794986706600237396589248746379040974034525714432669763486185533587286561136),
-  (2, some 16511079347741181052288917318141561912842708339331099409325098332830202613987),
-  (255, some 107535809238064730873335995143676968170243187874906453889788097605332025595584),
-  (256, some 70515616853955502638081244769189250539733285920752415866804593287428544386072),
-  (2 ^ 256 - 1, some 57655881719293170964465309150860510537028812815812853729182389455680009867045),
-  (2 ^ 255, some 33261368517523964077741793340843518474846216834467566246152698697055181055799),
-  (2 ^ 255 - 1, some 39200207660929337112266666871390544428014184820884090925102396269974450162141),
-  (3, some 39550463219767020936447378244865110222821850776900421484745546207258526633877),
-  (99, none),
-  (300, none),
-  (1001, some 60830111377926786314490136554414777589416998269549332393809054047616830022487)]
+an out-of-range input reads or writes a bytes value, `OutOfBounds()`. -/
+private def fixtureAResults : List (Nat × (Nat ⊕ Nat)) := [
+  (0, .inl 72242028008843834408630760672861491772646845153315677968046753082743170501259),
+  (1, .inl 28794986706600237396589248746379040974034525714432669763486185533587286561136),
+  (2, .inl 16511079347741181052288917318141561912842708339331099409325098332830202613987),
+  (255, .inl 107535809238064730873335995143676968170243187874906453889788097605332025595584),
+  (256, .inl 70515616853955502638081244769189250539733285920752415866804593287428544386072),
+  (2 ^ 256 - 1, .inl 57655881719293170964465309150860510537028812815812853729182389455680009867045),
+  (2 ^ 255, .inl 33261368517523964077741793340843518474846216834467566246152698697055181055799),
+  (2 ^ 255 - 1, .inl 39200207660929337112266666871390544428014184820884090925102396269974450162141),
+  (3, .inl 39550463219767020936447378244865110222821850776900421484745546207258526633877),
+  (99, .inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code),
+  (300, .inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code),
+  (1001, .inl 60830111377926786314490136554414777589416998269549332393809054047616830022487)]
 
-private def fixtureBResults : List (Nat × Option Nat) := [
-  (0, some 70895379005827235410385788254663289791512939887124188183065356754751538211480),
-  (1, some 26555323344963878524516092858499067571302160062675108872867170230023276099303),
-  (2, some 104699478716185010130315260041630595032925429523647116161313331864302840415402),
-  (255, some 64977749603918774623399018940398306120938914228916938263254806947498849643353),
-  (256, some 22785389816243773430335715020161494851259740866219976544483484395265919071376),
-  (2 ^ 256 - 1, some 18758776471704661775015560766960060675843703994723565537355641480988536135938),
-  (2 ^ 255, some 39800692868954229084531459478632215291755259371103084633425376066695511368604),
-  (2 ^ 255 - 1, some 17342871063904328424333649282263394694054430976925053944197056639101938932778),
-  (3, some 54611389255892579513659646500361393792497290255370143099917570726769428808481),
-  (42, none),
-  (7680, none),
-  (1001, some 101271697361168520248805485127094807716825221348644557259711928758180779855971)]
+private def fixtureBResults : List (Nat × (Nat ⊕ Nat)) := [
+  (0, .inl 70895379005827235410385788254663289791512939887124188183065356754751538211480),
+  (1, .inl 26555323344963878524516092858499067571302160062675108872867170230023276099303),
+  (2, .inl 104699478716185010130315260041630595032925429523647116161313331864302840415402),
+  (255, .inl 64977749603918774623399018940398306120938914228916938263254806947498849643353),
+  (256, .inl 22785389816243773430335715020161494851259740866219976544483484395265919071376),
+  (2 ^ 256 - 1, .inl 18758776471704661775015560766960060675843703994723565537355641480988536135938),
+  (2 ^ 255, .inl 39800692868954229084531459478632215291755259371103084633425376066695511368604),
+  (2 ^ 255 - 1, .inl 17342871063904328424333649282263394694054430976925053944197056639101938932778),
+  (3, .inl 54611389255892579513659646500361393792497290255370143099917570726769428808481),
+  (42, .inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code),
+  (7680, .inr Solcore.Synthesis.Core.MemoryValues.Failure.bytes.code),
+  (1001, .inl 101271697361168520248805485127094807716825221348644557259711928758180779855971)]
 
 private def header : List String := [
   "import * from std;",
@@ -684,7 +687,8 @@ private def generationChecks : IO Unit := do
     ensure ((← expect (MemoryCalls.replayCase case fuel)) == case) "a generated case failed exact replay"
     let direct ← expect (case.getObjVal? "directCore")
     if (direct.getObjValAs? String "status").toOption == some "reverted" then
-      ensure ((direct.getObjValAs? String "output").toOption == some "0xb4120f14") "a reverted case has other data"
+      ensure ([some MemoryCalls.outOfBounds, some MemoryCalls.arrayOutOfBounds].contains
+        (direct.getObjValAs? String "output").toOption) "a reverted case has other data"
       reverted := reverted + 1
   ensure (reverted ≥ 4) "fewer than four of 64 generated cases were out of range"
   let seeded ← cases (MemoryCalls.generateCases (Seed.ofNat 7) MemoryCalls.defaultNodes 12 4 fuel .seeded .nonIdentity)

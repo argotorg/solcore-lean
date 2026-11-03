@@ -25,7 +25,7 @@ CALL = {"stage": "execution", "status": "returned", "output": "0x", "index": 0}
 
 class ResultTests(unittest.TestCase):
     def test_manifests_partition_the_pinned_fixture_catalog(self):
-        upstream = ROOT / ".upstream/solcore-rs-20261023/tests/e2e"
+        upstream = ROOT / ".upstream/solcore-rs-20261102/tests/e2e"
         if not upstream.exists():
             self.skipTest("pinned reference checkout is absent")
         raw = json.loads((ROOT / "scripts/rust-scenario-parity.json").read_text())["fixtures"]
@@ -33,8 +33,8 @@ class ResultTests(unittest.TestCase):
         raw_ids, method_ids = {item["id"] for item in raw}, {item["id"] for item in methods}
         self.assertTrue(raw_ids.isdisjoint(method_ids))
         self.assertEqual(raw_ids | method_ids, {path.parent.name for path in upstream.glob("*/main.sol")})
-        self.assertEqual(sum(item["expectedCallCount"] for item in raw), 626)
-        self.assertEqual(sum(item["expectedCallCount"] for item in methods), 618)
+        self.assertEqual(sum(item["expectedCallCount"] for item in raw), 697)
+        self.assertEqual(sum(item["expectedCallCount"] for item in methods), 820)
 
     def test_runtime_prepare_failure_keeps_deployment(self):
         failed = {"stage": "preparation", "status": "rejected", "detail": "external call"}
@@ -80,7 +80,7 @@ class ResultTests(unittest.TestCase):
 
 class ExtractorTests(unittest.TestCase):
     binary = ROOT / ".upstream/rust-parity-target/debug/solcore-directive-export"
-    upstream = ROOT / ".upstream/solcore-rs-20261023"
+    upstream = ROOT / ".upstream/solcore-rs-20261102"
 
     @classmethod
     def setUpClass(cls):

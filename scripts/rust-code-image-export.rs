@@ -9,8 +9,8 @@ use sonatina_codegen::{
 };
 use std::{env, fmt::Write, fs};
 
-const UPSTREAM: &str = "2a745e12974c373c3799fec81b48a53c7dce2ab4";
-const BACKEND: &str = "8ee24814ea9b32c762df8ef80c796e7d48797c0f";
+const UPSTREAM: &str = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0";
+const BACKEND: &str = "6bd0ce661ea327c149429b00fee3c8608616040f";
 
 fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value

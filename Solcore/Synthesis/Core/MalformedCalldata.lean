@@ -35,8 +35,8 @@ def noSelectorError : Nat := 0x4924aef0
 /-- std's `ABIInputTruncated()`, reverted by every bounded calldata read. -/
 def truncatedError : Nat := 0x08638556
 
-/-- The std rejections this contract produces. `ArrayOutOfBounds()` cannot
-arise, since the protocol guards every index by the length, and the non-payable
+/-- The std rejections this contract produces. An index past a length, std's
+`Panic(0x32)`, cannot arise, since the protocol guards every index by the length, and the non-payable
 check cannot fail, since no transaction carries value. -/
 def stdErrors : List Nat := [noSelectorError, truncatedError]
 

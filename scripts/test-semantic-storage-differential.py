@@ -4702,14 +4702,15 @@ def enum_array_history(value, path, step=lambda x: x + 1):
     calldata, then r = step(slot 0 + L + both elements' index and Words) to slot
     0, the length to slot 1 and both elements to slots 2 to 9; odd decoded flags
     revert with r. A rejection reverts with std's data on Hull and the EVM and
-    with the selector Word or the Word zero in original Core."""
+    with the selector Word, the panic's included, or the Word zero in original
+    Core."""
     rows, prior = [], [0] * 10
     for index, tx in enumerate(value["transactions"]):
         rejection, decoded = runner.enum_array_decode(value, runner.common.hex_bytes(tx["calldata"], "calldata"))
         if rejection is not None:
             output = bytes.fromhex(rejection[2:])
             if path == "directCore":
-                output = int.from_bytes(output, "big").to_bytes(32, "big")
+                output = int.from_bytes(output[:4], "big").to_bytes(32, "big")
             status, committed = "reverted", list(prior)
         else:
             flags, *words = decoded
@@ -4869,8 +4870,8 @@ class EnumArrayTests(unittest.TestCase):
                          [(1, runner.STD_EMPTY_REVERT), (2, runner.STD_OUT_OF_BOUNDS), (3, runner.STD_TRUNCATED),
                           (4, runner.STD_NO_SELECTOR)])
         core = histories["directCore"]["transactions"]
-        self.assertEqual([core[index]["output"] for index in (1, 2)], ["0x" + "00" * 32, "0x" + "00" * 28 + "7f52b2bf"])
-        self.assertEqual(histories["rustEvm"]["transactions"][2]["output"], "0x7f52b2bf")
+        self.assertEqual([core[index]["output"] for index in (1, 2)], ["0x" + "00" * 32, "0x" + "00" * 28 + "4e487b71"])
+        self.assertEqual(histories["rustEvm"]["transactions"][2]["output"], "0x4e487b71" + "00" * 31 + "32")
         for index, tx in enumerate(value["transactions"]):
             rows_by_path = runner.comparable(value, tx, {name: histories[name]["transactions"][index] for name in runner.PATHS})
             prior = histories["rustEvm"]["transactions"][index - 1]["committedStorage"] if index else histories["rustEvm"]["initialStorage"]
@@ -4884,7 +4885,7 @@ class EnumArrayTests(unittest.TestCase):
             with self.subTest(index=index, path=path):
                 self.assertEqual((result["category"], result["transactionId"]), ("semantic-mismatch", f"tx-{index}"))
                 self.assertIn("output", result["fields"])
-        # Another profile's Core never maps ArrayOutOfBounds().
+        # Another profile's Core never maps the array index panic.
         self.assertNotIn(runner.STD_OUT_OF_BOUNDS, runner.STD_ERRORS)
 
     def test_decoded_elements_follow_the_protocol_on_every_path(self):

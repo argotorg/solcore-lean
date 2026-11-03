@@ -233,7 +233,7 @@ def parse_args(argv=None):
     parser.add_argument("--case", required=True, type=Path, help="reducible saved case; use fixed closed-g0 cases/0006.json")
     parser.add_argument("--output", required=True, type=Path, help="new validation directory")
     for key, default in {"anvil": Path(shutil.which("anvil") or "anvil"),
-                         "upstream": ROOT / ".upstream/solcore-rs-20261023", "target-dir": ROOT / ".upstream/rust-parity-target",
+                         "upstream": ROOT / ".upstream/solcore-rs-20261102", "target-dir": ROOT / ".upstream/rust-parity-target",
                          "case-tool": ROOT / ".lake/build/bin/semantic-case-tool", "core-runner": ROOT / ".lake/build/bin/rust-hull-scenario"}.items():
         parser.add_argument("--" + key, type=Path, default=default)
     parser.add_argument("--seconds", type=float, default=600)

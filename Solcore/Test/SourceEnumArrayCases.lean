@@ -35,17 +35,21 @@ private def slots (values : List Word) : Json :=
   toJson ((values.zipIdx).map fun (value, slot) => Json.mkObj [
     ("slot", toJson (toString slot)), ("value", toJson (toString value.val))])
 
+/-- std's revert data with a selector: an error's four bytes, or a panic's
+selector and code. -/
+private def selected (output : ByteArray) : Bool := output.size == 4 || output.size == 36
+
 /-- Original Core's revert Word for std's revert data: the selector Word for
-four bytes, the Word zero for none. -/
+an error or a panic, the Word zero for none. -/
 private def coreOutput (output : ByteArray) : String :=
-  if output.size == 4 then
+  if selected output then
     encodeBytesText (encodeWordBytesBE (Word.ofNatModulo (StdCalldata.bigEndian output 0 4)))
   else if output.size == 0 then encodeBytesText (encodeWordBytesBE Word.zero)
   else encodeBytesText output
 
 /-- The std outcome a model row stands for. -/
 private def outcome (row : EnumArrayExecution.ModelRow) : String :=
-  if row.output.size == 4 then encodeBytesText row.output
+  if selected row.output then encodeBytesText row.output
   else if row.output.size == 0 then "empty"
   else if row.reverted then "body-revert" else "returned"
 

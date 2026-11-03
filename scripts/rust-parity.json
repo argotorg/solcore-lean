@@ -1,6 +1,6 @@
 {
   "upstream_url": "https://github.com/argotorg/solcore-rs",
-  "upstream_commit": "2a745e12974c373c3799fec81b48a53c7dce2ab4",
+  "upstream_commit": "e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
   "scope": "Unmodified std-free top-level source execution. E2E contract coverage is tracked separately. Expected values are taken from upstream specialization assertions or direct scalar inputs.",
   "cases": [
     {
@@ -9,7 +9,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "4bd50f764e243eab397c205f9d3d37d14e4dc9e974724925691597bfd964d7cd"
+          "sha256": "e32d79dbfce332d673ba12e69fda15df3ca6436580c65cf733e05b45c6d4785a"
         }
       ],
       "arguments": [],
@@ -24,7 +24,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/002/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "9fc7717e2b48ca74fa191b8b8d603f17814981c692aa81a34739445c30701e20"
+          "sha256": "ba7976daff9b53c798607311b589ad02f84b20cd12d36a9394994c6e2945449e"
         }
       ],
       "arguments": [],
@@ -39,7 +39,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/003/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "4bfa8b96e52c6294826af93f363df5763ef4ce32a56a18a954870582f826dd2d"
+          "sha256": "0cd3cf66cc032cf028df325692e8f01b2c665f9fb1ee0244e12b66b90d02c2e4"
         }
       ],
       "arguments": [],
@@ -54,7 +54,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/004/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "b06315fde31ef2c7b283ff987fb2e473389c1608872537b071deba7a1f9b44e5"
+          "sha256": "b5dc804a382de4e4ab6cec6288bc3247bfc51bb2b5c88d550bcd9e2fa86ffaa7"
         }
       ],
       "arguments": [],
@@ -69,7 +69,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/005/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "5cbc8598db7767ab98aaf524e2a89a5708025f0a934c978b6dfbf6e7a00a7960"
+          "sha256": "191e0a2775a03e905ebe44b59351214aaad4bd2f043f0f85ebbdb7131c2ea961"
         }
       ],
       "arguments": [],
@@ -84,7 +84,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/006/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "a5bda0df46b0318b51807f5edf93fcd1dd59e9f4aa21514a2273f685b3b24b2e"
+          "sha256": "a589e47adb77aa2561599f221d53aad8496acb20cf9f9c882450cef1f3934e1b"
         }
       ],
       "arguments": [],
@@ -99,7 +99,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/007/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "e7327b7db74e46378848477f5bc44653aa458aa1ba1d30f0f80f832b0d5253b0"
+          "sha256": "a1ded5d9c2c64d5722079fa3f6b27013686108e81d363da3675eddefbb153447"
         }
       ],
       "arguments": [],
@@ -114,7 +114,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/008/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "b8b5441ecc0a5b6788f3832ad209c38bfe64dda6ce76338b9e0b7b4f22bc57c2"
+          "sha256": "359adfcc582bea0a34886f83882c67106f61dba4578951a316b58d438a86fe2b"
         }
       ],
       "arguments": [],
@@ -129,7 +129,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/009/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "2b71a22e9b2cedbc444ce0e8e714e4e1bc80d5f499f6c16e7baa27f478ea8489"
+          "sha256": "b955258d30efb2fa30b8de7e28cdd356c1db8cf59659fc346673a0c8b096ea57"
         }
       ],
       "arguments": [],
@@ -144,7 +144,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/constant_conditionals_preserve_outer_bindings_across_skipped_branches/010/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "75840d1651bf9d88ccc8dc2f76f2db1275f1b7ca735b8667de72e45a1f421875"
+          "sha256": "6fabfb7d93cb56e915c3e9c4d7637bba1090db04ff903c1e1c2dd90af7fbe090"
         }
       ],
       "arguments": [],
@@ -159,7 +159,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "a2457951caab8deada3ea38a2235c8b661ef989948b7b99dcd4004553105def6"
+          "sha256": "13fd43ec227e281c7553bbbe212189bf5d4ced23f1ac49ac1b0856e0d44de08e"
         }
       ],
       "arguments": [],
@@ -174,7 +174,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/003/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "01db78f78f976ef11e32b11639720d9a5a06d8c14f21dc369c7a7dad49624b2e"
+          "sha256": "a506de88e06b865b7faf6e52b54499e879c25e752aea6cfe21b61353635a54ba"
         }
       ],
       "arguments": [],
@@ -189,7 +189,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/005/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "2061a38981023074fa76deecd9a260c765bc0fbcd054d621133ca22b42496b8a"
+          "sha256": "a643ad439b05c052344870ddc01cbb4140d269f666906bd035ad1bb2cd8a875d"
         }
       ],
       "arguments": [],
@@ -204,7 +204,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/007/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "f4bbb8822036b68a5c522d9887c06e60e7768ab8fd5588ca6a2a852aebb2725f"
+          "sha256": "b9e0c0758bf009dd550ad7b6ca8007b5f9420177c1b2dada1ca7ef2e144ce5df"
         }
       ],
       "arguments": [],
@@ -219,7 +219,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/009/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "e46ba9442e26c9527c476d01fa5d881a8b71883ab7a6b7df5933c83305fc9fd8"
+          "sha256": "be3526af638781f13dc3f27f0404e7b238430550b59db0c3152a040caa3c5814"
         }
       ],
       "arguments": [],
@@ -234,7 +234,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/011/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "053c0f77cd7609216841e8d08bff9e34f7cc9812f765ef983a7f83daad5d97db"
+          "sha256": "92b0d5fff8523d9265fe826a065b7d6df39aac1bcf7a60e2378155e5c2febf51"
         }
       ],
       "arguments": [],
@@ -249,7 +249,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/013/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "79601deb9aecd48fe746f63ebd4b93a041aa0fb12efb8a6bff846cf77ab77055"
+          "sha256": "b0a2ee275b0c883719cf52e0e97632543d0ee81eeddc4fb2f39d077feadfb1b9"
         }
       ],
       "arguments": [],
@@ -264,7 +264,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/folded_match_and_block_scopes_preserve_outer_bindings_and_writes/015/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "51c693e0f1b93d4a3bfa7174ec16f60c302f4f822fbf10650580eb7d54b2db9b"
+          "sha256": "0171b1dcab647c76b0efeaa4a0254477c6ef6d5f10085475cc252b95984f15cb"
         }
       ],
       "arguments": [],
@@ -279,7 +279,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/callable_capture/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "48f0057852733e86ce3d49e517d4f9b92829fb5248512f6db056f4a608a3712c"
+          "sha256": "20b270e5d750d8470275001985e8b02494b65d3e98b6d09fffa7e4eddaeb571d"
         }
       ],
       "arguments": [
@@ -303,7 +303,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/initializer_read/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "9f0067cefc676634ca88758b5b3c4380fc74a4e28431e66497fa10199805daa8"
+          "sha256": "4b2075674ad57e0c6184bd71bb6a0f07657db5b9b0ccf21b996921f04a6d2076"
         }
       ],
       "arguments": [
@@ -323,7 +323,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/known_match/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "49505395ab8b137178f369e5792db11d41ca415cdd5bcc9efe27a44ce1c7edce"
+          "sha256": "6b760cd70354fb82549dee6d542334f7405a1aad86c918b3e08d96a97547c68b"
         }
       ],
       "arguments": [
@@ -343,7 +343,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/repeated_pattern_names_residualize_only_the_visible_declaration/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "407e6218d5eca5cae8e44376316c5785c0d91aab2a025588be221e035a2ede1a"
+          "sha256": "f8b6585a4da511ba07e18a3399dc5ea548b9e9f98b08abb9ab6b256e87bb3d93"
         }
       ],
       "arguments": [
@@ -363,7 +363,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/callable_capture/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "48f0057852733e86ce3d49e517d4f9b92829fb5248512f6db056f4a608a3712c"
+          "sha256": "20b270e5d750d8470275001985e8b02494b65d3e98b6d09fffa7e4eddaeb571d"
         }
       ],
       "arguments": [
@@ -387,7 +387,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/initializer_read/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "9f0067cefc676634ca88758b5b3c4380fc74a4e28431e66497fa10199805daa8"
+          "sha256": "4b2075674ad57e0c6184bd71bb6a0f07657db5b9b0ccf21b996921f04a6d2076"
         }
       ],
       "arguments": [
@@ -407,7 +407,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/control_flow_scope_restoration/known_match/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "49505395ab8b137178f369e5792db11d41ca415cdd5bcc9efe27a44ce1c7edce"
+          "sha256": "6b760cd70354fb82549dee6d542334f7405a1aad86c918b3e08d96a97547c68b"
         }
       ],
       "arguments": [
@@ -427,7 +427,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/repeated_pattern_names_residualize_only_the_visible_declaration/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "407e6218d5eca5cae8e44376316c5785c0d91aab2a025588be221e035a2ede1a"
+          "sha256": "f8b6585a4da511ba07e18a3399dc5ea548b9e9f98b08abb9ab6b256e87bb3d93"
         }
       ],
       "arguments": [
@@ -447,7 +447,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/known_if_binding_order/known_return_closure/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "4d0c6f8c39bc7e95e53b2767530583b10d8289e1bb96e8ac5308b6cff9e9f4cb"
+          "sha256": "da163c6016af1423903d7dcdcfce022959a6bb6bf438bb3693955e39a3e72b73"
         }
       ],
       "arguments": [],
@@ -462,7 +462,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/trait_methods_allow_unused_method_type_parameters/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "bb86b5dbc0f515fb0ad1374f18d41ae8c3eec827db0cbf7d2164e6d4e73a578f"
+          "sha256": "f5446b8b32ff9d31c4a79b496be91624832ebd023fc73945f08d9b3a361e0c16"
         }
       ],
       "arguments": [
@@ -486,7 +486,7 @@
         {
           "upstream_path": "crates/specialize/tests/fixtures/audit/cyclic_superclass_dictionaries_preserve_repeated_projections/001/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "98bb340bc274aa006b26a24574ab45225ebad2c8b039c9d2fa39abd7da643dd0"
+          "sha256": "a0b522bc0d64fb620b0680b0bdf4d4cd4fb1138a21643d4ec1f2a5fc5cd6b3f4"
         }
       ],
       "arguments": [],
@@ -501,7 +501,7 @@
         {
           "upstream_path": "crates/hull/tests/fixtures/regressions/read_only_known_match_comptime/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "936800c5632454752f15b3035ae5b7ccba101bc0357048a78f31332d8f190564"
+          "sha256": "acbf50bc3a0aaf21246e18275636b417f8c6ff2cce0bb812b89fb3537fae8582"
         }
       ],
       "arguments": [],
@@ -516,7 +516,7 @@
         {
           "upstream_path": "crates/hull/tests/fixtures/layouts/nested_box_inline/main.sol",
           "workspace_path": "main.sol",
-          "sha256": "7721c16fc6a6032a9542115f4b7c296738be1ea42df73181bba102a772800df9"
+          "sha256": "d10f0e763adac00cdd4542dacf781965ab2472fbcf509f6b4d9c6ed9b86ee63c"
         }
       ],
       "arguments": [

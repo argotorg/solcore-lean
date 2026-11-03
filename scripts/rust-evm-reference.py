@@ -21,7 +21,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
+COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 PREFIX = {"sonatina": "sonatina_evm_e2e__", "yul": "yul_evm_e2e_fixture__"}
 BUILD = ["cargo", "test", "--profile", "e2e", "-p", "solcore-yul", "-p",
          "solcore-sonatina", "--test", "e2e", "--locked", "--offline", "--no-run",
@@ -41,7 +41,7 @@ def sources(upstream: Path) -> dict:
     if head.returncode or head.stdout.strip() != COMMIT:
         raise ValueError(f"expected upstream {COMMIT}")
     changed = run(["git", "diff", "--name-only", "HEAD"], upstream)
-    allowed = {"crates/driver/src/main.rs", "crates/driver/src/emit.rs"}
+    allowed = {"crates/driver/src/lib.rs", "crates/driver/src/emit.rs"}
     if changed.returncode or set(changed.stdout.splitlines()) - allowed:
         raise ValueError("upstream E2E sources have tracked modifications")
     # Driver-only exporter patches are not dependencies of these test binaries.
@@ -95,12 +95,12 @@ def outcome(result: subprocess.CompletedProcess) -> tuple[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/evm-reference-target")
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--backend", choices=list(PREFIX), action="append")
-    parser.add_argument("--fixture", action="append", help="fixture id glob; omitted selects all 168")
+    parser.add_argument("--fixture", action="append", help="fixture id glob; omitted selects all 182")
     parser.add_argument("--output", type=Path, default=ROOT / ".upstream/evm-reference.json")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()

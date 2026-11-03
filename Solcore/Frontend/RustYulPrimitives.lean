@@ -2,7 +2,7 @@ import Solcore.Core.Renaming
 
 /-! Pure inline-Yul operations lowered to the existing Core language.
 The operation names follow solcore-rs commit
-`2a745e12974c373c3799fec81b48a53c7dce2ab4`. Arguments are evaluated from
+`e2eef19409fc8879cd4a9cc342ed60e3152f72c0`. Arguments are evaluated from
 right to left, once each, before the operation. Comparisons produce EVM words.
 Memory, storage, calls and termination belong to the enclosing effect lowering.
 -/

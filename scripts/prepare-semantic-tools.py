@@ -28,7 +28,7 @@ import types
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
-COMMIT = "2a745e12974c373c3799fec81b48a53c7dce2ab4"
+COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 REPOSITORY = "https://github.com/argotorg/solcore-rs.git"
 RUST = "1.97.0"
 LEAN = "leanprover/lean4:v4.33.1"
@@ -78,7 +78,7 @@ TARGETS = {
     "semanticNestedArrayTool": "semantic-nested-array-tool",
 }
 PATCHES = {
-    "crates/driver/src/main.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
+    "crates/driver/src/lib.rs": ("mod emit;", "mod emit;\nmod lean_export;"),
     "crates/driver/src/emit.rs": ("&hull::pretty_program(db, &program)", "&crate::lean_export::export(db, &program)"),
 }
 SERIALIZER = "crates/driver/src/lean_export.rs"
@@ -488,7 +488,7 @@ def main(argv=None) -> int:
     modes.add_argument("--verify", action="store_true", help="read-only readiness check (default)")
     modes.add_argument("--plan", action="store_true", help="print required versions and ordered operations without running tools")
     parser.add_argument("--allow-network", action="store_true")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261023")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
     parser.add_argument("--timeout", type=float, default=3600, help="total preparation deadline in seconds")

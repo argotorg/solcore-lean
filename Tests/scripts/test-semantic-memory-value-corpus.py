@@ -45,6 +45,9 @@ NODES = 1024
 CASE_LIMIT = 5120
 SHRINK_BYTES = 1_500_000
 OUT_OF_BOUNDS = "0xb4120f14"
+# std's Panic(0x32): a memory array element past its length, through IndexAccess or a[i], since solcore-rs
+# e2eef194; a value's Words and bytes keep slice_'s and truncate's OutOfBounds().
+ARRAY_OUT_OF_BOUNDS = "0x4e487b71" + "00" * 31 + "32"
 M = 1 << 256
 INDICES = sorted(f"{access}:{kind}" for access in ("byte", "element", "put", "put8", "set", "word")
                  for kind in ("counter", "input", "literal"))
@@ -587,7 +590,11 @@ def emitted_source(plan):
 # --- A byte-list model of std's memory values -------------------------------------
 
 class OutOfBounds(Exception):
-    pass
+    """An out-of-range access, with std's revert data."""
+
+    def __init__(self, output=OUT_OF_BOUNDS):
+        super().__init__(output)
+        self.output = output
 
 
 class Machine:
@@ -649,7 +656,7 @@ class Machine:
             position, word = self.index(a["index"]), self.operand(a["value"])
             if ref_of(a["target"])[0] == "array":
                 if position >= length:
-                    raise OutOfBounds
+                    raise OutOfBounds(ARRAY_OUT_OF_BOUNDS)
                 self.values[value][position] = word
             elif a["width"] == "word":
                 self.check(length, position, 32)
@@ -677,7 +684,7 @@ class Machine:
             self.check(length, position, 1)
             return self.values[value][start + position]
         if position >= length:
-            raise OutOfBounds
+            raise OutOfBounds(ARRAY_OUT_OF_BOUNDS)
         return self.values[value][position]
 
     def body(self, actions):
@@ -711,17 +718,18 @@ def model_outcome(plan, x):
     try:
         for s in plan["steps"]:
             machine.step(s)
-    except OutOfBounds:
-        return {"stage": "execution", "status": "reverted", "output": OUT_OF_BOUNDS}
+    except OutOfBounds as failure:
+        return {"stage": "execution", "status": "reverted", "output": failure.output}
     return {"stage": "execution", "status": "returned", "word": str(machine.acc)}
 
 
 def outcome(observation):
-    """A completed Core outcome: a returned Word, or std's OutOfBounds() revert."""
+    """A completed Core outcome: a returned Word, or std's OutOfBounds() or Panic(0x32) revert."""
     require(isinstance(observation, dict) and observation.get("stage") == "execution", "missing Core outcome")
     if observation.get("status") == "reverted":
-        require(observation == {"stage": "execution", "status": "reverted", "output": OUT_OF_BOUNDS},
-                "an out-of-range access must be std's OutOfBounds() revert")
+        require(observation in ({"stage": "execution", "status": "reverted", "output": output}
+                                for output in (OUT_OF_BOUNDS, ARRAY_OUT_OF_BOUNDS)),
+                "an out-of-range access must be std's OutOfBounds() or Panic(0x32) revert")
         return "reverted"
     require(observation.get("status") == "returned", "original Core did not complete within the native budget")
     canonical_word(observation.get("word"))
@@ -736,8 +744,8 @@ def check_case(case, fuel):
     number = canonical_word(case["input"])
     program = case["program"]
     require(program.get("schema") == "solcore-semantic-core" and program.get("dataDefinitions") == []
-            and program.get("resultType") == {"tag": "sum", "left": "word", "right": "unit"},
-            "the memory value reference is a closed program returning a Word or an out-of-range access")
+            and program.get("resultType") == {"tag": "sum", "left": "word", "right": "word"},
+            "the memory value reference is a closed program returning a Word or an out-of-range access's code")
     require(generic.complexity(program["body"])[0] <= CASE_LIMIT, "reference exceeds the case limit")
     require(1 <= case["provenance"]["referenceNodes"] <= CASE_LIMIT, "recorded reference size exceeds the case limit")
     require(case["contract"] == {"name": NAME, "method": "run", "signature": "run(uint256)",
