@@ -356,7 +356,8 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_CONTRACTS[runner.MEMORY_CASE_SCHEMA], "SynthesizedMemoryValues")
         self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
         self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA,
-                                                    runner.REVERT_DATA_CASE_SCHEMA, runner.HALT_CASE_SCHEMA))
+                                                    runner.REVERT_DATA_CASE_SCHEMA, runner.HALT_CASE_SCHEMA,
+                                                    runner.CHECKED_ARITHMETIC_CASE_SCHEMA))
         self.assertEqual(runner.HALTING_SCHEMAS, (runner.HALT_CASE_SCHEMA,))
 
     def test_revert_data_plan_envelope_and_shape_inventory(self):
@@ -421,6 +422,81 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.HALT_CASE_SCHEMA], "runtime-halts")
         self.assertEqual(runner.CASE_CONTRACTS[runner.HALT_CASE_SCHEMA], "SynthesizedHalts")
         self.assertEqual(runner.HALT_VERSIONS, ("profileVersion", "boundaryVersion"))
+
+    def test_integer_plan_envelopes_selectors_and_shape_inventories(self):
+        schema, shifts = runner.CHECKED_ARITHMETIC_CASE_SCHEMA, runner.SHIFT_CASE_SCHEMA
+        step = {"assign": {"form": "binary", "op": "add", "left": {"input": 0}, "right": {"literal": 0}}}
+        plan = {"schema": "solcore-lean.checked-arithmetic-plan.v1", "value": "int8", "abi": True, "raw": True,
+                "inputs": ["0", "1", "128"], "amounts": [], "helpers": [],
+                "groups": [{"unchecked": False, "steps": [step] * 4}, {"unchecked": True, "steps": [step] * 6}]}
+        runner.validate_integer_plan(plan, schema)
+        shift = {**plan, "schema": "solcore-lean.shift-plan.v1", "value": "word", "abi": False, "raw": False}
+        runner.validate_integer_plan(shift, shifts)
+        for invalid in (None, {}, {**plan, "extra": 0}, {**plan, "schema": "solcore-lean.shift-plan.v1"},
+                        {**plan, "value": "word"}, {**plan, "value": "uint7"}, {**plan, "abi": 1},
+                        {**plan, "groups": []}, {**plan, "groups": [{"unchecked": False, "steps": [step] * 11}]},
+                        {**plan, "groups": [{"steps": [step]}]}, {**plan, "inputs": []}, {**plan, "inputs": ["0"] * 4}):
+            with self.assertRaises(ValueError):
+                runner.validate_integer_plan(invalid, schema)
+        for invalid in ({**shift, "abi": True}, {**shift, "raw": True}, plan):
+            with self.assertRaises(ValueError):
+                runner.validate_integer_plan(invalid, shifts)
+        for case_schema, dimensions, counts in (
+                (schema, runner.CHECKED_ARITHMETIC_SHAPES,
+                 {"types": 12, "operators": 6, "forms": 5, "contexts": 2, "scopes": 5, "operands": 4, "literals": 9,
+                  "parameters": 2, "returns": 2, "outcomes": 4, "panics": 9, "wraps": 5, "typeOutcomes": 46}),
+                (shifts, runner.SHIFT_SHAPES,
+                 {"values": 13, "amounts": 8, "operators": 3, "forms": 2, "contexts": 2, "operands": 4, "ranges": 6,
+                  "results": 2, "typeRanges": 13})):
+            shapes = {key: list(values) for key, values in dimensions.items()}
+            runner.validate_integer_shapes(shapes, case_schema)
+            first = next(iter(shapes))
+            for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, first: list(reversed(shapes[first]))},
+                            {**shapes, first: shapes[first][:1] * 2}, {**shapes, first: ["unknown"]},
+                            {key: values for key, values in shapes.items() if key != first}):
+                with self.assertRaises(ValueError):
+                    runner.validate_integer_shapes(invalid, case_schema)
+            self.assertEqual({key: len(values) for key, values in dimensions.items()}, counts)
+        self.assertEqual((sum(map(len, runner.CHECKED_ARITHMETIC_SHAPES.values())),
+                          sum(map(len, runner.SHIFT_SHAPES.values()))), (111, 53))
+        # The run(T) selectors are keccak256 of their signatures.
+        spec = importlib.util.spec_from_file_location("test_integer_keccak", ROOT / "scripts/semantic-storage-differential.py")
+        storage = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(storage)
+        self.assertEqual(set(runner.RUN_SELECTORS), set(runner.INTEGER_TYPES))
+        for name, selector in runner.RUN_SELECTORS.items():
+            self.assertEqual(storage.keccak256(f"run({name})".encode())[:4].hex(), selector)
+        self.assertEqual(runner.integer_signature({"schema": schema, "checkedArithmeticPlan": plan}),
+                         ("run(int8)", bytes.fromhex("1778c9c6")))
+        self.assertEqual(runner.integer_signature({"schema": schema, "checkedArithmeticPlan": {**plan, "abi": False}}),
+                         ("run(uint256)", bytes.fromhex("a444f5e9")))
+        self.assertEqual(runner.integer_signature({"schema": shifts, "shiftPlan": shift}),
+                         ("run(uint256)", bytes.fromhex("a444f5e9")))
+        name = "SynthesizedCheckedArithmetic"
+        case = {"schema": schema, "program": {}, "source": "", "checkedArithmeticPlan": plan, "input": "5",
+                "provenance": {"generatorVersion": "g", "emitterVersion": "e", "wrapperVersion": "w", "profileVersion": "p",
+                               "boundaryVersion": "b", "referenceNodes": 3,
+                               "checkedArithmeticShapes": {key: [] for key in runner.CHECKED_ARITHMETIC_SHAPES}},
+                "contract": {"name": name, "method": "run", "signature": "run(int8)", "deployPath": [name + "Deploy"],
+                             "runtimePath": [name + "Deploy", name], "calldata": "0x1778c9c6" + f"{5:064x}",
+                             "constructorCalldata": "0x"}}
+        runner.validate_case(case)
+        with self.assertRaises(ValueError):
+            runner.validate_case({**case, "contract": {**case["contract"], "calldata": "0xa444f5e9" + f"{5:064x}"}})
+        with self.assertRaises(runner.Finding):
+            runner.validate_case({**case, "contract": {**case["contract"], "signature": "run(uint256)"}})
+        with self.assertRaises(ValueError):
+            runner.validate_case({**case, "provenance": {**case["provenance"], "referenceNodes": 4097}})
+        self.assertIn(schema, runner.REVERTING_SCHEMAS)
+        self.assertNotIn(shifts, runner.REVERTING_SCHEMAS + runner.HALTING_SCHEMAS)
+        panic = {"status": "reverted", "output": "0x4e487b71" + f"{0x11:064x}"}
+        self.assertEqual(runner.compare({path: panic for path in ("directCore", "importedHull", "rustEvm")},
+                                        reverts=True)["category"], "matched")
+        self.assertEqual(runner.CASE_PROFILES[schema], "runtime-checked-arithmetic")
+        self.assertEqual(runner.CASE_CONTRACTS[schema], name)
+        self.assertEqual(runner.CASE_PROFILES[shifts], "runtime-shifts")
+        self.assertEqual(runner.CASE_CONTRACTS[shifts], "SynthesizedShifts")
+        self.assertEqual(runner.INTEGER_VERSIONS, ("profileVersion", "boundaryVersion"))
 
     def test_memory_call_plan_envelope_and_shape_inventory(self):
         build = {"kind": "bytes", "build": "to_bytes", "parts": [{"part": "word", "operand": {"operand": "input"}}]}
@@ -862,7 +938,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 28)
+        self.assertEqual(len(runner.CASE_PROFILES), 30)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

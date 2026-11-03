@@ -1,0 +1,1340 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-checked-arithmetic",
+  "coverageKind": "core-ast-features",
+  "boundaryVersion": "word-primitive-boundary-bank-v1",
+  "emitterVersion": "solcore-source-checked-arithmetic-v1",
+  "generatorVersion": "core-integers-v1",
+  "profileVersion": "runtime-checked-arithmetic-v1/plan-seed-v1",
+  "wrapperVersion": "solcore-checked-arithmetic-contract-v1",
+  "requiredFeatures": [],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "2",
+    "255",
+    "256",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+  ],
+  "checkedArithmeticRequirements": {
+    "types": [
+      "int128",
+      "int16",
+      "int256",
+      "int32",
+      "int64",
+      "int8",
+      "uint128",
+      "uint16",
+      "uint256",
+      "uint32",
+      "uint64",
+      "uint8"
+    ],
+    "operators": [
+      "add",
+      "div",
+      "mod",
+      "mul",
+      "neg",
+      "sub"
+    ],
+    "forms": [
+      "apply",
+      "call",
+      "compound",
+      "default",
+      "inline"
+    ],
+    "contexts": [
+      "checked",
+      "unchecked"
+    ],
+    "scopes": [
+      "apply-in-block",
+      "block",
+      "call-in-block",
+      "unchecked-helper",
+      "unchecked-lambda"
+    ],
+    "operands": [
+      "input",
+      "literal",
+      "offset",
+      "variable"
+    ],
+    "literals": [
+      "half",
+      "max",
+      "max1",
+      "min",
+      "min1",
+      "minus1",
+      "one",
+      "small",
+      "zero"
+    ],
+    "parameters": [
+      "abi",
+      "word"
+    ],
+    "returns": [
+      "raw",
+      "word"
+    ],
+    "outcomes": [
+      "dirty",
+      "panic-0x11",
+      "panic-0x12",
+      "returned"
+    ],
+    "panics": [
+      "add",
+      "div-overflow",
+      "div-zero",
+      "mod-zero",
+      "mul",
+      "neg",
+      "sub",
+      "unchecked-div-zero",
+      "unchecked-mod-zero"
+    ],
+    "wraps": [
+      "add",
+      "div",
+      "mul",
+      "neg",
+      "sub"
+    ],
+    "typeOutcomes": []
+  },
+  "cases": [
+    {
+      "id": "arith-2-0",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-1",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-2",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-3",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-4",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-5",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-6",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-2-7",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-0",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-1",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-2",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-3",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-4",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-5",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-6",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-4-7",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-0",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-1",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-2",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-3",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-4",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-5",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-6",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-5-7",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-0",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-1",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-2",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-3",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-4",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-5",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-6",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-6-7",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-0",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-1",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-2",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-3",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-4",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-5",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-6",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-7-7",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-0",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-1",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-2",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-3",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-4",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-5",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-6",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-8-7",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-0",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-1",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-2",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-3",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-4",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-5",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-6",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-9-7",
+      "generation": {
+        "seed": "9",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-0",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-1",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-2",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-3",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-4",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-5",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-6",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-12-7",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-0",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-1",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-2",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-3",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-4",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-5",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-6",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-14-7",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-0",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-1",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-2",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-3",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-4",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-5",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-6",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-15-7",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-0",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-1",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-2",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-3",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-4",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-5",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-6",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-17-7",
+      "generation": {
+        "seed": "17",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-0",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-1",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-2",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-3",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-4",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-5",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-6",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-18-7",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-0",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-1",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-2",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-3",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-4",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-5",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-6",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-22-7",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-0",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-1",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-2",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-3",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-4",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-5",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-6",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-25-7",
+      "generation": {
+        "seed": "25",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-0",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-1",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-2",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-3",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-4",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-5",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-6",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-27-7",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-0",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-1",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-2",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-3",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-4",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-5",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-6",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-29-7",
+      "generation": {
+        "seed": "29",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-0",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-1",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-2",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-3",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-4",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-5",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-6",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "arith-94-7",
+      "generation": {
+        "seed": "94",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    }
+  ]
+}

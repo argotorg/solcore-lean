@@ -23,6 +23,10 @@ import Solcore.Synthesis.Source.MemoryCallsCases
 import Solcore.Synthesis.Source.RevertDataEmitter
 import Solcore.Synthesis.Source.RevertDataCases
 import Solcore.Synthesis.Source.HaltCases
+import Solcore.Synthesis.Source.IntegersEmitter
+import Solcore.Synthesis.Source.IntegerCases
+import Solcore.Synthesis.Source.CheckedArithmeticCases
+import Solcore.Synthesis.Source.ShiftCases
 import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter

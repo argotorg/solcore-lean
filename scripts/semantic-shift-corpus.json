@@ -1,0 +1,1249 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-shifts",
+  "coverageKind": "core-ast-features",
+  "boundaryVersion": "word-primitive-boundary-bank-v1",
+  "emitterVersion": "solcore-source-shifts-v1",
+  "generatorVersion": "core-integers-v1",
+  "profileVersion": "runtime-shifts-v1/plan-seed-v1",
+  "wrapperVersion": "solcore-word-shifts-contract-v1",
+  "requiredFeatures": [],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "2",
+    "255",
+    "256",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+  ],
+  "shiftRequirements": {
+    "values": [
+      "int128",
+      "int16",
+      "int256",
+      "int32",
+      "int64",
+      "int8",
+      "uint128",
+      "uint16",
+      "uint256",
+      "uint32",
+      "uint64",
+      "uint8",
+      "word"
+    ],
+    "amounts": [
+      "literal",
+      "uint128",
+      "uint16",
+      "uint256",
+      "uint32",
+      "uint64",
+      "uint8",
+      "word"
+    ],
+    "operators": [
+      "sar",
+      "shl",
+      "shr"
+    ],
+    "forms": [
+      "compound",
+      "inline"
+    ],
+    "contexts": [
+      "checked",
+      "unchecked"
+    ],
+    "operands": [
+      "input",
+      "literal",
+      "offset",
+      "variable"
+    ],
+    "ranges": [
+      "beyond",
+      "huge",
+      "inside",
+      "last",
+      "width",
+      "zero"
+    ],
+    "results": [
+      "minus-one",
+      "zero"
+    ],
+    "typeRanges": [
+      "int128:width",
+      "int16:width",
+      "int256:width",
+      "int32:width",
+      "int64:width",
+      "int8:width",
+      "uint128:width",
+      "uint16:width",
+      "uint256:width",
+      "uint32:width",
+      "uint64:width",
+      "uint8:width",
+      "word:width"
+    ]
+  },
+  "cases": [
+    {
+      "id": "shift-1-0",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-1",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-2",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-3",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-4",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-5",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-6",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-1-7",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-0",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-1",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-2",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-3",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-4",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-5",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-6",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-2-7",
+      "generation": {
+        "seed": "2",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-0",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-1",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-2",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-3",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-4",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-5",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-6",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-4-7",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-0",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-1",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-2",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-3",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-4",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-5",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-6",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-6-7",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-0",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-1",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-2",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-3",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-4",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-5",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-6",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-7-7",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-0",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-1",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-2",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-3",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-4",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-5",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-6",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-12-7",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-0",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-1",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-2",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-3",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-4",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-5",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-6",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-13-7",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-0",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-1",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-2",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-3",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-4",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-5",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-6",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-14-7",
+      "generation": {
+        "seed": "14",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-0",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-1",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-2",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-3",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-4",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-5",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-6",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-19-7",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-0",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-1",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-2",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-3",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-4",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-5",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-6",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-21-7",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-0",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-1",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-2",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-3",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-4",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-5",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-6",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-22-7",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-0",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-1",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-2",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-3",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-4",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-5",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-6",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-27-7",
+      "generation": {
+        "seed": "27",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-0",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-1",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-2",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-3",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-4",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-5",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-6",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-32-7",
+      "generation": {
+        "seed": "32",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-0",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-1",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-2",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-3",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-4",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-5",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-6",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-36-7",
+      "generation": {
+        "seed": "36",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-0",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-1",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-2",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-3",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-4",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-5",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-6",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-44-7",
+      "generation": {
+        "seed": "44",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-0",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-1",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-2",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-3",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-4",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-5",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-6",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "shift-45-7",
+      "generation": {
+        "seed": "45",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    }
+  ]
+}

@@ -161,10 +161,54 @@ HALT_SHAPES = {
     "haltTests": ("bits", "eq", "gt", "lt", "ne"),
     "haltWords": ("acc", "constant", "counter", "input", "local"),
     "haltOrders": ("revert-after", "revert-before", "write-after", "write-before")}
+CHECKED_ARITHMETIC_CASE_SCHEMA = "solcore-lean.semantic-checked-arithmetic-case.v1"
+SHIFT_CASE_SCHEMA = "solcore-lean.semantic-shift-case.v1"
+INTEGER_VERSIONS = ("profileVersion", "boundaryVersion")
+INTEGER_TYPES = ("uint8", "uint16", "uint32", "uint64", "uint128", "uint256",
+                 "int8", "int16", "int32", "int64", "int128", "int256")
+# The selectors of run(T), keccak256 of each signature; run(uint256) is every pure profile's.
+RUN_SELECTORS = {"uint8": "c4e5557a", "uint16": "1f63069c", "uint32": "0f6d710c", "uint64": "8a52d919",
+                 "uint128": "edc3b5ad", "uint256": "a444f5e9", "int8": "1778c9c6", "int16": "091ebc26",
+                 "int32": "23040ce1", "int64": "ec784157", "int128": "96c07422", "int256": "61a47706"}
+# The specified shape values of the checked arithmetic profile, from the plan and the runs its
+# plan reaches at the eight boundary inputs, never measured on a compiled path.
+CHECKED_ARITHMETIC_SHAPES = {
+    "types": tuple(sorted(INTEGER_TYPES)),
+    "operators": ("add", "div", "mod", "mul", "neg", "sub"),
+    "forms": ("apply", "call", "compound", "default", "inline"),
+    "contexts": ("checked", "unchecked"),
+    "scopes": ("apply-in-block", "block", "call-in-block", "unchecked-helper", "unchecked-lambda"),
+    "operands": ("input", "literal", "offset", "variable"),
+    "literals": ("half", "max", "max1", "min", "min1", "minus1", "one", "small", "zero"),
+    "parameters": ("abi", "word"),
+    "returns": ("raw", "word"),
+    "outcomes": ("dirty", "panic-0x11", "panic-0x12", "returned"),
+    "panics": ("add", "div-overflow", "div-zero", "mod-zero", "mul", "neg", "sub", "unchecked-div-zero",
+               "unchecked-mod-zero"),
+    "wraps": ("add", "div", "mul", "neg", "sub"),
+    "typeOutcomes": tuple(sorted([f"{name}:{outcome}" for name in INTEGER_TYPES for outcome in ("0x11", "0x12", "wrap")] +
+                                 [f"{name}:dirty" for name in INTEGER_TYPES if not name.endswith("256")]))}
+# The specified shape values of the shift profile, from the plan and the runs its plan reaches at
+# the eight boundary inputs, never measured on a compiled path.
+SHIFT_SHAPES = {
+    "values": tuple(sorted(("word",) + INTEGER_TYPES)),
+    "amounts": tuple(sorted(("literal", "word") + tuple(name for name in INTEGER_TYPES if name.startswith("u")))),
+    "operators": ("sar", "shl", "shr"),
+    "forms": ("compound", "inline"),
+    "contexts": ("checked", "unchecked"),
+    "operands": ("input", "literal", "offset", "variable"),
+    "ranges": ("beyond", "huge", "inside", "last", "width", "zero"),
+    "results": ("minus-one", "zero"),
+    "typeRanges": tuple(sorted(f"{name}:width" for name in ("word",) + INTEGER_TYPES))}
+INTEGER_PLAN_KEYS = {CHECKED_ARITHMETIC_CASE_SCHEMA: ("checkedArithmeticPlan", "checkedArithmeticShapes",
+                                                      CHECKED_ARITHMETIC_SHAPES, "solcore-lean.checked-arithmetic-plan.v1"),
+                     SHIFT_CASE_SCHEMA: ("shiftPlan", "shiftShapes", SHIFT_SHAPES, "solcore-lean.shift-plan.v1")}
 # Cases whose original Core can stop with revert data: std's OutOfBounds() revert at an
-# out-of-range access, or a revert data or halt plan's site; three reverts with the same
-# data are a match only for them.
-REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA, HALT_CASE_SCHEMA)
+# out-of-range access, a revert data or halt plan's site, or a checked arithmetic plan's
+# Panic or std's DirtyHigherBitsForInteger(); three reverts with the same data are a match
+# only for them.
+REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA, HALT_CASE_SCHEMA,
+                     CHECKED_ARITHMETIC_CASE_SCHEMA)
 # Cases whose original Core can halt with INVALID; three INVALID halts are a match only
 # for them.
 HALTING_SCHEMAS = (HALT_CASE_SCHEMA,)
@@ -198,7 +242,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  ENUM_CASE_SCHEMA: "runtime-enums", TRAIT_CASE_SCHEMA: "runtime-traits",
                  HIERARCHY_CASE_SCHEMA: "runtime-trait-hierarchies", MEMORY_CASE_SCHEMA: "runtime-memory-values",
                  MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls", REVERT_DATA_CASE_SCHEMA: "runtime-revert-data",
-                 HALT_CASE_SCHEMA: "runtime-halts"}
+                 HALT_CASE_SCHEMA: "runtime-halts", CHECKED_ARITHMETIC_CASE_SCHEMA: "runtime-checked-arithmetic",
+                 SHIFT_CASE_SCHEMA: "runtime-shifts"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -214,7 +259,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   ENUM_CASE_SCHEMA: "SynthesizedEnums", TRAIT_CASE_SCHEMA: "SynthesizedTraits",
                   HIERARCHY_CASE_SCHEMA: "SynthesizedTraitHierarchies", MEMORY_CASE_SCHEMA: "SynthesizedMemoryValues",
                   MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData",
-                  HALT_CASE_SCHEMA: "SynthesizedHalts"}
+                  HALT_CASE_SCHEMA: "SynthesizedHalts", CHECKED_ARITHMETIC_CASE_SCHEMA: "SynthesizedCheckedArithmetic",
+                  SHIFT_CASE_SCHEMA: "SynthesizedShifts"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 BACKEND_COMMIT = "6bd0ce661ea327c149429b00fee3c8608616040f"
@@ -791,6 +837,48 @@ def validate_revert_data_shapes(values, label="revertDataShapes", dimensions=REV
     return values
 
 
+def validate_integer_plan(plan, schema) -> dict:
+    """Validate the envelope, the types and the step count; native replay checks every
+    input, amount, helper and step against the profile and the seed."""
+    if (not isinstance(plan, dict) or plan.get("schema") != INTEGER_PLAN_KEYS[schema][3]
+            or set(plan) != {"schema", "value", "abi", "raw", "inputs", "amounts", "helpers", "groups"}):
+        raise ValueError("unsupported integer plan schema")
+    shifts = schema == SHIFT_CASE_SCHEMA
+    if plan["value"] not in INTEGER_TYPES + (("word",) if shifts else ()):
+        raise ValueError("integer plan value type is outside the profile's types")
+    if type(plan["abi"]) is not bool or type(plan["raw"]) is not bool or (shifts and (plan["abi"] or plan["raw"])):
+        raise ValueError("integer plan parameter and result forms are outside the profile")
+    groups = plan["groups"]
+    if (not isinstance(groups, list) or not groups or any(not isinstance(group, dict) or set(group) != {"unchecked", "steps"}
+                                                          or not isinstance(group["steps"], list) for group in groups)):
+        raise ValueError("integer plan groups must be a nonempty list of contexts and steps")
+    if not 1 <= sum(len(group["steps"]) for group in groups) <= 10:
+        raise ValueError("integer plan requires one to ten steps")
+    if not isinstance(plan["inputs"], list) or not 1 <= len(plan["inputs"]) <= 3:
+        raise ValueError("integer plan requires one to three inputs")
+    return plan
+
+
+def validate_integer_shapes(values, schema) -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    label, dimensions = INTEGER_PLAN_KEYS[schema][1], INTEGER_PLAN_KEYS[schema][2]
+    if not isinstance(values, dict) or set(values) != set(dimensions):
+        raise ValueError(f"{label} must name every integer shape dimension")
+    for key, allowed in dimensions.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
+def integer_signature(case: dict) -> tuple[str, bytes]:
+    """The checked arithmetic profile's run(T) when its plan takes the argument as its type."""
+    plan = case.get(INTEGER_PLAN_KEYS[case["schema"]][0], {})
+    parameter = plan.get("value") if case["schema"] == CHECKED_ARITHMETIC_CASE_SCHEMA and plan.get("abi") else "uint256"
+    return f"run({parameter})", bytes.fromhex(RUN_SELECTORS[parameter])
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -905,6 +993,8 @@ def validate_case(case: dict) -> None:
         validate_revert_data_plan(case.get("revertDataPlan"))
     if case["schema"] == HALT_CASE_SCHEMA:
         validate_halt_plan(case.get("haltPlan"))
+    if case["schema"] in INTEGER_PLAN_KEYS:
+        validate_integer_plan(case.get(INTEGER_PLAN_KEYS[case["schema"]][0]), case["schema"])
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -998,11 +1088,21 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
             raise ValueError("halt referenceNodes must be an integer from 1 to 4,096")
         validate_revert_data_shapes(provenance.get("haltShapes"), "haltShapes", HALT_SHAPES)
+    if case["schema"] in INTEGER_PLAN_KEYS:
+        for key in INTEGER_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing integer provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("integer referenceNodes must be an integer from 1 to 4,096")
+        validate_integer_shapes(provenance.get(INTEGER_PLAN_KEYS[case["schema"]][1]), case["schema"])
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
     name = CASE_CONTRACTS[case["schema"]]
-    if case["schema"] != CASE_SCHEMA:
+    if case["schema"] in INTEGER_PLAN_KEYS:
+        signature, selector = integer_signature(case)
+        calldata = selector + int(word(case.get("input"), "input")).to_bytes(32, "big")
+    elif case["schema"] != CASE_SCHEMA:
         signature = "run(uint256)"
         calldata = bytes.fromhex("a444f5e9") + int(word(case.get("input"), "input")).to_bytes(32, "big")
     else:
@@ -1021,7 +1121,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "checkedArithmeticPlan", "shiftPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -1523,6 +1623,8 @@ def execute(args, report: dict) -> None:
         MEMORY_CALL_CASE_SCHEMA: "runtime Word input, std's memory<bytes>, memory_ref and memory<DynArray<uint256>> values passed to and returned by helpers, generic helpers over std's memory traits, function values, tuples, std sums and a user enum holding a value and closures capturing one, in straight-line code, versus a Core reference over byte lists with every call inlined, std's OutOfBounds() revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         REVERT_DATA_CASE_SCHEMA: "runtime Word input, std Error values made from the input, held by variables, pairs, std sums and a user enum, made, chosen and raised by helpers, closures, match arms and a bounded while loop, through revertWithError, require with an Error or a string literal, revertLit and revertEmpty, beside std's memory<bytes> values that messages view, versus a Core reference over byte lists whose right injection is the revert data, compared exactly, Sonatina O0, run(uint256) ABI Word",
         HALT_CASE_SCHEMA: "runtime Word input, the revert data profile's sites beside halts with INVALID through std's assert, std.opcodes' invalid() and inline Yul invalid() under a Solcore or a Yul if, in run, helpers, closures, match arms and a bounded while loop, versus the revert data profile's Core reference, whose right injection with a length no revert data has is the halt, an INVALID halt matching only three INVALID halts and revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
+        CHECKED_ARITHMETIC_CASE_SCHEMA: "runtime Word input or a run(T) argument, std's uint8 to uint256 and int8 to int256 converted from the input with offsets, checked + - * / % and unary - with std's Panic(0x11) and Panic(0x12), the same inside unchecked blocks, through helpers and lambda bodies whose own scope decides, compound assignments, typed literals at the extremes and uint256 literals typed by defaulting, std's DirtyHigherBitsForInteger() for a run(T) argument and a T result std masks or sign-extends, versus an exact integer Core reference whose right injection is the revert data, compared exactly, Sonatina O0, run(uint256) or run(T) ABI Word",
+        SHIFT_CASE_SCHEMA: "runtime Word input, << >> <<= >>= of Words and std's uint8 to uint256 and int8 to int256 by amounts of a Word or an unsigned type converted from the input with offsets or literal amounts, arithmetic >> for signed types, amounts of at least the width, inside and outside unchecked blocks, versus an exact integer Core reference, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

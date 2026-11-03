@@ -1708,12 +1708,13 @@ class EnumCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
-        # Every profile but the trait, trait hierarchy, memory value, memory call and revert data
-        # profiles keeps the 512-node maximum.
+        # Every profile but the trait, trait hierarchy, memory value, memory call, revert data, halt,
+        # checked arithmetic and shift profiles keeps the 512-node maximum.
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
                           if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies',
                                              'runtime-memory-values', 'runtime-memory-calls',
-                                             'runtime-revert-data', 'runtime-halts')}, {512})
+                                             'runtime-revert-data', 'runtime-halts', 'runtime-checked-arithmetic',
+                                             'runtime-shifts')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -2183,7 +2184,8 @@ class MemoryCoverageTests(unittest.TestCase):
         self.assertIn(self.PROFILE, campaign.IDENTITY_FILTER_PROFILES)
         self.assertEqual(campaign.m2.REVERTING_SCHEMAS,
                          (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA,
-                          campaign.m2.REVERT_DATA_CASE_SCHEMA, campaign.m2.HALT_CASE_SCHEMA))
+                          campaign.m2.REVERT_DATA_CASE_SCHEMA, campaign.m2.HALT_CASE_SCHEMA,
+                          campaign.m2.CHECKED_ARITHMETIC_CASE_SCHEMA))
         for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
             self.assertNotIn(self.PROFILE, group)
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
@@ -2870,6 +2872,143 @@ class HaltCoverageTests(unittest.TestCase):
         self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
                             for entry in manifest['cases']))
         self.assertEqual(len(manifest['cases']), 96)
+
+
+def integer_plan(profile):
+    """A minimal plan of the profile: one inline operation or one shift."""
+    if profile == 'runtime-shifts':
+        return {'schema': 'solcore-lean.shift-plan.v1', 'value': 'int16', 'abi': False, 'raw': False, 'inputs': ['0'],
+                'amounts': [{'type': 'uint8', 'offset': 7}], 'helpers': [], 'groups': [{'unchecked': True, 'steps': [
+                    {'shift': {'direction': 'right', 'compound': False, 'value': {'input': 0}, 'amount': {'input': 0}}}]}]}
+    return {'schema': 'solcore-lean.checked-arithmetic-plan.v1', 'value': 'uint8', 'abi': True, 'raw': False,
+            'inputs': ['0'], 'amounts': [], 'helpers': [], 'groups': [{'unchecked': False, 'steps': [
+                {'assign': {'form': 'binary', 'op': 'add', 'left': {'input': 0}, 'right': {'literal': 7}}}]}]}
+
+
+def integer_case(profile):
+    """A case whose provenance carries the plan's authenticated shapes."""
+    schema = campaign.PROFILE_SCHEMAS[profile]
+    key, shapes_key = campaign.m2.INTEGER_PLAN_KEYS[schema][:2]
+    shapes = {dimension: [] for dimension in campaign.m2.INTEGER_PLAN_KEYS[schema][2]}
+    if profile == 'runtime-shifts':
+        shapes.update(values=['int16'], amounts=['uint8'], operators=['sar'], forms=['inline'], contexts=['unchecked'],
+                      operands=['input'], ranges=['inside', 'last', 'width'], results=['minus-one', 'zero'],
+                      typeRanges=['int16:width'])
+    else:
+        shapes.update(types=['uint8'], operators=['add'], forms=['inline'], contexts=['checked'], operands=['input', 'literal'],
+                      literals=['max'], parameters=['abi'], returns=['word'], outcomes=['dirty', 'panic-0x11', 'returned'],
+                      panics=['add'], typeOutcomes=['uint8:0x11', 'uint8:dirty'])
+    return {'schema': schema, key: integer_plan(profile), 'input': '1',
+            'provenance': {shapes_key: shapes, 'generatorVersion': 'core-integers-v1', 'emitterVersion': 'emitter',
+                           'wrapperVersion': 'wrapper', 'profileVersion': profile + '-v1/plan-seed-v1',
+                           'boundaryVersion': 'word-primitive-boundary-bank-v1'}}
+
+
+class IntegerCoverageTests(unittest.TestCase):
+    PROFILES = {'runtime-checked-arithmetic': ('checked-arithmetic', 'checkedArithmeticCoverage',
+                                               'checkedArithmeticRequirements'),
+                'runtime-shifts': ('shift', 'shiftCoverage', 'shiftRequirements')}
+
+    def manifest(self, profile, generated=False):
+        case = integer_case(profile)
+        requirements = {key: [] for key in campaign.m2.INTEGER_PLAN_KEYS[case['schema']][2]}
+        first = next(iter(requirements))
+        requirements[first] = case['provenance'][campaign.m2.INTEGER_PLAN_KEYS[case['schema']][1]][first]
+        key = campaign.m2.INTEGER_PLAN_KEYS[case['schema']][0]
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': profile,
+            **{name: case['provenance'][name] for name in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                          *campaign.PROFILE_VERSION_FIELDS[profile])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            self.PROFILES[profile][2]: requirements,
+            'cases': [{'id': 'integer', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 1024}} if generated else {key: case[key]})}]}
+
+    def test_registration(self):
+        self.assertIn(campaign.m2.CHECKED_ARITHMETIC_CASE_SCHEMA, campaign.m2.REVERTING_SCHEMAS)
+        self.assertNotIn(campaign.m2.SHIFT_CASE_SCHEMA, campaign.m2.REVERTING_SCHEMAS)
+        for profile, (prefix, coverage, _) in self.PROFILES.items():
+            self.assertEqual(campaign.PROFILE_COMMANDS[profile],
+                             (prefix + '-generate', prefix + '-emit', prefix + '-generated'))
+            self.assertEqual(campaign.PROFILE_VERSION_FIELDS[profile], ('profileVersion', 'boundaryVersion'))
+            # A one-step plan at a 256-bit type can return its input.
+            self.assertIn(profile, campaign.IDENTITY_FILTER_PROFILES)
+            self.assertNotIn(campaign.PROFILE_SCHEMAS[profile], campaign.m2.HALTING_SCHEMAS)
+            for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES,
+                          campaign.LOOP_PROFILES, campaign.COMPACT_CASE_PROFILES):
+                self.assertNotIn(profile, group)
+            self.assertEqual(campaign.profile_inputs(profile), campaign.PRIMITIVE_INPUTS)
+            self.assertEqual(campaign.inputs_per_function(profile, campaign.RANDOM_INPUT_SELECTION), 12)
+            self.assertEqual((campaign.minimum_nodes(profile), campaign.maximum_nodes(profile)), (256, 2048))
+            self.assertIsNone(campaign.g0_version(profile, {'generatorVersion': 'core-integers-v1'}))
+            summary, seen = CommandLine.run_main(self, '--profile', profile, '--cases', '1')
+            self.assertEqual(seen, [[prefix + '-generate', '1', '1024', '1', '256', '1000000',
+                                     campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+            dimensions = campaign.integer_dimensions(profile)
+            self.assertEqual(set(summary[coverage]) - {'classification'},
+                             {prefix + dimension for dimension in dimensions
+                              for prefix in ('generated', 'matched', 'required', 'missing')})
+            for nodes in ('255', '2049'):
+                with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                    CommandLine.run_main(self, '--profile', profile, '--cases', '1', '--nodes', nodes)
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for profile, (_, _, requirement) in self.PROFILES.items():
+            other = next(name for name in self.PROFILES if name != profile)
+            for generated in (False, True):
+                campaign.validate_manifest(self.manifest(profile, generated))
+            value = self.manifest(profile)
+            base = value[requirement]
+            first = next(iter(base))
+            for invalid in (None, {}, {**base, first: ['unknown']}, {**base, first: base[first] * 2},
+                            {key: values for key, values in base.items() if key != first}):
+                with self.assertRaises(ValueError):
+                    campaign.validate_manifest({**value, requirement: invalid})
+            with self.assertRaises(ValueError):
+                campaign.integer_requirements({'profile': other, requirement: base}, profile)
+            entry = value['cases'][0]
+            key = campaign.m2.INTEGER_PLAN_KEYS[campaign.PROFILE_SCHEMAS[profile]][0]
+            plan = entry[key]
+            for invalid in ({**plan, 'groups': []}, {**plan, 'extra': 1}, {**plan, 'value': 'uint7'},
+                            {**plan, 'schema': integer_plan(other)['schema']}):
+                with self.assertRaises(ValueError):
+                    campaign.validate_manifest({**value, 'cases': [{**entry, key: invalid}]})
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'program': {}}]})
+            with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+                campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        for profile in self.PROFILES:
+            case = integer_case(profile)
+            shapes = case['provenance'][campaign.m2.INTEGER_PLAN_KEYS[case['schema']][1]]
+            self.assertEqual(campaign.specified_integers(case, profile),
+                             {dimension: set(shapes[key]) for dimension, key in campaign.integer_dimensions(profile).items()})
+            other = next(name for name in self.PROFILES if name != profile)
+            self.assertEqual(campaign.specified_integers(case, other),
+                             {dimension: set() for dimension in campaign.integer_dimensions(other)})
+            with self.assertRaises(ValueError):
+                broken = copy.deepcopy(case)
+                broken['provenance'][campaign.m2.INTEGER_PLAN_KEYS[case['schema']][1]].pop(next(iter(shapes)))
+                campaign.specified_integers(broken, profile)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = 'runtime-checked-arithmetic'
+            instance = campaign.Campaign(config)
+            instance.record_integers(integer_case('runtime-checked-arithmetic'), matched=True)
+            self.assertEqual(instance.summary['checkedArithmeticCoverage']['matchedPanics'], ['add'])
+            self.assertEqual(instance.summary['shiftCoverage']['matchedValues'], [])
+
+    def test_committed_corpora_require_their_coverage(self):
+        for profile, corpus, count in (('runtime-checked-arithmetic', 'semantic-checked-arithmetic-corpus.json', 136),
+                                       ('runtime-shifts', 'semantic-shift-corpus.json', 128)):
+            manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts' / corpus).read_text()))
+            shapes = campaign.m2.INTEGER_PLAN_KEYS[campaign.PROFILE_SCHEMAS[profile]][2]
+            # The checked arithmetic corpus records its per-type outcomes but requires none.
+            self.assertEqual(manifest[self.PROFILES[profile][2]],
+                             {key: [] if key == 'typeOutcomes' else list(values) for key, values in shapes.items()})
+            self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+            self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
+                                for entry in manifest['cases']))
+            self.assertEqual(len(manifest['cases']), count)
 
 
 class AssemblyMemoryCoverageTests(unittest.TestCase):
@@ -4653,7 +4792,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 28)
+        self.assertEqual(len(campaign.PROFILES), 30)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -5351,7 +5490,8 @@ class G0VersionTests(CommandLine, unittest.TestCase):
         self.assertEqual(set(campaign.PROFILES) - set(campaign.G0_PROFILES),
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
              'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values',
-             'runtime-memory-calls', 'runtime-revert-data', 'runtime-halts'})
+             'runtime-memory-calls', 'runtime-revert-data', 'runtime-halts', 'runtime-checked-arithmetic',
+             'runtime-shifts'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -5449,7 +5589,7 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-aggregates': 8, 'runtime-loops': 10, 'runtime-nested-loops': 10, 'runtime-recursion': 11, 'runtime-recursive-loops': 10, 'runtime-loop-closures': 10, 'runtime-generics': 8, 'runtime-closures': 8,
               'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
               'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12,
-              'runtime-revert-data': 12, 'runtime-halts': 12}
+              'runtime-revert-data': 12, 'runtime-halts': 12, 'runtime-checked-arithmetic': 12, 'runtime-shifts': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))

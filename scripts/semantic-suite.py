@@ -65,6 +65,8 @@ PROFILES = {
     "runtime-memory-calls": ("semantic-memory-call", "pure", 1024),
     "runtime-revert-data": ("semantic-revert-data", "pure", 1024),
     "runtime-halts": ("semantic-halt", "pure", 1024),
+    "runtime-checked-arithmetic": ("semantic-checked-arithmetic", "pure", 1024),
+    "runtime-shifts": ("semantic-shift", "pure", 1024),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
     "runtime-assembly-loops": ("semantic-assembly-loop", "pure", 256),
@@ -592,7 +594,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all sixty for Sonatina, the twenty-eight pure profiles for Yul, "
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all sixty-two for Sonatina, the thirty pure profiles for Yul, "
                              "which also runs the twenty-seven storage-family profiles and the call-return, "
                              "call-sequence and call-branch profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
