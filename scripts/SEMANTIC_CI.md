@@ -305,6 +305,8 @@ share. The first is Sonatina O0's on `runtime-memory-values`: the EVM path
 returns another Word than original Core and Hull, which agree, and the final
 plan has a single loop that observes a bytes value or slice and later slices
 or writes one. Its occurrences count under the class and are shown as known.
+At `e2eef194` neither this class nor the fixtures' O2 crash occurs any more;
+both stay registered.
 Every other mismatch keeps its program signature and is new, including the
 same pattern on O2 or Yul.
 
@@ -327,7 +329,7 @@ in mutation mode. That harness compares compiled paths with each other and
 with upstream's recorded expectations, never with original Core.
 
 - Iteration `i` runs `--fixture-count` fixtures (default 8) with root seed
-  `base + i`. Each cycle of 21 iterations runs every fixture of the shard's
+  `base + i`. Each cycle of 23 iterations runs every fixture of the shard's
   pool once, in slices of a permutation seeded by the base seed and the cycle.
 - Each fixture keeps at most `--fixture-mutants` mutants (default 32), a
   seeded sample of its four per step, and gets `--fixture-seconds` of wall
@@ -356,7 +358,8 @@ with upstream's recorded expectations, never with original Core.
   fixture's result record and the command that replays that fixture alone.
 - The Sonatina O2 crash on `ignored-builtin-effects` and Hull's memory-range
   failure on a source mutant's store at `2^256 - 1` that solc's Yul removes
-  are listed as known: they are counted but never new.
+  are listed as known: they are counted but never new. The O2 crash no longer
+  occurs at `e2eef194`.
 - Readiness also runs `semantic-fixtures.py --check`. The epoch adds the
   digest of what that check reports: the scripts, the compilers, the
   directive tools, the declaration and site extractors, the Lean runner,

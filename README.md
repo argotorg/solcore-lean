@@ -77,9 +77,9 @@ state, transaction/block observations, and an optional gas value. Executable
 code comes from a checked Hull catalogue with exact linked images. Core fuel
 counts transitions; EVM gas consumption is not metered.
 
-The pinned contract inventory covers 168 fixtures. The checked Rust driver
-accepts 165; their 1,382 constructor and call observations match the fixture
-expectations on Core. Three fixtures fail upstream source checks before export.
+The pinned contract inventory covers 182 fixtures. The checked Rust driver
+accepts all of them, and their 1,699 constructor and call observations match
+the fixture expectations on Core.
 [RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
 The Rust EVM reference runs separately through Sonatina at O0 and O2 and through
 Yul compiled by solc. These checks compare each execution with fixture
@@ -87,9 +87,10 @@ expectations. [semantic-fixtures.py](scripts/semantic-fixtures.py) also runs
 the recorded steps, and seeded single-change mutants of their inputs, on
 checked Hull in Lean Core, Sonatina O0 and O2, and Yul, and compares the paths
 with each other. No original Core exists for these fixtures, so this compares
-compiled paths only: all 1,382 recorded steps agree on every admitted path,
-none of 4,308 mutants disagrees, and Sonatina O2 crashes on one fixture, a
-recorded finding ([pinned fixtures across paths](scripts/SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
+compiled paths only: all 1,699 recorded steps agree on every path
+([pinned fixtures across paths](scripts/SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
+The complete mutant runs below were made on the 168 fixtures of the previous
+pin, `2a745e12`, where none of 4,308 input mutants disagreed.
 Calls whose arguments are user data types under std's derived ABI also get
 every boundary Word of their tags, dynamic offsets and `bytes` lengths: all
 519 such mutants of the 26 recorded calls agree on every path. Sequence mutants
@@ -104,7 +105,10 @@ of all 168 fixtures the frontend refused 8 of 1,057 such mutants, and 8,135 of
 the others' 8,889 compared steps agree. Five disagree because Sonatina O0's
 first allocation lies at `0x200` and Hull's and solc's at `0x80`, and two fail
 on Hull, whose memory range a store at `2^256 - 1` exceeds while solc's Yul
-removes the store; both are recorded findings.
+removes the store; both are recorded findings. At the current pin, Sonatina O2
+also places its first allocation away from `0x80`, at `0x140`, and a
+fuzz-driver iteration over eight fixtures matched all 603 steps of its 147
+input, 27 sequence and 12 source mutants.
 Generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the

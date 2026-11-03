@@ -191,7 +191,7 @@ safety results do not establish Rust source-to-Hull preservation, Hull/EVM
 semantic equivalence, or consensus gas accounting.
 
 
-The 2026-10-24 account-runtime validation completed the 18,816-job build and the
+The 2026-10-24 account-runtime validation, at `2a745e12`, completed the 18,816-job build and the
 aggregate Lean test executable. The retained final reports are
 `.upstream/scalars-world-final-31.json` (31/31),
 `.upstream/contracts-world-final-172.json` (172/172),

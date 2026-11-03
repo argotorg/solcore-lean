@@ -7953,7 +7953,7 @@ preservation proof.
 
 ## Compare the pinned end-to-end fixtures across paths
 
-`scripts/semantic-fixtures.py` runs the pinned checkout's 168 end-to-end
+`scripts/semantic-fixtures.py` runs the pinned checkout's 182 end-to-end
 fixtures (`tests/e2e/*/main.sol`) on four compiled paths. No generator reaches
 most of their language, and no original Core exists for them. So the paths
 are compared with each other and with each fixture's own recorded upstream
@@ -7964,10 +7964,10 @@ this section describes how to run them.
 
 ### Definitions
 
-- **Fixtures:** the 168 fixtures that `scripts/rust-scenario-parity.json` and
-  `scripts/rust-method-parity.json` pin by source hash: 72 raw scenarios with
-  626 transactions and 96 method-directive fixtures with 617 typed directives
-  and one send. The existing extractor reads the directives with the pinned
+- **Fixtures:** the 182 fixtures that `scripts/rust-scenario-parity.json` and
+  `scripts/rust-method-parity.json` pin by source hash: 77 raw scenarios with
+  697 transactions and 105 method-directive fixtures with 820 directives. The
+  existing extractor reads the directives with the pinned
   Rust parser; the existing resolver encodes typed directives against the
   driver's ABI.
 - **Paths:** `hull`, the checked Hull on Lean Core through
