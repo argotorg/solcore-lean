@@ -59,7 +59,7 @@ revision four](SEMANTIC_DIFFERENTIAL.md#g0-generator-revisions)
 to the features the profile's emitter renders. The random steps of every
 stateful profile generate with revision three (`core-g0-v3/lcg64-v1`), the same
 mask without that restriction; the stateful tools refuse revision four. In the
-eighteen runtime-input profiles whose functions can be identities, random
+twenty runtime-input profiles whose functions can be identities, random
 campaigns also apply the acceptance filter `exclude-boundary-identity-v1`, which
 excludes a function that returns every boundary input unchanged
 ([boundary identities](SEMANTIC_DIFFERENTIAL.md#boundary-identities)). Random
@@ -88,7 +88,7 @@ in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
-`--backend yul` selects the twenty-eight pure profiles by default (2,106 fixed
+`--backend yul` selects the thirty pure profiles by default (2,370 fixed
 cases). The twenty-seven storage-family profiles also run on Yul when `--profile`
 selects them, with 416 fixed scenarios
 ([storage-family contracts on Yul](SEMANTIC_DIFFERENTIAL.md#compare-storage-family-contracts-on-yul)),
@@ -103,9 +103,9 @@ separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 2,629 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 2,629 | Sonatina O2 | Sonatina O2 |
-| `yul` | 2,106 pure; 416 storage-family, 45 call-return, 16 call-sequence and 18 call-branch when selected | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 2,893 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 2,893 | Sonatina O2 | Sonatina O2 |
+| `yul` | 2,370 pure; 416 storage-family, 45 call-return, 16 call-sequence and 18 call-branch when selected | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure, storage-family,
@@ -115,7 +115,7 @@ observations and the two call profiles that compile both contracts from one
 source remain unsupported on Yul. Reports record this
 distinction in `pathBackends`.
 
-The default selection is all sixty profiles: twenty-eight pure profiles,
+The default selection is all sixty-two profiles: thirty pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
 mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
@@ -138,7 +138,7 @@ parent that calls it two or three times in one method and reads the return
 data around each call in inline Yul, and a parent whose zero to three calls
 sit in branches and bounded loops, as the input decides, reading the return
 data before and after each site in inline Yul.
-Fixed mode runs all 2,629 manifest cases or scenarios. It rejects `--cases`,
+Fixed mode runs all 2,893 manifest cases or scenarios. It rejects `--cases`,
 `--functions` and `--nodes` overrides rather than silently truncating required
 coverage. Repeat `--profile NAME` to select a smaller suite.
 
@@ -184,6 +184,10 @@ compact JSON. The complete default fixed suite of fifty-five profiles took
 5,574 seconds and 340 MiB on Sonatina O0 and 3,980 seconds and 297 MiB on Yul
 locally, within its 7,200 seconds and 1 GiB
 ([per-case overhead](SEMANTIC_DIFFERENTIAL.md#per-case-overhead-and-the-fixed-suites-budget)).
+Later profiles add to that: the two integer corpora alone take about 316
+seconds on O0, 307 on O2 and 451 on Yul, so the O0 fixed suite may now exceed
+the CI job's 7,200 seconds. Splitting the fixed job by `--profile` would keep
+each part within its budget.
 
 The CI finding check uses a reducible fixed addition case:
 

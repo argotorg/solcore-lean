@@ -194,7 +194,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-eight pure profiles with `--backend yul`, and for the
+available for the thirty pure profiles with `--backend yul`, and for the
 twenty-seven storage-family profiles and the call-return, call-sequence and
 call-branch profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
@@ -207,7 +207,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same sixty-profile suite runs locally with shared time and disk limits.
+The same sixty-two-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -326,6 +326,20 @@ reports `invalid` and the EVM `InvalidFEOpcode`, and a halt matches only when
 all three paths halt. All 96 fixed cases, 31 of them halts, and 96 random
 cases of eight functions match on O0, O2 and Yul
 ([Solcore halts](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-halts)).
+The `runtime-checked-arithmetic` profile computes with std's twelve integer
+types, `uint8` to `uint256` and `int8` to `int256`, as solcore-rs #95 and #119
+define them: `+ - * / %` and unary `-` inline, as compound assignments, in
+helpers and in lambda applications, in checked code and in `unchecked` blocks,
+over inputs, typed literals at the extremes and `uint256` literals that
+upstream defaults, with `run(T)` arguments and `T` results. Its original Core
+reads every operand as an integer: a checked result outside the type is
+`Panic(0x11)`, a zero divisor `Panic(0x12)` in either context, an unchecked
+result wraps, and std's decoder refuses an argument outside `T` with
+`DirtyHigherBitsForInteger()`. The `runtime-shifts` profile applies `<<` and
+`>>` (#129) to the twelve types and `word`, by Word and unsigned amounts: `<<`
+gives 0 from the width on, and `>>` is arithmetic for a signed type. All 136
+and 128 fixed cases and 384 random cases of 32 functions each match on O0, O2
+and Yul ([Solcore integer arithmetic and shifts](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-integer-arithmetic-and-shifts)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -347,7 +361,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the eighteen profiles whose functions can be identities they
+inputs, and in the twenty profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
