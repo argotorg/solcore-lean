@@ -1,0 +1,179 @@
+# Closures capture by value
+
+Updated: 2026-11-03.
+
+solcore-rs issue #120 compared Rust and Lean on two closure programs. The
+maintainers decided that captured variables are passed by value, and Lean
+follows Rust. This note records the probe of the pinned Rust paths, the Lean
+probe, the design chosen for the source semantics and the source-to-Core
+lowering, and the alternatives.
+
+## The rule
+
+A closure captures the values its captured variables have when the closure is
+created:
+
+1. a later assignment in the enclosing scope does not reach the closure;
+2. an assignment inside the body does not reach the enclosing scope;
+3. each call starts again from the creation-time values, so an assignment
+   inside the body does not carry over to the next call of the same closure;
+4. a closure that captures another closure captures that closure value, which
+   keeps its own creation-time values.
+
+Rust passes captured values as ordinary runtime arguments of the lifted
+lambda (the module comment of `crates/specialize/src/evaluate/closures.rs` in
+upstream main), which gives rule 3.
+
+## Probe of the pinned Rust paths
+
+A probe compiled hand-written contracts through checked Hull export, Sonatina
+O0 and O2 and Yul (`export-rust-yul.py` with solc 0.8.35), ran them on Anvil
+and in the Lean Hull runner (`rust-hull-scenario`), at twelve inputs each,
+against a Python model of rule 1 to 4. `x0` below is the input's low byte.
+
+| Program | Model | O0 | O2 | Yul | Hull runner |
+| --- | --- | --- | --- | --- | --- |
+| #120's first program, `x = 99` after the capture | `x0 + 42` | match | match | match | match |
+| #120's second program, `x = 42` in the body | `42 + x0 + 41` | match | match | match | match |
+| two calls of `lam () { x = x + 1; return x; }`, `a * 10 + b + x * 100` | `11 (x0 + 1) + 100 x0` (11 at `x0 = 0`) | match | match | match | match |
+| a closure calling a mutating closure twice, then `x = 7` | rule 4 | match | match | match | match |
+| a closure created in a loop body, writing a loop-carried local | rules 1–3 | match | match | match | match |
+| a counter returned by a function, called twice | `seed + 2`, then `seed + 3` | match | match | match | match |
+| an uninitialized local captured, assigned later, read in the body | `0` | match | match | match | match |
+| an uninitialized local captured and assigned in the body before a read | rules 1–3 | match | match | match | match |
+| an uninitialized local captured but never read | rules 1–3 | match | match | match | match |
+
+At `x0 = 0` the repeated-call program gives 11. A closure with private state
+across calls would give 12, and shared cells 212. All Rust paths agree, so
+these results are the specification.
+
+- Rust reads an uninitialized local as zero, also through a capture. Lean
+  faults on every read of an uninitialized local (`uninitializedLocal`); this
+  is an existing difference that does not depend on captures, and capture by
+  value keeps it.
+- Rust rejects a polymorphic local lambda used at two types (`SC0201`), so
+  Lean's generalized local closures have no Rust counterpart. They follow the
+  same rule.
+
+Lean's source-to-Core API gave 101, 84 and 212 on the first three programs
+before this change, from shared cells. On solcore-rs #123,
+`let x: Word = 1; if (true) { let x: Word = 2; } return x;` already gives 1
+in Lean, also when the inner `x` is then assigned, so #123 needs no Lean
+change.
+
+The upstream fixture `control-flow-capture-identity`, unchanged except for its
+pragma between the pin and upstream main, encodes the same rule:
+`branch(true, 3)` gives `3 + 10 = 13`.
+
+## Candidates
+
+**A. Snapshot cells.** The lambda rule copies the captured cells into fresh
+closure-private cells and the closure keeps their locations. Each application
+copies those cells again into fresh cells before binding the parameters.
+Nothing writes a snapshot cell after the lambda rule, because the body only
+sees the per-call copies.
+
+**B. Carried values.** The closure keeps the captured cells' contents, and
+each application allocates fresh cells for them, as for parameters.
+
+B keeps the lambda rule free of heap effects, but the closure then contains
+values, so `Value`, `Closure`, `Cell` and `GeneralizedClosure` become one
+nested inductive. Closure typing would type captured values recursively, and
+every source-to-Core value relation (`Represents` and its variants) would
+relate captured values to Core values recursively instead of relating
+locations through the location map. In Core, B loads the captured cells at
+creation and allocates cells per call; the closure keeps plain values.
+
+A keeps `Value` and closures unchanged: a closure still holds an
+`Environment` of locations, and every location-based relation (`Captures`,
+`EnvRepresents`, the location map, the allocation ledger) still applies, now
+to snapshot cells. What changes is the lambda rule, which now allocates, and
+the application rules, which copy before binding parameters. In Core, A
+allocates the snapshot cells at creation and the copies at each call.
+
+A is chosen. Its changes are local to closure formation and closure
+application, on both sides and in lockstep, while B changes the carrier of
+every source value.
+
+## Source semantics
+
+`Dynamic/Heap.lean` gains:
+
+- `Heap.AllocatesCopy`, which appends an exact copy of a cell;
+- `EnvironmentCopies environment before copies after`, which walks the
+  environment from its most recent binding. A binding whose cell carries a
+  generalized principal keeps its location; any other binding gets a fresh
+  cell with the same type and optional value, and `copies` binds the same
+  identifier to it.
+
+No rule writes a cell that carries a generalized principal: place resolution's
+`RootInitialValue` and the empty-mapping read both require an ordinary cell.
+Sharing such a cell is therefore the same as copying it.
+
+`Dynamic/Evaluation.lean` and `Dynamic/Fault.lean`:
+
+- `ExpressionFormEvaluates.lambda` takes `EnvironmentCopies environment before
+  captured after`, stores `captured`, and ends in `after`.
+- `CallableApplies.closure` and `closureUnit` take `EnvironmentCopies
+  function.captured before entry copied` and allocate the parameters on top of
+  `entry` from `copied`. `CallableFaults.closureBody` and
+  `closureControlEscape` do the same.
+- `StatementExecutes.letInitializedGeneralized` and
+  `ForItemExecutes.letInitializedGeneralized` copy the environment first; the
+  principal captures the copies, and every materialized instance shares them.
+
+A copy of an uninitialized cell is uninitialized: the capture itself never
+faults, a read in the body faults as any read of an uninitialized local does,
+and an assignment in the body initializes only that call's copy. A copied
+closure value keeps its own snapshot locations, and nothing writes them, so a
+closure that captures another closure needs no deeper copy. Retained closures
+in public sessions, session snapshots and checkpoints hold the snapshot cells
+like any other cells.
+
+## Lowering
+
+The Core lowering mirrors the source rules allocation by allocation.
+
+- Copies are marked source allocations made through the profile's allocator
+  (`SourceCoreSourceCells`), so the allocation ledger knows them. A copy loads
+  the slot's optional payload and allocates an uninitialized or an initialized
+  marked cell in the two branches of a `caseE`. Without an allocator, the copy
+  is a plain `newCell` of the loaded payload.
+- At creation, the lowered lambda is preceded by one copy for each copied
+  scope slot, and the lambda expression is renamed so that those slots refer
+  to the copies. The closure's environment, the lambda manifest's captures and
+  the indexed frame snapshot therefore hold the snapshot cells.
+- At each call, the raw lambda body copies the captured slots after the
+  manifest and before parameter binding, and the body is renamed so that
+  scope slots refer to these copies.
+- A generalized declaration copies the scope around its bundle and its binder
+  allocation, so the bundle's instance closures and the binder's marker
+  capture the snapshot cells, which is what the ledger restores the principal
+  from. Instances of a generalized local take no snapshot of their own.
+- Hidden match scrutinee slots and generalized local slots are not copied:
+  the source environment has no binding for the first, and the second keeps
+  its location in the source rule.
+
+This changes neither Core's syntax nor its semantics, the Hull importer or the
+shared contract runtime.
+
+A prototype that copied with plain unmarked cells gave 42, 83 and 11 through
+the public API and ran the public execution test up to its first shared-capture
+expectation, but `Session.snapshot` then failed with the ledger's
+`unknownCaptureLocation`: every capture in a marker must be a marked cell.
+Copies are therefore marked allocations.
+
+## Proofs and tests
+
+Theorem statements that mention the lambda rule's unchanged heap, or a closure
+whose captured environment is its creation environment, change to the snapshot
+environment and the extended heaps; other statements stay unchanged. The
+lowering proofs gain lemmas for one marked copy and for a copied scope, and
+reuse the existing formation and invocation lemmas under the snapshot and
+call renamings. The runtime tests expect the by-value results, including #120's
+programs, the repeated call, a loop-carried capture and the adapted
+`control-flow-capture-identity` fixture.
+
+Closures in Hull (`Solcore/Frontend/RustHull/`) are Rust's lifted lambdas and
+are out of scope. The generated closure profiles already capture before the
+outer assignments, and every path agrees on them.

@@ -11732,6 +11732,12 @@ semantics and lowering, is not done; it waits for lane D's closure change,
 which shares `Solcore/SourceSemantics` and `Solcore/Frontend/SourceCore*`.
 The new emitters have no proof yet.
 
+**Closures capture by value.** After solcore-rs #120, a closure keeps the
+values its captured variables had at creation, and each call starts again
+from them. Every pinned Rust path agrees on this, and Lean's source semantics,
+lowering and proofs are to follow it. The probe, the design and its
+alternatives are in [Closures capture by value](closure-capture-by-value.md).
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
