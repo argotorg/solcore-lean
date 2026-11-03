@@ -1859,6 +1859,7 @@ import Solcore.Test.SourceMemoryValuesCases
 import Solcore.Test.SourceMemoryCallsCases
 import Solcore.Test.SourceRevertDataCases
 import Solcore.Test.SourceIntegerCases
+import Solcore.Test.SourceArrayCases
 import Solcore.Test.CallGraphGenerator
 import Solcore.Test.SourceCallGraphEmitter
 import Solcore.Test.SourceCallGraphCases
@@ -4084,6 +4085,7 @@ def run : IO Unit := do
   SourceRevertDataCases.testSourceRevertDataCases
   SourceRevertDataCases.testSourceHaltCases
   SourceIntegerCases.testSourceIntegerCases
+  SourceArrayCases.testSourceArrayCases
   CallGraphGenerator.testCallGraphGenerator
   SourceCallGraphEmitter.testSourceCallGraphEmitter
   SourceCallGraphCases.testSourceCallGraphCases

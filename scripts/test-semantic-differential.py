@@ -357,7 +357,8 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.MEMORY_VERSIONS, ("profileVersion", "boundaryVersion"))
         self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA,
                                                     runner.REVERT_DATA_CASE_SCHEMA, runner.HALT_CASE_SCHEMA,
-                                                    runner.CHECKED_ARITHMETIC_CASE_SCHEMA))
+                                                    runner.CHECKED_ARITHMETIC_CASE_SCHEMA, runner.MEMORY_ARRAY_CASE_SCHEMA,
+                                                    runner.ARRAY_ABI_CASE_SCHEMA))
         self.assertEqual(runner.HALTING_SCHEMAS, (runner.HALT_CASE_SCHEMA,))
 
     def test_revert_data_plan_envelope_and_shape_inventory(self):
@@ -422,6 +423,74 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.HALT_CASE_SCHEMA], "runtime-halts")
         self.assertEqual(runner.CASE_CONTRACTS[runner.HALT_CASE_SCHEMA], "SynthesizedHalts")
         self.assertEqual(runner.HALT_VERSIONS, ("profileVersion", "boundaryVersion"))
+
+    def test_array_plan_envelopes_selectors_calldata_and_return_data(self):
+        memory, abi = runner.MEMORY_ARRAY_CASE_SCHEMA, runner.ARRAY_ABI_CASE_SCHEMA
+        observe = {"observe": {"length": {"array": {"var": 0}}}}
+        plan = {"schema": "solcore-lean.memory-array-plan.v1", "element": "int8", "values": [{"offset": "0", "raw": False}],
+                "indices": [], "params": [], "steps": [{"literal": [{"input": 0}]}, observe], "result": "word"}
+        runner.validate_array_plan(plan, memory)
+        params = [{"calldata": True, "length": {"shift": 8, "mask": 3}, "offset": "1", "raw": True},
+                  {"calldata": False, "length": {"literal": 2}, "offset": "3", "raw": False}]
+        abi_plan = {**plan, "schema": "solcore-lean.array-abi-plan.v1", "params": params, "result": {"array": {"param": 1}}}
+        runner.validate_array_plan(abi_plan, abi)
+        for invalid in (None, {}, {**plan, "extra": 0}, {**plan, "schema": "solcore-lean.array-abi-plan.v1"},
+                        {**plan, "element": "word"}, {**plan, "values": []}, {**plan, "values": plan["values"] * 4},
+                        {**plan, "indices": [{}] * 4}, {**plan, "steps": []}, {**plan, "steps": [observe] * 13},
+                        {**plan, "params": params}, {**plan, "result": {"array": {"var": 0}}}):
+            with self.assertRaises(ValueError):
+                runner.validate_array_plan(invalid, memory)
+        for invalid in ({**abi_plan, "params": []}, {**abi_plan, "params": params * 2},
+                        {**abi_plan, "params": [{**params[0], "raw": 1}]}, {**abi_plan, "params": [{"calldata": True}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_array_plan(invalid, abi)
+        for case_schema, dimensions, counts in (
+                (memory, runner.MEMORY_ARRAY_SHAPES,
+                 {"types": 12, "declarations": 13, "writes": 15, "targets": 3, "members": 3, "observations": 6,
+                  "collections": 4, "bases": 4, "indices": 4, "lengths": 3, "loops": 4, "sharing": 4, "outcomes": 6,
+                  "panics": 14}),
+                (abi, runner.ARRAY_ABI_SHAPES,
+                 {"types": 12, "parameters": 3, "lengths": 2, "elements": 2, "values": 2, "results": 4,
+                  "calldataReads": 6, "parameterWrites": 4, "encodings": 2, "outcomes": 6, "dirty": 3})):
+            shapes = {key: list(values) for key, values in dimensions.items()}
+            runner.validate_array_shapes(shapes, case_schema)
+            first = next(iter(shapes))
+            for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, first: list(reversed(shapes[first]))},
+                            {**shapes, first: ["unknown"]}, {key: values for key, values in shapes.items() if key != first}):
+                with self.assertRaises(ValueError):
+                    runner.validate_array_shapes(invalid, case_schema)
+            self.assertEqual({key: len(values) for key, values in dimensions.items()}, counts)
+        self.assertEqual((sum(map(len, runner.MEMORY_ARRAY_SHAPES.values())),
+                          sum(map(len, runner.ARRAY_ABI_SHAPES.values()))), (95, 46))
+        # The run(T[],uint256) and run(T[],T[],uint256) selectors are keccak256 of their signatures.
+        spec = importlib.util.spec_from_file_location("test_array_keccak", ROOT / "scripts/semantic-storage-differential.py")
+        storage = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(storage)
+        self.assertEqual(set(runner.ARRAY_SELECTORS), {(name, count) for name in runner.INTEGER_TYPES for count in (1, 2)})
+        for (name, count), selector in runner.ARRAY_SELECTORS.items():
+            signature = "run(" + ",".join([name + "[]"] * count + ["uint256"]) + ")"
+            self.assertEqual(storage.keccak256(signature.encode())[:4].hex(), selector)
+        x = 0x3ff
+        self.assertEqual(runner.array_calldata({"schema": memory, "memoryArrayPlan": plan, "input": str(x)}),
+                         ("run(uint256)", bytes.fromhex("a444f5e9") + x.to_bytes(32, "big")))
+        signature, data = runner.array_calldata({"schema": abi, "arrayAbiPlan": abi_plan, "input": str(x)})
+        self.assertEqual(signature, "run(int8[],int8[],uint256)")
+        words = [0x60, 0x60 + 32 * 4, x, 3, x + 1, x + 2, x + 3, 2, 0x02, 0x03]
+        # The raw calldata elements stay as they are; the clean ones are x + 3 and x + 4 sign-extended from int8.
+        self.assertEqual(data, bytes.fromhex("25905c45") + b"".join(word.to_bytes(32, "big") for word in words))
+        self.assertEqual(runner.integer_convert("int8", 0x380), 2 ** 256 - 128)
+        self.assertEqual(runner.integer_convert("uint16", 2 ** 256 - 1), 0xffff)
+        with self.assertRaises(ValueError):
+            runner.array_calldata({"schema": abi, "arrayAbiPlan": {**abi_plan, "params": [{**params[0], "length": {"literal": 5}}]},
+                                   "input": "1"})
+        self.assertEqual(runner.OUTPUT_SCHEMAS, (abi,))
+        output = {"stage": "execution", "status": "returned", "output": "0x" + "00" * 31 + "07"}
+        self.assertEqual(runner.normalize_observation(output, direct=True, outputs=True), {"status": "returned", "word": "7"})
+        longer = {**output, "output": "0x" + "00" * 63 + "07"}
+        self.assertEqual(runner.normalize_observation(longer, direct=True, outputs=True),
+                         {"status": "returned", "output": longer["output"]})
+        with self.assertRaises(ValueError):
+            runner.normalize_observation(longer, direct=True)
 
     def test_integer_plan_envelopes_selectors_and_shape_inventories(self):
         schema, shifts = runner.CHECKED_ARITHMETIC_CASE_SCHEMA, runner.SHIFT_CASE_SCHEMA
@@ -938,7 +1007,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 30)
+        self.assertEqual(len(runner.CASE_PROFILES), 32)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

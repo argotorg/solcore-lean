@@ -1,0 +1,1390 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-array-abi",
+  "coverageKind": "core-ast-features",
+  "boundaryVersion": "word-primitive-boundary-bank-v1",
+  "emitterVersion": "solcore-source-array-abi-v1",
+  "generatorVersion": "core-arrays-v1",
+  "profileVersion": "runtime-array-abi-v1/plan-seed-v1",
+  "wrapperVersion": "solcore-array-abi-contract-v1",
+  "requiredFeatures": [],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "2",
+    "255",
+    "256",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+  ],
+  "arrayAbiRequirements": {
+    "types": [
+      "int128",
+      "int16",
+      "int256",
+      "int32",
+      "int64",
+      "int8",
+      "uint128",
+      "uint16",
+      "uint256",
+      "uint32",
+      "uint64",
+      "uint8"
+    ],
+    "parameters": [
+      "calldata",
+      "memory",
+      "two"
+    ],
+    "lengths": [
+      "input",
+      "literal"
+    ],
+    "elements": [
+      "clean",
+      "raw"
+    ],
+    "values": [
+      "clean",
+      "raw"
+    ],
+    "results": [
+      "array",
+      "copy",
+      "parameter",
+      "word"
+    ],
+    "calldataReads": [
+      "copy",
+      "element",
+      "get",
+      "length",
+      "loop",
+      "slice"
+    ],
+    "parameterWrites": [
+      "compound",
+      "fill",
+      "memref",
+      "plain"
+    ],
+    "encodings": [
+      "canonical",
+      "normalized"
+    ],
+    "outcomes": [
+      "dirty",
+      "panic-0x11",
+      "panic-0x12",
+      "panic-0x32",
+      "panic-0x41",
+      "returned"
+    ],
+    "dirty": [
+      "copy",
+      "memory",
+      "read"
+    ]
+  },
+  "cases": [
+    {
+      "id": "abi-4-0",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-1",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-2",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-3",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-4",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-5",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-6",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-4-7",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-0",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-1",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-2",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-3",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-4",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-5",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-6",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-5-7",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-0",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-1",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-2",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-3",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-4",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-5",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-6",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-7-7",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-0",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-1",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-2",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-3",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-4",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-5",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-6",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-8-7",
+      "generation": {
+        "seed": "8",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-0",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-1",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-2",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-3",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-4",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-5",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-6",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-10-7",
+      "generation": {
+        "seed": "10",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-0",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-1",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-2",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-3",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-4",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-5",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-6",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-12-7",
+      "generation": {
+        "seed": "12",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-0",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-1",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-2",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-3",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-4",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-5",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-6",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-13-7",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-0",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-1",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-2",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-3",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-4",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-5",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-6",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-16-7",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-0",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-1",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-2",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-3",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-4",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-5",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-6",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-18-7",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-0",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-1",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-2",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-3",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-4",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-5",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-6",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-19-7",
+      "generation": {
+        "seed": "19",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-0",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-1",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-2",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-3",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-4",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-5",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-6",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-20-7",
+      "generation": {
+        "seed": "20",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-0",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-1",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-2",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-3",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-4",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-5",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-6",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-22-7",
+      "generation": {
+        "seed": "22",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-0",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-1",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-2",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-3",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-4",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-5",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-6",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-30-7",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-0",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-1",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-2",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-3",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-4",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-5",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-6",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-34-7",
+      "generation": {
+        "seed": "34",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-0",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-1",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-2",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-3",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-4",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-5",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-6",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-39-7",
+      "generation": {
+        "seed": "39",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-0",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-1",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-2",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-3",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-4",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-5",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-6",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-41-7",
+      "generation": {
+        "seed": "41",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-0",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-1",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-2",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-3",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-4",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-5",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-6",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-47-7",
+      "generation": {
+        "seed": "47",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-0",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-1",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-2",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-3",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-4",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-5",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-6",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "abi-469-7",
+      "generation": {
+        "seed": "469",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    }
+  ]
+}

@@ -27,6 +27,10 @@ import Solcore.Synthesis.Source.IntegersEmitter
 import Solcore.Synthesis.Source.IntegerCases
 import Solcore.Synthesis.Source.CheckedArithmeticCases
 import Solcore.Synthesis.Source.ShiftCases
+import Solcore.Synthesis.Source.ArraysEmitter
+import Solcore.Synthesis.Source.ArrayCases
+import Solcore.Synthesis.Source.MemoryArrayCases
+import Solcore.Synthesis.Source.ArrayAbiCases
 import Solcore.Synthesis.Source.CallGraphEmitter
 import Solcore.Synthesis.Source.CallGraphCases
 import Solcore.Synthesis.Source.CallGraphLoopEmitter

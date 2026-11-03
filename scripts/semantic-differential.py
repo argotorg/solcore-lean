@@ -203,12 +203,64 @@ SHIFT_SHAPES = {
 INTEGER_PLAN_KEYS = {CHECKED_ARITHMETIC_CASE_SCHEMA: ("checkedArithmeticPlan", "checkedArithmeticShapes",
                                                       CHECKED_ARITHMETIC_SHAPES, "solcore-lean.checked-arithmetic-plan.v1"),
                      SHIFT_CASE_SCHEMA: ("shiftPlan", "shiftShapes", SHIFT_SHAPES, "solcore-lean.shift-plan.v1")}
+MEMORY_ARRAY_CASE_SCHEMA = "solcore-lean.semantic-memory-array-case.v1"
+ARRAY_ABI_CASE_SCHEMA = "solcore-lean.semantic-array-abi-case.v1"
+ARRAY_VERSIONS = ("profileVersion", "boundaryVersion")
+# The selectors of run(T[],uint256) and run(T[],T[],uint256), keccak256 of each signature.
+ARRAY_SELECTORS = {
+    ("uint8", 1): "8bd24abc", ("uint8", 2): "5434d13a", ("uint16", 1): "f9667762", ("uint16", 2): "b80c6e47",
+    ("uint32", 1): "6502c8b5", ("uint32", 2): "c85caa6b", ("uint64", 1): "c7b78359", ("uint64", 2): "980d964e",
+    ("uint128", 1): "2e2e3fe9", ("uint128", 2): "4317c184", ("uint256", 1): "bb031b59", ("uint256", 2): "f8b1231b",
+    ("int8", 1): "57b6bce4", ("int8", 2): "25905c45", ("int16", 1): "0b91d525", ("int16", 2): "83abf9bf",
+    ("int32", 1): "14240747", ("int32", 2): "bb1a6908", ("int64", 1): "157e1f25", ("int64", 2): "438c7ad6",
+    ("int128", 1): "8018c529", ("int128", 2): "5f653335", ("int256", 1): "4fec41af", ("int256", 2): "0533c749"}
+# The specified shape values of the memory array profile, from the plan and the runs its plan
+# reaches at the eight boundary inputs, never measured on a compiled path.
+MEMORY_ARRAY_SHAPES = {
+    "types": tuple(sorted(INTEGER_TYPES)),
+    "declarations": tuple(sorted(("new", "literal", "alias", "copy", "helper", "slice-range", "slice-from", "slice-to",
+                                  "slice-all", "tail", "grid-new", "grid-arrays", "grid-literal"))),
+    "writes": tuple(sorted(("plain", "put", "inc", "fill", "set-row") +
+                           tuple(name for op in ("add", "sub", "mul", "div", "mod") for name in (op, "unchecked-" + op)))),
+    "targets": ("array", "row", "storage"),
+    "members": ("pop", "push", "set-length"),
+    "observations": tuple(sorted(("length", "element", "grid-length", "sum", "get", "len"))),
+    "collections": ("array", "row", "slice", "storage"),
+    "bases": ("array", "row", "slice", "storage"),
+    "indices": ("counter", "flagged", "input", "literal"),
+    "lengths": ("flagged", "input", "literal"),
+    "loops": ("array", "row", "slice", "storage"),
+    "sharing": ("alias", "copy", "row", "view"),
+    "outcomes": ("panic-0x11", "panic-0x12", "panic-0x31", "panic-0x32", "panic-0x41", "returned"),
+    "panics": tuple(sorted(("read", "write", "row", "slice-start", "slice-end", "slice-read", "stale", "pop", "new",
+                            "grid-new", "compound-overflow", "compound-zero", "inc", "sum")))}
+# The specified shape values of the array ABI profile, from the plan and the runs its plan reaches
+# at the eight boundary inputs, never measured on a compiled path.
+ARRAY_ABI_SHAPES = {
+    "types": tuple(sorted(INTEGER_TYPES)),
+    "parameters": ("calldata", "memory", "two"),
+    "lengths": ("input", "literal"),
+    "elements": ("clean", "raw"),
+    "values": ("clean", "raw"),
+    "results": ("array", "copy", "parameter", "word"),
+    "calldataReads": tuple(sorted(("length", "element", "get", "slice", "copy", "loop"))),
+    "parameterWrites": ("compound", "fill", "memref", "plain"),
+    "encodings": ("canonical", "normalized"),
+    "outcomes": ("dirty", "panic-0x11", "panic-0x12", "panic-0x32", "panic-0x41", "returned"),
+    "dirty": ("copy", "memory", "read")}
+ARRAY_PLAN_KEYS = {MEMORY_ARRAY_CASE_SCHEMA: ("memoryArrayPlan", "memoryArrayShapes", MEMORY_ARRAY_SHAPES,
+                                              "solcore-lean.memory-array-plan.v1"),
+                   ARRAY_ABI_CASE_SCHEMA: ("arrayAbiPlan", "arrayAbiShapes", ARRAY_ABI_SHAPES,
+                                           "solcore-lean.array-abi-plan.v1")}
+# Cases whose original Core returns data rather than one Word: an array ABI plan's T[] result,
+# or its fold as 32 bytes.
+OUTPUT_SCHEMAS = (ARRAY_ABI_CASE_SCHEMA,)
 # Cases whose original Core can stop with revert data: std's OutOfBounds() revert at an
-# out-of-range access, a revert data or halt plan's site, or a checked arithmetic plan's
-# Panic or std's DirtyHigherBitsForInteger(); three reverts with the same data are a match
-# only for them.
+# out-of-range access, a revert data or halt plan's site, a checked arithmetic plan's
+# Panic or std's DirtyHigherBitsForInteger(), or an array plan's Panic or that rejection;
+# three reverts with the same data are a match only for them.
 REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA, HALT_CASE_SCHEMA,
-                     CHECKED_ARITHMETIC_CASE_SCHEMA)
+                     CHECKED_ARITHMETIC_CASE_SCHEMA, MEMORY_ARRAY_CASE_SCHEMA, ARRAY_ABI_CASE_SCHEMA)
 # Cases whose original Core can halt with INVALID; three INVALID halts are a match only
 # for them.
 HALTING_SCHEMAS = (HALT_CASE_SCHEMA,)
@@ -243,7 +295,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  HIERARCHY_CASE_SCHEMA: "runtime-trait-hierarchies", MEMORY_CASE_SCHEMA: "runtime-memory-values",
                  MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls", REVERT_DATA_CASE_SCHEMA: "runtime-revert-data",
                  HALT_CASE_SCHEMA: "runtime-halts", CHECKED_ARITHMETIC_CASE_SCHEMA: "runtime-checked-arithmetic",
-                 SHIFT_CASE_SCHEMA: "runtime-shifts"}
+                 SHIFT_CASE_SCHEMA: "runtime-shifts", MEMORY_ARRAY_CASE_SCHEMA: "runtime-memory-arrays",
+                 ARRAY_ABI_CASE_SCHEMA: "runtime-array-abi"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -260,7 +313,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   HIERARCHY_CASE_SCHEMA: "SynthesizedTraitHierarchies", MEMORY_CASE_SCHEMA: "SynthesizedMemoryValues",
                   MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData",
                   HALT_CASE_SCHEMA: "SynthesizedHalts", CHECKED_ARITHMETIC_CASE_SCHEMA: "SynthesizedCheckedArithmetic",
-                  SHIFT_CASE_SCHEMA: "SynthesizedShifts"}
+                  SHIFT_CASE_SCHEMA: "SynthesizedShifts", MEMORY_ARRAY_CASE_SCHEMA: "SynthesizedMemoryArrays",
+                  ARRAY_ABI_CASE_SCHEMA: "SynthesizedArrayAbi"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 BACKEND_COMMIT = "6bd0ce661ea327c149429b00fee3c8608616040f"
@@ -879,6 +933,87 @@ def integer_signature(case: dict) -> tuple[str, bytes]:
     return f"run({parameter})", bytes.fromhex(RUN_SELECTORS[parameter])
 
 
+def validate_array_plan(plan, schema) -> dict:
+    """Validate the envelope, the element type and the counts; native replay checks every
+    value, index, parameter and step against the profile and the seed."""
+    if (not isinstance(plan, dict) or plan.get("schema") != ARRAY_PLAN_KEYS[schema][3]
+            or set(plan) != {"schema", "element", "values", "indices", "params", "steps", "result"}):
+        raise ValueError("unsupported array plan schema")
+    if plan["element"] not in INTEGER_TYPES:
+        raise ValueError("array plan element type is outside the profile's types")
+    if not isinstance(plan["values"], list) or not 1 <= len(plan["values"]) <= 3:
+        raise ValueError("array plan requires one to three values")
+    if not isinstance(plan["indices"], list) or len(plan["indices"]) > 3:
+        raise ValueError("array plan admits at most three indices")
+    if not isinstance(plan["steps"], list) or not 1 <= len(plan["steps"]) <= 12:
+        raise ValueError("array plan requires one to twelve steps")
+    params = plan["params"]
+    abi = schema == ARRAY_ABI_CASE_SCHEMA
+    if (not isinstance(params, list) or not (1 <= len(params) <= 2 if abi else not params)
+            or any(not isinstance(param, dict) or set(param) != {"calldata", "length", "offset", "raw"}
+                   or type(param["calldata"]) is not bool or type(param["raw"]) is not bool for param in params)):
+        raise ValueError("array plan parameters are outside the profile")
+    if not abi and plan["result"] != "word":
+        raise ValueError("a memory array plan returns its fold")
+    return plan
+
+
+def validate_array_shapes(values, schema) -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    label, dimensions = ARRAY_PLAN_KEYS[schema][1], ARRAY_PLAN_KEYS[schema][2]
+    if not isinstance(values, dict) or set(values) != set(dimensions):
+        raise ValueError(f"{label} must name every array shape dimension")
+    for key, allowed in dimensions.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
+def integer_convert(name: str, value: int) -> int:
+    """A Word converted to an integer type as the generators convert it: its low bits,
+    sign-extended for a signed type."""
+    bits = int(name.lstrip("uint"))
+    low = value % 2 ** bits
+    if name.startswith("int") and low >= 2 ** (bits - 1):
+        return (low - 2 ** bits) % 2 ** 256
+    return low
+
+
+def array_calldata(case: dict) -> tuple[str, bytes]:
+    """An array plan's signature and calldata, encoded here independently of the case tool:
+    run(uint256) and the input, or the ABI encoding of the parameters the input makes."""
+    plan = case.get(ARRAY_PLAN_KEYS[case["schema"]][0], {})
+    x = int(word(case.get("input"), "input"))
+    params = plan.get("params", [])
+    if not params:
+        return "run(uint256)", bytes.fromhex("a444f5e9") + x.to_bytes(32, "big")
+    element = plan["element"]
+    lengths = []
+    for param in params:
+        length = param["length"]
+        if set(length) == {"literal"} and type(length["literal"]) is int and 0 <= length["literal"] <= 4:
+            lengths.append(length["literal"])
+        elif (set(length) == {"shift", "mask"} and length["shift"] in (0, 1, 2, 3, 8, 128, 253)
+              and length["mask"] in (1, 3, 7)):
+            lengths.append((x >> length["shift"]) & length["mask"])
+        else:
+            raise ValueError("array parameter length is outside the profile")
+    offsets, position, tails = [], 32 * (len(params) + 1), b""
+    for param, length in zip(params, lengths):
+        offsets.append(position)
+        offset = int(word(param["offset"], "parameter offset"))
+        items = [(x + offset + k) % 2 ** 256 for k in range(length)]
+        items = items if param["raw"] else [integer_convert(element, item) for item in items]
+        encoded = length.to_bytes(32, "big") + b"".join(item.to_bytes(32, "big") for item in items)
+        tails += encoded
+        position += len(encoded)
+    signature = "run(" + ",".join([element + "[]"] * len(params) + ["uint256"]) + ")"
+    head = b"".join(offset.to_bytes(32, "big") for offset in offsets) + x.to_bytes(32, "big")
+    return signature, bytes.fromhex(ARRAY_SELECTORS[(element, len(params))]) + head + tails
+
+
 def validate_call_graph_loop_plan(plan) -> dict:
     """Validate the envelope; native replay reseals the scalar graph and loop."""
     if not isinstance(plan, dict) or plan.get("schema") != "solcore-lean.call-graph-loop-plan.v1":
@@ -995,6 +1130,8 @@ def validate_case(case: dict) -> None:
         validate_halt_plan(case.get("haltPlan"))
     if case["schema"] in INTEGER_PLAN_KEYS:
         validate_integer_plan(case.get(INTEGER_PLAN_KEYS[case["schema"]][0]), case["schema"])
+    if case["schema"] in ARRAY_PLAN_KEYS:
+        validate_array_plan(case.get(ARRAY_PLAN_KEYS[case["schema"]][0]), case["schema"])
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -1095,6 +1232,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
             raise ValueError("integer referenceNodes must be an integer from 1 to 4,096")
         validate_integer_shapes(provenance.get(INTEGER_PLAN_KEYS[case["schema"]][1]), case["schema"])
+    if case["schema"] in ARRAY_PLAN_KEYS:
+        for key in ARRAY_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing array provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("array referenceNodes must be an integer from 1 to 4,096")
+        validate_array_shapes(provenance.get(ARRAY_PLAN_KEYS[case["schema"]][1]), case["schema"])
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -1102,6 +1246,8 @@ def validate_case(case: dict) -> None:
     if case["schema"] in INTEGER_PLAN_KEYS:
         signature, selector = integer_signature(case)
         calldata = selector + int(word(case.get("input"), "input")).to_bytes(32, "big")
+    elif case["schema"] in ARRAY_PLAN_KEYS:
+        signature, calldata = array_calldata(case)
     elif case["schema"] != CASE_SCHEMA:
         signature = "run(uint256)"
         calldata = bytes.fromhex("a444f5e9") + int(word(case.get("input"), "input")).to_bytes(32, "big")
@@ -1121,17 +1267,19 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "checkedArithmeticPlan", "shiftPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "checkedArithmeticPlan", "shiftPlan", "memoryArrayPlan", "arrayAbiPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
 
-def normalize_observation(row: dict, *, direct: bool = False) -> dict:
+def normalize_observation(row: dict, *, direct: bool = False, outputs: bool = False) -> dict:
+    """With `outputs`, for a profile whose original Core returns data, a direct row's return
+    data is normalized as the EVM's is."""
     if not isinstance(row, dict) or row.get("stage") != "execution":
         raise ValueError("missing execution observation")
     status = row.get("status")
     if status == "returned":
-        if direct:
+        if direct and not outputs:
             result = word(row.get("word"))
         else:
             data = hex_bytes(row.get("output"), "return data")
@@ -1625,6 +1773,8 @@ def execute(args, report: dict) -> None:
         HALT_CASE_SCHEMA: "runtime Word input, the revert data profile's sites beside halts with INVALID through std's assert, std.opcodes' invalid() and inline Yul invalid() under a Solcore or a Yul if, in run, helpers, closures, match arms and a bounded while loop, versus the revert data profile's Core reference, whose right injection with a length no revert data has is the halt, an INVALID halt matching only three INVALID halts and revert data compared exactly, Sonatina O0, run(uint256) ABI Word",
         CHECKED_ARITHMETIC_CASE_SCHEMA: "runtime Word input or a run(T) argument, std's uint8 to uint256 and int8 to int256 converted from the input with offsets, checked + - * / % and unary - with std's Panic(0x11) and Panic(0x12), the same inside unchecked blocks, through helpers and lambda bodies whose own scope decides, compound assignments, typed literals at the extremes and uint256 literals typed by defaulting, std's DirtyHigherBitsForInteger() for a run(T) argument and a T result std masks or sign-extends, versus an exact integer Core reference whose right injection is the revert data, compared exactly, Sonatina O0, run(uint256) or run(T) ABI Word",
         SHIFT_CASE_SCHEMA: "runtime Word input, << >> <<= >>= of Words and std's uint8 to uint256 and int8 to int256 by amounts of a Word or an unsigned type converted from the input with offsets or literal amounts, arithmetic >> for signed types, amounts of at least the width, inside and outside unchecked blocks, versus an exact integer Core reference, Sonatina O0, run(uint256) ABI Word",
+        MEMORY_ARRAY_CASE_SCHEMA: "runtime Word input, T[] memory arrays of std's integer types made with new T[](n), literals, aliases, toArray copies and helper results, element reads and checked, unchecked and memref writes, the four read-only slice forms over arrays, slices, grid rows and a storage array, T[][] grids, the storage array's push, pop and setLength and a loop over a length, versus a Core reference over length and element cells whose right injection is Panic(0x11), Panic(0x12), Panic(0x31), Panic(0x32) or Panic(0x41), compared exactly, Sonatina O0, run(uint256) ABI Word",
+        ARRAY_ABI_CASE_SCHEMA: "runtime Word input encoded with one or two T[] or calldata<T[]> parameters of std's integer types whose lengths and elements the input makes, memory arrays, slices and grids over them, std's DirtyHigherBitsForInteger() for a narrow element its decoder rejects, eagerly or when read, and a T[] result std's encoder masks or sign-extends, versus the memory array Core reference with the return data, compared exactly, Sonatina O0, run(T[],[T[],]uint256) ABI",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
@@ -1706,7 +1856,8 @@ def execute(args, report: dict) -> None:
     validate_replayed_case(case, fresh)
     (args.output / "replayed-case.json").write_bytes(json_bytes(fresh))
     report["rawObservations"]["directCore"] = fresh.get("directCore")
-    report["observations"]["directCore"] = normalize_observation(fresh.get("directCore"), direct=True)
+    report["observations"]["directCore"] = normalize_observation(fresh.get("directCore"), direct=True,
+                                                                 outputs=case["schema"] in OUTPUT_SCHEMAS)
     halting = case["schema"] in HALTING_SCHEMAS
     if report["observations"]["directCore"]["status"] not in COMPLETED | (HALTED if halting else set()):
         report["comparison"] = {"category": "inconclusive-resource" if report["observations"]["directCore"]["status"] == "out-of-fuel" else "execution-error", "pairs": {}}

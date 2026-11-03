@@ -67,6 +67,8 @@ PROFILES = {
     "runtime-halts": ("semantic-halt", "pure", 1024),
     "runtime-checked-arithmetic": ("semantic-checked-arithmetic", "pure", 1024),
     "runtime-shifts": ("semantic-shift", "pure", 1024),
+    "runtime-memory-arrays": ("semantic-memory-array", "pure", 1024),
+    "runtime-array-abi": ("semantic-array-abi", "pure", 1024),
     "runtime-call-graphs": ("semantic-call-graph", "pure", 192),
     "runtime-call-graph-loops": ("semantic-call-graph-loop", "pure", 256),
     "runtime-assembly-loops": ("semantic-assembly-loop", "pure", 256),
@@ -233,8 +235,8 @@ def profile_attempts(args, profile):
 def node_budget(args, profile):
     """An explicit budget wins; otherwise the profile default, scaled and capped like the campaigns:
     at 512 nodes, at the enum, trait and trait hierarchy profiles' 4,096-node case limit, or at the
-    memory value and memory call profiles' 2,048 nodes without their hash closure, or at the revert data
-    and halt profiles' 2,048 nodes."""
+    memory value and memory call profiles' 2,048 nodes without their hash closure, or at the revert data,
+    halt, checked arithmetic, shift, memory array and array ABI profiles' 2,048 nodes."""
     cap = pure_campaign.maximum_nodes(profile) if PROFILES[profile][1] == "pure" else 512
     return args.nodes or min(cap, round(PROFILES[profile][2] * args.nodes_scale))
 
@@ -606,7 +608,7 @@ def parse_args(argv=None):
     parser.add_argument("--backend", choices=adapter.BACKENDS, default="sonatina-o0")
     parser.add_argument("--mode", choices=("fixed", "random"), default="fixed")
     parser.add_argument("--output", type=Path, required=True, help="fresh suite directory; existing output is never overwritten")
-    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all sixty-two for Sonatina, the thirty pure profiles for Yul, "
+    parser.add_argument("--profile", action="append", choices=tuple(PROFILES), help="repeat to select profiles; default all sixty-four for Sonatina, the thirty-two pure profiles for Yul, "
                              "which also runs the twenty-seven storage-family profiles and the call-return, "
                              "call-sequence and call-branch profiles when they are selected")
     parser.add_argument("--seed", type=int, default=1, help="root seed for reproducible random profile/shard seeds")
@@ -617,7 +619,7 @@ def parse_args(argv=None):
                         help="random runtime-input pure profiles generate this many whole functions, each with all of its "
                              "inputs, instead of --cases; closed-g0 and the stateful profiles keep --cases")
     parser.add_argument("--nodes", type=int, help="override random node budget; otherwise profile-specific defaults")
-    parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512, or 4096 for enums, traits and trait hierarchies, or 2048 for memory values, memory calls, revert data and halts")
+    parser.add_argument("--nodes-scale", type=float, default=1.0, help="multiply each profile's default random node budget (1 to 4), capped at 512, or 4096 for enums, traits and trait hierarchies, or 2048 for memory values, memory calls, revert data, halts, checked arithmetic, shifts, memory arrays and array ABI")
     parser.add_argument("--attempts", type=int, help="generation attempts; default 1024 for call graphs, 512 for other profiles, "
                                                       "and with --functions at least 16 per function, up to 10000")
     # Hull fuel is only a bound: deploying the larger enum and struct storage
