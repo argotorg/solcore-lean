@@ -11232,6 +11232,176 @@ The plan of this unit:
 5. **The next units.** A table of upstream's changes and what Lean needs for
    each, below once the matrices are recorded.
 
+**Re-pin to upstream main `e2eef194`: results.** `4da119798` implements the
+plan above:
+- **Exporters and tools.** The checked Hull serializer is installed through
+  `crates/driver/src/lib.rs`; the directive, declaration and site crates pin
+  salsa 0.28.5, and a crate's lock is reseeded from the upstream lock when it
+  holds packages that lock lacks. The declaration extractor prints a `T[]`
+  type as `{"array": …}`; the site extractor reports shifts, which no operator
+  mutates, and the unchecked operators under their tokens. One offline
+  `prepare-semantic-tools.py --prepare` builds everything on the new pin, 42
+  native tools among it.
+- **Pragma.** `compiler_source` puts `pragma solcore;` on its own line before
+  every emitted source that the harness writes for the Rust compiler, and the
+  module bundle's receipt hashes the files as written. The four tracked
+  `.sol` fixtures declare it themselves.
+- **Manifests.** The scenario and method manifests pin all 182 fixtures, 77
+  raw scenarios with 697 calls and 105 method fixtures with 820 calls and
+  sends; `closure-parameters` has an explicit limit of 15,000,000 Core steps.
+  The 31 scalar cases and the 22 reviewed contract fixtures take the new
+  hashes.
+- **#145's panic.** The enum-array contract reverts with the panic's selector
+  Word for an index past the length, `EnumArrayExecution`'s std model with
+  `Panic(0x32)`, and the selector rule stands that Word for the 36 bytes
+  (`core-enum-array-argument-contract-v2`). The memory-value and memory-call
+  references return a failure code in their right injection, `OutOfBounds()`
+  for a value's Words and bytes and `Panic(0x32)` for an array element
+  (`core-memory-values-v2`, `core-memory-calls-v2`); their plan streams are
+  unchanged. `RevertData` keeps its references exactly.
+- **#130.** The recursive-layout gate checks that the checked export refuses
+  its three fixtures and upstream's two recursive layouts with `SC0420`, and
+  with `--evm-reference` that Sonatina and Yul emission refuse the three.
+- **Gate** on the committed tree: the kernel check, `lake build` (10,347 jobs),
+  `lake test` in 36 minutes, the 21 corpus validators and the
+  chunked-generation check, the 30 `scripts/test-*.py` files (990 tests in
+  the 15 CI suites) and the diff check; the tools prepared offline and
+  verified on `4da119798`.
+
+The matrices ran on `4da119798` with 348 digests frozen: every tracked file
+under `scripts` and `Tests/scripts`, the 42 native tools and the test driver,
+the Rust driver, code-image exporter, directive, declaration and site tools
+with their receipts, the installed driver patches, solc, Anvil and cast. None
+changed during any run. Each matrix ran in four streams of the suite's
+profiles beside another, under load averages of 7 to 177 from lane D's Lean
+builds:
+- **Fixed corpora:**
+  - O0: all 2,629 cases of the sixty profiles matched with complete
+    coverage, 2,106 pure cases and 523 stateful scenarios with 1,326
+    prefixes, in streams of 2,389 to 3,198 seconds.
+  - O2: the same 2,629 cases and 1,326 prefixes matched with complete
+    coverage, in 2,456 to 3,161 seconds.
+  - Yul, over the twenty-eight pure, twenty-seven storage-family and three
+    call profiles: 2,585 of the 2,601 cases matched with complete coverage,
+    2,106 pure cases and 495 stateful scenarios with 1,249 prefixes, in
+    streams of 3,202 to 3,853 seconds. solc rejected 16 with
+    `StackTooDeepError`, as at the old pin: `runtime-traits` 8 of 40 and
+    `runtime-trait-hierarchies` 8 of 104. `stateful-call-returns` stopped at
+    its 900-second limit twice, after 38 of its 45 scenarios each time, and
+    matched all 45 in 897 seconds with 1,800 seconds.
+- **Random suites** from root seed `20261026`, sixteen cases per profile and
+  2,048 attempts, on O0 and O2 over the sixty profiles and on Yul over the
+  same fifty-eight:
+  - O0: 950 of 960 cases matched; 10 `runtime-assembly-loops` cases crashed
+    O0 code-image export with `Integer overflow when casting to usize`; 58
+    attempts were excluded by the profiles' acceptance filters. The stateful
+    scenarios matched all 4,008 prefixes.
+  - O2: 934 of 960 cases matched; 26 crashed O2 code-image export with the
+    same panic: 12 of `runtime-call-graphs`, 10 of `runtime-assembly-loops`
+    and 4 of `runtime-aggregate-call-graphs`; 58 exclusions; 4,008 prefixes
+    matched.
+  - Yul: 918 of 928 cases matched; the 10 `runtime-assembly-loops` cases
+    crashed the Yul runs' O0 code images with the same panic; 55 exclusions;
+    3,752 prefixes matched.
+  - No case mismatched and none was inconclusive.
+- **Fixtures** (`semantic-fixtures.py`, root seed `20261111` for mutants):
+  - Fixed: all 182 fixtures were admitted on Hull, O0, O2 and Yul. Their
+    1,699 recorded steps (1,528 returns and 171 reverts) agree on the four
+    paths and match every recorded expectation, in 832 seconds.
+  - Fuzz driver: one `--backend fixtures` iteration from base seed
+    `20261102`, with two source mutants per fixture, chose `036wildcard`,
+    `abi-constructor-bounds`, `array-nested`, `arraylit`,
+    `inferred-local-lambdas`, `storage-array`, `struct-shadowed-namespace`
+    and `struct-storage-updates`. Its 147 mutants, 27 sequence mutants and 12
+    source mutants executed 603 entries, all matched, with no finding.
+  - Source mutants of the three fixtures whose mutants found something at the
+    old pin: 16 of `asm-string-escapes`, 20 of `revert` and 63 of
+    `ignored-builtin-effects`. All 99 compiled on every path, and 334 of
+    their 376 steps agree. The 30 disagreements come from Sonatina's first
+    allocation on `ignored-builtin-effects`, and the 2 incomplete steps from
+    Hull memory's range at `2^256 - 1`; both are described below. On the 10
+    unobserved steps no path completed: eight stop at Hull's memory range
+    with every EVM path out of gas, and two follow such a step.
+  - Mutants of the recorded calls of `concat` and `zeroize-memory-range`: of
+    104 mutants and 28 recorded calls, 113 agree and none disagrees. Lengths
+    of `2^256 - 1` stop at Hull's memory range (4) and other large lengths
+    run out of Core steps (15), with every EVM path out of gas each time.
+
+**Triage.** Every difference falls in one of three kinds:
+- **Intended upstream changes**, followed on the Lean side in `4da119798`:
+  the required pragma, which had every generated source rejected with
+  `SC0002`; #145's `Panic(0x32)`, behind the O0 probe's 42 mismatches;
+  `closure-parameters`' longer constructor; #130's `SC0420` in the
+  recursive-layout gate; and the inventory of 182 fixtures.
+- **Harness breakage**, fixed in the same commit: the tool crates' salsa pin
+  and stale locks, the driver's patch point, the extractors' missing variants
+  and the tests' counts.
+- **Upstream defects:** none new. Every crash, rejection and path difference
+  above has a symptom that `questions.md` records. All 46 crashes of the
+  random suites are `Integer overflow when casting to usize` at
+  `primitive-types-0.14.0/src/lib.rs:43:1`, and re-exported with
+  `RUST_BACKTRACE=1` each panics under `DemandedBitsQuery::propagate_binary`
+  and `propagate_from_value`, the site of the registered Q013 keys. The source
+  mutants' O2 values extend the recorded first-allocation observation to O2,
+  which now compiles that fixture.
+
+**Known findings at the new pin.** `questions.md`'s re-check section holds
+the evidence for each entry. Archived occurrences were rerun from their saved
+cases on the backend each recorded: 246 cases from fifteen archives, of
+which five cases of 2026-10-26/27 predate later profile versions, so the case
+tools refuse them.
+- **Gone:** Q008 and Q010, whose three fixtures are admitted and agree; the
+  O2 `has_inst` crash on `ignored-builtin-effects`; the O0 class of loops
+  that write std memory values (on O0 the fixed `runtime-memory-values`
+  corpus matches 232 of 232, and the random suite from root seed 1 with
+  eight whole functions 96 of 96); the O2 signextend overflow on the eight
+  `runtime-comptime` cases of G0 revision three and on unit 13's
+  `stateful-keyed-storage` case.
+- **Changed:** Q012's layouts are refused with `SC0420` before emission.
+  Q006's call is qualified by upstream's Yul emitter, while Hull keeps the
+  plain name that Lean's importer diagnoses.
+- **Remaining:** Q013's usize overflow at O2 (24 of 24 archived) and in
+  inline Yul on O0, O2 and Yul (104 of 104), and its `sar` wrong code at O2
+  for counts of `2^16` and `2^32`; the O2 signextend overflow on
+  `stateful-adt-storage` (4 of 4); solc's `StackTooDeepError` (28 of 28);
+  `SC0401` through two superclass bounds (72 of 72); std's mapping slot
+  order; Hull memory's range on a store at `2^256 - 1` that solc removes;
+  and Sonatina's first allocation, at `0x200` on O0 and now at `0x140` on O2.
+- The fuzz driver's `has_inst` key and its O0 memory-values class no longer
+  occur. Both stay registered.
+
+**Following upstream's semantics: the next units.** The re-pin keeps every
+comparison working, but Lean's source language still has none of the features
+that upstream added between the pins. Each row lists what the Lean side needs
+in its layers: the parser (`Solcore/Syntax`), typing (`Solcore/TypeSystem`,
+`Solcore/Frontend/SourceInference`), the source semantics
+(`Solcore/SourceSemantics`), the lowering to Core (`Solcore/Frontend/SourceCore*`),
+the Hull importer (`Solcore/Frontend/RustHull`) and the generators
+(`Solcore/Synthesis`). Core itself needs nothing in any row: checks, panics and
+wrapping are ordinary Core over Words.
+
+| Order | Upstream change | What the Lean side needs | Fixtures |
+| ---: | --- | --- | --- |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256` in `std.unsigned` and `std.signed`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, comptime range checks of literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | Typing: the default of an unconstrained integer literal, and the range check of a literal at its type. Source semantics: the integer types and their checked operations, a panic as revert data `Panic(code)`. Lowering: the checks before the wrapping Core operation, as std's `uAddChecked` and `sAddChecked` do. Importer: nothing; std's helpers lower through the existing `slt`, `sgt`, `sdiv`, `smod` and `signextend`. Generators: a profile of checked arithmetic over `uint256` and the narrow types, whose Core reference reverts with the panic, with boundary inputs at each type's extremes. | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | Parser: the `unchecked { … }` statement. Typing: the five unchecked operators and their traits. Source semantics: wrapping arithmetic by lexical scope, `MIN / -1` wrapping. Lowering: the plain Core operations. Generators: the checked profile's operations inside and outside such blocks. | `unchecked-scope`, `shift-operators` |
+| 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | Parser: the two tokens and their precedence. Typing: the two-parameter traits, an unsigned amount. Source semantics and lowering: Core's `wordShl`, `wordShr` and `wordSar`. Generators: shifts in the scalar fragment; the scalar meaning already has `shl`, `shr` and `sar`. | `shift-operators` |
+| 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` reads and writes through a checked `memref`, read-only slices `a[s:e]` over memory, storage and calldata arrays, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | Parser: the array type, `new`, slices and member calls. Typing: an array's location by context, `memref`, `arraySlice` and `assignRef`. Source semantics: memory arrays and slices with their panics. Lowering: std's layout. ABI: memory arrays as parameters and returns. Generators: the memory-value and memory-call profiles in `T[]` syntax, array returns through `T[]`, slices; their references already model `Panic(0x32)` (this unit). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
+| 5 | `pragma solcore;` (#141): required first in every file, once, without arguments | Parser: it reads the declaration as an ordinary pragma, which the frontend ignores, and also accepts a file without it, with it after another declaration, twice, or with arguments. Following upstream means rejecting those four cases as upstream's `SC0002` does (missing, not first, duplicate, arguments); other pragmas stay as they are. Generators: the emitters print it, and the scalar meaning's printer, lexer and parser and its text theorems take it, so the harness's transport header goes away. | every fixture |
+| 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | Importer: whether a plain-name Hull call from inline Yul, which the Yul emitter now qualifies, is accepted rather than diagnosed (Q006). Typing: whether Lean refuses the recursive layouts that `SC0420` refuses. The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted already follow upstream (this unit). | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
+| 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | Source semantics and lowering of captures, together with lane D's by-value capture (solcore-rs #120). | `closure-parameters` (36 → 49 calls) |
+| — | `msgSender` (#142) and contract-declared struct state (#138) | Nothing: #142 uses std's existing `msgSender` in examples and #138 changes only examples. | `msg-context` |
+
+The new `evm-word-boundaries` fixture checks the `word` operations at their
+extremes, which the scalar meaning already covers.
+
+Integer types come first because they change the meaning of the most
+programs: every `uint256` operation and every unconstrained literal. Unchecked
+blocks need them; shifts need the unsigned amount types but not unchecked
+blocks. Memory arrays are the largest feature and reuse the panic convention of
+this unit's references. The pragma can come with whichever unit first makes
+Lean's parser read upstream's Rust-dialect sources, and with it the emitters
+can print the declaration themselves.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
