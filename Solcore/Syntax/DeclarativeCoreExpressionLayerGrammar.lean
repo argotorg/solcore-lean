@@ -51,22 +51,41 @@ def ExpressionUnaryParses
     postfixParses afterOperators base output ∧
     expression = applyUnaryOperators operators base
 
-/-- Exact binary-operator token at one precedence. -/
+/-- Exact binary-operator tokens at one precedence: one token, or the two
+adjacent tokens of `<<` and `>>`, as `BinaryOp.at?` decodes them. -/
 def BinaryOperatorAtPrecedenceParses (precedence : Nat)
     (input : Remainder) (operator : Located BinaryOp)
     (output : Remainder) : Prop :=
   operator.value.precedence = precedence ∧
-    ExactTokenParses (.symbol operator.value.symbol) input operator.span output
+    BinaryOp.at? input.tokens input.endIndex input.cursor = some operator ∧
+    output = { input with cursor := input.cursor + operator.value.tokenCount }
 
 /-- No binary operator of one precedence occurs at the current cursor. -/
 def BinaryOperatorAtPrecedenceAbsentAt
     (precedence : Nat) (input : Remainder) : Prop :=
-  ¬ ∃ (span : SourceSpan) (operator : BinaryOp),
-    operator.precedence = precedence ∧
-    TokenAt input.tokens input.endIndex input.cursor {
-      span
-      value := .symbol operator.symbol
-    }
+  ¬ ∃ operator : Located BinaryOp, operator.value.precedence = precedence ∧
+    BinaryOp.at? input.tokens input.endIndex input.cursor = some operator
+
+namespace BinaryOperatorAtPrecedenceParses
+
+/-- The decoded operator fixes its span, its value and the remainder. -/
+theorem unique {precedence : Nat} {input leftOutput rightOutput : Remainder}
+    {left right : Located BinaryOp}
+    (leftParsed : BinaryOperatorAtPrecedenceParses precedence input left leftOutput)
+    (rightParsed : BinaryOperatorAtPrecedenceParses precedence input right rightOutput) :
+    left = right ∧ leftOutput = rightOutput := by
+  have same : left = right := Option.some.inj (leftParsed.2.1.symm.trans rightParsed.2.1)
+  subst same
+  exact ⟨rfl, leftParsed.2.2.trans rightParsed.2.2.symm⟩
+
+/-- A decoded operator excludes absence at its precedence. -/
+theorem not_absent {precedence : Nat} {input output : Remainder}
+    {operator : Located BinaryOp}
+    (parsed : BinaryOperatorAtPrecedenceParses precedence input operator output)
+    (absent : BinaryOperatorAtPrecedenceAbsentAt precedence input) : False :=
+  absent ⟨operator, parsed.1, parsed.2.1⟩
+
+end BinaryOperatorAtPrecedenceParses
 
 /-- Pure source-preserving construction used by every binary layer. -/
 def binaryNode (left : Expr) (operator : Located BinaryOp)
@@ -167,9 +186,10 @@ def ExpressionLayerParses
     (nestedParses postfixParses : Remainder → Expr → Remainder → Prop) :
     Remainder → Expr → Remainder → Prop :=
   let unary := ExpressionUnaryParses postfixParses
-  let multiply := LeftAssociativeParses unary 8
-  let add := LeftAssociativeParses multiply 7
-  let bitAnd := LeftAssociativeParses add 6
+  let multiply := LeftAssociativeParses unary 9
+  let add := LeftAssociativeParses multiply 8
+  let shift := LeftAssociativeParses add 7
+  let bitAnd := LeftAssociativeParses shift 6
   let bitXor := LeftAssociativeParses bitAnd 5
   let bitOr := LeftAssociativeParses bitXor 4
   let relational := NonAssociativeParses bitOr 3

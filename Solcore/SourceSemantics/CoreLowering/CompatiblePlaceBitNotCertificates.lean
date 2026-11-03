@@ -99,7 +99,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
         of_describe_prepare unique signatures sourceTyped nonempty described preparedBy generated extract typed
           (LanguageResult.success_hasType .unit)
       have profile : prepared.route.leafType = .word ∨ prepared.route.leafType = .integer := by
-        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using operatorValid
+        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using
+          operatorValid.imp_right (Or.imp_right And.left)
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
         leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile, by simp [routeEq]⟩
 

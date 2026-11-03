@@ -3427,6 +3427,7 @@ theorem BinaryOperatorHasType.applyParameters
       (substitution.apply result) requirements := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
+  | wordShift kind => exact .wordShift kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind
@@ -6242,7 +6243,7 @@ theorem result_type_admissible
       requirements) :
     TypeAdmissible context result := by
   cases typing with
-  | wordArithmetic => exact TypeAdmissible.word binders
+  | wordArithmetic | wordShift => exact TypeAdmissible.word binders
   | integerArithmetic => exact TypeAdmissible.integer binders
   | wordComparison | integerComparison => exact TypeAdmissible.bool binders
   | booleanAnd | booleanOr => exact TypeAdmissible.bool binders
@@ -11262,6 +11263,7 @@ theorem BinaryOperatorHasType.applySubstitution
       (substitution.apply right) (substitution.apply result) requirements := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
+  | wordShift kind => exact .wordShift kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind

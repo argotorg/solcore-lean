@@ -577,6 +577,7 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> try simp only [resolveLocalExpression?] at result
+        case shiftLeft | shiftRight => simp at result
         case add =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result

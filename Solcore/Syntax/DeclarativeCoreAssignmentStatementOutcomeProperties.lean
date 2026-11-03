@@ -20,8 +20,8 @@ private theorem valueOperator_output_unique
     {leftOperator rightOperator : Located ValueAssignOp}
     (leftParsed : ValueAssignOperatorParses input leftOperator leftOutput)
     (rightParsed : ValueAssignOperatorParses input rightOperator rightOutput) :
-    leftOutput = rightOutput := by
-  rw [leftParsed.2, rightParsed.2]
+    leftOutput = rightOutput :=
+  (leftParsed.unique rightParsed).2
 
 /-- A parsed assignment suffix has a unique output remainder. -/
 theorem AssignmentTailParses.output_unique
@@ -72,8 +72,7 @@ theorem OptionalAssignmentTailParses.output_unique
           | bitNot span token =>
               exact False.elim (absent_conflicts_exact leftAbsent.1 token)
           | value tildeAbsent operatorParsed expressionParsed =>
-              exact False.elim (leftAbsent.2
-                ⟨_, _, operatorParsed.1⟩)
+              exact False.elim (operatorParsed.not_absent leftAbsent.2)
   | present leftTail =>
       cases rightParsed with
       | absent rightAbsent =>
@@ -81,8 +80,7 @@ theorem OptionalAssignmentTailParses.output_unique
           | bitNot span token =>
               exact False.elim (absent_conflicts_exact rightAbsent.1 token)
           | value tildeAbsent operatorParsed expressionParsed =>
-              exact False.elim (rightAbsent.2
-                ⟨_, _, operatorParsed.1⟩)
+              exact False.elim (operatorParsed.not_absent rightAbsent.2)
       | present rightTail =>
           exact leftTail.output_unique outcomes rightTail
 
@@ -156,7 +154,7 @@ theorem AssignmentOrExpressionStatementRejects.disjointOrdinary
       subst afterLeftEq
       cases tailParsed with
       | absent tailAbsent =>
-          exact tailAbsent.2 ⟨_, _, rejectedOperator.1⟩
+          exact rejectedOperator.not_absent tailAbsent.2
       | present successfulTail =>
           cases successfulTail with
           | bitNot span token =>

@@ -40,7 +40,7 @@ def scalarSource : Ty → TypeSystem.Ty
 inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty → Mode → Prop where
   | word {operator} (strict : Dynamic.StrictBinaryOperator operator) :
       BinaryProfile operator .word (scalarSource (SourceCorePrimitive.binaryResultType operator)) .word
-  | integer {operator} (strict : Dynamic.StrictBinaryOperator operator) :
+  | integer {operator} (strict : Dynamic.IntegerStrictBinaryOperator operator) :
       BinaryProfile operator .integer (scalarSource (SourceCoreInteger.binaryResultType operator)) .integer
   | logicalAnd : BinaryProfile .logicalAnd .bool .bool .word
   | logicalOr : BinaryProfile .logicalOr .bool .bool .word
@@ -51,6 +51,7 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   cases typed with
   | wordArithmetic kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordComparison kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
+  | wordShift kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | integerArithmetic kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | integerComparison kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | booleanAnd => exact ⟨_, .logicalAnd⟩
@@ -103,7 +104,7 @@ theorem word_body {operator : Syntax.BinaryOp} (strict : Dynamic.StrictBinaryOpe
   simpa only [typed, staged_scalar_result typed] using (staged_payload (functions := functions) (registry := registry)
     (mapping := mapping) (world := world) result)
 
-theorem integer_body {operator : Syntax.BinaryOp} (strict : Dynamic.StrictBinaryOperator operator) (left right : Int) :
+theorem integer_body {operator : Syntax.BinaryOp} (strict : Dynamic.IntegerStrictBinaryOperator operator) (left right : Int) :
     ∃ sourceResult coreResult,
       Dynamic.BinaryPrimitiveApplies operator (.integer left) (.integer right) sourceResult ∧
       ValueRep checked registry functions mapping world (scalarSource (SourceCoreInteger.binaryResultType operator))

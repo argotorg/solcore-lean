@@ -14,7 +14,7 @@ theorem operands {source : TypedSource} {first : Nat} {table : SourceCoreAssignm
     (profile : operator = .equal ∨ assignment.target.type = .word) :
     AssignmentOperandDiagnostics.OperandsLaw faults operator
       (GenericAssignmentDiagnostics.token table site assignment.target.root operator) := by
-  have raw : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer :=
+  have raw : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false :=
     profile.elim Or.inl (fun word => .inr (.inl word))
   cases origin with
   | statement found form =>

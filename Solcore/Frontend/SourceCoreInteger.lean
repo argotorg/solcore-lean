@@ -30,6 +30,8 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .notEqual => .unary .boolNot (.binary .integerEq (.var 1) (.var 0))
   | .logicalAnd => .ifE (.var 1) (.var 0) (.bool false)
   | .logicalOr => .ifE (.var 1) (.bool true) (.var 0)
+  -- Shifts take Words only; typing never lowers one at Integer.
+  | .shiftLeft | .shiftRight => .bool false
 
 def binaryOperandType : Syntax.BinaryOp → Core.Ty
   | .logicalAnd | .logicalOr => .bool
@@ -51,6 +53,7 @@ theorem strictBinaryBody_hasType {definitions : Core.DataEnvironment} {scope : C
     | exact .unary (.binary (.var rfl) (.var rfl))
     | exact .ifE (.var rfl) (.var rfl) .bool
     | exact .ifE (.var rfl) .bool (.var rfl)
+    | exact .bool
 
 theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     {operator : Syntax.BinaryOp} {left right : Core.Expr}

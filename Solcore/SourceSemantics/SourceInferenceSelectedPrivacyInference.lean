@@ -2409,6 +2409,8 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       | bitAnd => exact finishNonEqual (valueIH place) success
       | bitXor => exact finishNonEqual (valueIH place) success
       | bitOr => exact finishNonEqual (valueIH place) success
+      | shiftLeft => exact finishNonEqual (valueIH place) success
+      | shiftRight => exact finishNonEqual (valueIH place) success
   case case46 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition body statementEq conditionInduction bodyInduction

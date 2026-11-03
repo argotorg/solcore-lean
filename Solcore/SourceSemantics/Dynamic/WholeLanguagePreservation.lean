@@ -1169,6 +1169,9 @@ mutual
         | integerArithmetic kind =>
             exact ⟨applies.preserves (.integerArithmetic kind) left_typed right_typed,
               before_typed, .refl before⟩
+        | wordShift kind =>
+            exact ⟨applies.preserves (.wordShift kind) left_typed right_typed,
+              before_typed, .refl before⟩
         | wordComparison kind =>
             exact ⟨applies.preserves (.wordComparison kind) left_typed right_typed,
               before_typed, .refl before⟩
@@ -1188,6 +1191,7 @@ mutual
         cases typing with
         | wordArithmetic kind => cases selected
         | integerArithmetic kind => cases selected
+        | wordShift kind => cases selected
         | wordComparison kind => cases selected
         | integerComparison kind => cases selected
         | booleanAnd => cases selected

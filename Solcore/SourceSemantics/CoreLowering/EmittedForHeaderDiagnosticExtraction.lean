@@ -98,7 +98,7 @@ def assign {context scope assignment operator rhs rest body}
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (remaining : ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation
         context scope rest body) :
     ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation

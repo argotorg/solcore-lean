@@ -2228,6 +2228,9 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
             exact .binary operator (sound leftAccepted) (sound rightAccepted)
         | none =>
             cases sourceOp <;> simp [directWordBinary?] at mapped
+            case shiftLeft | shiftRight =>
+              exact pure_sound (by
+                simpa [elaborateRecursiveLocalComputation?, directWordBinary?] using accepted)
             case logicalAnd =>
               obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (short_circuit_children false).mp accepted
               exact .logicalAnd (sound leftAccepted) (sound rightAccepted)

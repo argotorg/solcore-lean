@@ -42,7 +42,7 @@ theorem preserves_prefix
     (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.isShift = false)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -133,7 +133,7 @@ theorem preserves_fault_reachable
     (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.isShift = false)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -200,7 +200,7 @@ theorem preserves_fault
     (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.isShift = false)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)

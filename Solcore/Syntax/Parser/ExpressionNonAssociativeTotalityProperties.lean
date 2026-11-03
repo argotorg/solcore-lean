@@ -31,13 +31,14 @@ theorem nonAssociative_ordinary_of_elementFuel
           simp only [nonAssociative, leftResult, operatorResult]⟩
     | some operator =>
         rcases binaryAtPrecedence?_some_state_shape operatorResult with
-          ⟨operatorToken, operatorFound, _decoded, _span⟩
-        let afterOperator := { next with cursor := next.cursor + 1 }
+          ⟨_operatorToken, _operatorFound, _decoded, _precedence, operatorBound⟩
+        have operatorPositive := BinaryOp.tokenCount_pos operator.value
+        let afterOperator := { next with cursor := next.cursor + operator.value.tokenCount }
         have consumedResult :
             consumeBinary operator next = .ok () afterOperator := by
           exact consumeBinary_ok_state_shape operator next
         have consumedValid := consumeBinary_reply_validFor operator
-          leftValid.2.1 operatorFound
+          leftValid.2.1 operatorBound
         rw [consumedResult] at consumedValid
         have afterOperatorAdequate :
             afterOperator.remainingCount < operandFuel :=

@@ -32,7 +32,7 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? rhs = some node ∧ certificate scope rhs lowered)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
@@ -46,10 +46,10 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
   refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
     .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
     by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq, rfl⟩
-  rcases profile with equal | word | integer
+  rcases profile with equal | word | ⟨integer, notShift⟩
   · exact .inl equal
   · exact .inr (.inl (rawView.trans word))
-  · exact .inr (.inr (rawView.trans integer))
+  · exact .inr (.inr ⟨rawView.trans integer, notShift⟩)
 
 /-- Compatibility projection of the actual compiler receipt. -/
 theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
@@ -63,7 +63,7 @@ theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? rhs = some node ∧ certificate scope rhs lowered)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
@@ -115,7 +115,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
@@ -170,10 +170,10 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
           found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl, ?_⟩
-        · rcases profile with equal | word | integer
+        · rcases profile with equal | word | ⟨integer, notShift⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))
-          · exact .inr (.inr (leafView.trans integer))
+          · exact .inr (.inr ⟨leafView.trans integer, notShift⟩)
         · exact .projected route layout ordinary rfl described preparedBy
 
 /-- Compatibility projection retains the original selected head and token. -/
@@ -189,7 +189,7 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
@@ -217,7 +217,7 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧

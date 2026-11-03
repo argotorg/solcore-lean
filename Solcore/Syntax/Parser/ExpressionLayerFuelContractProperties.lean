@@ -26,19 +26,22 @@ theorem expressionLayer_fuelTotalityContract
     postfixSyntax
   have unaryTotality := expressionUnary_fuelTotalityContract nested block
     (nestedFuel + 1) postfixSyntax postfixTotality
-  have multiplySyntax := ExpressionContract.leftAssociative unarySyntax 8
+  have multiplySyntax := ExpressionContract.leftAssociative unarySyntax 9
   have multiplyTotality := leftAssociative_fuelTotalityContract
-    (expressionUnary nested block) (nestedFuel + 1) 8 unarySyntax
+    (expressionUnary nested block) (nestedFuel + 1) 9 unarySyntax
       unaryTotality
-  have addSyntax := ExpressionContract.leftAssociative multiplySyntax 7
+  have addSyntax := ExpressionContract.leftAssociative multiplySyntax 8
   have addTotality := leftAssociative_fuelTotalityContract
-    (leftAssociative (expressionUnary nested block) 8) (nestedFuel + 1) 7
+    (leftAssociative (expressionUnary nested block) 9) (nestedFuel + 1) 8
       multiplySyntax multiplyTotality
-  have bitAndSyntax := ExpressionContract.leftAssociative addSyntax 6
-  have bitAndTotality := leftAssociative_fuelTotalityContract
+  have shiftSyntax := ExpressionContract.leftAssociative addSyntax 7
+  have shiftTotality := leftAssociative_fuelTotalityContract
     (leftAssociative
-      (leftAssociative (expressionUnary nested block) 8) 7)
-      (nestedFuel + 1) 6 addSyntax addTotality
+      (leftAssociative (expressionUnary nested block) 9) 8)
+      (nestedFuel + 1) 7 addSyntax addTotality
+  have bitAndSyntax := ExpressionContract.leftAssociative shiftSyntax 6
+  have bitAndTotality := leftAssociative_fuelTotalityContract _
+    (nestedFuel + 1) 6 shiftSyntax shiftTotality
   have bitXorSyntax := ExpressionContract.leftAssociative bitAndSyntax 5
   have bitXorTotality := leftAssociative_fuelTotalityContract _
     (nestedFuel + 1) 5 bitAndSyntax bitAndTotality

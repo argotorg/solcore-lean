@@ -27,11 +27,13 @@ theorem expressionLayerDeterministicOutcomeSpec
   let unaryOutcomes := expressionUnaryDeterministicOutcomeSpec
     postfixOutcomes
   let multiplyOutcomes := leftAssociativeDeterministicOutcomeSpec
-    unaryOutcomes 8
+    unaryOutcomes 9
   let addOutcomes := leftAssociativeDeterministicOutcomeSpec
-    multiplyOutcomes 7
+    multiplyOutcomes 8
+  let shiftOutcomes := leftAssociativeDeterministicOutcomeSpec
+    addOutcomes 7
   let bitAndOutcomes := leftAssociativeDeterministicOutcomeSpec
-    addOutcomes 6
+    shiftOutcomes 6
   let bitXorOutcomes := leftAssociativeDeterministicOutcomeSpec
     bitAndOutcomes 5
   let bitOrOutcomes := leftAssociativeDeterministicOutcomeSpec
@@ -180,12 +182,14 @@ theorem ExpressionLayerParses.toOrdinary
       expression output := by
   let unaryClean := ExpressionUnaryParses postfixClean
   let unaryOrdinary := ExpressionUnaryParses postfixOrdinary
-  let multiplyClean := LeftAssociativeParses unaryClean 8
-  let multiplyOrdinary := LeftAssociativeParses unaryOrdinary 8
-  let addClean := LeftAssociativeParses multiplyClean 7
-  let addOrdinary := LeftAssociativeParses multiplyOrdinary 7
-  let bitAndClean := LeftAssociativeParses addClean 6
-  let bitAndOrdinary := LeftAssociativeParses addOrdinary 6
+  let multiplyClean := LeftAssociativeParses unaryClean 9
+  let multiplyOrdinary := LeftAssociativeParses unaryOrdinary 9
+  let addClean := LeftAssociativeParses multiplyClean 8
+  let addOrdinary := LeftAssociativeParses multiplyOrdinary 8
+  let shiftClean := LeftAssociativeParses addClean 7
+  let bitAndClean := LeftAssociativeParses shiftClean 6
+  let shiftOrdinary := LeftAssociativeParses addOrdinary 7
+  let bitAndOrdinary := LeftAssociativeParses shiftOrdinary 6
   let bitXorClean := LeftAssociativeParses bitAndClean 5
   let bitXorOrdinary := LeftAssociativeParses bitAndOrdinary 5
   let bitOrClean := LeftAssociativeParses bitXorClean 4
@@ -210,10 +214,14 @@ theorem ExpressionLayerParses.toOrdinary
       addClean input expression output →
         addOrdinary input expression output :=
     fun parsed => parsed.toOrdinary multiplyEmbedding
+  let shiftEmbedding : ∀ {input expression output},
+      shiftClean input expression output →
+        shiftOrdinary input expression output :=
+    fun parsed => parsed.toOrdinary addEmbedding
   let bitAndEmbedding : ∀ {input expression output},
       bitAndClean input expression output →
         bitAndOrdinary input expression output :=
-    fun parsed => parsed.toOrdinary addEmbedding
+    fun parsed => parsed.toOrdinary shiftEmbedding
   let bitXorEmbedding : ∀ {input expression output},
       bitXorClean input expression output →
         bitXorOrdinary input expression output :=

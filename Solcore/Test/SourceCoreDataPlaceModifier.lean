@@ -18,9 +18,10 @@ private def functions : GenericHeap.PayloadModel catalog where
   runtime_hasType := False.elim
   extend := fun impossible _ _ => False.elim impossible
 
-/-- Each source operator has a total initialized primitive result. This covers
-Word wrapping, division/modulo by zero and every Integer sign without a runtime
-evaluation premise. The store can include arbitrary closure/cell cycles. -/
+/-- Each source operator has a total initialized primitive result at Word, and
+each but the shifts at Integer. This covers Word wrapping, division/modulo by
+zero and every Integer sign without a runtime evaluation premise. The store can
+include arbitrary closure/cell cycles. -/
 example (operator : Syntax.ValueAssignOp) (left right : Word) (store : Store) :
     ∃ result value, ValueRep catalog signatures functions [] [] .word result value .word ∧
       Dynamic.AssignmentValueApplies operator (some (.word left)) (.word right) result ∧
@@ -28,16 +29,16 @@ example (operator : Syntax.ValueAssignOp) (left right : Word) (store : Store) :
         (modified .word (binaryOperator false operator) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) :=
-  initialized_success (.inl rfl) (.word left) (.word right) operator (.var rfl) (.var rfl) store Word.zero
+  initialized_success (.inl rfl) (.word left) (.word right) (.var rfl) (.var rfl) store Word.zero
 
-example (operator : Syntax.ValueAssignOp) (left right : Int) (store : Store) :
+example (operator : Syntax.ValueAssignOp) (notShift : operator.isShift = false) (left right : Int) (store : Store) :
     ∃ result value, ValueRep catalog signatures functions [] [] .integer result value .integer ∧
       Dynamic.AssignmentValueApplies operator (some (.integer left)) (.integer right) result ∧
       Evaluates [.inRight .unit (.integer left), .integer right] store
         (modified .integer (binaryOperator true operator) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.integer left)) (.integer right) :=
-  initialized_success (.inr rfl) (.integer left) (.integer right) operator (.var rfl) (.var rfl) store Word.zero
+  initialized_success (.inr ⟨rfl, notShift⟩) (.integer left) (.integer right) (.var rfl) (.var rfl) store Word.zero
 
 example (left : Int) (store : Store) :
     ∃ value, ValueRep catalog signatures functions [] [] .integer (.integer 0) value .integer ∧
@@ -45,7 +46,7 @@ example (left : Int) (store : Store) :
         (modified .integer (binaryOperator true .divide) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid .divide (some (.integer left)) (.integer 0) :=
-  initialized_preserves (.inr rfl) (.integer left) (.integer 0) (.divide (.integerDivideZero left))
+  initialized_preserves (.inr ⟨rfl, rfl⟩) (.integer left) (.integer 0) (.divide (.integerDivideZero left))
     (.var rfl) (.var rfl) store Word.zero
 
 private def integerCode (operator : Syntax.ValueAssignOp) : Expr :=

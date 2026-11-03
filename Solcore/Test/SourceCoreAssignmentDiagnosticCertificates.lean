@@ -36,7 +36,7 @@ theorem actual_compiler_operand_diagnostic
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer)
+    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ child,
       source.lookupExpression? id = some child ∧ certificate scope id lowered ∧

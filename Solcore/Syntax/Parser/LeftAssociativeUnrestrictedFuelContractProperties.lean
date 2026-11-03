@@ -28,7 +28,7 @@ theorem leftAssociativeTail_endIndex_onSuccess
       | none => simp only [leftAssociativeTail, operatorResult] at result; cases result; rfl
       | some operator =>
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape] at result
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => simp [childResult] at result
           | reject failure rejected => simp [childResult] at result
           | ok right next =>
@@ -65,7 +65,7 @@ theorem leftAssociativeTail_preservesEndIndex
       | none => simp only [leftAssociativeTail, operatorResult, Reply.PreservesEndIndex]
       | some operator =>
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape]
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => trivial
           | reject failure rejected =>
               have childFrame := operandFrame.endIndex_eq_of_reject childResult
@@ -103,9 +103,11 @@ theorem leftAssociativeTail_ordinary_of_unrestrictedFuels
       cases operatorResult : binaryAtPrecedence? input precedence with
       | none => exact Or.inl ⟨left, input, by simp only [leftAssociativeTail, operatorResult]⟩
       | some operator =>
-          rcases binaryAtPrecedence?_some_state_shape operatorResult with ⟨token, found, _, _⟩
+          rcases binaryAtPrecedence?_some_state_shape operatorResult with
+            ⟨token, found, _, _, operatorBound⟩
           have beforeEnd := State.cursor_lt_endIndex_of_peek?_eq_some found
-          let afterOperator := { input with cursor := input.cursor + 1 }
+          have operatorPositive := BinaryOp.tokenCount_pos operator.value
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have childAdequate : afterOperator.remainingCount < operandFuel := by
             simp only [afterOperator, State.remainingCount] at operandAdequate ⊢
             omega

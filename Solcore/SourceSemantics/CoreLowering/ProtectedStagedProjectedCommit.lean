@@ -60,7 +60,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap after : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right updatedRoot : Dynamic.Value}

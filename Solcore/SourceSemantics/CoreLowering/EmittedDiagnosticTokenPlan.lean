@@ -100,7 +100,7 @@ inductive TokensFor : Plan factory → Prop where
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) :
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false) :
       TokensFor (.assignment head site origin same sourceTyped rightTyped profile)
   | unary {context scope assignment}
       (head : CompatibleBitNotStatements.Head context scope assignment)
@@ -159,7 +159,7 @@ def PlaceReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Function
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type) →
     ExpressionHasType source context rhs assignment.target.type →
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) →
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false) →
     PlaceErrors head registry faults
 
 namespace TokensFor

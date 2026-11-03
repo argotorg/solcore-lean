@@ -35,7 +35,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}

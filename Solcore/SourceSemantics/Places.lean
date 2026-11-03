@@ -296,6 +296,8 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | bitAnd : WordCompoundAssignmentOperator .bitAnd
   | bitXor : WordCompoundAssignmentOperator .bitXor
   | bitOr : WordCompoundAssignmentOperator .bitOr
+  | shiftLeft : WordCompoundAssignmentOperator .shiftLeft
+  | shiftRight : WordCompoundAssignmentOperator .shiftRight
 
 /-- A value assignment validates its place and right-hand occurrence.  Plain
 assignment is homogeneous at any place type; current compound forms are

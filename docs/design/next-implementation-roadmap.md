@@ -11759,6 +11759,12 @@ alternatives and the order of implementation are in [Integer types,
 is shifts, then blocks, which bring panics through `word` division by zero,
 then the types.
 
+Shifts are done. `<<`, `>>`, `<<=` and `>>=` on `word` parse from adjacent
+tokens, type, run in the source semantics and lower to Core's `wordShl` and
+`wordShr`. `Solcore/Test/SourceCoreShiftExecution.lean` runs them through the
+public API with the probe's results. Compound assignment at `integer` now
+excludes the shifts in the lowering and in its theorems.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive

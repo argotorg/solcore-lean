@@ -38,7 +38,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
     (∃ output, Dynamic.ShortCircuits operator a output) ∨ Dynamic.EvaluatesRightOperand operator a := by
   cases profile with
   | word strict => exact .inr (.strict strict)
-  | integer strict => exact .inr (.strict strict)
+  | integer strict => exact .inr (.strict strict.toStrict)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -102,7 +102,7 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
     Evaluates environment before (mode.binary operator left right) (.inLeft (mode.resultType operator) (.word reason)) after := by
   cases profile with
   | word strict => rw [Mode.binary_strict _ strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
-  | integer strict => rw [Mode.binary_strict _ strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | integer strict => rw [Mode.binary_strict _ strict.toStrict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -141,7 +141,7 @@ theorem BinaryProfile.right_success {environment : Environment} {before middle a
     obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := integer_body (functions := functions) (registry := registry)
       (mapping := mapping) (world := world) strict a b
     exact ⟨sourceResult, coreResult, applied, represented, by
-      rw [Mode.binary_strict _ strict]
+      rw [Mode.binary_strict _ strict.toStrict]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
   | logicalAnd =>
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep

@@ -12,7 +12,7 @@ private theorem binaryAbsent_conflicts_parsed
     (absent : BinaryOperatorAtPrecedenceAbsentAt precedence input)
     (parsed : BinaryOperatorAtPrecedenceParses precedence input operator
       output) : False :=
-  absent ⟨operator.span, operator.value, parsed.1, parsed.2.1⟩
+  parsed.not_absent absent
 
 private theorem binaryOperator_output_unique
     {precedence : Nat} {input leftOutput rightOutput : Remainder}
@@ -20,8 +20,8 @@ private theorem binaryOperator_output_unique
     (leftParsed : BinaryOperatorAtPrecedenceParses precedence input
       leftOperator leftOutput)
     (rightParsed : BinaryOperatorAtPrecedenceParses precedence input
-      rightOperator rightOutput) : leftOutput = rightOutput := by
-  rw [leftParsed.2.2, rightParsed.2.2]
+      rightOperator rightOutput) : leftOutput = rightOutput :=
+  (leftParsed.unique rightParsed).2
 
 /-- Ordinary non-associative success has a unique output remainder. -/
 theorem NonAssociativeOrdinaryParses.output_unique

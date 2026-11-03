@@ -83,7 +83,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)

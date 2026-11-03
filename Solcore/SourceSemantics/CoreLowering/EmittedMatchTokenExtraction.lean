@@ -161,7 +161,7 @@ def assign
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (remaining : TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved
         context scope (.statements mode rest) expected type body) :
     TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved
@@ -264,7 +264,7 @@ def initializerAssign
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (remaining : TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved
         context scope (.initializers rest condition post statements) expected type body) :
     TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved

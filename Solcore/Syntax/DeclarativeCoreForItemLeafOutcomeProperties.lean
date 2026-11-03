@@ -27,8 +27,8 @@ private theorem valueOperator_output_unique
     {leftOperator rightOperator : Located ValueAssignOp}
     (leftParsed : ValueAssignOperatorParses input leftOperator leftOutput)
     (rightParsed : ValueAssignOperatorParses input rightOperator rightOutput) :
-    leftOutput = rightOutput := by
-  rw [leftParsed.2, rightParsed.2]
+    leftOutput = rightOutput :=
+  (leftParsed.unique rightParsed).2
 
 /-- Ordinary `for let` success has one final remainder. -/
 theorem ForLetItemOrdinaryParses.output_unique
@@ -168,7 +168,7 @@ theorem ForAssignmentOrExpressionRejects.disjointOrdinary
       subst afterLeftEq
       cases tailParsed with
       | absent tailAbsent =>
-          exact tailAbsent.2 ⟨_, _, rejectedOperator.1⟩
+          exact rejectedOperator.not_absent tailAbsent.2
       | present successfulTail =>
           cases successfulTail with
           | bitNot span token =>

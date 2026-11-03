@@ -27,6 +27,12 @@ inductive ArithmeticBinaryOperator : Syntax.BinaryOp → Prop where
   | bitXor : ArithmeticBinaryOperator .bitXor
   | bitOr : ArithmeticBinaryOperator .bitOr
 
+/-- Shift spellings: the result has the value's type, and the amount is typed
+independently of the value. -/
+inductive ShiftBinaryOperator : Syntax.BinaryOp → Prop where
+  | shiftLeft : ShiftBinaryOperator .shiftLeft
+  | shiftRight : ShiftBinaryOperator .shiftRight
+
 /-- Comparison spellings whose primitive result is Boolean. -/
 inductive ComparisonBinaryOperator : Syntax.BinaryOp → Prop where
   | less : ComparisonBinaryOperator .less
@@ -113,6 +119,9 @@ inductive BinaryOperatorHasType (context : Context) :
   | integerArithmetic {operator : Syntax.BinaryOp}
       (kind : ArithmeticBinaryOperator operator) :
       BinaryOperatorHasType context operator .integer .integer .integer []
+  | wordShift {operator : Syntax.BinaryOp}
+      (kind : ShiftBinaryOperator operator) :
+      BinaryOperatorHasType context operator .word .word .word []
   | wordComparison {operator : Syntax.BinaryOp}
       (kind : ComparisonBinaryOperator operator) :
       BinaryOperatorHasType context operator .word .word .bool []
@@ -156,8 +165,8 @@ theorem requirements_valid
     (typing : BinaryOperatorHasType context operator left right result requirements) :
     RequirementIdsValid context requirements := by
   cases typing with
-  | wordArithmetic | integerArithmetic | wordComparison | integerComparison |
-      booleanAnd | booleanOr => simp [RequirementIdsValid]
+  | wordArithmetic | integerArithmetic | wordShift | wordComparison |
+      integerComparison | booleanAnd | booleanOr => simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
 end BinaryOperatorHasType

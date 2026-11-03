@@ -597,6 +597,10 @@ def NumericPair : Value → Value → Prop
   | .integer _, .integer _ => True
   | _, _ => False
 
+def WordPair : Value → Value → Prop
+  | .word _, .word _ => True
+  | _, _ => False
+
 def BooleanPair : Value → Value → Prop
   | .bool _, .bool _ => True
   | _, _ => False
@@ -627,6 +631,10 @@ inductive NumericBinaryOperator : Syntax.BinaryOp → Prop where
   | lessEqual : NumericBinaryOperator .lessEqual
   | greaterEqual : NumericBinaryOperator .greaterEqual
 
+inductive WordBinaryOperator : Syntax.BinaryOp → Prop where
+  | shiftLeft : WordBinaryOperator .shiftLeft
+  | shiftRight : WordBinaryOperator .shiftRight
+
 inductive LogicalBinaryOperator : Syntax.BinaryOp → Prop where
   | logicalAnd : LogicalBinaryOperator .logicalAnd
   | logicalOr : LogicalBinaryOperator .logicalOr
@@ -648,6 +656,11 @@ inductive BinaryPrimitiveOperandsInvalid :
       {operator : Syntax.BinaryOp} {left right : Value}
       (operator_class : NumericBinaryOperator operator)
       (invalid : ¬ NumericPair left right) :
+      BinaryPrimitiveOperandsInvalid operator left right
+  | word
+      {operator : Syntax.BinaryOp} {left right : Value}
+      (operator_class : WordBinaryOperator operator)
+      (invalid : ¬ WordPair left right) :
       BinaryPrimitiveOperandsInvalid operator left right
   | logical
       {operator : Syntax.BinaryOp} {left right : Value}
@@ -675,6 +688,8 @@ inductive AssignmentOperatorBinary :
   | bitAnd : AssignmentOperatorBinary .bitAnd .bitAnd
   | bitXor : AssignmentOperatorBinary .bitXor .bitXor
   | bitOr : AssignmentOperatorBinary .bitOr .bitOr
+  | shiftLeft : AssignmentOperatorBinary .shiftLeft .shiftLeft
+  | shiftRight : AssignmentOperatorBinary .shiftRight .shiftRight
 
 inductive AssignmentOperandsInvalid :
     Syntax.ValueAssignOp → Option Value → Value → Prop where
@@ -905,6 +920,8 @@ theorem excludes_application
   cases invalid with
   | numeric operator_class invalid_pair =>
       cases operator_class <;> cases applies <;> simp_all [NumericPair]
+  | word operator_class invalid_pair =>
+      cases operator_class <;> cases applies <;> simp_all [WordPair]
   | logical operator_class invalid_pair =>
       cases operator_class <;> cases applies <;> simp_all [BooleanPair]
 

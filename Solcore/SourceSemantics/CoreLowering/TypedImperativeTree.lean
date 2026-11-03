@@ -88,7 +88,7 @@ inductive Syntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
       (remaining : Syntax source context mode rest expected) : Syntax source context mode (id :: rest) expected
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)

@@ -28,26 +28,19 @@ private theorem bind_ok_components {alpha beta : Type} {first : Parser alpha}
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
 
-@[simp] private theorem valueAssignOp?_symbol (operator : ValueAssignOp) :
-    valueAssignOp? (.symbol operator.symbol) = some operator := by
-  cases operator <;> rfl
-
 private theorem valueAssignOperatorAbsentAt_of_lookahead_false
     {input : State}
-    (absent : (input.peekKind?.bind valueAssignOp?).isSome = false) :
+    (absent : (valueAssignAt? input).isSome = false) :
     DeclarativeGrammar.ValueAssignOperatorAbsentAt
       input.declarativeRemainder := by
-  rintro ⟨span, operator, token⟩
-  change DeclarativeGrammar.TokenAt input.tokens input.window.endIndex
-    input.cursor { span, value := .symbol operator.symbol } at token
-  unfold State.peekKind? State.peek? at absent
-  simp only [token.1, ↓reduceIte, token.2, Option.map_some,
-    valueAssignOp?_symbol, Option.bind_some, Option.isSome_some] at absent
-  contradiction
+  unfold DeclarativeGrammar.ValueAssignOperatorAbsentAt
+  cases decoded : valueAssignAt? input with
+  | none => exact decoded
+  | some _ => simp [decoded] at absent
 
 private theorem assignmentTailAbsentAt_of_start_false {input : State}
     (absent : (isSymbol input .tildeEqual ||
-      (input.peekKind?.bind valueAssignOp?).isSome) = false) :
+      (valueAssignAt? input).isSome) = false) :
     DeclarativeGrammar.AssignmentTailAbsentAt
       input.declarativeRemainder := by
   rcases Bool.or_eq_false_iff.mp absent with ⟨tildeAbsent, valueAbsent⟩
@@ -55,24 +48,14 @@ private theorem assignmentTailAbsentAt_of_start_false {input : State}
     valueAssignOperatorAbsentAt_of_lookahead_false valueAbsent⟩
 
 private theorem valueAssignOperator_eq_ok_of_selected {input : State}
-    {selected : ValueAssignOp}
-    (selection : input.peekKind?.bind valueAssignOp? = some selected) :
+    {selected : Located ValueAssignOp}
+    (selection : valueAssignAt? input = some selected) :
     ∃ operator output,
       valueAssignOperator input = .ok operator output := by
-  unfold State.peekKind? at selection
-  cases found : input.peek? with
-  | none => simp [found] at selection
-  | some token =>
-      simp only [found, Option.map_some] at selection
-      cases decoded : valueAssignOp? token.value with
-      | none => simp [decoded] at selection
-      | some value =>
-          simp only [decoded, Option.bind_some] at selection
-          cases selection
-          refine ⟨{ span := token.span, value := selected },
-            { input with cursor := input.cursor + 1 }, ?_⟩
-          unfold valueAssignOperator
-          simp only [found, decoded]
+  refine ⟨selected,
+    { input with cursor := input.cursor + selected.value.tokenCount }, ?_⟩
+  unfold valueAssignOperator
+  simp only [selection]
 
 /-- Every executable assignment-tail success follows the ordinary prioritized
 tail grammar, independently of diagnostics. -/
@@ -99,7 +82,7 @@ theorem assignmentTail_success_ordinary_sound
   · have bitNotFalse : isSymbol input .tildeEqual = false :=
       Bool.eq_false_iff.mpr bitNot
     simp only [bitNotFalse, Bool.false_eq_true, if_false] at result
-    cases decoded : input.peekKind?.bind valueAssignOp? with
+    cases decoded : valueAssignAt? input with
     | none => rw [decoded] at result; unfold rejectAt at result; contradiction
     | some operator =>
         rw [decoded] at result
@@ -129,7 +112,7 @@ theorem optionalAssignmentTail_success_ordinary_sound
         output.declarativeRemainder := by
   unfold optionalAssignmentTail at result
   by_cases starts : (isSymbol input .tildeEqual ||
-      (input.peekKind?.bind valueAssignOp?).isSome) = true
+      (valueAssignAt? input).isSome) = true
   · simp only [starts, if_true] at result
     rcases bind_ok_components result with
       ⟨value, afterTail, tailResult, finished⟩
@@ -137,7 +120,7 @@ theorem optionalAssignmentTail_success_ordinary_sound
     exact .present (assignmentTail_success_ordinary_sound expression
       expressionOrdinary expressionSuccessSound tailResult)
   · have startsFalse : (isSymbol input .tildeEqual ||
-        (input.peekKind?.bind valueAssignOp?).isSome) = false :=
+        (valueAssignAt? input).isSome) = false :=
       Bool.eq_false_iff.mpr starts
     simp only [startsFalse, Bool.false_eq_true, if_false, pure] at result
     cases result
@@ -163,7 +146,7 @@ theorem optionalAssignmentTail_reject_ordinary_sound
         expressionRejects afterOperator rejected.declarativeRemainder := by
   unfold optionalAssignmentTail at result
   by_cases starts : (isSymbol input .tildeEqual ||
-      (input.peekKind?.bind valueAssignOp?).isSome) = true
+      (valueAssignAt? input).isSome) = true
   · simp only [starts, if_true, bind] at result
     unfold assignmentTail at result
     by_cases bitNot : isSymbol input .tildeEqual
@@ -175,7 +158,7 @@ theorem optionalAssignmentTail_reject_ordinary_sound
     · have bitNotFalse : isSymbol input .tildeEqual = false :=
         Bool.eq_false_iff.mpr bitNot
       simp only [bitNotFalse, Bool.false_eq_true, if_false] at result
-      cases selected : input.peekKind?.bind valueAssignOp? with
+      cases selected : valueAssignAt? input with
       | none => simp [bitNotFalse, selected] at starts
       | some selectedOperator =>
           simp only [selected] at result
@@ -193,7 +176,7 @@ theorem optionalAssignmentTail_reject_ordinary_sound
                 valueAssignOperator_success_sound operatorResult,
                 expressionRejectSound rightResult⟩
   · have startsFalse : (isSymbol input .tildeEqual ||
-        (input.peekKind?.bind valueAssignOp?).isSome) = false :=
+        (valueAssignAt? input).isSome) = false :=
       Bool.eq_false_iff.mpr starts
     simp [startsFalse] at result
 

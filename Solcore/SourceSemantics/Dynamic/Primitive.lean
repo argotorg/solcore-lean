@@ -238,6 +238,8 @@ inductive StrictBinaryOperator : Syntax.BinaryOp → Prop where
   | modulo : StrictBinaryOperator .modulo
   | add : StrictBinaryOperator .add
   | subtract : StrictBinaryOperator .subtract
+  | shiftLeft : StrictBinaryOperator .shiftLeft
+  | shiftRight : StrictBinaryOperator .shiftRight
   | bitAnd : StrictBinaryOperator .bitAnd
   | bitXor : StrictBinaryOperator .bitXor
   | bitOr : StrictBinaryOperator .bitOr
@@ -247,6 +249,29 @@ inductive StrictBinaryOperator : Syntax.BinaryOp → Prop where
   | greaterEqual : StrictBinaryOperator .greaterEqual
   | equal : StrictBinaryOperator .equal
   | notEqual : StrictBinaryOperator .notEqual
+
+/-- Strict operators with a primitive meaning on `integer`: every strict
+operator but the shifts, which take Words only. -/
+inductive IntegerStrictBinaryOperator : Syntax.BinaryOp → Prop where
+  | multiply : IntegerStrictBinaryOperator .multiply
+  | divide : IntegerStrictBinaryOperator .divide
+  | modulo : IntegerStrictBinaryOperator .modulo
+  | add : IntegerStrictBinaryOperator .add
+  | subtract : IntegerStrictBinaryOperator .subtract
+  | bitAnd : IntegerStrictBinaryOperator .bitAnd
+  | bitXor : IntegerStrictBinaryOperator .bitXor
+  | bitOr : IntegerStrictBinaryOperator .bitOr
+  | less : IntegerStrictBinaryOperator .less
+  | greater : IntegerStrictBinaryOperator .greater
+  | lessEqual : IntegerStrictBinaryOperator .lessEqual
+  | greaterEqual : IntegerStrictBinaryOperator .greaterEqual
+  | equal : IntegerStrictBinaryOperator .equal
+  | notEqual : IntegerStrictBinaryOperator .notEqual
+
+theorem IntegerStrictBinaryOperator.toStrict {operator : Syntax.BinaryOp}
+    (classification : IntegerStrictBinaryOperator operator) :
+    StrictBinaryOperator operator := by
+  cases classification <;> constructor
 
 /-- A left value which decides a lazy Boolean binary expression without
 evaluating the right occurrence. -/
@@ -302,6 +327,12 @@ inductive BinaryPrimitiveApplies :
   | wordSubtract (left right : Core.Word) :
       BinaryPrimitiveApplies .subtract (.word left) (.word right)
         (.word (left.sub right))
+  | wordShiftLeft (value amount : Core.Word) :
+      BinaryPrimitiveApplies .shiftLeft (.word value) (.word amount)
+        (.word (value.shiftLeft amount))
+  | wordShiftRight (value amount : Core.Word) :
+      BinaryPrimitiveApplies .shiftRight (.word value) (.word amount)
+        (.word (value.shiftRight amount))
   | wordBitAnd (left right : Core.Word) :
       BinaryPrimitiveApplies .bitAnd (.word left) (.word right)
         (.word (left.bitAnd right))

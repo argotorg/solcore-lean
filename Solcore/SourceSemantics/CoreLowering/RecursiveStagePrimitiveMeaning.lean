@@ -462,7 +462,8 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
     ∃ native, value = .inRight .word native ∧ finalStore = before ∧
       ValueRep checked rawRegistry model mapping world result output native (mode.resultType operator) := by
   cases profile with
-  | word strict | integer strict => cases circuit <;> cases strict
+  | word strict => cases circuit <;> cases strict
+  | integer strict => cases circuit <;> cases strict
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -487,7 +488,8 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore) :
     value = .inLeft (mode.resultType operator) (.word reason) ∧ finalStore = middle := by
   cases profile with
-  | word strict | integer strict => cases strict <;> exact bind_failed child evaluated
+  | word strict => cases strict <;> exact bind_failed child evaluated
+  | integer strict => cases strict <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

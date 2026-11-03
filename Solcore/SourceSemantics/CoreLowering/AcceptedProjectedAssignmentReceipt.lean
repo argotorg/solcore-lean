@@ -47,7 +47,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   child : SourceCoreBasic.LoweredExpr
   generated : policy.lowerExpression fuel source scope rhs reasonAt = .ok child
   childType : child.type = place.route.leafType
-  operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer
+  operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.isShift = false
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments keys) child.expression
     next output (binaryOperator (place.route.leafType = .integer) operator) false
     (invalidOperand site assignment.target.root operator)
@@ -79,7 +79,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     | @present id child generated childType =>
       obtain ⟨binder, selected, description⟩ := CompatiblePlaceDescription.of_describe described
       obtain ⟨routeType, _, path⟩ := description.prepared prepared
-      have operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer := by
+      have operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.isShift = false := by
         rw [routeType]
         rcases operatorValid with equal | word | integer
         · exact .inl equal.1

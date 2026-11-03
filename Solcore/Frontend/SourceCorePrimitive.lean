@@ -31,7 +31,8 @@ def binaryOperandType : Syntax.BinaryOp → Core.Ty
   | _ => .word
 
 def binaryResultType : Syntax.BinaryOp → Core.Ty
-  | .multiply | .divide | .modulo | .add | .subtract | .bitAnd | .bitXor | .bitOr => .word
+  | .multiply | .divide | .modulo | .add | .subtract | .shiftLeft | .shiftRight
+  | .bitAnd | .bitXor | .bitOr => .word
   | _ => .bool
 
 /-- Comparisons swap already evaluated payloads, so operand side effects keep
@@ -42,6 +43,8 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .modulo => .binary .wordMod (.var 1) (.var 0)
   | .add => .binary .wordAdd (.var 1) (.var 0)
   | .subtract => .binary .wordSub (.var 1) (.var 0)
+  | .shiftLeft => .binary .wordShl (.var 1) (.var 0)
+  | .shiftRight => .binary .wordShr (.var 1) (.var 0)
   | .bitAnd => .binary .wordAnd (.var 1) (.var 0)
   | .bitXor => .binary .wordXor (.var 1) (.var 0)
   | .bitOr => .binary .wordOr (.var 1) (.var 0)

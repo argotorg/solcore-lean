@@ -26,41 +26,28 @@ private theorem simpleBind_ok_components {alpha beta : Type}
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
 
-private theorem advanceAfterValueAssignPeek_validFor {input : State}
-    {token : Token} (valid : input.ValidFor)
-    (found : input.peek? = some token) :
-    token.span.ValidFor input.file ∧
-      ({ input with cursor := input.cursor + 1 } : State).ValidFor ∧
-      ({ input with cursor := input.cursor + 1 } : State).file = input.file := by
-  refine ⟨valid.peek?_span_validFor found, ?_, rfl⟩
-  apply valid.advance?_validFor (token := token)
-  unfold State.advance?
-  rw [found]
-  rfl
-
-/-- Assignment-operator success consumes the current token exactly once. -/
+/-- Assignment-operator success consumes the operator's tokens, starting at
+the current token. -/
 theorem valueAssignOperator_ok_state_shape {input next : State}
     {operator : Located ValueAssignOp}
     (parsed : valueAssignOperator input = .ok operator next) :
-    ∃ token, input.peek? = some token ∧ token.span = operator.span ∧
-      next = { input with cursor := input.cursor + 1 } := by
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = operator.span.startByte ∧
+      StatementSimpleInternals.valueAssignAt? input = some operator ∧
+      next = { input with cursor := input.cursor + operator.value.tokenCount } := by
   unfold valueAssignOperator at parsed
-  cases found : input.peek? with
+  cases decoded : StatementSimpleInternals.valueAssignAt? input with
   | none =>
-      simp only [found] at parsed
+      simp only [decoded] at parsed
       unfold rejectAt at parsed
       contradiction
-  | some token =>
-      simp only [found] at parsed
-      cases accepted : valueAssignOp? token.value with
-      | none =>
-          simp only [accepted] at parsed
-          unfold rejectAt at parsed
-          contradiction
-      | some value =>
-          simp only [accepted] at parsed
-          cases parsed
-          exact ⟨token, rfl, rfl, rfl⟩
+  | some value =>
+      simp only [decoded] at parsed
+      cases parsed
+      rcases ValueAssignOp.at?_cases decoded with
+        ⟨first, firstWithin, ⟨_, span⟩ | ⟨_, _, _, _, _, span⟩⟩
+      · exact ⟨first, firstWithin, by rw [span], rfl, rfl⟩
+      · exact ⟨first, firstWithin, by rw [span]; rfl, rfl, rfl⟩
 
 /-- Assignment-operator success preserves source and state validity. -/
 theorem valueAssignOperator_ok_validFor {input next : State}
@@ -69,9 +56,21 @@ theorem valueAssignOperator_ok_validFor {input next : State}
     operator.span.ValidFor input.file ∧ next.ValidFor ∧
       next.file = input.file := by
   rcases valueAssignOperator_ok_state_shape parsed with
-    ⟨token, found, span, rfl⟩
-  have advanced := advanceAfterValueAssignPeek_validFor valid found
-  exact ⟨by simpa [span] using advanced.1, advanced.2⟩
+    ⟨_token, _found, _start, decoded, rfl⟩
+  refine ⟨?_, { valid with cursor_le_endIndex := ValueAssignOp.at?_bound decoded }, rfl⟩
+  rcases ValueAssignOp.at?_cases decoded with
+    ⟨first, firstWithin, ⟨_, span⟩ | ⟨_, next, _, nextWithin, touching, span⟩⟩
+  · rw [span]
+    exact valid.token_span_validFor_of_getElem?_eq_some (tokenWithin?_some firstWithin).2
+  · have firstValid := valid.token_span_validFor_of_getElem?_eq_some
+      (tokenWithin?_some firstWithin).2
+    have nextValid := valid.token_span_validFor_of_getElem?_eq_some
+      (tokenWithin?_some nextWithin).2
+    rw [span]
+    apply SourceSpan.cover_validFor firstValid nextValid
+    have firstOrdered := firstValid.2.1
+    have nextOrdered := nextValid.2.1
+    omega
 
 /-- Assignment-operator rejection leaves the parser state unchanged. -/
 theorem valueAssignOperator_reject_state_shape {input next : State}
@@ -79,21 +78,13 @@ theorem valueAssignOperator_reject_state_shape {input next : State}
     (parsed : valueAssignOperator input = .reject failure next) :
     next = input := by
   unfold valueAssignOperator at parsed
-  cases found : input.peek? with
+  cases decoded : StatementSimpleInternals.valueAssignAt? input with
   | none =>
-      simp only [found] at parsed
+      simp only [decoded] at parsed
       unfold rejectAt at parsed
       cases parsed
       rfl
-  | some token =>
-      simp only [found] at parsed
-      cases accepted : valueAssignOp? token.value with
-      | none =>
-          simp only [accepted] at parsed
-          unfold rejectAt at parsed
-          cases parsed
-          rfl
-      | some value => simp [accepted] at parsed
+  | some value => simp [decoded] at parsed
 
 /-- Assignment-operator rejection retains valid failure provenance. -/
 theorem valueAssignOperator_reject_validFor {input next : State}
@@ -102,17 +93,11 @@ theorem valueAssignOperator_reject_validFor {input next : State}
     failure.span.ValidFor input.file ∧ next.ValidFor ∧
       next.file = input.file := by
   unfold valueAssignOperator at parsed
-  cases found : input.peek? with
+  cases decoded : StatementSimpleInternals.valueAssignAt? input with
   | none =>
-      simp only [found] at parsed
+      simp only [decoded] at parsed
       exact rejectAt_reject_validFor valid _ _ parsed
-  | some token =>
-      simp only [found] at parsed
-      cases accepted : valueAssignOp? token.value with
-      | none =>
-          simp only [accepted] at parsed
-          exact rejectAt_reject_validFor valid _ _ parsed
-      | some value => simp [accepted] at parsed
+  | some value => simp [decoded] at parsed
 
 /-- Every ordinary assignment-operator result has valid provenance. -/
 theorem valueAssignOperator_validFor :
@@ -132,7 +117,7 @@ theorem valueAssignOperator_preservesTokenWindow :
   cases parsed : valueAssignOperator input with
   | ok operator next =>
       rcases valueAssignOperator_ok_state_shape parsed with
-        ⟨_token, _found, _span, rfl⟩
+        ⟨_token, _found, _start, _decoded, rfl⟩
       exact ⟨rfl, rfl⟩
   | reject failure next =>
       rw [valueAssignOperator_reject_state_shape parsed]
@@ -143,12 +128,12 @@ theorem valueAssignOperator_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess valueAssignOperator :=
   valueAssignOperator_preservesTokenWindow.preservesTokensOnSuccess
 
-/-- Assignment-operator success advances by exactly one token. -/
+/-- Assignment-operator success advances over the operator's tokens. -/
 theorem valueAssignOperator_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess valueAssignOperator := by
   intro input operator next parsed
   rcases valueAssignOperator_ok_state_shape parsed with
-    ⟨_token, _found, _span, rfl⟩
+    ⟨_token, _found, _start, _decoded, rfl⟩
   simp
 
 /-- Assignment operators start at the current input token. -/
@@ -156,8 +141,8 @@ theorem valueAssignOperator_startsAtCurrentTokenOnSuccess :
     Parser.StartsAtCurrentTokenOnSuccess valueAssignOperator (·.span) := by
   intro input operator next parsed
   rcases valueAssignOperator_ok_state_shape parsed with
-    ⟨token, found, span, _next⟩
-  exact ⟨token, found, congrArg SourceSpan.startByte span⟩
+    ⟨token, found, start, _decoded, _next⟩
+  exact ⟨token, found, start⟩
 
 namespace AssignmentTail
 
@@ -190,7 +175,7 @@ theorem assignmentTail_validFor (expression : Parser Expr)
         exact ⟨by simpa [AssignmentTail.ValidFor, Located.ValidFor] using
             operatorValid,
           nextValid, rfl⟩)) input inputValid
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none =>
         unfold rejectAt Reply.ValidFor
         exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
@@ -252,7 +237,7 @@ theorem assignmentTail_startsAtCurrentTokenOnSuccess
       .tildeEqual .statement input operator afterOperator operatorResult
     cases finished
     exact starts
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none =>
         simp only [selected] at parsed
         unfold rejectAt at parsed
@@ -283,7 +268,7 @@ theorem assignmentTail_cursor_lt_onSuccess (expression : Parser Expr)
       simp
     cases finished
     exact strict
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none =>
         simp only [selected] at parsed
         unfold rejectAt at parsed
@@ -296,8 +281,10 @@ theorem assignmentTail_cursor_lt_onSuccess (expression : Parser Expr)
           ⟨right, afterRight, rightResult, finished⟩
         have strict : input.cursor < afterOperator.cursor := by
           rw [(valueAssignOperator_ok_state_shape
-            operatorResult).choose_spec.2.2]
-          simp
+            operatorResult).choose_spec.2.2.2]
+          have positive := ValueAssignOp.tokenCount_pos operator.value
+          simp only
+          omega
         have rightMonotone := expressionCursor afterOperator right
           afterRight rightResult
         cases finished
@@ -325,7 +312,7 @@ theorem assignmentTail_start_le_endOnSuccess
     rw [operatorResult] at operatorContract
     cases finished
     exact operatorContract.1.2.1
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none =>
         simp only [selected] at parsed
         unfold rejectAt at parsed
@@ -345,20 +332,24 @@ theorem assignmentTail_start_le_endOnSuccess
           simpa [operatorContract.2.2] using
             expressionSpan afterOperator.file right rightContract.1
         rcases valueAssignOperator_ok_state_shape operatorResult with
-          ⟨operatorToken, operatorFound, operatorSpan, afterOperatorEq⟩
-        have advanced : input.advance? =
-            some (operatorToken, afterOperator) := by
-          unfold State.advance?
-          rw [operatorFound, afterOperatorEq]
-          rfl
+          ⟨operatorToken, operatorFound, operatorStart, _decoded, afterOperatorEq⟩
         rcases expressionStarts afterOperator right afterRight rightResult with
           ⟨rightToken, rightFound, rightStart⟩
-        have separated := inputValid.consumed_end_le_peek_start_after_advance
-          advanced rightFound
+        have operatorAt := State.getElem?_eq_some_of_peek?_eq_some operatorFound
+        have rightAt : input.tokens[input.cursor + operator.value.tokenCount]? =
+            some rightToken := by
+          subst afterOperatorEq
+          simpa using State.getElem?_eq_some_of_peek?_eq_some rightFound
+        have positive := ValueAssignOp.tokenCount_pos operator.value
+        have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+          operatorAt rightAt (by omega)
+        have operatorTokenValid := inputValid.peek?_span_validFor operatorFound
         cases finished
-        exact Nat.le_trans operatorContract.1.2.1
-          (Nat.le_trans (by simpa [operatorSpan, rightStart] using separated)
-            rightSpanValid.2.1)
+        calc operator.span.startByte = operatorToken.span.startByte := operatorStart.symm
+          _ ≤ operatorToken.span.endByte := operatorTokenValid.2.1
+          _ ≤ rightToken.span.startByte := separated
+          _ = right.span.startByte := rightStart
+          _ ≤ right.span.endByte := rightSpanValid.2.1
 
 /-- A present optional tail exposes the operator at the caller's cursor. -/
 theorem optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
@@ -423,7 +414,7 @@ theorem assignmentTail_preservesTokenWindow (expression : Parser Expr)
       (symbol_preservesTokenWindow .tildeEqual .statement)
     intro operator
     exact Parser.pure_preservesTokenWindow _
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none => exact rejectAt_preservesTokenWindow input _ _
     | some operator =>
         apply Parser.bind_preservesTokenWindow
@@ -450,7 +441,7 @@ theorem assignmentTail_cursorMonotoneOnSuccess (expression : Parser Expr)
       (symbol_cursorMonotoneOnSuccess .tildeEqual .statement)
       (fun operator => Parser.pure_cursorMonotoneOnSuccess _))
         input tail next parsed
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : StatementSimpleInternals.valueAssignAt? input with
     | none =>
         simp only [selected] at parsed
         unfold rejectAt at parsed

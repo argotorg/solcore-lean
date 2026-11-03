@@ -79,7 +79,7 @@ theorem reflects_ready {checked : SourceCoreDataCatalog.Checked} {signatures : P
     (keyTypes : prepared.keyTypes = codes.map (·.type))
     (missingTokens : ∀ type, faults (.missingMappingDefault type) (missing type))
     {operator : Syntax.ValueAssignOp} {invalid : Word}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer)
+    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.isShift = false)
     (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::

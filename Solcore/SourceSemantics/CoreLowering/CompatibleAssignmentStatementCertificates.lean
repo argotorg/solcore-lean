@@ -29,7 +29,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope id lowered ∧
       HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression (LanguageResult.resultType lowered.type) definitions)
@@ -47,10 +47,10 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
       .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
       by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq⟩
-    rcases profile with equal | word | integer
+    rcases profile with equal | word | ⟨integer, notShift⟩
     · exact .inl equal
     · exact .inr (.inl (rawView.trans word))
-    · exact .inr (.inr (rawView.trans integer))
+    · exact .inr (.inr ⟨rawView.trans integer, notShift⟩)
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
       _, found, tree, rawView, sameType, codeEq⟩ :=
       CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare extract accepted typed
@@ -58,10 +58,10 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
       .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_⟩, codeEq⟩
     rw [rawType] at rawView
-    rcases profile with equal | word | integer
+    rcases profile with equal | word | ⟨integer, notShift⟩
     · exact .inl equal
     · exact .inr (.inl (rawView.trans word))
-    · exact .inr (.inr (rawView.trans integer))
+    · exact .inr (.inr ⟨rawView.trans integer, notShift⟩)
 
 /-- Static source obligations for the ordinary assignment branch. General
 functions, unary assignments and loop syntax are deliberately separate. -/
@@ -75,7 +75,7 @@ inductive Syntax (source : TypedSource) (context : SourceSemantics.Context) : Bo
       (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
       (remaining : Syntax source context mode rest expected) : Syntax source context mode (id :: rest) expected
 
 private theorem read_found {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}

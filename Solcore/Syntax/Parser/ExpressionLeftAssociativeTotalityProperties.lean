@@ -37,13 +37,14 @@ theorem leftAssociativeTail_ordinary_of_fuels
             simp only [leftAssociativeTail, operatorResult]⟩
       | some operator =>
           rcases binaryAtPrecedence?_some_state_shape operatorResult with
-            ⟨operatorToken, operatorFound, _decoded, _span⟩
-          let afterOperator := { input with cursor := input.cursor + 1 }
+            ⟨_operatorToken, _operatorFound, _decoded, _precedence, operatorBound⟩
+          have operatorPositive := BinaryOp.tokenCount_pos operator.value
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator input = .ok () afterOperator := by
             exact consumeBinary_ok_state_shape operator input
           have consumedValid := consumeBinary_reply_validFor operator
-            inputValid operatorFound
+            inputValid operatorBound
           rw [consumedResult] at consumedValid
           have afterOperatorAdequate :
               afterOperator.remainingCount < operandFuel :=
@@ -63,7 +64,7 @@ theorem leftAssociativeTail_ordinary_of_fuels
             have nextWindow : next.window = input.window := by
               exact rightWindow.2
             have inputProgress : input.cursor < next.cursor := by
-              exact Nat.lt_trans (by simp [afterOperator]) rightProgress
+              exact Nat.lt_trans (by simp only [afterOperator]; omega) rightProgress
             have nextLoopAdequate :
                 next.remainingCount < loopFuel :=
               remainingCount_lt_after_strict_progress rightValid.2.1

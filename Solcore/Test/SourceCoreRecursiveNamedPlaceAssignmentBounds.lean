@@ -64,7 +64,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (found : source.lookupExpression? rhs = some node)
   (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
-  (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
+  (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
   (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, targetPrepared.route.rootType))
   (rootTyped : WritableLocal context place.root targetPrepared.route.rootSourceType)
   (missingTokens : ∀ {root resolved reason token count},

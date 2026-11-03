@@ -21,9 +21,10 @@ theorem expressionLayer_reflectsDiagnosticFreeOnSuccess
     Parser.ReflectsDiagnosticFreeOnSuccess
       (expressionLayer nested block) := by
   let unary := ExpressionInternals.expressionUnary nested block
-  let multiply := ExpressionInternals.leftAssociative unary 8
-  let add := ExpressionInternals.leftAssociative multiply 7
-  let bitAnd := ExpressionInternals.leftAssociative add 6
+  let multiply := ExpressionInternals.leftAssociative unary 9
+  let add := ExpressionInternals.leftAssociative multiply 8
+  let shift := ExpressionInternals.leftAssociative add 7
+  let bitAnd := ExpressionInternals.leftAssociative shift 6
   let bitXor := ExpressionInternals.leftAssociative bitAnd 5
   let bitOr := ExpressionInternals.leftAssociative bitXor 4
   let relational := ExpressionInternals.nonAssociative bitOr 3
@@ -36,13 +37,16 @@ theorem expressionLayer_reflectsDiagnosticFreeOnSuccess
   have multiplyReflects :
       Parser.ReflectsDiagnosticFreeOnSuccess multiply :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      unary unaryReflects 8
+      unary unaryReflects 9
   have addReflects : Parser.ReflectsDiagnosticFreeOnSuccess add :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      multiply multiplyReflects 7
+      multiply multiplyReflects 8
+  have shiftReflects : Parser.ReflectsDiagnosticFreeOnSuccess shift :=
+    ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
+      add addReflects 7
   have bitAndReflects : Parser.ReflectsDiagnosticFreeOnSuccess bitAnd :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      add addReflects 6
+      shift shiftReflects 6
   have bitXorReflects : Parser.ReflectsDiagnosticFreeOnSuccess bitXor :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
       bitAnd bitAndReflects 5
@@ -94,9 +98,10 @@ theorem expressionLayer_success_sound
     DeclarativeGrammar.ExpressionLayerParses nestedParses postfixParses
       input.declarativeRemainder value next.declarativeRemainder := by
   let unary := ExpressionInternals.expressionUnary nested block
-  let multiply := ExpressionInternals.leftAssociative unary 8
-  let add := ExpressionInternals.leftAssociative multiply 7
-  let bitAnd := ExpressionInternals.leftAssociative add 6
+  let multiply := ExpressionInternals.leftAssociative unary 9
+  let add := ExpressionInternals.leftAssociative multiply 8
+  let shift := ExpressionInternals.leftAssociative add 7
+  let bitAnd := ExpressionInternals.leftAssociative shift 6
   let bitXor := ExpressionInternals.leftAssociative bitAnd 5
   let bitOr := ExpressionInternals.leftAssociative bitXor 4
   let relational := ExpressionInternals.nonAssociative bitOr 3
@@ -106,11 +111,13 @@ theorem expressionLayer_success_sound
   let unaryParses :=
     DeclarativeGrammar.ExpressionUnaryParses postfixParses
   let multiplyParses :=
-    DeclarativeGrammar.LeftAssociativeParses unaryParses 8
+    DeclarativeGrammar.LeftAssociativeParses unaryParses 9
   let addParses :=
-    DeclarativeGrammar.LeftAssociativeParses multiplyParses 7
+    DeclarativeGrammar.LeftAssociativeParses multiplyParses 8
+  let shiftParses :=
+    DeclarativeGrammar.LeftAssociativeParses addParses 7
   let bitAndParses :=
-    DeclarativeGrammar.LeftAssociativeParses addParses 6
+    DeclarativeGrammar.LeftAssociativeParses shiftParses 6
   let bitXorParses :=
     DeclarativeGrammar.LeftAssociativeParses bitAndParses 5
   let bitOrParses :=
@@ -138,7 +145,7 @@ theorem expressionLayer_success_sound
   have multiplyReflects :
       Parser.ReflectsDiagnosticFreeOnSuccess multiply :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      unary unaryReflects 8
+      unary unaryReflects 9
   have multiplySound :
       ∀ {layerInput layerNext : State} {expression : Expr},
         layerNext.diagnosticsRev = [] →
@@ -147,10 +154,10 @@ theorem expressionLayer_success_sound
           layerNext.declarativeRemainder := by
     intro layerInput layerNext expression layerFree layerResult
     exact ExpressionInternals.leftAssociative_success_sound
-      unary unaryParses unaryReflects unarySound 8 layerFree layerResult
+      unary unaryParses unaryReflects unarySound 9 layerFree layerResult
   have addReflects : Parser.ReflectsDiagnosticFreeOnSuccess add :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      multiply multiplyReflects 7
+      multiply multiplyReflects 8
   have addSound : ∀ {layerInput layerNext : State} {expression : Expr},
       layerNext.diagnosticsRev = [] →
       add layerInput = .ok expression layerNext →
@@ -158,11 +165,22 @@ theorem expressionLayer_success_sound
         layerNext.declarativeRemainder := by
     intro layerInput layerNext expression layerFree layerResult
     exact ExpressionInternals.leftAssociative_success_sound
-      multiply multiplyParses multiplyReflects multiplySound 7
+      multiply multiplyParses multiplyReflects multiplySound 8
         layerFree layerResult
+  have shiftReflects : Parser.ReflectsDiagnosticFreeOnSuccess shift :=
+    ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
+      add addReflects 7
   have bitAndReflects : Parser.ReflectsDiagnosticFreeOnSuccess bitAnd :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
-      add addReflects 6
+      shift shiftReflects 6
+  have shiftSound : ∀ {layerInput layerNext : State} {expression : Expr},
+      layerNext.diagnosticsRev = [] →
+      shift layerInput = .ok expression layerNext →
+      shiftParses layerInput.declarativeRemainder expression
+        layerNext.declarativeRemainder := by
+    intro layerInput layerNext expression layerFree layerResult
+    exact ExpressionInternals.leftAssociative_success_sound
+      add addParses addReflects addSound 7 layerFree layerResult
   have bitAndSound : ∀ {layerInput layerNext : State} {expression : Expr},
       layerNext.diagnosticsRev = [] →
       bitAnd layerInput = .ok expression layerNext →
@@ -170,7 +188,7 @@ theorem expressionLayer_success_sound
         layerNext.declarativeRemainder := by
     intro layerInput layerNext expression layerFree layerResult
     exact ExpressionInternals.leftAssociative_success_sound
-      add addParses addReflects addSound 6 layerFree layerResult
+      shift shiftParses shiftReflects shiftSound 6 layerFree layerResult
   have bitXorReflects : Parser.ReflectsDiagnosticFreeOnSuccess bitXor :=
     ExpressionInternals.leftAssociative_reflectsDiagnosticFreeOnSuccess
       bitAnd bitAndReflects 5

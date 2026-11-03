@@ -193,6 +193,8 @@ theorem inferAssignedValueFuel_children_actual_invariants
       | bitAnd => exact finishNonEqual success
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
+      | shiftLeft => exact finishNonEqual success
+      | shiftRight => exact finishNonEqual success
 
 /-- The actual inferred place and RHS are typed in one enclosing statement
 source.  The place is inferred before the RHS; its recorded type is finally

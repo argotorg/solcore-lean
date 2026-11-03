@@ -178,6 +178,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               have bTyped := secondPost.value_typed _ rfl
               cases operatorTyped with
               | wordArithmetic kind => exact ⟨applies.preserves (.wordArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+              | wordShift kind => exact ⟨applies.preserves (.wordShift kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | integerArithmetic kind => exact ⟨applies.preserves (.integerArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | wordComparison kind => exact ⟨applies.preserves (.wordComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | integerComparison kind => exact ⟨applies.preserves (.integerComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
@@ -224,7 +225,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
-              | wordArithmetic | integerArithmetic | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
+              | wordArithmetic | integerArithmetic | wordShift | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
               | trait staticDispatch profile requirementsProve =>
                 have same := binary_dispatch_same staticDispatch dispatch
                 rcases same with ⟨rfl, rfl⟩

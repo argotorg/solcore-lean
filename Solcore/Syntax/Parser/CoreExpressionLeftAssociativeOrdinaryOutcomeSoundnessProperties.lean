@@ -40,7 +40,7 @@ theorem leftAssociativeTail_success_ordinary_sound
           cases result
           exact .done (binaryAtPrecedence?_none_absentAt operatorResult)
       | some operator =>
-          let afterOperator := { input with cursor := input.cursor + 1 }
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator input = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator input
@@ -98,7 +98,7 @@ theorem leftAssociativeTail_reject_ordinary_sound
       | none =>
           simp [leftAssociativeTail, operatorResult] at result
       | some operator =>
-          let afterOperator := { input with cursor := input.cursor + 1 }
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator input = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator input

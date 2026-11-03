@@ -27,7 +27,7 @@ theorem evaluates {catalog : SourceCoreDataCatalog.Catalog} {signatures : Progra
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer)
+    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
@@ -46,14 +46,14 @@ theorem evaluates {catalog : SourceCoreDataCatalog.Catalog} {signatures : Progra
       all_goals exact .caseLeft (snapshotSelected.evaluates store) (.inLeft .word)
     | present related =>
       obtain ⟨source, value, resultRep, sourceApplied, ran, _⟩ :=
-        DataPlaceModifier.initialized_success (profile.resolve_left equal) related rightRep operator snapshotSelected rightSelected store invalid
+        DataPlaceModifier.initialized_success (profile.resolve_left equal) related rightRep snapshotSelected rightSelected store invalid
       exact ⟨_, .applied sourceApplied resultRep, ran⟩
 
 theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer)
+    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}

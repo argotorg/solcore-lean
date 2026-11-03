@@ -29,7 +29,7 @@ theorem reflects {checked : SourceCoreDataCatalog.Checked} {signatures : Program
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp} {invalid : Word}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer)
+    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.isShift = false)
     (invalidOperandToken : faults (.invalidAssignmentOperands operator) invalid)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::

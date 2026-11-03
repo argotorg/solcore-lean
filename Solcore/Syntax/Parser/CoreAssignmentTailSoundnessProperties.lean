@@ -49,69 +49,33 @@ def AssignmentTail.declarative : AssignmentTail →
   cases semicolon <;> cases tail <;> simp [statementEnd,
     DeclarativeGrammar.statementEnd]
 
-private theorem valueAssignOp?_some_kind {kind : TokenKind}
-    {operator : ValueAssignOp}
-    (result : valueAssignOp? kind = some operator) :
-    kind = .symbol operator.symbol := by
-  cases kind with
-  | symbol symbol =>
-      cases symbol <;> cases operator <;>
-        simp [valueAssignOp?, ValueAssignOp.symbol] at result ⊢
-  | keyword keyword => simp [valueAssignOp?] at result
-  | identifier text => simp [valueAssignOp?] at result
-  | yulIdentifier text => simp [valueAssignOp?] at result
-  | decimalLiteral spelling => simp [valueAssignOp?] at result
-  | hexadecimalLiteral spelling => simp [valueAssignOp?] at result
-  | stringLiteral spelling => simp [valueAssignOp?] at result
-  | yulMetaBacktick spelling => simp [valueAssignOp?] at result
-  | yulMetaInterpolation spelling => simp [valueAssignOp?] at result
-
-@[simp] private theorem valueAssignOp?_symbol (operator : ValueAssignOp) :
-    valueAssignOp? (.symbol operator.symbol) = some operator := by
-  cases operator <;> rfl
-
-/-- One successful value-assignment operator is its exact source token. -/
+/-- One successful value-assignment operator is its exact source tokens. -/
 theorem valueAssignOperator_success_sound {input next : State}
     {operator : Located ValueAssignOp}
     (result : valueAssignOperator input = .ok operator next) :
     DeclarativeGrammar.ValueAssignOperatorParses
       input.declarativeRemainder operator next.declarativeRemainder := by
   unfold valueAssignOperator at result
-  cases found : input.peek? with
-  | none => simp [found, rejectAt] at result
-  | some token =>
-      simp only [found] at result
-      cases decoded : valueAssignOp? token.value with
-      | none => simp [decoded, rejectAt] at result
-      | some value =>
-          simp only [decoded] at result
-          cases result
-          unfold DeclarativeGrammar.ValueAssignOperatorParses
-          unfold DeclarativeGrammar.ExactTokenParses
-          refine ⟨?_, rfl⟩
-          have kindEq := valueAssignOp?_some_kind decoded
-          rcases token with ⟨span, kind⟩
-          simp only at kindEq
-          subst kind
-          simpa only [State.declarativeRemainder] using
-            tokenAt_of_peek?_eq_some found
+  cases decoded : valueAssignAt? input with
+  | none => simp [decoded, rejectAt] at result
+  | some value =>
+      simp only [decoded] at result
+      cases result
+      exact ⟨decoded, rfl⟩
 
 private theorem valueAssignOperatorAbsentAt_of_lookahead_false
     {input : State}
-    (absent : (input.peekKind?.bind valueAssignOp?).isSome = false) :
+    (absent : (valueAssignAt? input).isSome = false) :
     DeclarativeGrammar.ValueAssignOperatorAbsentAt
       input.declarativeRemainder := by
-  rintro ⟨span, operator, token⟩
-  change DeclarativeGrammar.TokenAt input.tokens input.window.endIndex
-    input.cursor { span, value := .symbol operator.symbol } at token
-  unfold State.peekKind? State.peek? at absent
-  simp only [token.1, ↓reduceIte, token.2, Option.map_some,
-    valueAssignOp?_symbol, Option.bind_some, Option.isSome_some] at absent
-  contradiction
+  unfold DeclarativeGrammar.ValueAssignOperatorAbsentAt
+  cases decoded : valueAssignAt? input with
+  | none => exact decoded
+  | some _ => simp [decoded] at absent
 
 private theorem assignmentTailAbsentAt_of_start_false {input : State}
     (absent : (isSymbol input .tildeEqual ||
-      (input.peekKind?.bind valueAssignOp?).isSome) = false) :
+      (valueAssignAt? input).isSome) = false) :
     DeclarativeGrammar.AssignmentTailAbsentAt
       input.declarativeRemainder := by
   rcases Bool.or_eq_false_iff.mp absent with ⟨tildeAbsent, valueAbsent⟩
@@ -144,7 +108,7 @@ theorem assignmentTail_success_sound
   · have bitNotFalse : isSymbol input .tildeEqual = false :=
       Bool.eq_false_iff.mpr bitNot
     simp only [bitNotFalse, Bool.false_eq_true, if_false] at result
-    cases decoded : input.peekKind?.bind valueAssignOp? with
+    cases decoded : valueAssignAt? input with
     | none => rw [decoded] at result; unfold rejectAt at result; contradiction
     | some operator =>
         rw [decoded] at result
@@ -175,7 +139,7 @@ theorem optionalAssignmentTail_success_sound
         next.declarativeRemainder := by
   unfold optionalAssignmentTail at result
   by_cases starts : (isSymbol input .tildeEqual ||
-      (input.peekKind?.bind valueAssignOp?).isSome) = true
+      (valueAssignAt? input).isSome) = true
   · simp only [starts, if_true] at result
     rcases bind_ok_components result with
       ⟨value, afterTail, tailResult, finished⟩
@@ -183,7 +147,7 @@ theorem optionalAssignmentTail_success_sound
     exact .present (assignmentTail_success_sound expression expressionParses
       expressionSound diagnosticFree tailResult)
   · have startsFalse : (isSymbol input .tildeEqual ||
-        (input.peekKind?.bind valueAssignOp?).isSome) = false :=
+        (valueAssignAt? input).isSome) = false :=
       Bool.eq_false_iff.mpr starts
     simp only [startsFalse, Bool.false_eq_true, if_false, pure] at result
     cases result

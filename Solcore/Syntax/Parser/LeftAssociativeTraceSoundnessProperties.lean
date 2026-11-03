@@ -40,7 +40,7 @@ theorem leftAssociativeTail_trace_success_sound
           have operatorParsed := consumeBinary_success_sound_of_binaryAtPrecedence?_some
             operatorResult (consumeBinary_ok_state_shape operator input)
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape] at result
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => simp [childResult] at result
           | reject failure rejected => simp [childResult] at result
           | ok right next =>
@@ -74,7 +74,7 @@ theorem leftAssociativeTail_reject_trace_sound
           have operatorParsed := consumeBinary_success_sound_of_binaryAtPrecedence?_some
             operatorResult (consumeBinary_ok_state_shape operator input)
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape] at result
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => simp [childResult] at result
           | reject actual next =>
               simp only [childResult] at result; cases result

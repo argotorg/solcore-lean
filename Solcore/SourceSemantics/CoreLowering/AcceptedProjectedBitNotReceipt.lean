@@ -79,7 +79,8 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       obtain ⟨binder, selected, description⟩ := CompatiblePlaceDescription.of_describe described
       obtain ⟨routeType, _, path⟩ := description.prepared prepared
       have leafType : place.route.leafType = .word ∨ place.route.leafType = .integer := by
-        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeType] using operatorValid
+        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeType] using
+          operatorValid.imp_right (Or.imp_right And.left)
       refine ⟨⟨values, invalidProjection, invalidUnary, missing, matched, sourceProfile,
         projected, _, callbackSelected, accepted, lowered, route, binder, selected, description,
         place, prepared, routeType, path, index, slot, keys, keysGenerated,

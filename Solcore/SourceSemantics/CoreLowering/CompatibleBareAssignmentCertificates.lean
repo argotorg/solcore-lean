@@ -37,7 +37,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType) ∧
       Layout compilation prepared ∧ expression fuel source scope rhs reasonAt = .ok value ∧
       value.type = prepared.route.leafType ∧
-      (operator = .equal ∨ prepared.route.leafType = .word ∨ prepared.route.leafType = .integer) ∧
+      (operator = .equal ∨ prepared.route.leafType = .word ∨ prepared.route.leafType = .integer ∧ operator.isShift = false) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) value.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand := by
   cases generated_of_lower accepted with

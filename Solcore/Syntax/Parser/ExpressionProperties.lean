@@ -1117,26 +1117,27 @@ theorem expressionUnary_retainsPostfixEndOnSuccess
             by simpa using postfixResult,
             applyUnaryOperators_preservesBaseEnd operators base⟩
 
-/-- Successful precedence lookup identifies the current token exactly. -/
+/-- Successful precedence lookup decodes the operator whose first token is the
+current token, inside the active window. -/
 theorem binaryAtPrecedence?_some_state_shape {input : State}
     {precedence : Nat} {operator : Located BinaryOp}
     (result : binaryAtPrecedence? input precedence = some operator) :
     ∃ token, input.peek? = some token ∧
-      binaryOp? token.value = some operator.value ∧
-      token.span = operator.span := by
+      BinaryOp.at? input.tokens input.window.endIndex input.cursor = some operator ∧
+      operator.value.precedence = precedence ∧
+      input.cursor + operator.value.tokenCount ≤ input.window.endIndex := by
   unfold binaryAtPrecedence? at result
-  cases found : input.peek? with
-  | none => simp [found] at result
-  | some token =>
-      simp only [found] at result
-      cases decoded : binaryOp? token.value with
-      | none => simp [decoded] at result
-      | some value =>
-          simp only [decoded] at result
-          split at result
-          · cases result
-            exact ⟨token, rfl, by simpa using decoded, rfl⟩
-          · contradiction
+  cases decoded : BinaryOp.at? input.tokens input.window.endIndex input.cursor with
+  | none => simp [decoded] at result
+  | some found =>
+      simp only [decoded] at result
+      split at result
+      · rename_i selected
+        cases result
+        rcases BinaryOp.at?_cases decoded with ⟨first, firstWithin, _⟩
+        exact ⟨first, firstWithin, rfl, beq_iff_eq.mp selected,
+          BinaryOp.at?_bound decoded⟩
+      · contradiction
 
 /-- Every recognized binary operator belongs to the active source. -/
 theorem binaryAtPrecedence?_validFor {input : State}
@@ -1145,27 +1146,35 @@ theorem binaryAtPrecedence?_validFor {input : State}
     (result : binaryAtPrecedence? input precedence = some operator) :
     Located.ValidFor input.file operator := by
   rcases binaryAtPrecedence?_some_state_shape result with
-    ⟨token, found, _decoded, span⟩
-  simpa only [Located.ValidFor, ← span] using
-    inputValid.peek?_span_validFor found
+    ⟨_token, _found, decoded, _precedence, _bound⟩
+  rcases BinaryOp.at?_cases decoded with
+    ⟨first, firstWithin, ⟨_, span⟩ | ⟨_, next, _, nextWithin, touching, span⟩⟩
+  · have firstValid := inputValid.token_span_validFor_of_getElem?_eq_some
+      (tokenWithin?_some firstWithin).2
+    simpa only [Located.ValidFor, span] using firstValid
+  · have firstValid := inputValid.token_span_validFor_of_getElem?_eq_some
+      (tokenWithin?_some firstWithin).2
+    have nextValid := inputValid.token_span_validFor_of_getElem?_eq_some
+      (tokenWithin?_some nextWithin).2
+    simp only [Located.ValidFor, span]
+    apply SourceSpan.cover_validFor firstValid nextValid
+    have firstOrdered := firstValid.2.1
+    have nextOrdered := nextValid.2.1
+    omega
 
-/-- Binary consumption is the exact one-token cursor update. -/
+/-- Binary consumption is the exact cursor update over the operator's tokens. -/
 theorem consumeBinary_ok_state_shape (operator : Located BinaryOp)
     (input : State) :
     consumeBinary operator input =
-      .ok () { input with cursor := input.cursor + 1 } := rfl
+      .ok () { input with cursor := input.cursor + operator.value.tokenCount } := rfl
 
-/-- Consuming a recognized current token preserves state validity. -/
+/-- Consuming the tokens of a recognized operator preserves state validity. -/
 theorem consumeBinary_reply_validFor (operator : Located BinaryOp)
-    {input : State} (inputValid : input.ValidFor) {token : Token}
-    (found : input.peek? = some token) :
+    {input : State} (inputValid : input.ValidFor)
+    (bound : input.cursor + operator.value.tokenCount ≤ input.window.endIndex) :
     (consumeBinary operator input).ValidFor input (fun _ _ => True) := by
   unfold consumeBinary modifyState Reply.ValidFor
-  refine ⟨trivial, ?_, rfl⟩
-  apply inputValid.advance?_validFor (token := token)
-  unfold State.advance?
-  rw [found]
-  rfl
+  exact ⟨trivial, { inputValid with cursor_le_endIndex := bound }, rfl⟩
 
 /-- Binary consumption preserves the immutable token window. -/
 theorem consumeBinary_preservesTokenWindow (operator : Located BinaryOp) :
@@ -1177,14 +1186,16 @@ theorem consumeBinary_preservesTokensOnSuccess
     Parser.PreservesTokensOnSuccess (consumeBinary operator) :=
   (consumeBinary_preservesTokenWindow operator).preservesTokensOnSuccess
 
-/-- Binary consumption advances the cursor by exactly one. -/
+/-- Binary consumption advances the cursor. -/
 theorem consumeBinary_cursor_lt_onSuccess (operator : Located BinaryOp)
     {input final : State} {value : Unit}
     (result : consumeBinary operator input = .ok value final) :
     input.cursor < final.cursor := by
   unfold consumeBinary modifyState at result
   cases result
-  simp
+  have positive := BinaryOp.tokenCount_pos operator.value
+  simp only
+  omega
 
 theorem consumeBinary_cursorMonotoneOnSuccess
     (operator : Located BinaryOp) :
@@ -1373,11 +1384,12 @@ theorem leftAssociativeTail_validFor
       | some operator =>
           simp only
           rcases binaryAtPrecedence?_some_state_shape operatorResult with
-            ⟨operatorToken, operatorFound, _decoded, _operatorSpan⟩
+            ⟨operatorToken, operatorFound, _decoded, _precedence, operatorBound⟩
+          have operatorPositive := BinaryOp.tokenCount_pos operator.value
           have operatorValid := binaryAtPrecedence?_validFor inputValid
             operatorResult
           have consumedReply := consumeBinary_reply_validFor operator
-            inputValid operatorFound
+            inputValid operatorBound
           cases consumedResult : consumeBinary operator input with
           | invariant error => trivial
           | reject failure rejected =>
@@ -1391,30 +1403,30 @@ theorem leftAssociativeTail_validFor
               cases exactConsumed
               simp only
               cases operandResult : operand
-                  { input with cursor := input.cursor + 1 } with
+                  { input with cursor := input.cursor + operator.value.tokenCount } with
               | invariant error => trivial
               | reject failure rejected =>
                   have rejectedValid := operandValid
-                    { input with cursor := input.cursor + 1 }
+                    { input with cursor := input.cursor + operator.value.tokenCount }
                     consumedReply.2.1
                   rw [operandResult] at rejectedValid
                   simp only
                   exact rejectedValid.of_file_eq consumedReply.2.2
               | ok right next =>
                   have rightReply := operandValid
-                    { input with cursor := input.cursor + 1 }
+                    { input with cursor := input.cursor + operator.value.tokenCount }
                     consumedReply.2.1
                   rw [operandResult] at rightReply
                   have rightValidInput :
                       Expr.ValidFor statementValid input.file right := by
                     simpa [rightReply.2.2, consumedReply.2.2] using rightReply.1
                   rcases operandStarts
-                      { input with cursor := input.cursor + 1 } right next
+                      { input with cursor := input.cursor + operator.value.tokenCount } right next
                       operandResult with
                     ⟨rightToken, rightFound, rightStart⟩
                   have operatorAt :=
                     State.getElem?_eq_some_of_peek?_eq_some operatorFound
-                  have rightAt : input.tokens[input.cursor + 1]? =
+                  have rightAt : input.tokens[input.cursor + operator.value.tokenCount]? =
                       some rightToken := by
                     simpa using
                       State.getElem?_eq_some_of_peek?_eq_some rightFound
@@ -1440,12 +1452,13 @@ theorem leftAssociativeTail_validFor
                     simpa [rightReply.2.2, consumedReply.2.2] using
                       combinedValidInput
                   have tokensEq := operandTokens
-                    { input with cursor := input.cursor + 1 } right next
+                    { input with cursor := input.cursor + operator.value.tokenCount } right next
                       operandResult
                   have cursorOrder : input.cursor < next.cursor :=
-                    Nat.lt_of_lt_of_le (by simp)
+                    Nat.lt_of_lt_of_le
+                      (show input.cursor < input.cursor + operator.value.tokenCount by omega)
                       (operandCursor
-                        { input with cursor := input.cursor + 1 } right next
+                        { input with cursor := input.cursor + operator.value.tokenCount } right next
                           operandResult)
                   have combinedBefore : ∀ future,
                       next.peek? = some future →
@@ -1744,7 +1757,8 @@ theorem nonAssociative_validFor
       | some operator =>
           simp only
           rcases binaryAtPrecedence?_some_state_shape operatorResult with
-            ⟨operatorToken, operatorFound, _decoded, _operatorSpan⟩
+            ⟨operatorToken, operatorFound, _decoded, _precedence, operatorBound⟩
+          have operatorPositive := BinaryOp.tokenCount_pos operator.value
           have operatorValidNext := binaryAtPrecedence?_validFor
             leftReply.2.1 operatorResult
           have leftTokens := operandTokens input left next leftResult
@@ -1764,7 +1778,7 @@ theorem nonAssociative_validFor
             exact Nat.le_trans
               (by simpa [leftStart] using leftTokenValid.2.1) beforeOperator
           have consumedReply := consumeBinary_reply_validFor operator
-            leftReply.2.1 operatorFound
+            leftReply.2.1 operatorBound
           cases consumedResult : consumeBinary operator next with
           | invariant error =>
               simp only
@@ -1780,13 +1794,13 @@ theorem nonAssociative_validFor
               cases exactConsumed
               simp only
               cases rightResult : operand
-                  { next with cursor := next.cursor + 1 } with
+                  { next with cursor := next.cursor + operator.value.tokenCount } with
               | invariant error =>
                   simp only
                   trivial
               | reject failure rejected =>
                   have rejectedValid := operandValid
-                    { next with cursor := next.cursor + 1 }
+                    { next with cursor := next.cursor + operator.value.tokenCount }
                     consumedReply.2.1
                   rw [rightResult] at rejectedValid
                   simp only
@@ -1794,7 +1808,7 @@ theorem nonAssociative_validFor
                     (consumedReply.2.2.trans leftReply.2.2)
               | ok right afterRight =>
                   have rightReply := operandValid
-                    { next with cursor := next.cursor + 1 }
+                    { next with cursor := next.cursor + operator.value.tokenCount }
                     consumedReply.2.1
                   rw [rightResult] at rightReply
                   have rightValidInput :
@@ -1802,12 +1816,12 @@ theorem nonAssociative_validFor
                     simpa [rightReply.2.2, consumedReply.2.2,
                       leftReply.2.2] using rightReply.1
                   rcases operandStarts
-                      { next with cursor := next.cursor + 1 } right afterRight
+                      { next with cursor := next.cursor + operator.value.tokenCount } right afterRight
                       rightResult with
                     ⟨rightToken, rightFound, rightStart⟩
                   have rightAtAfter :=
                     State.getElem?_eq_some_of_peek?_eq_some rightFound
-                  have rightAt : input.tokens[next.cursor + 1]? =
+                  have rightAt : input.tokens[next.cursor + operator.value.tokenCount]? =
                       some rightToken := by
                     simpa [leftTokens] using rightAtAfter
                   have operatorBeforeRight :=
@@ -2127,9 +2141,10 @@ theorem expressionLayer_contract
     ExpressionContract statementValid (expressionLayer nested block) := by
   have unaryContract := ExpressionContract.unary statementValid nested block
     postfixContract
-  have multiplyContract := ExpressionContract.leftAssociative unaryContract 8
-  have addContract := ExpressionContract.leftAssociative multiplyContract 7
-  have bitAndContract := ExpressionContract.leftAssociative addContract 6
+  have multiplyContract := ExpressionContract.leftAssociative unaryContract 9
+  have addContract := ExpressionContract.leftAssociative multiplyContract 8
+  have shiftContract := ExpressionContract.leftAssociative addContract 7
+  have bitAndContract := ExpressionContract.leftAssociative shiftContract 6
   have bitXorContract := ExpressionContract.leftAssociative bitAndContract 5
   have bitOrContract := ExpressionContract.leftAssociative bitXorContract 4
   have relationalContract :=

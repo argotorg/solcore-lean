@@ -35,7 +35,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered →
       RawTyped (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression definitions →
@@ -102,10 +102,10 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
           found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl, ?_⟩
-        · rcases profile with equal | word | integer
+        · rcases profile with equal | word | ⟨integer, notShift⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))
-          · exact .inr (.inr (leafView.trans integer))
+          · exact .inr (.inr ⟨leafView.trans integer, notShift⟩)
         · exact .projected route layout ordinary rfl described preparedBy
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors

@@ -18,18 +18,38 @@ inductive CoreAssignmentTail where
   | bitNot (operator : SourceSpan)
   deriving Repr, BEq
 
-/-- Exact token spelling of one value-assignment operator. -/
+/-- Exact tokens of one value-assignment operator: one token, or the two
+adjacent tokens of `<<=` and `>>=`, as `ValueAssignOp.at?` decodes them. -/
 def ValueAssignOperatorParses (input : Remainder)
     (operator : Located ValueAssignOp) (output : Remainder) : Prop :=
-  ExactTokenParses (.symbol operator.value.symbol) input operator.span output
+  ValueAssignOp.at? input.tokens input.endIndex input.cursor = some operator ∧
+    output = { input with cursor := input.cursor + operator.value.tokenCount }
 
 /-- No value-assignment operator occurs at the current cursor. -/
 def ValueAssignOperatorAbsentAt (input : Remainder) : Prop :=
-  ¬ ∃ (span : SourceSpan) (operator : ValueAssignOp),
-    TokenAt input.tokens input.endIndex input.cursor {
-      span
-      value := .symbol operator.symbol
-    }
+  ValueAssignOp.at? input.tokens input.endIndex input.cursor = none
+
+namespace ValueAssignOperatorParses
+
+/-- The decoded operator fixes its span, its value and the remainder. -/
+theorem unique {input leftOutput rightOutput : Remainder}
+    {left right : Located ValueAssignOp}
+    (leftParsed : ValueAssignOperatorParses input left leftOutput)
+    (rightParsed : ValueAssignOperatorParses input right rightOutput) :
+    left = right ∧ leftOutput = rightOutput := by
+  have same : left = right := Option.some.inj (leftParsed.1.symm.trans rightParsed.1)
+  subst same
+  exact ⟨rfl, leftParsed.2.trans rightParsed.2.symm⟩
+
+/-- A decoded operator excludes absence. -/
+theorem not_absent {input output : Remainder} {operator : Located ValueAssignOp}
+    (parsed : ValueAssignOperatorParses input operator output)
+    (absent : ValueAssignOperatorAbsentAt input) : False := by
+  unfold ValueAssignOperatorAbsentAt at absent
+  rw [parsed.1] at absent
+  contradiction
+
+end ValueAssignOperatorParses
 
 /-- Neither assignment-tail form starts at the current cursor. -/
 def AssignmentTailAbsentAt (input : Remainder) : Prop :=

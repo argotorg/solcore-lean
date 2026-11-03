@@ -19,9 +19,10 @@ theorem expressionLayerExactOutcomeSpec
       (ExpressionLayerOrdinaryParses nestedOrdinary postfixOrdinary)
       (ExpressionLayerRejects nestedOrdinary nestedRejects postfixOrdinary postfixRejects) := by
   let unaryOutcomes := expressionUnaryExactOutcomeSpec postfixOutcomes
-  let multiplyOutcomes := leftAssociativeExactOutcomeSpec unaryOutcomes 8
-  let addOutcomes := leftAssociativeExactOutcomeSpec multiplyOutcomes 7
-  let bitAndOutcomes := leftAssociativeExactOutcomeSpec addOutcomes 6
+  let multiplyOutcomes := leftAssociativeExactOutcomeSpec unaryOutcomes 9
+  let addOutcomes := leftAssociativeExactOutcomeSpec multiplyOutcomes 8
+  let shiftOutcomes := leftAssociativeExactOutcomeSpec addOutcomes 7
+  let bitAndOutcomes := leftAssociativeExactOutcomeSpec shiftOutcomes 6
   let bitXorOutcomes := leftAssociativeExactOutcomeSpec bitAndOutcomes 5
   let bitOrOutcomes := leftAssociativeExactOutcomeSpec bitXorOutcomes 4
   let relationalOutcomes := nonAssociativeExactOutcomeSpec bitOrOutcomes 3

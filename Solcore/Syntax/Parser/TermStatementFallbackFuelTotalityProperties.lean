@@ -27,7 +27,7 @@ theorem assignmentTail_ordinary_of_expressionFuel
         simp only [bind, operatorResult, pure]⟩
     · exact Or.inr ⟨failure, rejected, by
         simp only [bind, operatorResult]⟩
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : valueAssignAt? input with
     | none =>
         exact (Parser.rejectAt_invariantFreeOnValid
           (alpha := AssignmentTail)

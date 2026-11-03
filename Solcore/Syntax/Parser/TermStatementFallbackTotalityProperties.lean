@@ -19,13 +19,9 @@ theorem valueAssignOperator_invariantFreeOnValid :
   | reject failure next => exact Or.inr ⟨failure, next, rfl⟩
   | invariant error =>
       unfold valueAssignOperator at result
-      cases found : input.peek? with
-      | none => simp [found, rejectAt] at result
-      | some token =>
-          simp only [found] at result
-          cases accepted : valueAssignOp? token.value with
-          | none => simp [accepted, rejectAt] at result
-          | some operator => simp [accepted] at result
+      cases decoded : valueAssignAt? input with
+      | none => simp [decoded, rejectAt] at result
+      | some operator => simp [decoded] at result
 
 /-- Assignment suffixes inherit valid-input totality from expressions. -/
 theorem assignmentTail_invariantFreeOnValid
@@ -41,7 +37,7 @@ theorem assignmentTail_invariantFreeOnValid
       (symbol_ordinary .tildeEqual .statement).invariantFreeOnValid
       (fun operator => Parser.pure_invariantFreeOnValid
         (AssignmentTail.bitNot operator.span))) input inputValid
-  · cases selected : input.peekKind?.bind valueAssignOp? with
+  · cases selected : valueAssignAt? input with
     | none =>
         exact (Parser.rejectAt_invariantFreeOnValid
           (alpha := AssignmentTail)

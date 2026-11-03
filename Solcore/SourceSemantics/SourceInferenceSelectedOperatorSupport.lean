@@ -296,7 +296,27 @@ theorem inferBinaryOperator
   let hasOpenLiteralOperand :=
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right
+  by_cases shift : Detail.isShiftOperator operator = true
+  · obtain ⟨_, typeEq, valued, valueResult, amountResult⟩ :=
+      Detail.inferBinaryOperator_shift_result shift success
+    have wordResolved : ∀ any : State, Resolved cutoff roots any .word := by
+      intro any metavariable member
+      simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
+        TypeSystem.Ty.freeVariables] at member
+    have valueTransport := unify ready leftBelow (TypeSystem.Ty.variablesBelow_constructor _ _)
+      leftSupported (wordResolved state) valueResult
+    have valuedReady := Detail.unify_preserves_inferenceReady ready leftBelow
+      (TypeSystem.Ty.variablesBelow_constructor _ _) valueResult
+    have valueProgress := Detail.unify_inferenceProgress ready.solved leftBelow
+      (TypeSystem.Ty.variablesBelow_constructor _ _) valueResult
+    have amountTransport := unify valuedReady (rightBelow.weaken valueProgress.next_le)
+      (TypeSystem.Ty.variablesBelow_constructor _ _) (valueTransport right rightSupported)
+      (wordResolved valued) amountResult
+    rw [typeEq]
+    exact ⟨fun type supported => amountTransport type (valueTransport type supported),
+      wordResolved result.state⟩
   unfold Detail.inferBinaryOperator at success
+  rw [if_neg shift] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

@@ -156,6 +156,9 @@ inductive PrimitiveBinaryHasType :
   | integerArithmetic {operator : Syntax.BinaryOp}
       (kind : ArithmeticBinaryOperator operator) :
       PrimitiveBinaryHasType operator .integer .integer
+  | wordShift {operator : Syntax.BinaryOp}
+      (kind : ShiftBinaryOperator operator) :
+      PrimitiveBinaryHasType operator .word .word
   | wordComparison {operator : Syntax.BinaryOp}
       (kind : ComparisonBinaryOperator operator) :
       PrimitiveBinaryHasType operator .word .bool
@@ -173,6 +176,7 @@ theorem sourceTyping {context : Context} {operator : Syntax.BinaryOp}
     BinaryOperatorHasType context operator operand operand result [] := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
+  | wordShift kind => exact .wordShift kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind
@@ -203,6 +207,10 @@ theorem preserves
       cases kind <;> cases application <;>
         try { cases left_typed } <;> try { cases right_typed } <;>
         exact ValueHasType.integer _
+  | wordShift kind =>
+      cases kind <;> cases application <;>
+        try { cases left_typed } <;> try { cases right_typed } <;>
+        exact ValueHasType.word _
   | wordComparison kind =>
       cases kind <;> cases application <;>
         try { cases left_typed } <;> try { cases right_typed } <;>
@@ -323,6 +331,20 @@ theorem wordCompoundPreserves
           cases current_typed with
           | some left_typed =>
               exact primitive.preserves (.wordArithmetic .bitOr) left_typed
+                right_typed
+  | shiftLeft =>
+      cases applies with
+      | shiftLeft primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordShift .shiftLeft) left_typed
+                right_typed
+  | shiftRight =>
+      cases applies with
+      | shiftRight primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordShift .shiftRight) left_typed
                 right_typed
 
 end AssignmentValueApplies

@@ -36,12 +36,8 @@ theorem BinaryOperatorAtPrecedenceParses.result_unique
     {left right : Located BinaryOp}
     (leftParsed : BinaryOperatorAtPrecedenceParses precedence input left afterLeft)
     (rightParsed : BinaryOperatorAtPrecedenceParses precedence input right afterRight) :
-    left = right ∧ afterLeft = afterRight := by
-  have outputEq := leftParsed.2.2.trans rightParsed.2.2.symm
-  have tokenEq := leftParsed.2.1.token_unique rightParsed.2.1
-  rcases left with ⟨leftSpan, leftValue⟩
-  rcases right with ⟨rightSpan, rightValue⟩
-  cases leftValue <;> cases rightValue <;> simp_all [BinaryOp.symbol]
+    left = right ∧ afterLeft = afterRight :=
+  leftParsed.unique rightParsed
 
 /-- Absence at one precedence excludes every positive token at that precedence. -/
 theorem BinaryOperatorAtPrecedenceAbsentAt.not_parses
@@ -49,7 +45,7 @@ theorem BinaryOperatorAtPrecedenceAbsentAt.not_parses
     (absent : BinaryOperatorAtPrecedenceAbsentAt precedence input)
     (parsed : BinaryOperatorAtPrecedenceParses precedence input operator output) :
     False :=
-  absent ⟨operator.span, operator.value, parsed.1, parsed.2.1⟩
+  parsed.not_absent absent
 
 /-- A maximal prefix sequence fixes all operators in source order and its end. -/
 theorem UnaryOperatorsParses.result_unique

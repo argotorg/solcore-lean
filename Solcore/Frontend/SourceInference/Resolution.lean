@@ -412,6 +412,10 @@ def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
   | .modulo => .traitMethod "Mod" "mod"
   | .add => .traitMethod "Add" "add"
   | .subtract => .traitMethod "Sub" "sub"
+  -- Shifts never dispatch to a program's trait: upstream's `Shl` and `Shr`
+  -- take two parameters, and inference types shifts before dispatch.
+  | .shiftLeft => .function "shl"
+  | .shiftRight => .function "shr"
   | .bitAnd => .traitMethod "BitAnd" "band"
   | .bitXor => .traitMethod "BitXor" "bxor"
   | .bitOr => .traitMethod "BitOr" "bor"
@@ -489,10 +493,23 @@ structure OperatorInferenceResult where
   requirements : List RequirementId
   state : State
 
+/-- Whether an operator is `<<` or `>>`. -/
+def isShiftOperator : Syntax.BinaryOp → Bool
+  | .shiftLeft | .shiftRight => true
+  | _ => false
+
 def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     (left right : Ty) (expected : Option Ty)
     (integerLiterals : List IntegerLiteralOrigin) (state : State) :
     Except Error OperatorInferenceResult := do
+  if isShiftOperator operator then
+    -- A shift types its amount independently of its value, and its result
+    -- has the value's type; both are Words, so open literal operands are
+    -- Words at once. Upstream's `Shl` and `Shr` take two parameters, so
+    -- shifts never dispatch to a program's one-parameter traits.
+    let state ← unify state left .word
+    let state ← unify state right .word
+    return { type := .word, requirements := [], state }
   let hasOpenLiteralOperand :=
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right

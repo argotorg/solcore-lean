@@ -19,22 +19,18 @@ private theorem binary_none_of_absent {input : State} {precedence : Nat}
   | some operator =>
       have parsed := consumeBinary_success_sound_of_binaryAtPrecedence?_some selected
         (consumeBinary_ok_state_shape operator input)
-      exact False.elim (absent ⟨operator.span, operator.value, parsed.1, parsed.2.1⟩)
+      exact False.elim (parsed.not_absent absent)
 
 private theorem binary_some_of_parsed {input : State} {precedence : Nat} {after : Remainder}
     {operator : Located BinaryOp}
     (parsed : BinaryOperatorAtPrecedenceParses precedence input.declarativeRemainder operator after) :
     binaryAtPrecedence? input precedence = some operator := by
-  rcases operator with ⟨operatorSpan, value⟩
-  rcases parsed with ⟨operatorPrecedence, tokenAt, _⟩
-  change input.cursor < input.window.endIndex ∧
-    input.tokens[input.cursor]? = some { span := operatorSpan, value := .symbol value.symbol } at tokenAt
-  have found : input.peek? = some { span := operatorSpan, value := .symbol value.symbol } := by
-    unfold State.peek?
-    rw [if_pos tokenAt.1, tokenAt.2]
-  have decoded : binaryOp? (.symbol value.symbol) = some value := by cases value <;> rfl
-  have selected : (value.precedence == precedence) = true := beq_iff_eq.mpr operatorPrecedence
-  simp only [binaryAtPrecedence?, found, decoded, selected, if_true]
+  rcases parsed with ⟨operatorPrecedence, decoded, _⟩
+  have found : BinaryOp.at? input.tokens input.window.endIndex input.cursor = some operator :=
+    decoded
+  have selected : (operator.value.precedence == precedence) = true :=
+    beq_iff_eq.mpr operatorPrecedence
+  simp only [binaryAtPrecedence?, found, selected, if_true]
 
 variable {operand : Parser Expr}
   {operandTrace : SourceId → Nat → Remainder → Expr → Remainder → List ParseDiagnostic → Prop}
@@ -63,12 +59,13 @@ private theorem success_complete_at
       | succ fuel =>
           exact ⟨input, by simp only [leftAssociativeTail, binary_none_of_absent absent],
             rfl, (List.append_nil _).symm⟩
-  | next operatorParsed rightParsed tail ih =>
+  | @next before afterOperator afterRight output left right expression operator rightEvents
+      tailEvents operatorParsed rightParsed tail ih =>
       intro input sourceEq byteEq remEq
       cases sourceEq; cases byteEq; cases remEq
       have operatorResult := binary_some_of_parsed operatorParsed
       rcases operatorParsed with ⟨_, _, rfl⟩
-      rcases successComplete (input := { input with cursor := input.cursor + 1 }) rightParsed with
+      rcases successComplete (input := { input with cursor := input.cursor + operator.value.tokenCount }) rightParsed with
         ⟨next, childResult, nextAfter, childEvents⟩
       have frame := successFrame childResult
       rcases ih next (congrArg SourceFile.id frame.1) frame.2 nextAfter with ⟨bound, tailComplete⟩
@@ -99,12 +96,13 @@ private theorem reject_complete_at
         rejected.declarativeRemainder = after ∧ failure.toDiagnostic = report ∧
         rejected.diagnostics = input.diagnostics ++ trace := by
   induction rejection with
-  | rightRejected operatorParsed rightRejected =>
+  | @rightRejected before afterOperator rejected left operator report trace operatorParsed
+      rightRejected =>
       intro input sourceEq byteEq remEq
       cases sourceEq; cases byteEq; cases remEq
       have operatorResult := binary_some_of_parsed operatorParsed
       rcases operatorParsed with ⟨_, _, rfl⟩
-      rcases rejectComplete (input := { input with cursor := input.cursor + 1 }) rightRejected with
+      rcases rejectComplete (input := { input with cursor := input.cursor + operator.value.tokenCount }) rightRejected with
         ⟨failure, rejected, childResult, afterEq, reportEq, events⟩
       refine ⟨1, ?_⟩
       intro fuel adequate
@@ -113,12 +111,13 @@ private theorem reject_complete_at
       | succ fuel =>
           exact ⟨failure, rejected, by simp only [leftAssociativeTail, operatorResult,
             consumeBinary_ok_state_shape, childResult], afterEq, reportEq, events⟩
-  | laterRejected operatorParsed rightParsed tail ih =>
+  | @laterRejected before afterOperator afterRight rejected left right operator report
+      rightEvents tailEvents operatorParsed rightParsed tail ih =>
       intro input sourceEq byteEq remEq
       cases sourceEq; cases byteEq; cases remEq
       have operatorResult := binary_some_of_parsed operatorParsed
       rcases operatorParsed with ⟨_, _, rfl⟩
-      rcases successComplete (input := { input with cursor := input.cursor + 1 }) rightParsed with
+      rcases successComplete (input := { input with cursor := input.cursor + operator.value.tokenCount }) rightParsed with
         ⟨next, childResult, nextAfter, childEvents⟩
       have frame := successFrame childResult
       rcases ih next (congrArg SourceFile.id frame.1) frame.2 nextAfter with ⟨bound, tailComplete⟩

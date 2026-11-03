@@ -213,6 +213,12 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
   | bitOr {left right result : Value}
       (applies : BinaryPrimitiveApplies .bitOr left right result) :
       AssignmentValueApplies .bitOr (some left) right result
+  | shiftLeft {left right result : Value}
+      (applies : BinaryPrimitiveApplies .shiftLeft left right result) :
+      AssignmentValueApplies .shiftLeft (some left) right result
+  | shiftRight {left right result : Value}
+      (applies : BinaryPrimitiveApplies .shiftRight left right result) :
+      AssignmentValueApplies .shiftRight (some left) right result
 
 /-- Bit-not assignment operates on the leaf snapshot captured by place
 resolution. -/

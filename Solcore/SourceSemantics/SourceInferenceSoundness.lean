@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceInference.ProgramProperties
 import Solcore.Frontend.SourceInference.RequirementProperties
+import Solcore.Frontend.SourceInference.ShiftOperatorInference
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.TraitSubstitutionProperties
 import Solcore.SourceSemantics.TraitResolutionSoundness
@@ -2369,6 +2370,8 @@ theorem inferAssignedValueFuel_success_sound
       | bitAnd => exact finishNonEqual .bitAnd success
       | bitXor => exact finishNonEqual .bitXor success
       | bitOr => exact finishNonEqual .bitOr success
+      | shiftLeft => exact finishNonEqual .shiftLeft success
+      | shiftRight => exact finishNonEqual .shiftRight success
 
 /-- Alignment supplies the two semantic lookups for a guarded local name,
 while active formation supplies the corresponding closed scheme judgments. -/
@@ -16427,7 +16430,8 @@ inductive BinaryOperatorInferenceCase
             (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
               Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
             (Detail.binaryBuiltinType operator)
-            (result.state.resolve left) = true) :
+            (result.state.resolve left) = true)
+      (not_shift : Detail.isShiftOperator operator = false) :
       BinaryOperatorInferenceCase inferenceContext semanticContext initial
         operator left right integerLiterals result
   | trait
@@ -16457,19 +16461,21 @@ theorem binaryBuiltin_hasType
         else Detail.binaryBuiltinType operator) [] := by
   cases operator <;>
     simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool]
-  all_goals constructor
-  all_goals constructor
+  all_goals first
+    | exact .wordShift (by constructor)
+    | (constructor <;> constructor)
 
 /-- Every Word-backed binary builtin also has the staged integer typing used
 while literal targets are being finalized. -/
 theorem binaryInteger_hasType
     (context : SourceSemantics.Context) (operator : Syntax.BinaryOp)
-    (word_builtin : Detail.binaryBuiltinType operator = TypeSystem.Ty.word) :
+    (word_builtin : Detail.binaryBuiltinType operator = TypeSystem.Ty.word)
+    (not_shift : Detail.isShiftOperator operator = false) :
     BinaryOperatorHasType context operator .integer .integer
       (if Detail.binaryResultIsBool operator then .bool else .integer) [] := by
   cases operator <;>
-    simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool,
-      TypeSystem.Ty.bool, TypeSystem.Ty.word] at word_builtin ⊢
+    simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool, Detail.isShiftOperator,
+      TypeSystem.Ty.bool, TypeSystem.Ty.word] at word_builtin not_shift ⊢
   all_goals constructor
   all_goals constructor
 
@@ -16625,6 +16631,7 @@ private theorem finishBinaryOperator_success_case
     {integerLiterals : List IntegerLiteralOrigin}
     {initial state : Frontend.SourceInference.State}
     {result : Detail.OperatorInferenceResult}
+    (not_shift : Detail.isShiftOperator operator = false)
     (operands_eq : state.resolve left = state.resolve right)
     (success : finishBinaryOperator inferenceContext operator left right
       integerLiterals initial state = .ok result) :
@@ -16658,7 +16665,7 @@ private theorem finishBinaryOperator_success_case
               true
         · simp [fallback] at success
           cases success
-          exact .literalFallback rfl operands_eq rfl (by simpa using fallback)
+          exact .literalFallback rfl operands_eq rfl (by simpa using fallback) not_shift
         · simp [fallback] at success
     | traitMethod traitName methodName =>
         simp only [operand_builtin, ↓reduceIte, dispatch_eq] at success
@@ -16685,7 +16692,7 @@ private theorem finishBinaryOperator_success_case
                 · simp [selected, fallback] at success
                   cases success
                   exact .literalFallback rfl operands_eq rfl
-                    (by simpa using fallback)
+                    (by simpa using fallback) not_shift
                 · simp [selected, fallback] at success
             | some trait =>
                 cases profile : Detail.operatorTraitPredicates inferenceContext
@@ -16706,6 +16713,11 @@ private theorem finishBinaryOperator_success_case
                       (corresponds :=
                         addRequirementsWithIds_correspond state predicates)
 
+theorem shiftBinaryOperator_of_isShiftOperator {operator : Syntax.BinaryOp}
+    (shift : Detail.isShiftOperator operator = true) :
+    ShiftBinaryOperator operator := by
+  cases operator <;> simp [Detail.isShiftOperator] at shift <;> constructor
+
 /-- Every successful binary-operator inference step is exactly a direct
 builtin, a selected trait profile with its allocated evidence rows, or the
 literal-only fallback deliberately left to final defaulting. -/
@@ -16721,7 +16733,24 @@ theorem inferBinaryOperator_success_case
       expected integerLiterals initial = .ok result) :
     BinaryOperatorInferenceCase inferenceContext semanticContext initial
       operator left right integerLiterals result := by
+  by_cases shift : Detail.isShiftOperator operator = true
+  · obtain ⟨requirementsEq, typeEq, valued, valueResult, amountResult⟩ :=
+      Detail.inferBinaryOperator_shift_result shift success
+    have leftWord : result.state.resolve left = .word := by
+      have valueEq := Detail.unify_preserves_resolve_eq
+        (Detail.unify_resolve_eq valueResult) amountResult
+      simpa [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve,
+        TypeSystem.Ty.word] using valueEq
+    have rightWord : result.state.resolve right = .word := by
+      simpa [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve,
+        TypeSystem.Ty.word] using Detail.unify_resolve_eq amountResult
+    refine .primitive ?_
+    rw [leftWord, rightWord, typeEq, requirementsEq]
+    exact .wordShift (shiftBinaryOperator_of_isShiftOperator shift)
+  have not_shift : Detail.isShiftOperator operator = false :=
+    Bool.eq_false_iff.mpr shift
   unfold Detail.inferBinaryOperator at success
+  rw [if_neg shift] at success
   simp only [bind, Except.bind] at success
   cases first_unify : Detail.unify initial left right with
   | error error => simp [first_unify] at success
@@ -16732,12 +16761,12 @@ theorem inferBinaryOperator_success_case
       | none =>
           simp only [pure, Pure.pure, Except.pure]
             at success
-          exact finishBinaryOperator_success_case unified_eq success
+          exact finishBinaryOperator_success_case not_shift unified_eq success
       | some expected =>
           simp only [pure, Pure.pure, Except.pure]
             at success
           split at success
-          · exact finishBinaryOperator_success_case unified_eq success
+          · exact finishBinaryOperator_success_case not_shift unified_eq success
           · cases second_unify : Detail.unify unified
                 (unified.resolve left) expected with
             | error error => simp [second_unify] at success
@@ -16745,7 +16774,7 @@ theorem inferBinaryOperator_success_case
                 have prepared_eq :=
                   Detail.unify_preserves_resolve_eq unified_eq second_unify
                 simp only [second_unify] at success
-                exact finishBinaryOperator_success_case prepared_eq success
+                exact finishBinaryOperator_success_case not_shift prepared_eq success
 
 /-- A successfully loaded coercion-method profile and its successfully
 instantiated predicate row supply the declarative `Coerce` profile used by
@@ -18133,7 +18162,7 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
         FlexibleSubstitution.BinaryOperatorHasType.applySubstitution catalog
           contextValid typing
       simpa only [resolvedLeftEq, resolvedRightEq] using mapped
-  | literalFallback requirementsEq operandsEq typeEq fallback =>
+  | literalFallback requirementsEq operandsEq typeEq fallback notShift =>
       have finalOperandsEq :
           later.inference.substitution.apply left =
             later.inference.substitution.apply right := by
@@ -18231,7 +18260,7 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
               if Detail.binaryResultIsBool operator then .bool
               else .integer := by
             rw [resultTypeEq, leftInteger]
-          have typing := binaryInteger_hasType active operator deferredFacts.1
+          have typing := binaryInteger_hasType active operator deferredFacts.1 notShift
           simpa only [leftInteger, rightInteger, resultInteger,
             requirementsEq] using typing
       · have stagedFacts :
@@ -18260,7 +18289,7 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
             if Detail.binaryResultIsBool operator then .bool
             else .integer := by
           rw [resultTypeEq, leftInteger]
-        have typing := binaryInteger_hasType active operator stagedFacts.1
+        have typing := binaryInteger_hasType active operator stagedFacts.1 notShift
         simpa only [leftInteger, rightInteger, resultInteger,
           requirementsEq] using typing
   | @trait trait traitName methodName predicates operandsEq dispatch selected

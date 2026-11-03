@@ -36,7 +36,7 @@ theorem initialized_success
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer)
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.isShift = false)
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshot rhs : Expr}
@@ -46,7 +46,7 @@ theorem initialized_success
       Dynamic.AssignmentValueApplies operator (some left) right result ∧
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
         (.inRight .word value) store ∧ ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
-  rcases profile with rfl | word | integer
+  rcases profile with rfl | word | ⟨integer, notShift⟩
   · exact ⟨right, rightCore, rightRep, .equal _ _, .inRight (rightSelected.evaluates store),
       DataPlaceModifier.assignment_excludes_invalid (.equal _ _)⟩
   · have projected : checked.catalog.project sourceType = .ok .word := by
@@ -63,7 +63,7 @@ theorem initialized_success
     subst type
     obtain ⟨left, rfl, rfl⟩ := integer_fields observations leftRep
     obtain ⟨right, rfl, rfl⟩ := integer_fields observations rightRep
-    obtain ⟨result, applied, evaluated⟩ := DataPlaceModifier.integer_success operator left right snapshotSelected rightSelected store invalid
+    obtain ⟨result, applied, evaluated⟩ := DataPlaceModifier.integer_success operator notShift left right snapshotSelected rightSelected store invalid
     exact ⟨_, _, .compatible (actual := .integer) integer (.integer result), applied, evaluated, DataPlaceModifier.assignment_excludes_invalid applied⟩
 
 /-- The source operation determines the same result as the actual native
@@ -73,7 +73,7 @@ theorem preserves
     {sourceType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer)
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.isShift = false)
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     (applied : Dynamic.AssignmentValueApplies operator (some left) right result)

@@ -521,6 +521,8 @@ private def directBinary (operator : Syntax.BinaryOp)
   | .modulo => .binary .wordMod left right
   | .add => .binary .wordAdd left right
   | .subtract => .binary .wordSub left right
+  | .shiftLeft => .binary .wordShl left right
+  | .shiftRight => .binary .wordShr left right
   | .bitAnd => .binary .wordAnd left right
   | .bitXor => .binary .wordXor left right
   | .bitOr => .binary .wordOr left right
@@ -2605,6 +2607,8 @@ private def stagedCoreBinary? : Syntax.BinaryOp → Option Core.BinaryOp
   | .bitOr => some .wordOr
   | .greater => some .wordGt
   | .equal => some .wordEq
+  | .shiftLeft
+  | .shiftRight
   | .less
   | .lessEqual
   | .greaterEqual

@@ -62,7 +62,7 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
     rw [Mode.binary_strict .word strict] at typed
     exact binary_children typed
   | integer strict =>
-    rw [Mode.binary_strict .integer strict] at typed
+    rw [Mode.binary_strict .integer strict.toStrict] at typed
     exact binary_children typed
   | logicalAnd =>
     have children := choose_children (show HasType nativeContext

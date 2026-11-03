@@ -27,7 +27,7 @@ theorem leftAssociativeTail_success_context_of_windowProjection
       | none => simp only [leftAssociativeTail, operatorResult] at result; cases result; exact ⟨rfl, rfl⟩
       | some operator =>
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape] at result
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => simp [childResult] at result
           | reject failure rejected => simp [childResult] at result
           | ok right next =>
@@ -53,11 +53,11 @@ theorem leftAssociativeTail_reject_context_of_windowProjection
       | none => simp [leftAssociativeTail, operatorResult] at result
       | some operator =>
           simp only [leftAssociativeTail, operatorResult, consumeBinary_ok_state_shape] at result
-          cases childResult : operand { input with cursor := input.cursor + 1 } with
+          cases childResult : operand { input with cursor := input.cursor + operator.value.tokenCount } with
           | invariant error => simp [childResult] at result
           | reject actual next =>
               simp only [childResult] at result; cases result
-              exact rejectFrame (input := { input with cursor := input.cursor + 1 }) childResult
+              exact rejectFrame (input := { input with cursor := input.cursor + operator.value.tokenCount }) childResult
           | ok right next =>
               simp only [childResult] at result
               have childFrame := successFrame childResult

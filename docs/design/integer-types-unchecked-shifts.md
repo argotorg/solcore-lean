@@ -382,6 +382,27 @@ without checked types. With panics brought in by `word` division, rows 3 and
 2 are observable on their own and smaller than row 1, so this order builds
 the operator and panic plumbing first.
 
+### Shifts as implemented
+
+- **Parsing.** One decoder reads an operator from one token or from two
+  adjacent ones (`BinaryOp.at?`, `ValueAssignOp.at?`), and the parser and its
+  declarative grammar both use it.
+- **Typing.** Inference types a shift before any dispatch: the value and then
+  the amount unify with `word`, so an open literal operand is a `word` at
+  once. The dispatch map gives shifts no trait.
+- **Semantics.** `BinaryPrimitiveApplies` gains the two `word` shifts, and
+  the compound forms apply them. A shift of any other value is an operand
+  fault.
+- **Lowering.** Shifts lower to `wordShl` and `wordShr`. A compound shift of
+  a local uses a frontend copy of Core's compound-assignment shape, so Core is
+  unchanged.
+- **Integer targets.** The data-place lowering already refused compound
+  assignment outside `word` and `integer`. It now also refuses shifts at
+  `integer`, which typing never produces. The assignment profile shared by its
+  theorems says the same: `T = .integer ∧ operator.isShift = false`.
+- **Legacy fragments.** The older strict-`word` evaluators leave the shifts
+  out.
+
 **Out of scope:**
 
 - conversions between `word` and the integer types: upstream's are std

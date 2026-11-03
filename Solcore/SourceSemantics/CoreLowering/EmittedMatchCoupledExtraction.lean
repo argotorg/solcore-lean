@@ -168,7 +168,7 @@ def assign
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (headFuel : Nat)
     (prepared : head.PreparedAt site headFuel (invalidProjection site assignment.target.root)
       (missingDefault site assignment.target.root))
@@ -274,7 +274,7 @@ def initializerAssign
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
     (headFuel : Nat)
     (prepared : head.PreparedAt site headFuel (invalidProjection site assignment.target.root)
       (missingDefault site assignment.target.root))

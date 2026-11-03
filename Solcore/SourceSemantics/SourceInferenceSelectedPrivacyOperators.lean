@@ -304,7 +304,24 @@ theorem inferBinaryOperator_private {protectedVars : List TypeVarId}
       PredicateSafe protectedVars result.state row.predicate := by
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
     Detail.isOpenIntegerLiteralTarget state integerLiterals right
+  by_cases shift : Detail.isShiftOperator operator = true
+  · obtain ⟨_, typeEq, valued, valueResult, amountResult⟩ :=
+      Detail.inferBinaryOperator_shift_result shift accepted
+    have wordSafe : ∀ any : State, Safe protectedVars any .word := by
+      intro any metavariable member
+      simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
+        TypeSystem.Ty.freeVariables] at member
+    have valuedLive := live.unify leftSafe (wordSafe state) valueResult
+    have valuePrivacy := ProtectedVariables.unify leftSafe (wordSafe state) valueResult
+    apply prepend_unify leftSafe (wordSafe state) valueResult
+    have rightSafeValued := valuePrivacy _ rightSafe
+    apply prepend_unify rightSafeValued (wordSafe valued) amountResult
+    refine ⟨SafeTransport.refl _ _, by rw [typeEq]; exact wordSafe _,
+      valuedLive.unify rightSafeValued (wordSafe valued) amountResult, ?_⟩
+    intro row member fresh
+    exact absurd member fresh
   unfold Detail.inferBinaryOperator at accepted
+  rw [if_neg shift] at accepted
   cases unified : Detail.unify state left right with
   | error error => simp [unified, bind, Except.bind] at accepted
   | ok unifiedState =>

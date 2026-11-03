@@ -37,7 +37,7 @@ private theorem absentRan : runStateful 30 (.initial absentAdd [.inLeft .integer
 
 example : Dynamic.AssignmentOperandsInvalid .add none (.integer 5) := by
   have result := reflects (catalog := catalog) (signatures := signatures) (functions := functions)
-    (mapping := []) (world := []) (.inr (.inr rfl)) .absent (.integer 5)
+    (mapping := []) (world := []) (.inr (.inr ⟨rfl, rfl⟩)) .absent (.integer 5)
     (.var rfl) (.var (index := 1) rfl) (runStateful_evaluation_sound absentRan)
   exact result.2.invalid.2.2
 

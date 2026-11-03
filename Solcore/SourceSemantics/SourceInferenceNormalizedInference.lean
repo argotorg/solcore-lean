@@ -899,6 +899,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       | bitAnd => exact finishNonEqual (valueIH place) success
       | bitXor => exact finishNonEqual (valueIH place) success
       | bitOr => exact finishNonEqual (valueIH place) success
+      | shiftLeft => exact finishNonEqual (valueIH place) success
+      | shiftRight => exact finishNonEqual (valueIH place) success
 
   case case14 =>
     intros context expression expected initial fuel id allocated allocationEq

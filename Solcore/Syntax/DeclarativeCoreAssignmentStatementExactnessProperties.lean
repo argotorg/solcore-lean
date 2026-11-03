@@ -23,15 +23,8 @@ theorem ValueAssignOperatorParses.result_unique
     {leftOperator rightOperator : Located ValueAssignOp}
     (leftParsed : ValueAssignOperatorParses input leftOperator leftOutput)
     (rightParsed : ValueAssignOperatorParses input rightOperator rightOutput) :
-    leftOperator = rightOperator ∧ leftOutput = rightOutput := by
-  have tokenEq := leftParsed.1.token_unique rightParsed.1
-  cases leftOperator with
-  | mk leftSpan leftValue =>
-      cases rightOperator with
-      | mk rightSpan rightValue =>
-          cases leftValue <;> cases rightValue <;>
-            simp_all [ValueAssignOperatorParses, ValueAssignOp.symbol]
-          all_goals exact leftParsed.output_unique rightParsed
+    leftOperator = rightOperator ∧ leftOutput = rightOutput :=
+  leftParsed.unique rightParsed
 
 /-- Exact expression outcomes fix a prioritized assignment suffix and its
 final remainder. -/
@@ -94,7 +87,7 @@ theorem OptionalAssignmentTailParses.result_unique
               exact False.elim
                 (assignment_absent_conflicts_exact leftAbsent.1 token)
           | value tildeAbsent operator expression =>
-              exact False.elim (leftAbsent.2 ⟨_, _, operator.1⟩)
+              exact False.elim (operator.not_absent leftAbsent.2)
   | present leftTail =>
       cases rightParsed with
       | absent rightAbsent =>
@@ -103,7 +96,7 @@ theorem OptionalAssignmentTailParses.result_unique
               exact False.elim
                 (assignment_absent_conflicts_exact rightAbsent.1 token)
           | value tildeAbsent operator expression =>
-              exact False.elim (rightAbsent.2 ⟨_, _, operator.1⟩)
+              exact False.elim (operator.not_absent rightAbsent.2)
       | present rightTail =>
           rcases leftTail.result_unique outcomes rightTail with
             ⟨tailEq, outputEq⟩

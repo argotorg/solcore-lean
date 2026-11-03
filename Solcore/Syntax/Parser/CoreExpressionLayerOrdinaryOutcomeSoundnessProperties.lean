@@ -49,9 +49,10 @@ theorem expressionLayer_ordinaryOutcome_sound
           postfixOrdinary postfixRejects input.declarativeRemainder
             rejected.declarativeRemainder) := by
   let unary := ExpressionInternals.expressionUnary nested block
-  let multiply := ExpressionInternals.leftAssociative unary 8
-  let add := ExpressionInternals.leftAssociative multiply 7
-  let bitAnd := ExpressionInternals.leftAssociative add 6
+  let multiply := ExpressionInternals.leftAssociative unary 9
+  let add := ExpressionInternals.leftAssociative multiply 8
+  let shift := ExpressionInternals.leftAssociative add 7
+  let bitAnd := ExpressionInternals.leftAssociative shift 6
   let bitXor := ExpressionInternals.leftAssociative bitAnd 5
   let bitOr := ExpressionInternals.leftAssociative bitXor 4
   let relational := ExpressionInternals.nonAssociative bitOr 3
@@ -63,18 +64,22 @@ theorem expressionLayer_ordinaryOutcome_sound
   let unaryRejects :=
     DeclarativeGrammar.ExpressionUnaryRejects postfixRejects
   let multiplyOrdinary :=
-    DeclarativeGrammar.LeftAssociativeOrdinaryParses unaryOrdinary 8
+    DeclarativeGrammar.LeftAssociativeOrdinaryParses unaryOrdinary 9
   let multiplyRejects :=
-    DeclarativeGrammar.LeftAssociativeRejects unaryOrdinary unaryRejects 8
+    DeclarativeGrammar.LeftAssociativeRejects unaryOrdinary unaryRejects 9
   let addOrdinary :=
-    DeclarativeGrammar.LeftAssociativeOrdinaryParses multiplyOrdinary 7
+    DeclarativeGrammar.LeftAssociativeOrdinaryParses multiplyOrdinary 8
   let addRejects :=
     DeclarativeGrammar.LeftAssociativeRejects multiplyOrdinary
-      multiplyRejects 7
+      multiplyRejects 8
+  let shiftOrdinary :=
+    DeclarativeGrammar.LeftAssociativeOrdinaryParses addOrdinary 7
   let bitAndOrdinary :=
-    DeclarativeGrammar.LeftAssociativeOrdinaryParses addOrdinary 6
+    DeclarativeGrammar.LeftAssociativeOrdinaryParses shiftOrdinary 6
+  let shiftRejects :=
+    DeclarativeGrammar.LeftAssociativeRejects addOrdinary addRejects 7
   let bitAndRejects :=
-    DeclarativeGrammar.LeftAssociativeRejects addOrdinary addRejects 6
+    DeclarativeGrammar.LeftAssociativeRejects shiftOrdinary shiftRejects 6
   let bitXorOrdinary :=
     DeclarativeGrammar.LeftAssociativeOrdinaryParses bitAndOrdinary 5
   let bitXorRejects :=
@@ -107,13 +112,16 @@ theorem expressionLayer_ordinaryOutcome_sound
       postfixOrdinary postfixRejects postfixSuccessSound postfixRejectSound
   have multiplySound :=
     ExpressionInternals.leftAssociative_ordinaryOutcome_sound unary
-      unaryOrdinary unaryRejects unarySound.1 unarySound.2 8
+      unaryOrdinary unaryRejects unarySound.1 unarySound.2 9
   have addSound :=
     ExpressionInternals.leftAssociative_ordinaryOutcome_sound multiply
-      multiplyOrdinary multiplyRejects multiplySound.1 multiplySound.2 7
-  have bitAndSound :=
+      multiplyOrdinary multiplyRejects multiplySound.1 multiplySound.2 8
+  have shiftSound :=
     ExpressionInternals.leftAssociative_ordinaryOutcome_sound add addOrdinary
-      addRejects addSound.1 addSound.2 6
+      addRejects addSound.1 addSound.2 7
+  have bitAndSound :=
+    ExpressionInternals.leftAssociative_ordinaryOutcome_sound shift shiftOrdinary
+      shiftRejects shiftSound.1 shiftSound.2 6
   have bitXorSound :=
     ExpressionInternals.leftAssociative_ordinaryOutcome_sound bitAnd
       bitAndOrdinary bitAndRejects bitAndSound.1 bitAndSound.2 5

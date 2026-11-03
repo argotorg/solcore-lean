@@ -67,6 +67,8 @@ private def compound : (operator : Syntax.ValueAssignOp) → IO (PLift (WordComp
   | .bitAnd => pure ⟨.bitAnd⟩
   | .bitXor => pure ⟨.bitXor⟩
   | .bitOr => pure ⟨.bitOr⟩
+  | .shiftLeft => pure ⟨.shiftLeft⟩
+  | .shiftRight => pure ⟨.shiftRight⟩
 
 structure Statement (source : TypedSource) (control : ControlContext)
     (context : SourceSemantics.Context) (id : StatementId) where

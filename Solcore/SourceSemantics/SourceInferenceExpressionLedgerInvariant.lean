@@ -1024,7 +1024,12 @@ theorem inferBinaryOperator
   let hasOpenLiteralOperand :=
     Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
       Detail.isOpenIntegerLiteralTarget state integerLiterals right
+  by_cases shift : Detail.isShiftOperator operator = true
+  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
+      Detail.inferBinaryOperator_shift_result shift success
+    exact (LedgerEvolution.trans (.unify valueResult) (.unify amountResult)).preserve tracked
   unfold Detail.inferBinaryOperator at success
+  rw [if_neg shift] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

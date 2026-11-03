@@ -30,7 +30,7 @@ theorem leftAssociativeTail_reflectsDiagnosticFreeOnSuccess
           cases result
           exact diagnosticFree
       | some operator =>
-          let afterOperator := { input with cursor := input.cursor + 1 }
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator input = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator input
@@ -106,7 +106,7 @@ theorem leftAssociativeTail_success_sound
           cases result
           exact .done (binaryAtPrecedence?_none_absentAt operatorResult)
       | some operator =>
-          let afterOperator := { input with cursor := input.cursor + 1 }
+          let afterOperator := { input with cursor := input.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator input = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator input
@@ -190,7 +190,7 @@ theorem nonAssociative_reflectsDiagnosticFreeOnSuccess
           exact operandReflects input expression next leftResult diagnosticFree
       | some operator =>
           let afterOperator := { afterLeft with
-            cursor := afterLeft.cursor + 1 }
+            cursor := afterLeft.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator afterLeft = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator afterLeft
@@ -240,7 +240,7 @@ theorem nonAssociative_success_sound
             (binaryAtPrecedence?_none_absentAt operatorResult)
       | some operator =>
           let afterOperator := { afterLeft with
-            cursor := afterLeft.cursor + 1 }
+            cursor := afterLeft.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator afterLeft = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator afterLeft

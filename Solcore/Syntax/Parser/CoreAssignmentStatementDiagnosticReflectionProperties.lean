@@ -14,16 +14,12 @@ theorem valueAssignOperator_reflectsDiagnosticFreeOnSuccess :
     Parser.ReflectsDiagnosticFreeOnSuccess valueAssignOperator := by
   intro input operator next result diagnosticFree
   unfold valueAssignOperator at result
-  cases found : input.peek? with
-  | none => simp [found, rejectAt] at result
-  | some token =>
-      simp only [found] at result
-      cases decoded : valueAssignOp? token.value with
-      | none => simp [decoded, rejectAt] at result
-      | some value =>
-          simp only [decoded] at result
-          cases result
-          exact diagnosticFree
+  cases decoded : valueAssignAt? input with
+  | none => simp [decoded, rejectAt] at result
+  | some value =>
+      simp only [decoded] at result
+      cases result
+      exact diagnosticFree
 
 /-- Assignment-tail success reflects through a possible right expression. -/
 theorem assignmentTail_reflectsDiagnosticFreeOnSuccess
@@ -43,7 +39,7 @@ theorem assignmentTail_reflectsDiagnosticFreeOnSuccess
   · have bitNotFalse : isSymbol input .tildeEqual = false :=
       Bool.eq_false_iff.mpr bitNot
     simp only [bitNotFalse, Bool.false_eq_true, if_false] at result
-    cases decoded : input.peekKind?.bind valueAssignOp? with
+    cases decoded : valueAssignAt? input with
     | none => rw [decoded] at result; unfold rejectAt at result; contradiction
     | some operator =>
         rw [decoded] at result

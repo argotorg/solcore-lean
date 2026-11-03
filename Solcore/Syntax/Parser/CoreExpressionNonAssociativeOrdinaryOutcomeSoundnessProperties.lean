@@ -39,7 +39,7 @@ theorem nonAssociative_success_ordinary_sound
             (binaryAtPrecedence?_none_absentAt operatorResult)
       | some operator =>
           let afterOperator := { afterLeft with
-            cursor := afterLeft.cursor + 1 }
+            cursor := afterLeft.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator afterLeft = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator afterLeft
@@ -96,7 +96,7 @@ theorem nonAssociative_reject_ordinary_sound
       | none => simp [operatorResult] at result
       | some operator =>
           let afterOperator := { afterLeft with
-            cursor := afterLeft.cursor + 1 }
+            cursor := afterLeft.cursor + operator.value.tokenCount }
           have consumedResult :
               consumeBinary operator afterLeft = .ok () afterOperator :=
             consumeBinary_ok_state_shape operator afterLeft

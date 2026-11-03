@@ -16,30 +16,6 @@ end ExpressionInternals
 
 namespace ExpressionInternals
 
-/-- Recognize one canonical binary operator token. -/
-def binaryOp? : TokenKind → Option BinaryOp
-  | .symbol .star => some .multiply
-  | .symbol .slash => some .divide
-  | .symbol .percent => some .modulo
-  | .symbol .plus => some .add
-  | .symbol .minus => some .subtract
-  | .symbol .amp => some .bitAnd
-  | .symbol .caret => some .bitXor
-  | .symbol .pipe => some .bitOr
-  | .symbol .less => some .less
-  | .symbol .greater => some .greater
-  | .symbol .lessEqual => some .lessEqual
-  | .symbol .greaterEqual => some .greaterEqual
-  | .symbol .equalEqual => some .equal
-  | .symbol .notEqual => some .notEqual
-  | .symbol .logicalAnd => some .logicalAnd
-  | .symbol .logicalOr => some .logicalOr
-  | _ => none
-
-end ExpressionInternals
-
-namespace ExpressionInternals
-
 /-- Consume the maximal prefix sequence of canonical unary operators. -/
 def unaryOperators :
     Nat → List (Located UnaryOp) → State → Reply (List (Located UnaryOp))
@@ -80,22 +56,20 @@ def ExpressionInternals.expressionUnary (nested : Parser Expr)
 
 namespace ExpressionInternals
 
-/-- Inspect the current token for a binary operator at one precedence. -/
+/-- Inspect the current token, and an adjacent second token for `<<` and
+`>>`, for a binary operator at one precedence. -/
 def binaryAtPrecedence? (state : State)
     (precedence : Nat) : Option (Located BinaryOp) :=
-  match state.peek? with
-  | some token => match ExpressionInternals.binaryOp? token.value with
-    | some operator =>
-        if operator.precedence == precedence then
-          some { span := token.span, value := operator }
-        else
-          none
-    | none => none
+  match BinaryOp.at? state.tokens state.window.endIndex state.cursor with
+  | some operator =>
+      if operator.value.precedence == precedence then some operator else none
   | none => none
 
-/-- Advance over a binary operator already recognized at the current token. -/
-def consumeBinary (_operator : Located BinaryOp) : Parser Unit :=
-  modifyState fun state => { state with cursor := state.cursor + 1 }
+/-- Advance over the tokens of a binary operator already recognized at the
+cursor. -/
+def consumeBinary (operator : Located BinaryOp) : Parser Unit :=
+  modifyState fun state =>
+    { state with cursor := state.cursor + operator.value.tokenCount }
 
 /-- Construct the source cover for one binary-expression node. -/
 def binaryNode (left : Expr) (operator : Located BinaryOp)
@@ -240,9 +214,10 @@ are supplied by the later statement/expression knot with strictly less fuel.
 def expressionLayer (nested : Parser Expr)
     (block : Parser Block) : Parser Expr :=
   let unary := ExpressionInternals.expressionUnary nested block
-  let multiply := ExpressionInternals.leftAssociative unary 8
-  let add := ExpressionInternals.leftAssociative multiply 7
-  let bitAnd := ExpressionInternals.leftAssociative add 6
+  let multiply := ExpressionInternals.leftAssociative unary 9
+  let add := ExpressionInternals.leftAssociative multiply 8
+  let shift := ExpressionInternals.leftAssociative add 7
+  let bitAnd := ExpressionInternals.leftAssociative shift 6
   let bitXor := ExpressionInternals.leftAssociative bitAnd 5
   let bitOr := ExpressionInternals.leftAssociative bitXor 4
   let relational := ExpressionInternals.nonAssociative bitOr 3

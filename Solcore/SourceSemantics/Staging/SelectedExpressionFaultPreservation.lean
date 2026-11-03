@@ -227,7 +227,7 @@ theorem expression_fault_step (selectedBodies : SelectedPreservation.SelectedBod
               obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
-              | wordArithmetic | integerArithmetic | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
+              | wordArithmetic | integerArithmetic | wordShift | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
               | trait staticDispatch profile requirementsProve =>
                 have same := binary_dispatch_same staticDispatch dispatch
                 rcases same with ⟨rfl, rfl⟩

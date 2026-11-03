@@ -22,7 +22,7 @@ abbrev LoweredExpr := SourceCoreBasic.LoweredExpr
 abbrev ExpressionLowerer := Nat → TypedSource → Scope → ExpressionId → Except Error LoweredExpr
 
 def operator? : Syntax.ValueAssignOp → Option Core.LocalAssignment.Operator
-  | .equal => none
+  | .equal | .shiftLeft | .shiftRight => none
   | .add => some .add
   | .subtract => some .subtract
   | .multiply => some .multiply
@@ -31,6 +31,24 @@ def operator? : Syntax.ValueAssignOp → Option Core.LocalAssignment.Operator
   | .bitAnd => some .bitAnd
   | .bitOr => some .bitOr
   | .bitXor => some .bitXor
+
+/-- The Core shift of a compound shift assignment, applied to the stored Word
+and the amount. -/
+def shift? : Syntax.ValueAssignOp → Option Core.BinaryOp
+  | .shiftLeft => some .wordShl
+  | .shiftRight => some .wordShr
+  | _ => none
+
+/-- `Core.LocalAssignment.compound` with a Core shift in place of its
+arithmetic operator: the stored Word is read before the amount is evaluated,
+and an uninitialized target fails with the assignment's reason. -/
+def shiftCompound (outputType : Core.Ty) (operation : Core.BinaryOp)
+    (reference rhs next : Core.Expr) (invalidReason : Core.Word) : Core.Expr :=
+  .letE reference (.letE (.loadCell (.var 0))
+    (Core.LanguageResult.bind outputType (Core.LocalAssignment.weakenTwo rhs)
+      (.caseE (.var 1) (Core.LanguageResult.failure outputType (.word invalidReason))
+        (.letE (.storeCell (.var 3) (.inRight .unit (.binary operation (.var 0) (.var 1))))
+          (Core.LocalAssignment.weakenFive next)))))
 
 /-- Scalar target validation checks the owner, binding, declared payload type,
 empty requirements and absence of projections. Equal function assignments
@@ -63,12 +81,17 @@ def assignValue (lowerExpression : ExpressionLowerer) (fuel : Nat)
     (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (outputType : Core.Ty)
     (next : Core.Expr) (invalidReason : Core.Word) : Except Error Core.Expr := do
   let (index, payloadType) ← target source scope assignment
-  match operator? operator with
-  | none =>
+  match operator? operator, shift? operator with
+  | none, some operation =>
+      SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
+      let rhs ← lowerExpression fuel source scope rhs
+      SourceCoreBasic.ensureType (.binder assignment.target.root) .word rhs.type
+      pure (shiftCompound outputType operation (.var index) rhs.expression next invalidReason)
+  | none, none =>
       let rhs ← lowerExpression fuel source scope rhs
       SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
       pure (Core.LocalSequence.assign outputType (.var index) rhs.expression next)
-  | some operator =>
+  | some operator, _ =>
       if payloadType = .integer then
         let rhs ← lowerExpression fuel source scope rhs
         SourceCoreBasic.ensureType (.binder assignment.target.root) .integer rhs.type

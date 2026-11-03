@@ -7,24 +7,15 @@ namespace Solcore.Syntax.Parser
 
 namespace StatementSimpleInternals
 
-def valueAssignOp? : TokenKind → Option ValueAssignOp
-  | .symbol .equal => some .equal
-  | .symbol .plusEqual => some .add
-  | .symbol .minusEqual => some .subtract
-  | .symbol .starEqual => some .multiply
-  | .symbol .slashEqual => some .divide
-  | .symbol .percentEqual => some .modulo
-  | .symbol .ampEqual => some .bitAnd
-  | .symbol .caretEqual => some .bitXor
-  | .symbol .pipeEqual => some .bitOr
-  | _ => none
+/-- The value-assignment operator at the cursor, of one token or of two
+adjacent tokens (`<<=`, `>>=`). -/
+def valueAssignAt? (state : State) : Option (Located ValueAssignOp) :=
+  ValueAssignOp.at? state.tokens state.window.endIndex state.cursor
 
 def valueAssignOperator : Parser (Located ValueAssignOp) := fun state =>
-  match state.peek? with
-  | some token => match valueAssignOp? token.value with
-    | some operator => .ok { span := token.span, value := operator }
-        { state with cursor := state.cursor + 1 }
-    | none => rejectAt state { head := .expression, tail := [] } .statement
+  match valueAssignAt? state with
+  | some operator => .ok operator
+      { state with cursor := state.cursor + operator.value.tokenCount }
   | none => rejectAt state { head := .expression, tail := [] } .statement
 
 end StatementSimpleInternals
@@ -41,7 +32,7 @@ def assignmentTail
     (do
       let operator ← symbol .tildeEqual .statement
       pure (AssignmentTail.bitNot operator.span)) state
-  else match state.peekKind?.bind StatementSimpleInternals.valueAssignOp? with
+  else match StatementSimpleInternals.valueAssignAt? state with
     | some _ =>
         (do
           let operator ← StatementSimpleInternals.valueAssignOperator
@@ -52,7 +43,7 @@ def assignmentTail
 def optionalAssignmentTail
     (expression : Parser Expr) : Parser (Option AssignmentTail) := fun state =>
   if isSymbol state .tildeEqual ||
-      (state.peekKind?.bind StatementSimpleInternals.valueAssignOp?).isSome then
+      (StatementSimpleInternals.valueAssignAt? state).isSome then
     (do
       let value ← assignmentTail expression
       pure (some value)) state
