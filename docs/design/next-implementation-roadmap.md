@@ -11402,6 +11402,220 @@ this unit's references. The pragma can come with whichever unit first makes
 Lean's parser read upstream's Rust-dialect sources, and with it the emitters
 can print the declaration themselves.
 
+**Checked arithmetic, `unchecked` blocks and shifts: probe and definitions.**
+Rows 1 to 3 change what an integer operator means, but no generated case uses
+std's integer types: every pure profile computes on `word` and returns
+`uint256(w)`. This unit builds the generator side of those rows, two pure
+profiles whose original Core references model upstream's intended semantics,
+so that the compiled paths are compared with them before the Lean source
+language follows. The source semantics and lowering wait for lane D's closure
+change, which shares `Solcore/SourceSemantics` and `Solcore/Frontend/SourceCore*`.
+
+Before any profile code, a probe compiled hand-written sources through checked
+Hull export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner
+(on the O0 export), against a Python model of the intended semantics; the
+records are in `.upstream/upstream-unit2-arithmetic/probe/`:
+- One contract per type of `uint8` … `uint256` and `int8` … `int256`, whose
+  methods take Words, convert them as the generators do and return
+  `uint256(Typedef.rep(r))`: checked and unchecked `+ - * / %` and unary `-`; a
+  checked helper and a lambda called inside a block; compound assignments
+  inside and outside a block; an unchecked block followed by a checked
+  operation on its result; typed literals at the extremes; `<<` and `>>` by
+  `uint8`, `word` and `uint256` amounts inside and outside blocks and a
+  compound shift; a `T` argument returned, two added, and a `T` result built
+  with `Typedef.abs` of any Word; and, for `uint256`, an unannotated literal
+  that an input-dependent branch sets to `2^256 − 1` before `+ 1`. 74,562
+  calls per path, from 4,359 to 8,067 a type.
+- A second contract per type for the forms the generators write: negative
+  literals inside expressions, defaulted literals inside and outside blocks
+  (with only `std.unchecked.signed` imported for a signed type), an unchecked
+  helper and an unchecked lambda body called from checked code, compound
+  assignments of a variable declared before its block, two blocks in one
+  function, the Word fold below, shifts of Words and by `uint16` and literal
+  amounts. 19,530 calls per path.
+- The generators below, in drafts, at twelve inputs: 36 checked arithmetic
+  plans and 28 shift plans, 768 outcomes per path, against the plans' own
+  interpreter.
+
+All 94,860 outcomes matched on every path: `Panic(0x11)` and `Panic(0x12)` as
+36 bytes of revert data, std's ABI decoder's `DirtyHigherBitsForInteger()` as
+the four bytes `0x6cc54a63`, wrapping inside blocks with `MIN / -1` giving
+`MIN`, the lexical scope of a block, defaulting to a checked `uint256`, a `T`
+result masked or sign-extended by std's encoder, and shifts that never revert,
+`>>` arithmetic for a signed type, by amounts past the width. No path departed,
+so nothing was recorded upstream. Core, `Solcore/SourceSemantics`, the shared
+contract runtime, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, so no stop condition applies; the
+references use Core's existing integers. The pure adapter adds the checked
+arithmetic schema to the revert matching of the memory and revert data
+profiles, and admits its `run(T)` signatures. The existing profiles, corpora,
+emitters and emitter proofs stay unchanged, and the new emitter has no proof
+yet. The definitions were fixed before execution:
+
+- Plans (`core-integers-v1`), shared by both profiles, each admitting its own:
+  - A value type: one of the twelve integer types, or for `runtime-shifts`
+    also `word`; one to three inputs `sc_a<i>`, the input Word plus an offset
+    converted to the type, the first offset 0 and the others among 1, 3,
+    `2^(N−1) − 1`, `2^(N−1)` and `2^N − 1` for an `N`-bit type, so that the
+    boundary inputs reach each type's extremes; a narrow unsigned type
+    converts with `(w & (2^N − 1))`, a narrow signed one with std.opcodes'
+    `signextend(N/8 − 1, w)`, imported as `sc_signextend`, and a 256-bit type
+    or a Word takes `w` as it is; then the steps in groups, each step making
+    a new variable `sc_v<n>` of the value type, or a defaulted result
+    `sc_e<m>`.
+  - Groups alternate between the checked context and `unchecked { … }`
+    blocks, at most three blocks, none nested; a block's variables are
+    declared before it with `0`, and assigned inside it.
+  - `run` folds every result in creation order into
+    `sc_acc = ((sc_acc * 1099511628211) ^ W)`, from `0`, `W` being
+    `Typedef.rep(v)` or a Word itself, and returns `uint256(sc_acc)`.
+- `runtime-checked-arithmetic`: contract `SynthesizedCheckedArithmetic`, whose
+  source imports std, `std.unsigned`, `std.signed` for a signed type, one of
+  `std.unchecked.unsigned` and `std.unchecked.signed` when an unchecked
+  context exists, and std.dispatch.
+  - One to ten steps (three to ten drawn) over one integer type `T`: `(L op R)`
+    with `op` among `+ - * / %`; `(-L)` of an input or a variable; a compound
+    assignment, `sc_v<n> = L;` then `sc_v<n> op= R;`; a call `sc_h<k>(L, R)` of
+    one of at most two helpers `function sc_h<k>(sc_p: T, sc_q: T) returns (T)`,
+    each `return (sc_p op sc_q);` in a checked body or in a block, each
+    called; and an application
+    `sc_apply(lam (sc_l: T) -> T { return (sc_l op R); }, L)` of a lambda
+    capturing `R`, its body checked, or in its own block when the lambda is
+    outside one. An operand is an input, an earlier variable or a typed
+    literal among `MIN`, `MIN + 1` and `-1` for a signed type, then 0, 1, 2,
+    3, 7, `2^(N/2)`, `MAX − 1` and `MAX`, a negative one written in
+    parentheses.
+  - At most two defaulted results: `let sc_d<m> = L;`, `if (C) { sc_d<m> = L'; }`
+    with `C` a test of the input Word, `(sc_x < c)`, `(sc_x > c)`,
+    `(sc_x == c)` with `c` among 0, 1, 2, 7, 255, 256 and `2^255`, or
+    `((sc_x & m) == k)` with `m` among 1, 3 and 7, before any block, then
+    `sc_e<m>` is `(sc_d<m> op L'')`; the literals are `uint256`'s and no
+    annotation types them, so upstream's defaulting makes them `uint256` and
+    the operation checked unless it is in a block.
+  - The parameter is `run(uint256)`, or for a quarter of the plans `run(T)`,
+    whose `sc_a0` is the argument and whose selector is `keccak256` of that
+    signature; the result is `uint256`, or for a quarter of the plans with a
+    narrow type `T`, returning `Typedef.abs(sc_acc)` for std's encoder to mask
+    or sign-extend.
+  - An operation's context is its own: a block's operations wrap, and a call
+    or an application inside a block stays checked unless the helper's or the
+    lambda's own body is in a block.
+- `runtime-shifts`: contract `SynthesizedShifts`, `run(uint256)` returning
+  `uint256`, with the imports above (and `std.unchecked.unsigned` or
+  `std.unchecked.signed` when it has a block).
+  - One to three amounts `sc_k<j>`, each a Word or one of the six unsigned
+    types, the input plus an offset among 0, 1, 3, 7, 8, 31, 64, 127, 128,
+    254, 255, 256 and 300, converted to its type.
+  - One to ten steps (two to eight drawn): `(V << K)` or `(V >> K)`, or
+    `sc_v<n> = V;` then `sc_v<n> <<= K;` or `>>= K;`, with `V` an input, an
+    earlier variable or a literal of the value type, and `K` an amount or a
+    literal amount among 0, 1, 3, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128,
+    255, 256, 257 and 300; a quarter of the plans have blocks, and half of
+    their steps are in them.
+- Draws come from the case seed by a SplitMix64 stream with a domain per
+  profile (`0x636865636b000001` and `0x7368696674000001`):
+  - checked arithmetic: the type evenly, `run(T)` 1 in 4, a `T` result 1 in 4
+    for a narrow type, the inputs, zero to two helpers weighted 3, 2 and 1,
+    blocks for two thirds of the plans and then a third of the steps; each
+    step a defaulted result 1 in 10 while fewer than two exist, otherwise by
+    weight `(L op R)` 6, `(-L)` 2, a compound assignment 2, a call 3 when a
+    helper exists and an application 2; a left operand is an input 4, a
+    variable 4 or a literal 2, a right one a literal 4 (2 for a divisor, so
+    that inputs reach zero); and a third of a signed type's divisions are
+    `MIN / -1` where an input reaches `MIN`: the input offset by `2^(N−1)`, or
+    the `MIN` literal, by the `-1` literal;
+  - shifts: the value type evenly among thirteen, the inputs, one to three
+    amounts of a type drawn evenly among seven, then each step's direction
+    evenly, compound 1 in 4, its value as a left operand above, and its amount
+    an amount input 7 in 10 or a literal one.
+- Core reference, with no source text and no data definitions:
+  `fun input => …` of type `sum word (word × word × word)`, with every helper
+  and lambda inlined where it runs:
+  - each operand's representation Word is read as an integer, two's
+    complement for a signed type, and the exact result is computed with
+    Core's integers; a zero divisor raises `Panic(0x12)` in either context; a
+    quotient rounds toward zero, from the floor quotient of the magnitudes,
+    negated when exactly one operand is negative, and a remainder takes the
+    dividend's sign; a checked result outside the type raises `Panic(0x11)`,
+    and an unchecked one wraps to the type's width;
+  - a shift reads its amount Word: `<<` gives 0 for an amount of at least the
+    width and otherwise wraps `v · 2^s`, `>>` gives the floor quotient by
+    `2^s`, and for an amount of at least 256, 0, or `-1` for a negative
+    signed value;
+  - a panic is the right injection of the revert data, its length 36 and its
+    bytes in two Words: the selector `0x4e487b71` at the top of the first
+    Word and the code at the top of the second; with `run(T)`, an argument
+    std's decoder does not admit, one whose low bits converted to `T` differ
+    from it, is first the right injection of `0x6cc54a63`'s four bytes;
+  - the input conversions, the defaulted literals' choice and the fold are the
+    source's own Word operations, and the left injection is the fold, masked
+    or sign-extended for a `T` result;
+  - a case observes a returned Word, or the revert data compared exactly with
+    the EVM's and the imported Hull's; a shift reference never reverts.
+
+  Admission checks every step against its scope: operands in range, a
+  negation of an input or a variable, no lambda with its own block inside a
+  block, the counts, every helper called, and for shifts no helper, defaulted
+  result, `run(T)` or `T` result. A direct interpreter of the plans over Lean
+  integers, independent of the reference, gives the shapes below.
+- Bounds: the node budget, default 1,024, minimum 256 and at most 2,048,
+  bounds the applied reference; steps are dropped from the end while it
+  exceeds the budget and more than one step remains. A case's reference is at
+  most 4,096 nodes. Of the first 1,000 seeds at the default budget, the
+  checked arithmetic references had a median of 388 and at most 862 nodes and
+  the shift references 204 and 364, and none dropped a step; at 256 nodes, 397
+  and 119 of 500 dropped steps and none stayed over it.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stages `checked-arithmetic-profile` and
+  `shift-profile`: a plan still over the budget or not admitted; then, at the
+  eight boundary inputs, fuel exhaustion (an inconclusive resource exclusion),
+  a result other than a Word or revert data, or the same outcome for all
+  eight, as for 279 and 197 of the first 1,000 seeds.
+- Identity filter: a plan of one step that returns `sc_a0` unchanged at a
+  256-bit type returns its input, so random campaigns apply
+  `exclude-boundary-identity-v1`; none of the first 1,000 seeds of either
+  profile is an identity.
+- Reductions: remove a step, later references to its variable reading
+  `sc_a0`; move a step out of its block; lower an operation to `+`, a
+  compound assignment, a call or an application to `(L op R)`, an unchecked
+  lambda body to a checked one, an operand to `sc_a0` and a literal to 0, a
+  compound shift to an inline one and an amount to the literal 0; remove an
+  input or an amount, their references reading `sc_a0` or the literal 0;
+  lower a helper's body to a checked one and its operation to `+`, `run(T)`
+  to `run(uint256)` and a `T` result to `uint256`; then the inputs 0, 1 and half the input. Every
+  candidate is admitted and sealed by the full checker, and strictly smaller
+  in plan size, then input. A shrink response stops before its cases would
+  exceed 1.5 MB.
+- Specified shapes, from the plan and from the runs its interpreter makes at
+  the eight boundary inputs, never measured on a compiled path:
+  - checked arithmetic, 111 values: `types` (12), `operators` (`add`, `sub`,
+    `mul`, `div`, `mod`, `neg`), `forms` (`inline`, `compound`, `call`,
+    `apply`, `default`), `contexts` (`checked`, `unchecked`), `scopes`
+    (`block`, `call-in-block`, `apply-in-block`, `unchecked-helper`,
+    `unchecked-lambda`), `operands` (`input`, `offset`, `variable`,
+    `literal`), `literals` (`min`, `min1`, `minus1`, `zero`, `one`, `small`,
+    `half`, `max1`, `max`), `parameters` (`word`, `abi`), `returns` (`word`,
+    `raw`), the `outcomes` reached (`returned`, `panic-0x11`, `panic-0x12`,
+    `dirty`), the deciding `panics` (`add`, `sub`, `mul`, `neg`,
+    `div-overflow`, `div-zero`, `mod-zero`, `unchecked-div-zero`,
+    `unchecked-mod-zero`), the operations that `wraps` (`add`, `sub`, `mul`,
+    `div`, `neg`) and the `typeOutcomes`, each type's `0x11`, `0x12`, `wrap`
+    and, for a narrow type, `dirty` (46);
+  - shifts, 53 values: `values` (13), `amounts` (`word`, the six unsigned
+    types, `literal`), `operators` (`shl`, `shr`, `sar` for a signed type's
+    `>>`), `forms` (`inline`, `compound`), `contexts`, `operands`, the amount
+    `ranges` reached relative to the width `N` (`zero`, `inside`, `last` at
+    `N − 1`, `width`, `beyond` up to 255, `huge` from 256), the `results` of
+    amounts of at least the width (`zero`, `minus-one`) and the `typeRanges`,
+    each value type reaching such an amount (13).
+- Fixed corpora: from seed 1 upwards at the default budget, every accepted
+  plan that covers a missing value, until nothing is missing, each at the
+  eight boundary inputs: checked arithmetic requires every value but the
+  per-type outcomes, which needed 37 seeds and are recorded instead, and took
+  17 seeds between 2 and 94 (136 cases); shifts require every value and took
+  16 seeds between 1 and 45 (128 cases).
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
