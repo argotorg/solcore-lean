@@ -101,9 +101,11 @@ private def testSources (program : CheckedProgram) : IO Unit := do
   assertTrue (store[0]? == some (present (deep (-huge) huge)))
     "deep integer assignment mutated the input value instead of the local reference"
   discard <| success (← firstEntry (← prepared program ["named"])) [.integer huge] (.integer huge)
+  /- Each call of `f` starts again from the captured `value`, so the second
+  call returns `value + 3`. -/
   let shared ← firstEntry (← prepared program ["shared"])
   discard <| success shared [.integer (-huge)]
-    (.integer (-huge + 5))
+    (.integer (-huge + 3))
   let recursive ← firstEntry (← prepared program ["recurse"])
   discard <| success recursive [.integer 3, .integer huge] (.integer huge)
   let paused ← execute recursive [.integer 3, .integer huge] 15

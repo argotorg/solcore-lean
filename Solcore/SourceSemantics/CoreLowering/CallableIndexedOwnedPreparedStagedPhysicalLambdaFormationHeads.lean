@@ -41,6 +41,8 @@ abbrev Certificate : GenericExpressionMeaning.Certificate :=
     caller context invocation.evidence scope id lowered)
 
 include globals slots prefixZero in
+/-- The literal formation copies the captured cells; the formed closure over the
+copies is represented in the formed state. -/
 theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr}
     (receipt : OrdinaryFormation (registry := bodyRegistry) (faults := semanticFaults)
@@ -54,10 +56,15 @@ theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     (allSlots : CallableIndexedOwnedPhysicalGlobals.Slots compiled 1 scope canonical)
     (initial : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
       ⟨scope, mapping, world, before, store, canonical⟩) :
-    ∃ payload,
-      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word payload) store ∧
-      ValueRep compiled.compatible.checked receiving functions mapping world
-        receipt.site.code.sourceNode.type (.closure (receipt.toFormation.function environment)) payload lowered.type := by
+    ∃ captured after payload finalStore finalMap finalWorld,
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment before captured after ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word payload) finalStore ∧
+      ValueRep compiled.compatible.checked receiving functions finalMap finalWorld
+        receipt.site.code.sourceNode.type (.closure (receipt.toFormation.function captured)) payload lowered.type ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions finalMap finalWorld after
+        finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore := by
   let head := receipt.toFormation
   let entry := CallableIndexedOwnedLambdaViewHeads.nested_entry initial.val owner prefixZero
     initial.property.observed initial.property.carried initial.property.bundle globals
@@ -75,17 +82,19 @@ theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
   have capturedSlots := CallableIndexedOwnedPhysicalLambdaCaptures.capture_slots_for allSlots globals entry environments agrees nativeTyped
   let code : Code compiled.indexed (head.function environment) scope captured.administrative := head.code environment
   let support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry semanticFaults := head.support environment
-  obtain ⟨_sourceTrace, native, _determined, member⟩ :=
+  obtain ⟨formed, _sourceTrace, native, _determined, member⟩ :=
     @CallableIndexedOwnedPhysicalLambdaFormation.formation_member compiled headers keys
       bodyRegistry semanticFaults mapping world (head.function environment) scope actual canonical before store
       captured code support owner initial.val initial.property profile rfl observed (receipt.at environment globals)
-      capturedSlots heaps.runtime_hasTypes receipt.ordinary receipt.coercions
+      capturedSlots _ _ heaps receipt.site.snapshots receipt.ordinary receipt.coercions
   have payload := CallableIndexedOwnedPhysicalCellOrigins.payload_static_member (registry := receiving) profile member
   let actualHistory : History code :=
     @CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at compiled headers keys bodyRegistry
       semanticFaults (head.function environment) scope mapping world before store actual canonical
       captured code support owner initial.val initial.property
-  refine ⟨value code captured.embedding actualHistory.native actual, ?_, ?_⟩
+  refine ⟨formed.captured, formed.finalHeap, value code formed.embedding actualHistory.native formed.closureActual,
+    formed.finalStore, formed.finalMap, formed.finalWorld, formed.copy, ?_, ?_, formed.heaps, formed.maps, formed.worlds,
+    formed.frame⟩
   · simpa only [code, Formation.code, recaptureCode, head, receipt.emitted, captured, CallableIndexedOwnedPhysicalLambdaCaptures.captures_for, actualHistory] using native
   have sourceType : receipt.site.code.sourceNode.type = FunctionValues.sourceType (head.function environment) := receipt.sourceType
   have nativeType := CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type

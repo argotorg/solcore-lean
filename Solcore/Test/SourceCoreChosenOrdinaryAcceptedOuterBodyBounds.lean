@@ -116,8 +116,10 @@ theorem parent_within_whole_budget (budget : Nat) {size : Nat} {result : Value}
     parent_at_whole_completion fixture atHeader receipt initializer allocation completed
   exact ⟨child, parentResult, parentStore, Nat.le_trans (Nat.le_of_lt smaller) within, parent⟩
 
-/-- Finite Source inversion retains the original initializer, actual Source
-allocation and parent outcome, including faults after the successful let. -/
+/-- Finite Source inversion retains the original initializer, which copies the
+captured cells and forms the closure over the copies, the actual Source
+allocation at the copied heap and the parent outcome, including faults after
+the successful let. -/
 theorem source_parent_at_body
     (shape : SourceCoreChosenOrdinaryAcceptedTyping.Shape fixture)
     (typing : SourceCoreChosenOrdinaryAcceptedOuterTyping.Metadata fixture)
@@ -128,13 +130,14 @@ theorem source_parent_at_body
       (source fixture.packet.named) environment before
       [statementId fixture.packet 0, statementId fixture.packet 4] finalContext control after) :
     finalContext = SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture ∧
-    ∃ initializerSize parentSize location middle outcome,
+    ∃ initializerSize parentSize captured copied location middle outcome,
+      Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied ∧
       SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
         initializerSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
         (expressionId fixture.packet 1)
-        (.closure (SourceCoreChosenOrdinaryAcceptedInitializerAdmission.initializer fixture [] environment)) before ∧
-      Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-        (some (.closure (SourceCoreChosenOrdinaryAcceptedInitializerAdmission.initializer fixture [] environment))) location middle ∧
+        (.closure (SourceCoreChosenOrdinaryAcceptedInitializerAdmission.initializer fixture [] captured)) copied ∧
+      Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+        (some (.closure (SourceCoreChosenOrdinaryAcceptedInitializerAdmission.initializer fixture [] captured))) location middle ∧
       RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked fixture.packet.compiled.sourceProgram)
         parentSize (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) []
         (source fixture.packet.named) ((fixture.graph.binder.id, location) :: environment) middle
@@ -148,16 +151,15 @@ theorem source_parent_at_body
   rcases original with failed | completed
   · obtain ⟨child, _reason, _context, _control, fault, _smaller⟩ := failed
     exact False.elim (SourceCoreChosenOrdinaryAcceptedInitializerAdmission.no_fault fixture shape [] environment fault)
-  · obtain ⟨child, tailSize, sourceValue, location, middle, allocatedHeap, evaluated, allocated, tail,
+  · obtain ⟨child, tailSize, sourceValue, location, copied, allocatedHeap, evaluated, allocated, tail,
       childSmall, tailSmall⟩ := completed
-    obtain ⟨valueEq, heapEq⟩ := SourceCoreChosenOrdinaryAcceptedInitializerAdmission.values_at
+    obtain ⟨captured, valueEq, copies⟩ := SourceCoreChosenOrdinaryAcceptedInitializerAdmission.values_at
       fixture shape [] environment evaluated.sound
     subst sourceValue
-    subst middle
     obtain ⟨contextEq, parentSize, outcome, parent, controlEq, parentSmall⟩ :=
       RecursiveNamedLexicalTreeSourceBounds.returning fixture.runtime.source_runtime.graph.nodeOccurrencesUnique
         fixture.graph.outerReturnFound fixture.graph.outerReturnForm tail
-    exact ⟨contextEq, child, parentSize, location, allocatedHeap, outcome, evaluated, allocated,
-      parent, controlEq, childSmall, Nat.lt_trans parentSmall tailSmall⟩
+    exact ⟨contextEq, child, parentSize, captured, copied, location, allocatedHeap, outcome, copies, evaluated,
+      allocated, parent, controlEq, childSmall, Nat.lt_trans parentSmall tailSmall⟩
 
 end Tests.SourceCoreChosenOrdinaryAcceptedOuterBodyBounds

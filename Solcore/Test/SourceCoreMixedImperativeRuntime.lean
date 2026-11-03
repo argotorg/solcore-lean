@@ -101,7 +101,7 @@ def run : IO Unit := do
             "third mixed imperative retained Source value changed"
           let heaps := [firstStart.session.heapSize, firstReturned.session.heapSize,
             secondReturned.session.heapSize, thirdReturned.session.heapSize]
-          require (heaps == [2,32,53,83]) "mixed imperative Source-certified repeated native heaps changed"
+          require (heaps == [2,59,95,152]) "mixed imperative Source-certified repeated native heaps changed"
           IO.println "MIXED_IMPERATIVE_SOURCE_PUBLIC: originals1/cache1/typing1/profile1; proof before every resume"
           IO.println s!"MIXED_IMPERATIVE_SOURCE_HEAPS: {heaps}"
           IO.println "MIXED_IMPERATIVE_SOURCE_PUBLIC_PASS"

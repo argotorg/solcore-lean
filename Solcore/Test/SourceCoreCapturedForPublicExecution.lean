@@ -3,9 +3,11 @@ import Solcore.Test.SourceCoreCapturedForMakeStep
 import Solcore.Test.SourceCoreCapturedForSeed
 import Solcore.Test.SourceCoreCapturedForClosureShape
 
-/-! The first captured cell is written and read again after a separate closure
-and a fresh factory allocation. Every transition uses the actual returned
-public session and the same Source heap retained by the previous call. -/
+/-! The first closure is called again after a separate closure and a fresh
+factory allocation, and its second call starts again from its captured seed:
+the write of its first call does not carry over. Every transition uses the
+actual returned public session and the same Source heap retained by the
+previous call. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedFor
@@ -41,10 +43,11 @@ def SequenceMeaning {fixture : CompiledFixture} {observed : ObservedFactory fixt
         SourceInvocation support scope third.heap secondEntry.source false (Core.Word.ofNatModulo 21) false
           (.value (.word (Core.Word.ofNatModulo 20))) other.heap ∧
         SourceInvocation support scope other.heap firstEntry.source true (Core.Word.ofNatModulo 12) false
-          (.value (.word (Core.Word.ofNatModulo 11))) final.heap
+          (.value (.word (Core.Word.ofNatModulo 10))) final.heap
 
-/-- Accepted checker/compiler observations construct all static support. The
-loop writes and reads the first capture again after independent activity. -/
+/-- Accepted checker/compiler observations construct all static support. After
+independent activity the first closure reads its captured seed again: the
+loop's write in its first call does not carry over. -/
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (stages : ObservedStages fixture observed)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
@@ -90,6 +93,6 @@ def run : IO Unit := do
   let stages ← observeStages fixture observed
   let sequence ← observeSequence fixture observed
   have _meaning := closed_sequence_meaning fixture observed stages sequence
-  IO.println "Actual captured for loops: make10/make20, first(true,11,false) returns10, make30, second(false,21,false) returns20, first(true,12,false) returns11; six Source calls and returned histories proved"
+  IO.println "Actual captured for loops: make10/make20, first(true,11,false) returns10, make30, second(false,21,false) returns20, first(true,12,false) returns10; six Source calls and returned histories proved"
 
 end Tests.SourceCoreCapturedFor

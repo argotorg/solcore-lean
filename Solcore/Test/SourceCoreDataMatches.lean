@@ -299,23 +299,30 @@ def run : IO Unit := do
       assertTrue (resumed.observation == (← execute choose [nested])) "typed match checkpoint changed result/store"
     | none => throw (IO.userError "match checkpoint completed unexpectedly")
   | .error error => throw (IO.userError s!"match checkpoint rejected: {reprStr error}")
+  -- Closures capture by value. The scrutinee lambda copies `marker` and `value`
+  -- when it is created and again for its one call, which assigns 11 to its own
+  -- copy of `marker`; the arm reads the enclosing `marker`, still 10.
   let once ← entryFor program checked "once"
-  assertTrue ((← execute once [single, .word (w 10)]) == .succeeded (.word (w 15))
-    [present single, present (.word (w 11)), present single, present (.word (w 4))])
-    "scrutinee effect was duplicated or binding observed an old store"
+  assertTrue ((← execute once [single, .word (w 10)]) == .succeeded (.word (w 14))
+    [present single, present (.word (w 10)), present (.word (w 10)), present single,
+      present (.word (w 11)), present single, present single, present (.word (w 4))])
+    "scrutinee closure ran more than once or its call reached the enclosing marker"
   let scrutineeFailure ← entryFor program checked "scrutineeFailure"
   match ← execute scrutineeFailure [single] with
   | .failed reason store =>
     assertTrue (scrutineeFailure.failureDiagnostic? reason |>.isSome) "scrutinee failure lost exact diagnostic"
-    assertTrue (store == [present single, .inLeft (.namedData treeId) .unit])
+    -- `value`, the lambda's snapshot of it, its call's copy, then the absent local.
+    assertTrue (store == [present single, present single, present single, .inLeft (.namedData treeId) .unit])
       "failed scrutinee allocated hidden or arm cells"
   | other => throw (IO.userError s!"scrutinee failure changed: {reprStr other}")
   let functionBinder ← entryFor program checked "functionBinder"
   match ← execute functionBinder [.word (w 10)] with
   | .succeeded (.word value) store =>
-    assertTrue (value == w 15 && store[0]? == some (present (.word (w 15))))
-      "function pattern binder cloned or lost shared captured cell"
-    assertTrue (store.length == 6) "function pattern binder parameter/let allocation count changed"
+    -- Both calls start again from the lambda's snapshot of `marker = 10`.
+    assertTrue (value == w 13 && store[0]? == some (present (.word (w 10))))
+      "function pattern call reached the enclosing marker or did not restart from its snapshot"
+    -- The six parameter, hidden, binder and let cells, the lambda's snapshot and two call copies.
+    assertTrue (store.length == 9) "function pattern binder parameter/let/copy allocation count changed"
   | other => throw (IO.userError s!"function pattern binder changed: {reprStr other}")
   let modulo ← entryFor program checked "moduloPattern"
   assertTrue ((← execute modulo [.word Word.zero]) == .succeeded (.word (w 1))

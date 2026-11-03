@@ -52,10 +52,10 @@ theorem InitialForward.observed_collected
       entries.map Entry.handle = selection.handles ∧
       RecursiveNamedPublicOutputSelections.Selected selection
         ((selected.make_shape shape).value selected.packet.header.context
-          (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) selected.packet.header.function.evidence)
+          (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) selected.packet.header.function.evidence)
         payload selected.packet.header.output outputFuel entries ∧
       retained.state.heap = (selected.make_shape shape).principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) (inputHeap ⟨[]⟩ .bool (.bool flag)) := by
+        (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) (snapshotHeap ⟨[]⟩ .bool (.bool flag)) := by
   let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued selected.input.prepared selected.packet.selected
   have diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared :=
     ⟨selected.packet.selected.diagnostics, selected.packet.selected.found, rfl⟩
@@ -86,13 +86,13 @@ theorem InitialForward.observed_collected
     obtain ⟨reached,payload,entries,_native,selectedLeaves,handles,_related,history⟩ := collect actualSelection
     have selectedPublic : RecursiveNamedPublicOutputSelections.Selected selection
         ((selected.make_shape shape).value selected.packet.header.context
-          (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) selected.packet.header.function.evidence)
+          (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) selected.packet.header.function.evidence)
         payload selected.packet.header.output outputFuel entries := selected_original atReturned.1 selectedLeaves
     refine ⟨entries, ⟨{
       artifact := first.start.artifact, session := actual.session,
       mapping := mapping, world := world,
       heap := (selected.make_shape shape).principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) (inputHeap ⟨[]⟩ .bool (.bool flag)),
+        (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) (snapshotHeap ⟨[]⟩ .bool (.bool flag)),
       store := store, caller := reached, atSession := atReturned.2.2.2,
       atRecipe := first.start.started.recipe_eq, receiving := first.initial.receiving,
       issued := first.initial.issued, extension := .refl _, registry := registry, history := history

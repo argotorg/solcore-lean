@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedDiagnosticIssuer
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedPrefix
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotPrefix
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedDescriptor
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopePhysicalExtension
 import Solcore.SourceSemantics.CoreLowering.CellAwareNativeBodyCollectors
@@ -7,7 +7,9 @@ import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 
 /-! A genuine named declaration constructs its descriptor origin from the
 selected caller and extends the physical lexical authority at the actual
-marked allocation. No future expression or body behavior is an input. -/
+marked allocation. The declaration first copies its scope; the principal
+captures the copies and the continuation keeps the original cells. No future
+expression or body behavior is an input. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -15,7 +17,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedPrefix
 open Core Frontend SourceInference GeneralHeap ReadOnly CoreProof
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
-open TypedLexicalWhile (initializedRequest sequence)
+open TypedLexicalWhile (initializedRequest)
+open CellAwareGeneralizedSnapshotCode (snapshotInner snapshotSequence)
 open GeneralizedLocalDescriptorHeap GeneralizedLocalLocatedRows
 open CallableIndexedNamedGeneration (source context)
 
@@ -30,6 +33,18 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
   (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics code)
   (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
+
+include bridge in
+/-- The caller witness reaches every administrative extension through the
+owned pool and its returned wrapper. -/
+theorem transitions : ProtectedStateTransition.AdministrativeTransitions protocol := by
+  intro _ initial _ _ _ _ maps worlds frame metadata
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedFunctionState.protocol headers keys)
+    (CallableIndexedOwnedFunctionState.administrativeTransport headers keys) (bridge.pool initial)
+    maps worlds frame metadata
+  obtain ⟨returned, _, callerRelated⟩ := bridge.restore initial reached maps worlds frame metadata related
+  exact ⟨returned, callerRelated⟩
 
 include record in
 set_option maxHeartbeats 2000000 in
@@ -56,9 +71,14 @@ theorem complete {scope : SourceCoreLocalCell.Scope} {sourceContext nextContext 
       (whole.indexed.layouts.allocatorAt named.signature.key [] (fun error => .sourceAllocation (reprStr error)))
       (initializedRequest (source named) scope binder lowered.type))
     (same : annotation.original = allocation.expression)
+    {captured : Expr}
+    (copied : SourceCoreSourceCells.copyScope (some (CallableIndexedNamedGeneration.allocator whole.indexed named))
+      (source named) scope (fun index => index) (snapshotInner lowered.type lowered.expression annotation.expression) =
+        .ok captured)
     (producer : ProtectedStateTransition.CellAllocation.Producer
       (catalog := CompatibleEquality.storageCatalog whole.compatible.checked.catalog) protocol whole.indexed.layouts
       whole.indexed.ancestry.layout.frame (cellModel model (GeneralizedLocalInstanceValues.model whole.indexed)))
+    (bindings : ProtectedStateTransition.Bindings protocol)
     (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
     {canonical actual : Core.Environment} {embedding : Renaming} {before after : Dynamic.Heap} {store : Store}
@@ -74,37 +94,36 @@ theorem complete {scope : SourceCoreLocalCell.Scope} {sourceContext nextContext 
     (authority : CellAwareScopeAuthority.At (GeneralizedLocalInstanceValues.model whole.indexed)
       named.signature.key [] mapping world before store environment)
     (physical : CellAwareScopePhysical.Physical whole named sourceContext scope canonical mapping world before store environment)
-    (ready : producer.Ready initial physical.location physical.native)
+    (ready : ProtectedStateTransition.CellAllocation.ReadyAt producer physical.location physical.native)
+    {copies : Dynamic.Environment} {snapshotHeap : Dynamic.Heap}
     {function : Dynamic.GeneralizedClosure} {location : Dynamic.Location}
-    (captures : Dynamic.GeneralizedClosureCaptures sourceContext (source named) environment binder initializer function)
-    (functionTyped : Dynamic.GeneralizedClosureWellTyped sourceContext before function)
-    (allocated : Dynamic.Heap.AllocatesGeneralized before function location after)
+    (snapshot : Dynamic.EnvironmentCopies (source named) environment before copies snapshotHeap)
+    (captures : Dynamic.GeneralizedClosureCaptures sourceContext (source named) copies binder initializer function)
+    (functionTyped : Dynamic.GeneralizedClosureWellTyped sourceContext snapshotHeap function)
+    (allocated : Dynamic.Heap.AllocatesGeneralized snapshotHeap function location after)
     (output : Ty) (body : Expr) :
-    ∃ values marker,
+    ∃ values marker, ∃ (copiedStore : Store) (copiedMap : LocationMap) (copiedWorld : StoreTyping),
       let bundle := SourceCoreLocalPolymorphism.ProductBundle.value values
-      let nextStore := store ++ [SourceCoreCallableIndexedFrames.encode whole.indexed.ancestry.layout.frame physical.native,
-        SourceCoreHeapMarkers.markerValue allocation.entry.layout marker, .inRight .unit bundle]
-      let nextWorld := world ++ [whole.indexed.ancestry.layout.frame.type, allocation.entry.layout.type,
+      let nextStore := copiedStore ++ [SourceCoreCallableIndexedFrames.encode whole.indexed.ancestry.layout.frame
+        physical.native, SourceCoreHeapMarkers.markerValue allocation.entry.layout marker, .inRight .unit bundle]
+      let nextWorld := copiedWorld ++ [whole.indexed.ancestry.layout.frame.type, allocation.entry.layout.type,
         OptionalCell.cellType lowered.type]
-      let nextMap := mapping ++ [store.length + 2]
-      let nextRef := Value.cellRef (OptionalCell.cellType lowered.type) (store.length + 2)
-      ContinuationAgreement actual store
-        ((sequence output lowered.expression annotation.expression body).rename embedding)
-        (nextRef :: bundle :: actual) nextStore
-        (body.rename (Renaming.comp (Renaming.insertion 0) embedding).lift) ∧
+      let nextMap := copiedMap ++ [copiedStore.length + 2]
+      let nextRef := Value.cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)
+      ContinuationAgreement actual store ((snapshotSequence output captured body).rename embedding)
+        (nextRef :: actual) nextStore (body.rename embedding.lift) ∧
       (∀ {size value finalStore}, EvaluationSize size actual store
-          ((sequence output lowered.expression annotation.expression body).rename embedding) value finalStore →
-        ∃ tailSize, tailSize < size ∧ EvaluationSize tailSize (nextRef :: bundle :: actual) nextStore
-          (body.rename (Renaming.comp (Renaming.insertion 0) embedding).lift) value finalStore) ∧
+          ((snapshotSequence output captured body).rename embedding) value finalStore →
+        ∃ tailSize, tailSize < size ∧ EvaluationSize tailSize (nextRef :: actual) nextStore
+          (body.rename embedding.lift) value finalStore) ∧
       DataHeap.EnvRepresents (CompatibleEquality.storageCatalog whole.compatible.checked.catalog) nextMap nextWorld administrative
         ((binder.id, lowered.type) :: scope) ((binder.id, location) :: environment) (nextRef :: canonical) whole.indexed.layouts.definitions ∧
       GenericHeap.CellHeapRepresents (cellModel model (GeneralizedLocalInstanceValues.model whole.indexed))
         nextMap nextWorld after nextStore ∧
       Dynamic.EnvironmentAgrees after nextContext.locals ((binder.id, location) :: environment) ∧
-      EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) embedding).lift
-        (nextRef :: canonical) (nextRef :: bundle :: actual) ∧
-      RuntimeEnvironmentHasTypes nextWorld (nextRef :: bundle :: actual)
-        (OptionalCell.referenceType lowered.type :: lowered.type :: actualContext) whole.indexed.layouts.definitions ∧
+      EnvironmentsAgree embedding.lift (nextRef :: canonical) (nextRef :: actual) ∧
+      RuntimeEnvironmentHasTypes nextWorld (nextRef :: actual)
+        (OptionalCell.referenceType lowered.type :: actualContext) whole.indexed.layouts.definitions ∧
       AdministrativePreserved mapping store nextMap nextStore ∧
       CellAwareScopeAuthority.Effect (GeneralizedLocalInstanceValues.model whole.indexed)
         mapping world before store nextMap nextWorld after nextStore ∧
@@ -117,7 +136,7 @@ theorem complete {scope : SourceCoreLocalCell.Scope} {sourceContext nextContext 
         nextPhysical.location = physical.location ∧ nextPhysical.native = physical.native := by
   obtain ⟨_node, parameters, resultType, statements, _found, _form, _rawType, _type, _requirements, _coercions, rfl⟩ :=
     captures.canonical
-  let function := Dynamic.GeneralizedClosure.ofDirectLambda sourceContext (source named) environment binder
+  let function := Dynamic.GeneralizedClosure.ofDirectLambda sourceContext (source named) copies binder
     initializer parameters resultType statements
   obtain ⟨retainedOrigin, nativeEq, _ghostEq, _metadataEq, namedMetadata, ⟨attachment⟩,
       descriptorSource, binderEq, _initializerEq⟩ :=
@@ -126,7 +145,7 @@ theorem complete {scope : SourceCoreLocalCell.Scope} {sourceContext nextContext 
     { retainedOrigin with
       native := physical.native
       carried := by simpa only [nativeEq] using retainedOrigin.carried }
-  let captured : CallableIndexedLambdaValues.Captures whole.indexed mapping world scope function.captured actual :=
+  let current : CallableIndexedLambdaValues.Captures whole.indexed mapping world scope environment actual :=
     ⟨administrative, canonical, actualContext, embedding, environments,
       agrees, TypedLexicalWhile.environment_respects environments.runtime_hasTypes actualTyped agrees, actualTyped⟩
   have originalExtended : BinderExtends function.source.owner function.definitionContext function.binder nextContext := extended
@@ -140,45 +159,56 @@ theorem complete {scope : SourceCoreLocalCell.Scope} {sourceContext nextContext 
   have sameOriginal : originalAnnotation.original = originalAllocation.expression := by
     simpa only [originalAnnotation, originalAllocation] using same
   have originalDeclarations : CompatibleExpressionReads.ScopeDeclarations function.source scope function.definitionContext := physical.declarations
-  have originalLocals : Dynamic.EnvironmentAgrees before function.definitionContext.locals function.captured := locals
+  have originalLocals : Dynamic.EnvironmentAgrees before function.definitionContext.locals environment := locals
+  have originalSnapshot : Dynamic.EnvironmentCopies function.source environment before function.captured snapshotHeap :=
+    snapshot
   have originalRead := physical.read
-  have originalReady : producer.Ready initial physical.location origin.native := ready
-  obtain ⟨values, marker, agreement, smaller, nextEnvironments, nextHeaps, nextLocals,
-      nextAgrees, nextTyped, _nextReference, _nextRead, preserved, located, transition⟩ :=
-    CellAwareGeneralizedPrefix.complete receipt descriptorSource site.bindingCaller.symm site.bindingInitializer.symm
-      origin rfl namedMetadata attachment originalExtended originalOrdinary originalAllocation originalAnnotation sameOriginal
-      producer registered captured originalDeclarations physical.ownership
-      (CellAwareNamedDiagnosticIssuer.Named.initializer compiled issuer childFuel (childFuel + 1) scope initializer) nativeTyped heaps originalLocals physical.reference
-      (by rfl) originalRead allocated initial originalReady output body
+  have originalReady : ProtectedStateTransition.CellAllocation.ReadyAt producer physical.location origin.native := ready
+  obtain ⟨values, marker, copiedStore, copiedMap, copiedWorld, agreement, smaller, nextEnvironments, nextHeaps,
+      nextLocals, nextAgrees, nextTyped, _nextReference, _nextRead, preserved, maps, worlds, ⟨suffix, storeEq⟩,
+      located, transition⟩ :=
+    CellAwareGeneralizedSnapshotPrefix.complete receipt descriptorSource site.bindingCaller.symm
+      site.bindingInitializer.symm origin rfl namedMetadata attachment originalExtended originalOrdinary
+      originalAllocation originalAnnotation sameOriginal copied producer (transitions bridge) bindings registered
+      current originalDeclarations physical.ownership
+      (CellAwareNamedDiagnosticIssuer.Named.initializer compiled issuer childFuel (childFuel + 1) scope initializer)
+      nativeTyped heaps originalLocals physical.reference (by rfl) originalRead originalSnapshot allocated initial
+      originalReady output body
   obtain ⟨located, frames⟩ := located
-  have metadata := Dynamic.HeapMetadataExtend.of_generalized_allocation allocated
-  have effect := CellAwareScopeAuthority.Effect.append
-    (instances := GeneralizedLocalInstanceValues.model whole.indexed) store
-    [SourceCoreCallableIndexedFrames.encode whole.indexed.ancestry.layout.frame origin.native,
-      SourceCoreHeapMarkers.markerValue allocation.entry.layout marker,
-      .inRight .unit (SourceCoreLocalPolymorphism.ProductBundle.value values)] metadata
-    (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩)
-    (show WorldExtends world (world ++ [whole.indexed.ancestry.layout.frame.type,
-      allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩)
+  have metadata := snapshot.metadata_extends.trans (Dynamic.HeapMetadataExtend.of_generalized_allocation allocated)
+  have effect : CellAwareScopeAuthority.Effect (GeneralizedLocalInstanceValues.model whole.indexed)
+      mapping world before store (copiedMap ++ [copiedStore.length + 2])
+      (copiedWorld ++ [whole.indexed.ancestry.layout.frame.type, allocation.entry.layout.type,
+        OptionalCell.cellType lowered.type]) after
+      (copiedStore ++ [SourceCoreCallableIndexedFrames.encode whole.indexed.ancestry.layout.frame origin.native,
+        SourceCoreHeapMarkers.markerValue allocation.entry.layout marker,
+        .inRight .unit (SourceCoreLocalPolymorphism.ProductBundle.value values)]) := by
+    rw [storeEq]
+    exact CellAwareScopeAuthority.Effect.append
+      (instances := GeneralizedLocalInstanceValues.model whole.indexed) store suffix metadata maps worlds
   have bindingId : site.binding.binder.id = binder.id := by
     simpa only [EmptySourceSubstitution.binder] using congrArg TypedBinder.id site.bindingMetadata
   have lexical : GeneralizedLocalBundleContexts.ContextExtension [] [] := ⟨by simp, by simp⟩
   have nextAuthority := CellAwareScopeAuthority.At.cons
     (.generalized site.bindingCaller bindingId lexical ⟨located⟩) (authority.transport effect)
   obtain ⟨reached, related⟩ := transition
-  have nextAdmitted := CellAwareGeneralizedDeclaration.admitted_after_allocation bridge initial reached admitted
-    originalExtended functionTyped allocated preserved
+  have nextAdmitted : Admission bridge nextContext reached :=
+    ⟨(Dynamic.HeapWellTyped.iff_of_binderExtends originalExtended).mp
+        ((admitted.heap.copy snapshot).allocateGeneralized functionTyped allocated),
+      CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative
+        (bridge.pool initial) (bridge.pool reached) admitted.rows preserved⟩
   have fields : Dynamic.RuntimeContextFields function.definitionContext nextContext :=
     Dynamic.RuntimeContextFields.ofBinderExtends extended
   have requirements : nextContext.LocalSchemeRequirementsLookup function.binder.id function.binder.schemeRequirements := extended.local_scheme_requirements_self
   have head : CellAwareScopePhysical.Entry whole named nextContext physical.location binder.id location
-      (mapping ++ [store.length + 2]) _ after _ :=
+      (copiedMap ++ [copiedStore.length + 2]) _ after _ :=
     .generalized located site.bindingCaller bindingId lexical frames fields requirements
   let nextPhysical := (physical.transport effect preserved).cons extended
     (CellAwareNativeBodyCollectors.scope_generalized lowered.type physical.declarations declaration polymorphic extended)
     ((List.mem_filter.mp (declaration ▸ List.mem_singleton_self binder)).1)
-    (.cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) head
-  exact ⟨values, marker, agreement, smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
-    preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical, rfl, rfl⟩
+    (.cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) head
+  exact ⟨values, marker, copiedStore, copiedMap, copiedWorld, agreement, smaller, nextEnvironments, nextHeaps,
+    nextLocals, nextAgrees, nextTyped, preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical,
+    rfl, rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedPrefix

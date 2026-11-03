@@ -212,12 +212,12 @@ theorem source_continuation (budget : Nat) :
     captured code history inputs (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile)
     owner principal observed body.administrative sourceSeed caller
     (CallableIndexedOwnedLambdaInvocationBounds.BodyOrigin.nested code inputs body bodyEscaped) budget
-  intro entry added length spine reached child _strict
+  intro entry added length copied spine kept reached child _strict
   exact preserves_at owner prefixZero profile complete globals slots sameLayouts extension faithful observations functionTypes
     owners uninitialized missing escaped ranks profiles principal principalGlobals code body bodyUninitialized bodyMissing bodyEscaped child
     (CallableIndexedOwnedLambdaNestedEntries.source_entry captured code history inputs
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) owner principal observed body.administrative sourceSeed
-      caller (CallableIndexedOwnedLambdaInvocationBounds.BodyOrigin.nested code inputs body bodyEscaped) entry added length spine reached)
+      caller (CallableIndexedOwnedLambdaInvocationBounds.BodyOrigin.nested code inputs body bodyEscaped) entry added length copied spine kept reached)
 
 include prefixZero complete globals slots sameLayouts extension faithful observations functionTypes
   uninitialized missing escaped profiles principalGlobals body bodyUninitialized bodyMissing observed sourceSeed in

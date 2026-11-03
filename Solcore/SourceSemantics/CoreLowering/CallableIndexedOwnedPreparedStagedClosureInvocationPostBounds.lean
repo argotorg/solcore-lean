@@ -37,17 +37,18 @@ private theorem source_body {program : Program} {stages : Registry}
     (arity : function.parameters.length = arguments.length)
     (trace : Size.Applies program stages size invocation callContext before
       (.closure function) arguments outcome after) :
-    ∃ childSize child environment bound finalContext bodyOutcome,
+    ∃ childSize child entry copied environment bound finalContext bodyOutcome,
       stages.Closure function child ∧ Dynamic.ClosureFrame program function ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+      Dynamic.EnvironmentCopies function.source function.captured before entry copied ∧
+      Dynamic.BindersAllocate entry copied function.parameters arguments environment bound ∧
       Size.Statements program stages childSize child bodyContext environment bound function.body
         finalContext bodyOutcome after ∧ BodyResult function.resultType bodyOutcome outcome ∧ childSize < size := by
   cases trace with
   | closureArity mismatch => exact False.elim (mismatch arity)
-  | closure selected valid extended allocated body resultRule =>
+  | closure selected valid extended copy allocated body resultRule =>
       have same := binders_context_eq extended parameters
       subst same
-      exact ⟨_, _, _, _, _, _, selected, valid, allocated, body, resultRule,
+      exact ⟨_, _, _, _, _, _, _, _, selected, valid, copy, allocated, body, resultRule,
         Size.child_lt_stepSize (by simp)⟩
 
 section Invocation
@@ -160,11 +161,13 @@ theorem invocation_preserves (budget : Nat)
     rw [CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) code,
       List.length_map]
     exact represented.length.1
-  obtain ⟨childSize, child, environment, bound, finalContext, bodyOutcome,
-    selected, valid, allocated, bodyTrace, resultRule, smaller⟩ := source_body inputs.extended arity trace
-  obtain ⟨entry, _added, _length, _spine, parameterState, parameterRelated⟩ :=
+  obtain ⟨childSize, child, copies, copiedHeap, environment, bound, finalContext, bodyOutcome,
+    selected, valid, copy, allocated, bodyTrace, resultRule, smaller⟩ := source_body inputs.extended arity trace
+  obtain ⟨entry, _added, _copied, _length, _spine, _kept, parameterState, parameterRelated⟩ :=
     CallableIndexedOwnedLambdaInvocationBounds.parameters_with_state captured code history inputs
       functions represented owner caller heaps locals reference currentCarried allowed
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
@@ -272,7 +275,7 @@ theorem invocation_reflects (child : Scope) (selected : stages.Closure function 
   have callerPost := CallableIndexedOwnedPreparedStagedBodyRestorationAdmission.restore_post
     caller bodyState owner.position savedRows bodyPost supports restoredFrame
   subst finalStore
-  exact ⟨_, outcome, after, .closure selected valid inputs.extended entry.allocation bodyTrace resultRule,
+  exact ⟨_, outcome, after, .closure selected valid inputs.extended entry.copy entry.allocation bodyTrace resultRule,
     finalMap, finalWorld, result, restoredHeaps, maps, worlds, restoredFrame, metadata,
     CallableIndexedOwnedBodyRestoration.returned caller bodyState owner.position, callerRelated, callerPost⟩
 

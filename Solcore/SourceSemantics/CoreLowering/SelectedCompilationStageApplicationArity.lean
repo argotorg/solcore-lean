@@ -21,14 +21,14 @@ theorem closure_mismatch {function : Dynamic.Closure}
   cases trace with
   | value evaluated =>
     cases evaluated with
-    | closure _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
-    | closureUnit _ _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
+    | closure _ _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
+    | closureUnit _ _ _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
   | fault failed =>
     cases failed with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity rejected => exact ⟨_, _, .closureArity rejected, .completed⟩
-    | closureBody _ _ _ allocated _ => exact False.elim (mismatch allocated.length_eq)
-    | closureControlEscape _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
+    | closureBody _ _ _ _ allocated _ => exact False.elim (mismatch allocated.length_eq)
+    | closureControlEscape _ _ _ _ allocated _ _ => exact False.elim (mismatch allocated.length_eq)
 
 theorem global_mismatch {function : Dynamic.GlobalFunction} {body : Dynamic.BodyInstance}
     {closure : Dynamic.Closure}

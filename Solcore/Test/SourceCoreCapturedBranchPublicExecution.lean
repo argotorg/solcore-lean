@@ -3,9 +3,11 @@ import Solcore.Test.SourceCoreCapturedBranchMakeStep
 import Solcore.Test.SourceCoreCapturedBranchSeed
 import Solcore.Test.SourceCoreCapturedBranchClosureShape
 
-/-! The first captured cell is written and read again after a separate closure
-and a fresh factory allocation. Every transition uses the actual returned
-public session and the same Source heap retained by the previous call. -/
+/-! The first closure is called again after a separate closure and a fresh
+factory allocation, and its second call starts again from its captured seed:
+the write of its first call does not carry over. Every transition uses the
+actual returned public session and the same Source heap retained by the
+previous call. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedBranch
@@ -41,10 +43,11 @@ def SequenceMeaning {fixture : CompiledFixture} {observed : ObservedFactory fixt
         SourceInvocation support scope third.heap secondEntry.source false (Core.Word.ofNatModulo 21)
           (.value (.word (Core.Word.ofNatModulo 20))) other.heap ∧
         SourceInvocation support scope other.heap firstEntry.source false (Core.Word.ofNatModulo 12)
-          (.value (.word (Core.Word.ofNatModulo 11))) final.heap
+          (.value (.word (Core.Word.ofNatModulo 10))) final.heap
 
 /-- Accepted checker/compiler observations construct all static support. The
-last returned eleven is the value written through the first handle earlier. -/
+last returned ten is the first handle's captured seed, not its first call's
+write. -/
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (stages : ObservedStages fixture observed)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
@@ -83,6 +86,6 @@ def run : IO Unit := do
   let sequence ← observeSequence fixture observed
   let receiver ← observeReceiver fixture observed
   have _meaning := sequence_meaning fixture observed stages sequence receiver
-  IO.println "Actual captured branches: make10/make20, first(true,11) returns11, make30, second(false,21) returns20, first(false,12) returns11; six Source calls and returned histories proved"
+  IO.println "Actual captured branches: make10/make20, first(true,11) returns11, make30, second(false,21) returns20, first(false,12) returns10; six Source calls and returned histories proved"
 
 end Tests.SourceCoreCapturedBranch

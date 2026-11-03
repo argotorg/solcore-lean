@@ -80,17 +80,37 @@ private def runPrepared (prepared : Prepared)
     (arguments : List Value := []) (fuel : Nat := 300000) : IO RunResult :=
   SourceCoreUnifiedCorpusSupport.observe prepared.compiled prepared.key arguments fuel
 
+private def expectShallowHeap (label : String)
+    (plan : SourceSpecializationWorklist.Plan) (state : RuntimeState) : IO Unit := do
+  for cell in state.heap do
+    match cell.value with
+    | none => pure ()
+    | some value =>
+        assertTrue (decide (value.type? plan = some cell.type))
+          s!"{label} left an initialized cell with a mismatched type"
+
 private def expectWordAndShallowHeap (label : String) (expected : Nat)
     (plan : SourceSpecializationWorklist.Plan) : RunResult → IO Unit
   | .done (.word actual) state => do
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
-      for cell in state.heap do
-        match cell.value with
-        | none => pure ()
-        | some value =>
-            assertTrue (decide (value.type? plan = some cell.type))
-              s!"{label} left an initialized cell with a mismatched type"
+      expectShallowHeap label plan state
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
+
+/-- The binder of the local `name` declared in the checked source of
+`function`. -/
+private def localBinderNamed (program : CheckedProgram) (function name : String) :
+    IO Resolved.LocalId := do
+  let signature ← signatureNamed program function
+  match program.functions.find? (·.declaration == signature.id) with
+  | some checked =>
+      match checked.typedBody.nodes.filterMap (fun
+          | .statement { form := .letDecl binder _, .. } =>
+              if binder.name == name then some binder.id else none
+          | _ => none) with
+      | [binder] => pure binder
+      | binders => throw (IO.userError
+          s!"expected one local `{name}` in `{function}`, found {binders.length}")
+  | none => throw (IO.userError s!"checked source of `{function}` missing")
 
 private def source : String := String.intercalate "\n" [
   "trait Witness<T> {}",
@@ -169,10 +189,12 @@ private def source : String := String.intercalate "\n" [
   "}"
 ]
 
+/-- `mutate` writes its own copies of `total` and `table`: the call returns 3,
+while the enclosing `total` stays 1 and `table[7]` stays 0. -/
 private def testGenericConstrainedCapturedState
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "capturedStateEntry"
-  expectWordAndShallowHeap "generic constrained captured mutation" 9
+  expectWordAndShallowHeap "generic constrained captured-copy mutation" 4
     prepared.plan (← runPrepared prepared [.word (word 19)])
 
 private def testStatefulCoercionMethod
@@ -189,10 +211,12 @@ private def testStatefulCoercionMethod
   expectWordAndShallowHeap "stateful coercion in function result (false)" 8
     result.plan (← runPrepared result [.bool false])
 
+  /- The returned closure keeps the method's `scratch` as it was when the
+  closure was created, and each call starts again from it. -/
   let captured ← prepareNamed program "coercionCapturedState"
-  expectWordAndShallowHeap "coercion closure preserves method state (true)" 86
+  expectWordAndShallowHeap "coercion closure restarts from its method state (true)" 84
     captured.plan (← runPrepared captured [.bool true])
-  expectWordAndShallowHeap "coercion closure preserves method state (false)" 18
+  expectWordAndShallowHeap "coercion closure restarts from its method state (false)" 16
     captured.plan (← runPrepared captured [.bool false])
 
 private def testGenericProxyMappingKey
@@ -201,11 +225,20 @@ private def testGenericProxyMappingKey
   expectWordAndShallowHeap "generic proxy mapping key" 73
     prepared.plan (← runPrepared prepared [.word (word 5)])
 
+/-- `loop` is assigned after the closure is created, so the closure's copy of
+`loop` is uninitialized: the first recursive call faults on it before any call
+reaches `retain`. -/
 private def testRecursiveClosureSelfCellAndEvidence
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "recursiveClosureEntry"
-  expectWordAndShallowHeap "recursive closure self-cell and evidence" 67
-    prepared.plan (← runPrepared prepared [.word (word 67)])
+  let loop ← localBinderNamed program "recurseClosure" "loop"
+  match ← runPrepared prepared [.word (word 67)] with
+  | .fault (.uninitializedLocal binder) state => do
+      assertTrue (binder == loop)
+        "recursive closure self-cell faulted on another binder"
+      expectShallowHeap "recursive closure self-cell" prepared.plan state
+  | result => throw (IO.userError
+      s!"recursive closure self-cell did not fault on its uninitialized copy: {reprStr result}")
 
 private def testAll : IO Unit := do
   let program ← checkedProgram source

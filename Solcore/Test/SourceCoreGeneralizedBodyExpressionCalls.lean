@@ -1,8 +1,9 @@
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionSource
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaSourceAdmission
 
-/-! Source evaluation is built from the original lambda, its actual captured
-cell and the instantiated static frame. No Core run supplies a body trace. -/
+/-! Source evaluation is built from the original lambda, the call's copy of
+its actual captured cell and the instantiated static frame. No Core run
+supplies a body trace. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -11,6 +12,7 @@ open Solcore Core Frontend SourceInference SourceSemantics
 open Tests.SourceCoreNamedBranch (Read)
 open Tests.SourceCoreSelectedInterleavedLocal (WordNode)
 open Tests.SourceCoreMixedImperative (StoredValue)
+open Tests.SourceSemanticsCaptureCopies (copy_reads)
 
  theorem PairAt.children {source : TypedSource} {left right : ExpressionId}
     (pair : PairAt source left right) {context : SourceSemantics.Context} {type : TypeSystem.Ty}
@@ -84,16 +86,18 @@ theorem LambdaShape.body_applies {source : TypedSource} (shape : LambdaShape sou
     (evidence callerEvidence : Dynamic.EvidenceEnvironment)
     (before : Dynamic.Heap) (argument : Dynamic.Value) (flag : Bool)
     (capturedValue : StoredValue shape.flag captured before (.bool flag))
+    {entry : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies (source.applySubstitution substitution) captured before entry copied)
     (frame : Dynamic.ClosureFrame program
       ((shape.descriptor definitionContext captured).instantiate substitution evidence)) :
     Dynamic.CallableApplies program context callerEvidence evidence before
       (.closure ((shape.descriptor definitionContext captured).instantiate substitution evidence))
       [argument] (resultValue argument flag)
-      ⟨before.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
+      ⟨copied.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
   let function := (shape.descriptor definitionContext captured).instantiate substitution evidence
   let parameter := shape.parameter.applySubstitution substitution
-  let after : Dynamic.Heap := ⟨before.cells ++ [{type := parameter.scheme.body, value := some argument}]⟩
-  have allocation : Dynamic.Heap.Allocates before parameter.scheme.body (some argument) ⟨before.cells.length⟩ after := .append
+  let after : Dynamic.Heap := ⟨copied.cells ++ [{type := parameter.scheme.body, value := some argument}]⟩
+  have allocation : Dynamic.Heap.Allocates copied parameter.scheme.body (some argument) ⟨copied.cells.length⟩ after := .append
   have parameters : ∃ types callContext,
       MonoBindersExtend function.source.owner function.context function.parameters types callContext := by
     rcases frame.code.occurrence with ⟨id,node,_contains,form,_raw,typed⟩
@@ -127,20 +131,21 @@ theorem LambdaShape.body_applies {source : TypedSource} (shape : LambdaShape sou
         obtain ⟨_,_,_,extraTyped⟩ := (shape.result.substitute substitution).children frame.code.graph.nodeOccurrencesUnique typed
         obtain ⟨_,_,_,zeroTyped⟩ := (shape.extra.substitute substitution).children frame.code.graph.nodeOccurrencesUnique extraTyped
         have firstStored : StoredValue (shape.parameter.applySubstitution substitution)
-            ((parameter.id,⟨before.cells.length⟩)::captured) after argument := ⟨_,_,.head,allocation.reads_new,rfl,rfl⟩
+            ((parameter.id,⟨copied.cells.length⟩)::entry) after argument := ⟨_,_,.head,allocation.reads_new,rfl,rfl⟩
         have firstTrace := Tests.SourceCoreMixedImperative.read_value (program := program) (context := function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements) (evidence := evidence) (substituteRead shape.first substitution) firstStored
         have secondTrace := Tests.SourceCoreMixedImperative.read_value (program := program) (context := function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements) (evidence := evidence) (substituteRead shape.second substitution) firstStored
         have captureStored : StoredValue (shape.flag.applySubstitution substitution)
-            ((parameter.id,⟨before.cells.length⟩)::captured) after (.bool flag) := by
+            ((parameter.id,⟨copied.cells.length⟩)::entry) after (.bool flag) := by
           rcases capturedValue with ⟨location,cell,lookup,read,ordinary,contents⟩
-          exact ⟨location,cell,.tail shape.parameterFlag lookup,(Tests.SourceCoreMixedImperative.HeapAppends.read (show Tests.SourceCoreMixedImperative.HeapAppends before after from ⟨_,rfl⟩) read),ordinary,contents⟩
+          obtain ⟨copyLocation,copyLookup,copyRead⟩ := copy_reads copy lookup read
+          exact ⟨copyLocation,cell,.tail shape.parameterFlag copyLookup,allocation.preserves_read copyRead,ordinary,contents⟩
         have captureTrace := Tests.SourceCoreMixedImperative.read_value (program := program) (context := function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements) (evidence := evidence) (substituteRead shape.capture substitution) captureStored
         have zeroTrace := (substituteWord shape.zero substitution).evaluates (program := program) evidence
-          ((parameter.id,⟨before.cells.length⟩)::captured) after frame.code.graph.nodeOccurrencesUnique zeroTyped
+          ((parameter.id,⟨copied.cells.length⟩)::entry) after frame.code.graph.nodeOccurrencesUnique zeroTyped
         have expression := (shape.result.substitute substitution).evaluates
           ((shape.duplicate.substitute substitution).evaluates firstTrace secondTrace)
           ((shape.extra.substitute substitution).evaluates captureTrace zeroTrace)
-        apply Dynamic.CallableApplies.closure rfl frame extended
+        apply Dynamic.CallableApplies.closure rfl frame extended copy
         · exact .cons allocation (.nil _ _)
         · apply Dynamic.FunctionStatementsExecute.singleton
             (FlexibleSubstitution.ContainsStatement.applySubstitution substitution (lookupStatement?_sound shape.returnFound))
@@ -169,9 +174,11 @@ theorem LambdaShape.invoke {source : TypedSource} (shape : LambdaShape source)
       ((shape.descriptor definitionContext captured).instantiate substitution
         (produced ++ evidence.applySubstitution substitution)))
     (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment
-      before argumentId argument argumentsHeap) :
+      before argumentId argument argumentsHeap)
+    {entry : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies (source.applySubstitution substitution) captured argumentsHeap entry copied) :
     Dynamic.ExpressionEvaluates program context evidence source environment before call.node.id
-      (resultValue argument flag) ⟨argumentsHeap.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
+      (resultValue argument flag) ⟨copied.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
   have callee : Dynamic.ExpressionEvaluates program context evidence source environment before
       call.callee.node.id
       (.closure ((shape.descriptor definitionContext captured).instantiate substitution
@@ -189,7 +196,7 @@ theorem LambdaShape.invoke {source : TypedSource} (shape : LambdaShape source)
       callee (.cons argumentTrace .nil) (.singleton argument)
       (by rw [call.argumentCoercions]; exact .nil) (.singleton argument)
       (by rw [call.arity]; rfl) (by rw [call.arity]; rfl)
-      (shape.body_applies captured substitution _ evidence argumentsHeap argument flag capturedValue frame)
+      (shape.body_applies captured substitution _ evidence argumentsHeap argument flag capturedValue copy frame)
   · rw [call.coercions]; exact .nil
 
 
@@ -281,9 +288,12 @@ theorem LambdaShape.invoke_from_typed {source : TypedSource} (shape : LambdaShap
     (descriptor : cell.generalized = some (shape.descriptor definitionContext captured))
     (fields : Dynamic.RuntimeContextFields definitionContext context)
     (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment
-      before argumentId argument argumentsHeap) :
+      before argumentId argument argumentsHeap)
+    {entry : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies (source.applySubstitution [(shape.typeVariable, type)]) captured
+      argumentsHeap entry copied) :
     Dynamic.ExpressionEvaluates program context evidence source environment before call.node.id
-      (resultValue argument flag) ⟨argumentsHeap.cells ++ [{type := (shape.parameter.applySubstitution [(shape.typeVariable, type)]).scheme.body, value := some argument}]⟩ := by
+      (resultValue argument flag) ⟨copied.cells ++ [{type := (shape.parameter.applySubstitution [(shape.typeVariable, type)]).scheme.body, value := some argument}]⟩ := by
   have wellformed := descriptor_scheme_of_typed runtime.graph.nodeOccurrencesUnique
     call.callee.found call.callee.form typed locals lookup read descriptor
   have descriptorTyped := ((heapTyped cell read.member).generalized_inv descriptor).2
@@ -291,6 +301,6 @@ theorem LambdaShape.invoke_from_typed {source : TypedSource} (shape : LambdaShap
     (by simpa only [fields.signatures] using catalog) descriptorTyped fields
     runtime.signatures covers wellformed ground
   exact shape.invoke call captured environment [(shape.typeVariable, type)] evidence [] flag capturedValue
-    lookup read descriptor fields (shape.instance evidence wellformed ground) frame argumentTrace
+    lookup read descriptor fields (shape.instance evidence wellformed ground) frame argumentTrace copy
 
 end Tests.SourceCoreGeneralizedBodyExpression

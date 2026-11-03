@@ -31,7 +31,7 @@ private def branch (fixture : Fixture) (flag : Bool) : IO Unit := do
     | throw (IO.userError "retained coerced call did not complete")
   require (repeated.value == .word (converted flag)) "retained coerced Source read changed"
   require ([started.session.heapSize, factory.session.heapSize, first.session.heapSize, repeated.session.heapSize]
-    == [5, 8, 14, 20]) "coerced exact heap sizes changed"
+    == [5, 11, 20, 29]) "coerced exact heap sizes changed"
   require (fixture.recipe.compiled.indexed.base.functions.length == 4) "coerced cache changed"
   IO.println s!"SOURCE_FIRST_COERCED_BRANCH_PASS: flag={flag}; result={converted flag}; heaps{[started.session.heapSize, factory.session.heapSize, first.session.heapSize, repeated.session.heapSize]}"
 

@@ -2,8 +2,9 @@ import Solcore.Test.SourceCoreGeneralizedExportFixture
 import Solcore.Test.SourceCoreNamedBranchSource
 import Solcore.SourceSemantics.Dynamic.Evaluation
 
-/-! Exact original factory graphs. A generalized declaration stores its
-principal descriptor; returning an instance does not execute its body. -/
+/-! Exact original factory graphs. A generalized declaration copies the
+captured input and stores its principal descriptor over the copy; returning an
+instance does not execute its body. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreGeneralizedExport
@@ -25,6 +26,7 @@ structure LambdaShape (source : TypedSource) where
   bodyRead : Read source bodyBinder resultType
   inputs : source.inputs = [input]
   inputScheme : input.scheme = .mono inputType
+  inputCopied : CaptureBinders.copiedBinder? source input.id = some input
   scheme : binder.scheme = ⟨[typeVariable], .function (.variable typeVariable) resultType⟩
   schemeRequirements : binder.schemeRequirements = []
   parameterScheme : parameter.scheme = .mono (.variable typeVariable)
@@ -91,6 +93,7 @@ def observeLambda (source : TypedSource) (captured : Bool)
   let bodyRead ← observeRead source bodyBinder bodyValue resultType
   let ⟨inputs⟩ ← observed (source.inputs = [input]) "export factory input identity"
   let ⟨inputScheme⟩ ← observed (input.scheme = .mono inputType) "export factory input type"
+  let ⟨inputCopied⟩ ← observed (CaptureBinders.copiedBinder? source input.id = some input) "export factory input copied"
   let ⟨scheme⟩ ← observed (binder.scheme = ⟨[typeVariable], .function (.variable typeVariable) resultType⟩)
     "export exact principal scheme"
   let ⟨schemeRequirements⟩ ← observed (binder.schemeRequirements = []) "export principal requirements"
@@ -108,7 +111,7 @@ def observeLambda (source : TypedSource) (captured : Bool)
   let ⟨bodyFound⟩ ← observed (source.lookupStatement? bodyReturn.id = some bodyReturn) "export inner return identity"
   let ⟨bodyForm⟩ ← observed (bodyReturn.form = .returnStmt (some bodyRead.node.id)) "export inner return read"
   return ⟨input,inputType,binder,parameter,typeVariable,resultType,bodyBinder,
-    by cases captured <;> simp [bodyBinder],initialized,lambda,bodyReturn,bodyRead,inputs,inputScheme,
+    by cases captured <;> simp [bodyBinder],initialized,lambda,bodyReturn,bodyRead,inputs,inputScheme,inputCopied,
     scheme,schemeRequirements,parameterScheme,parameterRequirements,parameterInputDistinct,initializedFound,initializedForm,
     lambdaFound,lambdaForm,lambdaRaw,lambdaType,lambdaRequirements,lambdaCoercions,bodyFound,bodyForm⟩
 
@@ -176,14 +179,16 @@ theorem LambdaShape.captures {source : TypedSource} (shape : LambdaShape source)
 
 theorem LambdaShape.initializes {source : TypedSource} (shape : LambdaShape source)
     {program : SourceSemantics.Program} {context nextContext : SourceSemantics.Context}
-    (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    (evidence : Dynamic.EvidenceEnvironment) {environment captured : Dynamic.Environment}
+    {before middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (extended : BinderExtends source.owner context shape.binder nextContext) :
     Dynamic.StatementExecutes program context evidence source environment before shape.initialized.id
-      nextContext (.fallthrough ((shape.binder.id, ⟨before.cells.length⟩) :: environment))
-      (shape.allocatedHeap context environment before) := by
+      nextContext (.fallthrough ((shape.binder.id, ⟨middle.cells.length⟩) :: environment))
+      (shape.allocatedHeap context captured middle) := by
   apply Dynamic.StatementExecutes.letInitializedGeneralized
-    (lookupStatement?_sound shape.initializedFound) shape.initializedForm
-    (shape.captures context environment) (by rw [shape.scheme]; simp) extended
+    (lookupStatement?_sound shape.initializedFound) shape.initializedForm snapshot
+    (shape.captures context captured) (by rw [shape.scheme]; simp) extended
   exact .append
 
 end Tests.SourceCoreGeneralizedExport

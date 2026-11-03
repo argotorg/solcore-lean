@@ -42,8 +42,10 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
 include extension uninitialized missing in
 theorem Entry.preserves
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
-    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies environment : Dynamic.Environment} {copied bound after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -54,7 +56,7 @@ theorem Entry.preserves
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
-  exact CallableIndexedLambdaSemanticCalls.Entry.preserves captured code history body.semantic profile extension uninitialized missing entry allocated trace
+  exact CallableIndexedLambdaSemanticCalls.Entry.preserves captured code history body.semantic profile extension uninitialized missing entry copy allocated trace
 
 include extension uninitialized missing in
 theorem Entry.reflects
@@ -62,8 +64,9 @@ theorem Entry.reflects
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
       store applyPayload result finalStore) :
-    ∃ environment bound outcome after finalMap finalWorld,
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+    ∃ copies copied environment bound outcome after finalMap finalWorld,
+      Dynamic.EnvironmentCopies function.source function.captured before copies copied ∧
+      Dynamic.BindersAllocate copies copied function.parameters arguments environment bound ∧
       FunctionCallBody.Trace program function body.context environment bound outcome after ∧
       FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
         finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧

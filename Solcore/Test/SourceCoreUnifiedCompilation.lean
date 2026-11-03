@@ -51,8 +51,8 @@ private def key (program : CheckedProgram) (name : String) : IO Key :=
 
 private def initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.word, none⟩]}
 
-private def check (compiled : Compiled) (owner : Key) (arguments : List SourceValue)
-    (expected : SourceValue) : IO Unit := do
+private def checkFinal (compiled : Compiled) (owner : Key) (arguments : List SourceValue)
+    (accept : SourceTypedRuntime.RunResult → IO Unit) : IO Unit := do
   for spent in [0, 37, 150000] do
     let first ← get "unified Core run" (compiled.run owner arguments 500 spent initial)
     assertTrue first.execution.isSome "valid unified invocation omitted its native receipt"
@@ -61,12 +61,29 @@ private def check (compiled : Compiled) (owner : Key) (arguments : List SourceVa
       | .outOfFuel state => assertTrue (reprStr state == reprStr initial) "zero fuel changed initial source prefix"
       | result => throw (IO.userError s!"zero fuel did not suspend: {reprStr result}")
     let final ← get "unified Core resume" (Solcore.Frontend.SourceCoreUnifiedCompilation.Result.resume first 150000)
-    match final.observation with
-    | .done actual state =>
+    accept final.observation
+
+private def check (compiled : Compiled) (owner : Key) (arguments : List SourceValue)
+    (expected : SourceValue) : IO Unit :=
+  checkFinal compiled owner arguments fun
+    | .done actual state => do
       assertTrue (reprStr actual == reprStr expected) s!"unified result changed: {reprStr actual}"
       assertTrue (reprStr (state.heap.take initial.heap.length) == reprStr initial.heap)
         "unified execution changed the inert source prefix"
     | result => throw (IO.userError s!"unified execution did not complete: {reprStr result}")
+
+/-- The binder of the local `name` declared in the checked source of
+`function`. -/
+private def localBinder (program : CheckedProgram) (function name : String) : IO Resolved.LocalId := do
+  let owner ← key program function
+  match program.functions.find? (·.declaration == owner.declaration) with
+  | some checked =>
+      match checked.typedBody.nodes.filterMap (fun
+          | .statement { form := .letDecl binder _, .. } => if binder.name == name then some binder.id else none
+          | _ => none) with
+      | [binder] => pure binder
+      | _ => throw (IO.userError s!"unified fixture {function} lost its local {name}")
+  | none => throw (IO.userError s!"unified fixture {function} source missing")
 
 example (compiled : Compiled) :
     SourceCoreCompatibleFunctions.prepare compiled.sourceProgram compiled.validationPlan compiled.compilationFuel =
@@ -87,8 +104,17 @@ def run : IO Unit := do
   let mapping : SourceValue := .mapping .word .word [(.word (w 1), .word (w 9))]
   check compiled (← key program "local") [mapping] mapping
   check compiled (← key program "lazy") [] (.mapping .word .word [(.word (w 1), .word (w 7))])
-  check compiled (← key program "capture") [.word (w 10)] (.word (w 17))
-  check compiled (← key program "recursive") [.word (w 4)] (.word (w 4))
+  /- Closures capture by value: each call of `f` starts again from the
+  captured `value`, so `f(4)` returns 14. -/
+  check compiled (← key program "capture") [.word (w 10)] (.word (w 14))
+  /- `f` is assigned after the closure is created, so the closure's copy of
+  `f` is uninitialized and its first recursive read faults. -/
+  let recursiveSelf ← localBinder program "recursive" "f"
+  checkFinal compiled (← key program "recursive") [.word (w 4)] fun
+    | .fault (.uninitializedLocal binder) state =>
+      assertTrue (binder == recursiveSelf && reprStr (state.heap.take initial.heap.length) == reprStr initial.heap)
+        "recursive closure did not fault on its uninitialized copy of its self cell"
+    | result => throw (IO.userError s!"recursive self-cell read changed: {reprStr result}")
   check compiled (← key program "unused") [] (.word (w 7))
   check compiled (← key program "tuple") [.product (.word (w 13)) (.bool true)] (.word (w 13))
   check compiled (← key program "looping") [.word (w 4)] (.word (w 6))
@@ -109,7 +135,7 @@ def run : IO Unit := do
       assertTrue (initial.heap.length < state.heap.length) "language failure lost its source allocations"
       if name == "failAfterWrite" then
         assertTrue (state.heap.any fun cell => match cell.value with
-          | some (.word value) => value == w 3 | _ => false) "language failure lost the captured write"
+          | some (.word value) => value == w 3 | _ => false) "language failure lost the closure call's write to its copy"
     | other => throw (IO.userError s!"unified language failure changed: {reprStr other}")
   IO.println "cached unified Core artifact, complete source observations and resumptions GREEN"
 

@@ -73,9 +73,11 @@ def run : IO Unit := do
   expect (← compile program "intoWord") [.integer (-1)] (.word Core.Word.maximum)
   expect (← compile program "intoInteger") [.word Core.Word.maximum] (.integer (Int.ofNat Core.Word.maximum.val))
   expect (← compile program "nativeLiteral") [] (.integer 1234567890123456789012345678901234567890)
+  /- Each call of `step` starts again from the captured `value`, so the result
+  is `(large + 1) - (large + 2)` in either argument order. -/
   let order ← compile program "order"
-  expect order [.integer large] (.integer (-2))
-  order.checkResume [.integer large] (.integer (-2))
+  expect order [.integer large] (.integer (-1))
+  order.checkResume [.integer large] (.integer (-1))
   expect (← compile program "recurse") [.integer 8] (.integer 7)
   let absent ← compile program "absent"
   let invocation ← absent.invoke []

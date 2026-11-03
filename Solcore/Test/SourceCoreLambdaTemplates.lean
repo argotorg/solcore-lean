@@ -11,9 +11,11 @@ import Solcore.Frontend.ProgramChecking
 
 /-! Actual compiler manifests authenticate source lambda templates after
 installation and administrative weakening. Native code/type preservation,
-shared mutable capture, scope-free/zero-parameter closures, unused principals,
-polymorphic bundles, tampered descriptors/code and typed suspension are tested.
-Source closure export and dynamic ancestry remain separate ledger boundaries. -/
+by-value capture (a manifest references the snapshot copies made when its
+lambda is created, and each call starts again from them), scope-free and
+zero-parameter closures, unused principals, polymorphic bundles, tampered
+descriptors/code and typed suspension are tested. Source closure export and
+dynamic ancestry remain separate ledger boundaries. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreLambdaTemplates
 open Solcore Solcore.Frontend SourceInference
@@ -163,10 +165,16 @@ private def callTwice {definitions : Core.DataEnvironment} {world : Core.StoreTy
       | some next => next.resume 150000 | none => first
     match completed.observation with
     | .succeeded (.pair (.word left) (.word right)) final =>
-      assertTrue (left == w 4 && right == w 6) "lambda calls stopped sharing their mutable lexical cell"
-      assertTrue (final.length == store.length + 2) "manifest allocated an extra heap cell during invocation"
-      assertTrue (captureLocations.any (fun location => final[location]? == some (.inRight .unit (.word (w 6)))))
-        "lambda manifest lost the original source capture location"
+      -- Each call starts again from the creation-time `value = 3`.
+      assertTrue (left == w 4 && right == w 5) "lambda calls did not restart from their creation-time capture"
+      -- Every capture of these lambdas is copied: each call allocates one plain
+      -- cell per capture and one for its parameter.
+      assertTrue (final.length == store.length + 2 * (captureLocations.length + 1))
+        "manifest allocated an extra heap cell during invocation"
+      assertTrue (captureLocations.all (fun location => final[location]? == store[location]?))
+        "lambda call wrote its snapshot cell"
+      assertTrue (captureLocations.any (fun location => final[location]? == some (.inRight .unit (.word (w 3)))))
+        "lambda manifest lost the creation-time source capture"
     | other => throw (IO.userError s!"typed lambda reuse/resume failed: {reprStr other}")
 
 private def checkClosure {checked : Checked} (ready : Ready checked) (owner : Key) (parameter : Core.Ty)
@@ -251,8 +259,11 @@ def run : IO Unit := do
     "principal polymorphic bundle was confused with a monomorphic emitted closure"
   let loopTemplate ← match ready.compiled.templates.find? (fun template => decide (template.lambda.owner = loop)) with
     | some template => pure template | none => throw (IO.userError "lambda nested in loop lost manifest")
-  assertTrue (loopTemplate.references != monoTemplate.references)
-    "loop/install administrative weakening did not reach captured variables"
+  -- A manifest references the snapshot copies made right before its lambda.
+  -- `loop` copies `f` before `value`, so `f`'s copy is the deeper one; loop and
+  -- install weakening reach the reads of those copies, not the manifest.
+  assertTrue (monoTemplate.references == [0] && loopTemplate.references == [1, 0])
+    "manifest references did not select the lambda's snapshot copies"
   checkClosure ready maker .word ⟨.word, Core.LanguageResult.success (.word (w 3))⟩
   checkClosure ready zero .unit ⟨.unit, Core.LanguageResult.success .unit⟩
   checkClosure ready loop .word ⟨.word, Core.LanguageResult.success (.word (w 3))⟩
@@ -278,5 +289,5 @@ def run : IO Unit := do
   | .ok structural =>
     assertTrue (structural.body != monoTemplate.body) "structural decode accidentally authenticated compiler emission history"
   | .error _ => throw (IO.userError "syntactic scanner should distinguish shape from actual cached emission ownership")
-  IO.println "lambda manifests/installed templates, typed tamper/capture auth, shared heap, nested bundles and resume GREEN"
+  IO.println "lambda manifests/installed templates, typed tamper/capture auth, by-value captures, nested bundles and resume GREEN"
 end Tests.SourceCoreLambdaTemplates

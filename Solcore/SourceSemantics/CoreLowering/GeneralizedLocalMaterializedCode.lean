@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInstanceValues
 
 /-! The materialized Source closure uses the exact native value stored at
 declaration time. Equality follows from the accepted emitted expression, not
-from running the creation code again in a changed store. -/
+from running the creation code again in a changed store. A generalized
+initializer is not snapshotted at creation; its `let` copies the captures. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedCode
 open Core Frontend SourceInference
@@ -21,10 +22,15 @@ theorem value_eq (indexed : Indexed prepared packet)
     {viewRelation : TypedSource → TypedSource → Prop}
     (code : CallableIndexedLambdaValues.Code prepared function inputs.scope administrative viewRelation)
     (lowered : code.lowered = packet.original.lowered)
+    (policy : code.policy = GeneralizedLocalLambdaCompilation.policy inputs packet.original.emission.prepared packet.fuel)
+    (codeId : code.id = inputs.initializer)
     (embedding : Renaming) (native : NativeFrame) (actual : Core.Environment) :
     CallableIndexedLambdaValues.value code embedding native actual =
       GeneralizedLocalInstanceValues.value indexed embedding native actual := by
-  have emitted := code.emitted
+  have shared : code.policy.snapshotLambda code.id = false := by
+    rw [policy, codeId]
+    simp [GeneralizedLocalLambdaCompilation.policy]
+  have emitted := code.emitted_shared shared
   conv at emitted => lhs; rw [lowered, packet.original.extracted, indexed.emitted]
   change Expr.inRight .word
       (.pair (.pair (.inLeft .word .unit)

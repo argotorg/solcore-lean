@@ -1,9 +1,10 @@
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.Staging.SelectedStatementPreservationSupport
 
-/-! A genuine generalized Source declaration exposes its retained descriptor
-and allocation directly. Its graded tail starts at the extended lexical
-context without executing the principal initializer. -/
+/-! A genuine generalized Source declaration exposes the copies of its
+environment, its retained descriptor over the copies and its allocation
+directly. Its graded tail starts at the extended lexical context, over the
+original environment, without executing the principal initializer. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
@@ -39,20 +40,21 @@ theorem generalized {program : Program} {registry : Registry} {mode : Bool} {inv
     (extended : BinderExtends invocation.source.owner context binder nextContext)
     (trace : Size.StatementsIn program registry mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
-    ∃ tailSize function location bound,
+    ∃ tailSize captured snapshotHeap function location bound,
       size = Size.stepSize [tailSize] ∧
-      Dynamic.GeneralizedClosureCaptures context invocation.source environment binder initializer function ∧
-      Dynamic.Heap.AllocatesGeneralized before function location bound ∧
+      Dynamic.EnvironmentCopies invocation.source environment before captured snapshotHeap ∧
+      Dynamic.GeneralizedClosureCaptures context invocation.source captured binder initializer function ∧
+      Dynamic.Heap.AllocatesGeneralized snapshotHeap function location bound ∧
       Size.StatementsIn program registry mode tailSize invocation nextContext
         ((binder.id, location) :: environment) bound rest finalContext outcome after := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
-  | letGeneralized actual same captures _ actualExtended allocated remaining =>
+  | letGeneralized actual same snapshot captures _ actualExtended allocated remaining =>
       have equal := (shape actual).symm.trans same
       cases equal
       have contexts := extension_unique extended actualExtended
       cases contexts
-      exact ⟨_, _, _, _, rfl, captures, allocated, remaining⟩
+      exact ⟨_, _, _, _, _, _, rfl, snapshot, captures, allocated, remaining⟩
   | letInitialized actual same _ mono _ _ _ | letFault actual same mono _ =>
       have equal := (shape actual).symm.trans same
       cases equal
@@ -111,5 +113,26 @@ theorem captured_wellTyped {program : Program} {source : TypedSource}
   | letInitialized _ mono _ => exact False.elim (polymorphic mono)
   | letInitializedGeneralized poly requirements generalizes value extension =>
     exact captures.wellTyped runtime locals poly requirements generalizes value extension
+
+/-- Every lexical cell of an agreeing environment can be copied: a declaration
+snapshot exists before its actual copies are fixed. -/
+theorem copies_exist (source : TypedSource) {environment : Dynamic.Environment} :
+    ∀ {scope : Resolved.LocalScope TypeSystem.Scheme} {heap : Dynamic.Heap},
+      Dynamic.EnvironmentAgrees heap scope environment →
+      ∃ copies after, Dynamic.EnvironmentCopies source environment heap copies after := by
+  induction environment with
+  | nil => intro _ heap _; exact ⟨[], heap, .nil heap⟩
+  | cons entry rest ih =>
+    intro scope heap agrees
+    cases agrees with
+    | @cons scope environment id scheme location cell read _ _ tail =>
+      cases copied : CaptureBinders.copiedBinder? source id with
+      | none =>
+        obtain ⟨copies, after, copy⟩ := ih tail
+        exact ⟨_, after, .shared copied copy⟩
+      | some binder =>
+        have allocate : Dynamic.Heap.AllocatesCopy heap cell ⟨heap.cells.length⟩ ⟨heap.cells ++ [cell]⟩ := .append
+        obtain ⟨copies, after, copy⟩ := ih (tail.mono (Dynamic.HeapTypesExtend.of_copy allocate))
+        exact ⟨_, after, .copied copied read allocate copy⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion

@@ -24,6 +24,7 @@ structure Shape (source : TypedSource) where
   result : IndexRead source tableRead.node.id resultKey.node.id
   inputs : source.inputs = [table]
   tableScheme : table.scheme = .mono mappingType
+  tableCopied : CaptureBinders.copiedBinder? source table.id = some table
   keyScheme : key.scheme = .mono .word
   keyTable : key.id ≠ table.id
   roots : source.roots = [.statement outer.id]
@@ -41,19 +42,31 @@ structure Shape (source : TypedSource) where
   outerFound : source.lookupStatement? outer.id = some outer
   outerForm : outer.form = .returnStmt (some lambda.id)
 
-/-- The captured cell stays at its original location while later arguments append. -/
+def mappingCell (entries : List (Dynamic.Value × Dynamic.Value)) : Dynamic.Cell :=
+  {type := mappingType, value := some (mappingValue entries)}
+
+/-- The factory's input cell and the closure's snapshot of it. Later calls
+append their own copies and arguments in `suffix`; nothing writes the snapshot. -/
 def heap (before : Dynamic.Heap) (entries : List (Dynamic.Value × Dynamic.Value))
     (suffix : List Dynamic.Cell := []) : Dynamic.Heap :=
-  ⟨before.cells ++ {type := mappingType, value := some (mappingValue entries)} :: suffix⟩
+  ⟨before.cells ++ mappingCell entries :: mappingCell entries :: suffix⟩
+
+/-- The closure's snapshot, right after the input cell. -/
+def snapshotLocation (before : Dynamic.Heap) : Dynamic.Location := ⟨before.cells.length + 1⟩
 
 def function {compiled : SourceCoreUnifiedCompilation.Compiled}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (shape : Shape header.function.source) (before : Dynamic.Heap) : Dynamic.Closure := {
   parameters := [shape.key], resultType := .word, body := [shape.assigned.id, shape.returned.id]
-  source := header.function.source, captured := [(shape.table.id, location before)]
+  source := header.function.source, captured := [(shape.table.id, snapshotLocation before)]
   context := header.context, evidence := header.function.evidence }
 
 def keyCell (key : Word) : Dynamic.Cell := {type := .word, value := some (.word key)}
+
+/-- The cells one call appends: its copy of the snapshot, written by the update,
+and its key. -/
+def callCells (key previous : Word) (tail : List (Dynamic.Value × Dynamic.Value)) : List Dynamic.Cell :=
+  [mappingCell ((.word key, .word previous.bitNot) :: tail), keyCell key]
 
 private theorem roots_injective {left right : List StatementId}
     (same : left.map NodeId.statement = right.map NodeId.statement) : left = right := by
@@ -112,7 +125,8 @@ theorem input_types : header.types = [mappingType] := by
   have types := Dynamic.MonoBindersExtend.bodyTypes_eq header.extended
   simpa only [params, List.map_cons, List.map_nil, shape.tableScheme, TypeSystem.Scheme.mono] using types.symm
 
-/-- Allocate the actual mapping parameter and capture that exact cell. -/
+/-- Allocate the actual mapping parameter; the lambda copies that exact cell
+into the closure's snapshot. -/
 theorem factory_plain {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {global : Dynamic.GlobalFunction}
     (sourceAt : NamedSourceAt header rawD global)
     (anchor : Header compiled (Program.ofChecked compiled.sourceProgram))
@@ -123,23 +137,36 @@ theorem factory_plain {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {gl
   have params : header.function.parameters = [shape.table] :=
     header.parameters.trans (header.inputs.symm.trans shape.inputs)
   have allocated : Dynamic.Heap.Allocates before shape.table.scheme.body
-      (some (mappingValue entries)) (location before) (heap before entries) := by
+      (some (mappingValue entries)) (location before) (appendCell before mappingType (some (mappingValue entries))) := by
     rw [shape.tableScheme]; exact .append
   have bound : Dynamic.BindersAllocate [] before header.function.parameters [mappingValue entries]
-      [(shape.table.id, location before)] (heap before entries) := by
+      [(shape.table.id, location before)] (appendCell before mappingType (some (mappingValue entries))) := by
     rw [params]; exact .cons allocated (.nil _ _)
+  have stored : Dynamic.Heap.Allocates before mappingType (some (mappingValue entries)) (location before)
+      (appendCell before mappingType (some (mappingValue entries))) := .append
+  have copied : Dynamic.Heap.AllocatesCopy (appendCell before mappingType (some (mappingValue entries)))
+      (mappingCell entries) (snapshotLocation before) (heap before entries) := by
+    have appended := Dynamic.Heap.AllocatesCopy.append
+      (heap := appendCell before mappingType (some (mappingValue entries))) (cell := mappingCell entries)
+    simpa only [appendCell, heap, snapshotLocation, mappingCell, List.length_append, List.length_singleton,
+      List.append_assoc, List.cons_append, List.nil_append, List.singleton_append] using appended
+  have snapshot : Dynamic.EnvironmentCopies header.function.source [(shape.table.id, location before)]
+      (appendCell before mappingType (some (mappingValue entries)))
+      [(shape.table.id, snapshotLocation before)] (heap before entries) :=
+    .copied shape.tableCopied stored.reads_new copied (.nil _)
   have roots : header.function.body = [shape.outer.id] :=
     roots_injective (header.agreement.roots.symm.trans shape.roots)
   have expression : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
       header.context header.function.evidence header.function.source [(shape.table.id, location before)]
-      (heap before entries) shape.lambda.id (.closure (function header shape before)) (heap before entries) := by
+      (appendCell before mappingType (some (mappingValue entries))) shape.lambda.id
+      (.closure (function header shape before)) (heap before entries) := by
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.lambdaFound)
     · rw [shape.lambdaForm]
-      exact .lambda (by rw [shape.lambdaRequirements, shape.lambdaCoercions]; rfl)
+      exact .lambda (by rw [shape.lambdaRequirements, shape.lambdaCoercions]; rfl) snapshot
     · rw [shape.lambdaCoercions]; exact .nil
   have body : Dynamic.FunctionStatementsExecute (Program.ofChecked compiled.sourceProgram)
       header.context header.function.evidence header.function.source [(shape.table.id, location before)]
-      (heap before entries) header.function.body header.context
+      (appendCell before mappingType (some (mappingValue entries))) header.function.body header.context
       (.returned (.closure (function header shape before))) (heap before entries) := by
     rw [roots]
     exact .singleton (lookupStatement?_sound shape.outerFound)
@@ -150,8 +177,10 @@ theorem factory_plain {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {gl
   | value invoked => exact ⟨rawD, global, sourceAt, .global sourceAt.frame.instantiated rfl
       (sourceAt.dictionary ▸ sourceAt.frame.covers) (sourceAt.dictionary ▸ invoked)⟩
 
-/-- Execute a captured update from original syntax. Previous call allocations
-remain in `suffix`; only the captured mapping cell is written. There is no RHS. -/
+/-- Execute the captured update from original syntax. The call copies the
+closure's snapshot, binds the key after the copy and writes only the copy, so
+every call starts from the mapping the factory received. Earlier call
+allocations remain in `suffix`. There is no RHS. -/
 theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
     (tail : List (Dynamic.Value × Dynamic.Value)) (suffix : List Dynamic.Cell)
     {context : SourceSemantics.Context} (invocation : Staging.Recursive.Scope)
@@ -161,7 +190,7 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
     Dynamic.CallableApplies (Program.ofChecked compiled.sourceProgram) context invocation.evidence
       (function header shape before).evidence (heap before ((.word key, .word previous) :: tail) suffix)
       (.closure (function header shape before)) [.word key] (.word previous.bitNot)
-      (heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key])) := by
+      (heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail)) := by
   obtain ⟨_parameters, _result, sameSignatures, code, covers, _captures⟩ := typed.closure_function_inv
   have frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) (function header shape before) :=
     ⟨sameSignatures.trans signatures, code.owner, code, code.requirement_ledger.idsUnique, covers⟩
@@ -171,22 +200,33 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
   let original := mappingValue ((.word key, .word previous) :: tail)
   let replacement := mappingValue ((.word key, .word previous.bitNot) :: tail)
   let initial := heap before ((.word key, .word previous) :: tail) suffix
-  let current := appendCell initial .word (some (.word key))
-  let after := heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key])
+  let copied := appendCell initial mappingType (some original)
+  let current := appendCell copied .word (some (.word key))
+  let after := heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail)
+  let entry : Dynamic.Environment := [(shape.table.id, location initial)]
   let environment : Dynamic.Environment :=
-    [(shape.key.id, location initial), (shape.table.id, location before)]
-  have rootBefore : Dynamic.Heap.Reads initial (location before) ⟨mappingType, some original, none⟩ :=
-    .intro (cell_at before.cells _ suffix)
-  have allocation : Dynamic.Heap.Allocates initial .word (some (.word key)) (location initial) current := .append
-  have rootRead := allocation.preserves_read rootBefore
+    [(shape.key.id, location copied), (shape.table.id, location initial)]
+  have snapshotRead : Dynamic.Heap.Reads initial (snapshotLocation before) ⟨mappingType, some original, none⟩ := by
+    have selected := cell_at (before.cells ++ [⟨mappingType, some original, none⟩])
+      ⟨mappingType, some original, none⟩ suffix
+    apply Dynamic.Heap.Reads.intro
+    simpa only [initial, original, heap, snapshotLocation, mappingCell, List.append_assoc, List.cons_append,
+      List.nil_append, List.singleton_append, List.length_append, List.length_singleton] using selected
+  have copyAllocated : Dynamic.Heap.AllocatesCopy initial ⟨mappingType, some original, none⟩
+      (location initial) copied := .append
+  have copy : Dynamic.EnvironmentCopies header.function.source (function header shape before).captured
+      initial entry copied :=
+    .copied shape.tableCopied snapshotRead copyAllocated (.nil _)
+  have allocation : Dynamic.Heap.Allocates copied .word (some (.word key)) (location copied) current := .append
+  have rootRead := allocation.preserves_read copyAllocated.reads_new
   have keyRead := allocation.reads_new
-  have allocated : Dynamic.BindersAllocate (function header shape before).captured initial
+  have allocated : Dynamic.BindersAllocate entry copied
       (function header shape before).parameters [.word key] environment current := by
     exact .cons (by rw [shape.keyScheme]; exact allocation) (.nil _ _)
   have equalKey : Dynamic.ValueEquivalent (.word key) (.word key) := .refl (.word key)
   have resolve : Dynamic.SourcePlaceResolves (Program.ofChecked compiled.sourceProgram)
       callContext header.function.evidence header.function.source environment current shape.resolution.target
-      {location := location before, rootType := mappingType, valueType := shape.resolution.target.type,
+      {location := location initial, rootType := mappingType, valueType := shape.resolution.target.type,
         projections := [.index (.word key)], selected := some (.word previous)} current := by
     apply Dynamic.SourcePlaceResolves.intro
       (initialCell := ⟨mappingType, some original, none⟩) (currentCell := ⟨mappingType, some original, none⟩)
@@ -197,12 +237,13 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
     · exact rootRead
     · exact .initialized
     · exact .indexFound (.head equalKey) .nil
-  have write : Dynamic.Heap.Writes current (location before) (some replacement) after := by
+  have write : Dynamic.Heap.Writes current (location initial) (some replacement) after := by
     apply Dynamic.Heap.Writes.intro rootRead
-    simpa only [current, initial, after, appendCell, heap, location, keyCell,
-      List.append_assoc, List.cons_append] using
-      write_at before.cells ⟨mappingType, some original, none⟩
-        ⟨mappingType, some replacement, none⟩ (suffix ++ [keyCell key])
+    simpa only [current, copied, initial, after, original, replacement, appendCell, heap, location, keyCell,
+      callCells, mappingCell, List.append_assoc, List.cons_append, List.nil_append, List.singleton_append] using
+      write_at (before.cells ++ mappingCell ((.word key, .word previous) :: tail) ::
+          mappingCell ((.word key, .word previous) :: tail) :: suffix)
+        ⟨mappingType, some original, none⟩ ⟨mappingType, some replacement, none⟩ [keyCell key]
   have assigned : Dynamic.StatementExecutes (Program.ofChecked compiled.sourceProgram)
       callContext header.function.evidence header.function.source environment current shape.assigned.id
       callContext (.fallthrough environment) after := by
@@ -210,13 +251,20 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
     exact .intro resolve (.intro rootRead rfl .initialized
       (.indexFound (.head equalKey) (.leaf (.word previous)) (.update (.head equalKey))) write)
-  have finalRoot : Dynamic.Heap.Reads after (location before) ⟨mappingType, some replacement, none⟩ :=
-    .intro (cell_at before.cells _ (suffix ++ [keyCell key]))
-  have finalKey : Dynamic.Heap.Reads after (location initial) ⟨.word, some (.word key), none⟩ := by
-    have selected := cell_at (before.cells ++ ⟨mappingType, some replacement, none⟩ :: suffix) (keyCell key) []
+  have finalRoot : Dynamic.Heap.Reads after (location initial) ⟨mappingType, some replacement, none⟩ := by
+    have selected := cell_at (before.cells ++ mappingCell ((.word key, .word previous) :: tail) ::
+      mappingCell ((.word key, .word previous) :: tail) :: suffix) ⟨mappingType, some replacement, none⟩ [keyCell key]
     apply Dynamic.Heap.Reads.intro
-    simpa only [after, heap, location, initial, List.append_assoc, List.cons_append,
-      List.length_append, List.length_cons, keyCell] using selected
+    simpa only [after, initial, replacement, heap, location, callCells, mappingCell, List.append_assoc,
+      List.cons_append, List.nil_append] using selected
+  have finalKey : Dynamic.Heap.Reads after (location copied) ⟨.word, some (.word key), none⟩ := by
+    have selected := cell_at (before.cells ++ mappingCell ((.word key, .word previous) :: tail) ::
+      mappingCell ((.word key, .word previous) :: tail) :: suffix ++ [⟨mappingType, some replacement, none⟩])
+      (keyCell key) []
+    apply Dynamic.Heap.Reads.intro
+    simpa only [after, copied, initial, original, replacement, appendCell, heap, location, callCells, mappingCell,
+      keyCell, List.append_assoc, List.cons_append, List.nil_append, List.singleton_append,
+      List.length_append, List.length_cons, List.length_nil] using selected
   have result : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
       callContext header.function.evidence header.function.source environment after shape.result.node.id
       (.word previous.bitNot) after := by
@@ -226,7 +274,7 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
         (read_value shape.tableRead _ _ _ _ _ _ (.tail shape.keyTable .head) finalRoot)
         (read_value shape.resultKey _ _ _ _ _ _ .head finalKey) (.head equalKey)
     · rw [shape.result.coercions]; exact .nil
-  exact .closure rfl frame parameters allocated
+  exact .closure rfl frame parameters copy allocated
     (.cons assigned (.singleton (lookupStatement?_sound shape.returnedFound)
       (by rw [shape.returnedForm]; intro expression impossible; cases impossible)
       (.returnValue (lookupStatement?_sound shape.returnedFound) shape.returnedForm result))) rfl

@@ -31,10 +31,10 @@ theorem InitialForward.observed_materialized_selected
       entries.map Entry.handle = selection.handles ∧
       RecursiveNamedPublicOutputSelections.Selected selection
         ((selected.make_shape shape).value selected.packet.header.context
-          (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) selected.packet.header.function.evidence)
+          (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) selected.packet.header.function.evidence)
         payload selected.packet.header.output outputFuel entries ∧
       retained.state.heap = (selected.make_shape shape).principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) (inputHeap ⟨[]⟩ .bool (.bool flag)) ∧
+        (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) (snapshotHeap ⟨[]⟩ .bool (.bool flag)) ∧
       CellAwareMaterializedOutput.EntriesAt fixture.original.recipe.compiled retained.state.mapping retained.state.world
         (owner fixture.original.recipe.compiled).key.frameLocation entries := by
   let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued selected.input.prepared selected.packet.selected
@@ -67,7 +67,7 @@ theorem InitialForward.observed_materialized_selected
     obtain ⟨reached,payload,entries,nativeEq,selectedLeaves,handles,_related,history⟩ := collect actualSelection
     have selectedPublic : RecursiveNamedPublicOutputSelections.Selected selection
         ((selected.make_shape shape).value selected.packet.header.context
-          (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) selected.packet.header.function.evidence)
+          (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) selected.packet.header.function.evidence)
         payload selected.packet.header.output outputFuel entries := selected_original atReturned.1 selectedLeaves
     obtain ⟨strongPayload,strongEq,strongValue⟩ := output _ rfl
     have payloadEq : strongPayload = payload := (Core.Value.inRight.inj (strongEq.symm.trans nativeEq)).2
@@ -76,7 +76,7 @@ theorem InitialForward.observed_materialized_selected
       artifact := first.start.artifact, session := actual.session,
       mapping := mapping, world := world,
       heap := (selected.make_shape shape).principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) (inputHeap ⟨[]⟩ .bool (.bool flag)),
+        (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) (snapshotHeap ⟨[]⟩ .bool (.bool flag)),
       store := store, caller := reached, atSession := atReturned.2.2.2,
       atRecipe := first.start.started.recipe_eq, receiving := first.initial.receiving,
       issued := first.initial.issued, extension := .refl _, registry := registry, history := history

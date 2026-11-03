@@ -299,7 +299,8 @@ theorem source_at_entry (size : Nat)
       (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt capturedEnvironment captured prefixContext) (receipt.formation.code capturedEnvironment) history (receipt.formation.support capturedEnvironment).body.toBody.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (first.rows owner.position).authority.current (first.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = (receipt.formation.code capturedEnvironment).receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys ⟨((receipt.formation.code capturedEnvironment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope), entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) size (receipt.formation.function capturedEnvironment) (receipt.formation.support capturedEnvironment).body.context
@@ -318,7 +319,7 @@ theorem source_at_entry (size : Nat)
   obtain ⟨packet, source, rows⟩ := CallableIndexedOwnedChosenNestedLambdaBodyContinuations.source_parameter_admission
     (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt capturedEnvironment captured prefixContext)
     (receipt.formation.code capturedEnvironment) history (receipt.formation.support capturedEnvironment) origin
-    functions owner observed rfl first beforeTyped argumentsTyped stable entry added length spine reached
+    functions owner observed rfl first beforeTyped argumentsTyped stable entry added length copied spine kept reached
   let nested : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State _ := ⟨reached, packet⟩
   have admitted : Admission (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller)
       (receipt.formation.support capturedEnvironment).body.context nested := ⟨source.heapTyped, rows⟩
@@ -432,7 +433,7 @@ theorem source_continuation (budget : Nat) :
       (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt capturedEnvironment captured prefixContext)
       (receipt.formation.code capturedEnvironment) history
       (receipt.formation.support capturedEnvironment).body.toBody.toContext functions owner first budget := by
-  intro entry added length spine reached size _strict outcome after trace
+  intro entry added length copied spine kept reached size _strict outcome after trace
   obtain ⟨packet, value, finalStore, finalMap, finalWorld, evaluated, represented, heaps,
       maps, worlds, frame, metadata, exit, post⟩ :=
     source_at_entry (literalRoot := literalRoot) (literalId := literalId) (node := node) (receipt := receipt)
@@ -440,7 +441,7 @@ theorem source_continuation (budget : Nat) :
       (found := found) (form := form) (singleton := singleton) (bodyLedger := bodyLedger) (bodyRuntime := bodyRuntime)
       (owner := owner) (captured := captured) (prefixContext := prefixContext) (history := history)
       (origin := origin) (observed := observed) (first := first) (beforeTyped := beforeTyped)
-      (argumentsTyped := argumentsTyped) (stable := stable) size entry added length spine reached trace
+      (argumentsTyped := argumentsTyped) (stable := stable) size entry added length copied spine kept reached trace
   obtain ⟨returned, related⟩ := post.forget
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps,
     maps, worlds, frame, metadata, exit, returned.val,

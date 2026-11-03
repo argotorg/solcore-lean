@@ -2,12 +2,13 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOr
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualInitializedClosureReceipts
 
 /-! One actual contextual formation returns its original source/native traces,
-receiving-model value and positive Member. Pure formation keeps the input heap
-and store, so the same CellOrigins receipt remains valid. Forward attachment of
-the Member supplies the strong payload at that actual native value. Ordinary
-and principal packets retain their original authority and history. The original
-Selection supplies its same-code escaped-control row; no general-model inverse,
-allocation replay or body meaning is used. -/
+receiving-model value and positive Member. Formation copies the captured cells
+over the incoming CellOrigins receipt, so that receipt holds again at the formed
+state, where the Member is the formed closure over the copies. Forward
+attachment of the Member supplies the strong payload at that actual native
+value. Ordinary and principal packets retain their original authority and
+history. The original Selection supplies its same-code escaped-control row; no
+general-model inverse, allocation replay or body meaning is used. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOriginFormationReceipts
@@ -57,56 +58,66 @@ variable {canonical : Environment}
     headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
   (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
 
+open CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation (history_at source_origin reference_index)
+
 include inclusion cells selected prefixContext observed provenance in
-/-- The original ordinary formation factory runs once under its actual
-receiving model. The strong result and heap describe the same pure tuple and
-its original packet-derived history. -/
+/-- The original ordinary formation factory runs once over the incoming
+positive cells, under its actual receiving model. The strong result, Member
+and heap describe the same formed closure over the copies of its captured
+cells and its original packet-derived history. -/
 theorem ordinary_formation
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual)) store ∧
-    receiving.Represents bodyRegistry mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual) ∧ finalStore = store) ∧
-    Member headers keys bodyRegistry faults mapping world function
-      (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual)
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
-    PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
-      (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    CellOrigins headers keys bodyRegistry registry faults profile mapping world heap store ∧
-    FunctionCalls.ResultRepresents
-      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
-      mapping world (FunctionValues.sourceType function)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) faults
-      (.value (.closure function)) (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.history_at
-          captured code support owner initial packet).native actual)) := by
-  obtain ⟨sourceTrace, nativeTrace, represented, determined, member⟩ :=
-    CallableIndexedOwnedContextualStoredClosureAssociationReceipts.formation_member
-      (captured := captured) (code := code) (support := support) (owner := owner)
-      (initial := initial) (packet := packet) (profile := profile) (prefixContext := prefixContext)
-      (observed := observed) (provenance := provenance) (functions := receiving)
-      (inclusion := inclusion) (escaped := selected.escaped) cells.runtime_hasTypes ordinary coercions
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)) captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      receiving.Represents bodyRegistry formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) ∧
+      Member headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
+      PayloadOrigins headers keys bodyRegistry registry faults profile formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      CellOrigins headers keys bodyRegistry registry faults profile formed.finalMap formed.finalWorld
+        formed.finalHeap formed.finalStore ∧
+      FunctionCalls.ResultRepresents
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) faults
+        (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding
+          (history_at captured code support owner initial packet).native formed.closureActual)) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, represented, determined⟩ :=
+    CallableIndexedOwnedGeneralLambdaValues.ordinary_lambda_of_formation initial owner captured code
+      (history_at captured code support owner initial packet) support
+      (source_origin captured code support owner initial packet) prefixContext observed
+      (reference_index captured code support) rfl profile cells copied ordinary coercions
+  have typed := (CallableIndexedOwnedGeneralLambdaValues.model headers keys bodyRegistry faults profile).runtime_hasType
+    (registry := bodyRegistry) represented
+  have member : Member headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+      (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore :=
+    .ordinary (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (support.recapture formed.captured) ⟨(source_origin captured code support owner initial packet).metadata⟩
+      prefixContext (observed.of_slots formed.slots) (reference_index captured code support) typed
+      (CallableIndexedOwnedAdmittedContextualOrdinaryLambdaFormation.provenance_recapture provenance formed.captured)
+      selected.escaped
   have payload := CallableIndexedOwnedContextualCellOrigins.payload_member (registry := registry) profile member
-  exact ⟨sourceTrace, nativeTrace, represented, determined, member, payload, cells, .value payload⟩
+  exact ⟨formed, sourceTrace, nativeTrace, inclusion member.represents, determined, member, payload, formed.heaps,
+    .value payload⟩
 
 end Ordinary
 
@@ -117,56 +128,68 @@ variable
   (packet : CallableIndexedOwnedOriginCanonicalState.Packet owner support.principal.named _ initial)
   (provenance : CallableIndexedOwnedContextualLambdaProvenance.PrincipalAt code support)
 
+open CallableIndexedOwnedMethodLambdaFormationReceipts (history_at source_origin leading reference_index)
+
 include inclusion cells selected packet provenance in
-/-- The original principal formation factory runs once. Its actual leading
-bundle, Source origin and history stay in the same Member; only a forward
-strong payload receipt is added to the unchanged input heap and store. -/
+/-- The original principal formation factory runs once over the incoming
+positive cells. Its actual leading bundle, Source origin and history stay in
+the same Member, now at the formed closure over the copies of its captured
+cells; a forward strong payload receipt is added at the formed heap and store. -/
 theorem principal_formation
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual)) store ∧
-    receiving.Represents bodyRegistry mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual) ∧ finalStore = store) ∧
-    Member headers keys bodyRegistry faults mapping world function
-      (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual)
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
-    PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
-      (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    CellOrigins headers keys bodyRegistry registry faults profile mapping world heap store ∧
-    FunctionCalls.ResultRepresents
-      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
-      mapping world (FunctionValues.sourceType function)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) faults
-      (.value (.closure function)) (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
-          captured code support owner initial packet).native actual)) := by
-  obtain ⟨sourceTrace, nativeTrace, represented, determined, member⟩ :=
-    CallableIndexedOwnedContextualStoredClosureAssociationReceipts.principal_formation_member
-      (captured := captured) (code := code) (support := support) (owner := owner)
-      (initial := initial) (packet := packet) (profile := profile) (provenance := provenance)
-      (functions := receiving) (inclusion := inclusion) (escaped := selected.escaped)
-      cells.runtime_hasTypes ordinary coercions
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)) captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      receiving.Represents bodyRegistry formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) ∧
+      Member headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
+      PayloadOrigins headers keys bodyRegistry registry faults profile formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      CellOrigins headers keys bodyRegistry registry faults profile formed.finalMap formed.finalWorld
+        formed.finalHeap formed.finalStore ∧
+      FunctionCalls.ResultRepresents
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) faults
+        (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding
+          (history_at captured code support owner initial packet).native formed.closureActual)) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, represented, determined⟩ :=
+    CallableIndexedOwnedAdmittedPrincipalLambdaFormation.principal_representation captured code support owner
+      initial packet profile cells copied ordinary coercions
+  have typed := (CallableIndexedOwnedGeneralLambdaValues.model headers keys bodyRegistry faults profile).runtime_hasType
+    (registry := bodyRegistry) represented
+  have leadingFormed : formed.captures.administrative[0]? = some support.principal.named.signature.parameterType :=
+    leading captured code support owner initial packet
+  have member : Member headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+      (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore :=
+    .principal (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (CallableIndexedOwnedMethodLambdaValues.recaptureSupport support formed.captured)
+      (CallableIndexedOwnedMethodLambdaValues.recaptureOrigin (source_origin captured code support owner initial packet)
+        formed.captured)
+      (packet.observed.of_slots formed.slots) leadingFormed (reference_index captured code support) typed
+      (CallableIndexedOwnedAdmittedContextualPrincipalLambdaFormation.provenance_recapture provenance formed.captured)
+      selected.escaped
   have payload := CallableIndexedOwnedContextualCellOrigins.payload_member (registry := registry) profile member
-  exact ⟨sourceTrace, nativeTrace, represented, determined, member, payload, cells, .value payload⟩
+  exact ⟨formed, sourceTrace, nativeTrace, inclusion member.represents, determined, member, payload, formed.heaps,
+    .value payload⟩
 
 end Principal
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOriginFormationReceipts

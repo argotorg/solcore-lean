@@ -305,6 +305,7 @@ structure LambdaWith
   nativeType : lowered.type = CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore
   ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions []
   coercions : code.sourceNode.coercions = []
+  snapshots : code.policy.snapshotLambda code.id = true
 
 theorem site_native_type {parameters : List TypedBinder} {result : TypeSystem.Ty}
     {statements : List StatementId}
@@ -345,7 +346,7 @@ theorem LambdaWith.of_site
     body := body, compilation := site.compilation, active := site.active,
     identifier := rfl, emitted := rfl, sourceType := sourceType, nativeType := nativeType,
     ordinary := by rw [requirements, coercions]; rfl,
-    coercions := coercions }⟩
+    coercions := coercions, snapshots := site.snapshots }⟩
 
 structure Lambda (caller : Header indexed.ancestry values indexed.layouts.definitions program)
     (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
@@ -365,6 +366,7 @@ structure Lambda (caller : Header indexed.ancestry values indexed.layouts.defini
   nativeType : lowered.type = CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore
   ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions []
   coercions : code.sourceNode.coercions = []
+  snapshots : code.policy.snapshotLambda code.id = true
 
 /-- The actual contextual generation site supplies every compiler field. The
 independent source annotation and complete static body stay explicit. -/
@@ -385,7 +387,7 @@ theorem Lambda.of_site {parameters : List TypedBinder} {result : TypeSystem.Ty}
     body := body, compilation := site.compilation, active := site.active,
     identifier := rfl, emitted := rfl, sourceType := sourceType, nativeType := nativeType,
     ordinary := by rw [requirements, coercions]; rfl,
-    coercions := coercions }⟩
+    coercions := coercions, snapshots := site.snapshots }⟩
 
 
 def Lambda.formed {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
@@ -442,16 +444,18 @@ theorem Lambda.reference {id : ExpressionId} {lowered : SourceCoreBasic.LoweredE
   rw [List.getElem?_take, if_pos bound, Lambda.reference_index head, ← globals]
   exact entry.reference
 
-/-- Source lambda inversion is indexed by the actual closure fields in Code.
-No body semantics or reconstructed source context is needed. -/
+/-- Source lambda inversion is indexed by the actual closure fields in Code:
+the value is the closure over the copies of the creation environment. No body
+semantics or reconstructed source context is needed. -/
 theorem source_value_of_code
     (code : Code indexed function scope administrative)
     (unique : NodeOccurrencesUnique function.source)
     (emptyCoercions : code.sourceNode.coercions = [])
-    {before after : Dynamic.Heap} {value : Dynamic.Value}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}
     (evaluation : Dynamic.ExpressionEvaluates program function.context function.evidence
-      function.source function.captured before code.id value after) :
-    value = .closure function ∧ after = before := by
+      function.source environment before code.id value after) :
+    ∃ captured, value = .closure {function with captured := captured} ∧
+      Dynamic.EnvironmentCopies function.source environment before captured after := by
   have contains := lookupExpression?_sound code.sourceFound
   cases evaluation with
   | intro found raw coercions =>
@@ -461,8 +465,8 @@ theorem source_value_of_code
     rw [emptyCoercions] at coercions
     cases coercions
     rw [code.sourceForm] at raw
-    cases raw
-    exact ⟨rfl, rfl⟩
+    cases raw with
+    | lambda _ snapshot => exact ⟨_, rfl, snapshot⟩
   | generalizedLocal found form _ _ _ _ _ _ _ =>
     have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
       (lookupExpression?_complete unique contains))
@@ -507,7 +511,8 @@ theorem Lambda.source_value {id : ExpressionId} {lowered : SourceCoreBasic.Lower
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}
     (evaluation : Dynamic.ExpressionEvaluates program context evidence
       (CallableIndexedNamedGeneration.source caller.named) environment before id value after) :
-    value = .closure (head.formed environment) ∧ after = before := by
+    ∃ captured, value = .closure (head.formed captured) ∧
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment before captured after := by
   apply source_value_of_code (head.actualCode environment) unique head.coercions
   change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
     environment before head.code.id value after
@@ -524,8 +529,9 @@ theorem Lambda.excludes_fault {id : ExpressionId} {lowered : SourceCoreBasic.Low
     environment before head.code.id reason after
   simpa only [head.identifier] using failed
 
-/-- Formation stores the complete static body in the same fixed function
-model used by the heap. The original native environment is never shortened. -/
+/-- Formation copies the captured cells and stores the complete static body
+over the copies in the same fixed function model used by the heap. The
+original native environment is never shortened. -/
 theorem Lambda.formation {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store} {canonical actual : Environment}
     {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {ξ : Renaming}
@@ -539,27 +545,41 @@ theorem Lambda.formation {id : ExpressionId} {lowered : SourceCoreBasic.LoweredE
       administrative scope environment canonical indexed.layouts.definitions)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions)
-    (stored : RuntimeStoreHasTypes world store indexed.layouts.definitions) :
-    ∃ value,
+    (heaps : GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry
+      (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile)) mapping world heap store) :
+    ∃ value captured finalHeap finalStore finalMap finalWorld,
       Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-        environment heap id (.closure (head.formed environment)) heap ∧
-      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) store ∧
+        environment heap id (.closure (head.formed captured)) finalHeap ∧
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment heap captured
+        finalHeap ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) finalStore ∧
       CompatiblePayload.ValueRep values.checked registry
         (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile)
-        mapping world head.code.sourceNode.type (.closure (head.formed environment)) value lowered.type := by
-  let captured := captures complete globals entry related agrees typed
+        finalMap finalWorld head.code.sourceNode.type (.closure (head.formed captured)) value lowered.type ∧
+      GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry
+        (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile))
+        finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap finalHeap := by
+  let current := captures complete globals entry related agrees typed
   let code := head.actualCode environment
   let history := head.history entry environment
-  let body : CallableIndexedLambdaRuntimeBody.Body code program registry faults := recaptureBody head.code head.body environment
-  obtain ⟨source, evaluated, represented⟩ := CallableIndexedLambdaRuntimeValues.formation (function := head.formed environment) (scope := scope) indexed program registry faults
-    captured code history body profile stored (head.reference complete globals entry related agrees typed)
-    entry.catalog.authority.frame.read heap head.ordinary head.coercions
-  refine ⟨CallableIndexedLambdaValues.value code captured.embedding history.native actual, ?_, ?_, ?_⟩
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation current code history head.snapshots
+    (Lambda.reference_index head) heaps (head.reference complete globals entry related agrees typed)
+    entry.catalog.authority.frame.read
+  let body : CallableIndexedLambdaRuntimeBody.Body formed.closureCode program registry faults :=
+    recaptureBody head.code head.body formed.captured
+  obtain ⟨source, evaluated, represented⟩ := CallableIndexedLambdaRuntimeValues.formation indexed program registry
+    faults formed body profile heaps.runtime_hasTypes head.ordinary head.coercions
+  refine ⟨CallableIndexedLambdaValues.value code formed.embedding history.native formed.closureActual,
+    formed.captured, formed.finalHeap, formed.finalStore, formed.finalMap, formed.finalWorld, ?_, formed.copy, ?_, ?_,
+    formed.heaps, formed.maps, formed.worlds, formed.frame, formed.copy.metadata_extends⟩
   · change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-      environment heap head.code.id (.closure (head.formed environment)) heap at source
+      environment heap head.code.id (.closure (head.formed formed.captured)) formed.finalHeap at source
     simpa only [head.identifier] using source
   · exact Eq.mp (congrArg (fun expression => Evaluates actual store expression
-      (.inRight .word (CallableIndexedLambdaValues.value code captured.embedding history.native actual)) store)
+      (.inRight .word (CallableIndexedLambdaValues.value code formed.embedding history.native formed.closureActual))
+        formed.finalStore)
       (congrArg (fun output : SourceCoreBasic.LoweredExpr => output.expression.rename ξ) head.emitted)) evaluated
   · rw [head.sourceType, head.nativeType]
     exact .function represented
@@ -637,9 +657,12 @@ theorem preserves_at
   subst node
   cases trace.sound with
   | value evaluated =>
-    obtain ⟨rfl, rfl⟩ := head.source_value unique evaluated
-    obtain ⟨value, _, native, represented⟩ := head.formation profile complete alignment.globals entry related agrees typed heaps.runtime_hasTypes
-    exact ⟨_, store, mapping, world, native, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+    obtain ⟨captured, rfl, copy⟩ := head.source_value unique evaluated
+    obtain ⟨value, formedCaptured, finalHeap, finalStore, finalMap, finalWorld, _, formedCopy, native, represented,
+        finalHeaps, maps, worlds, frame, metadata⟩ :=
+      head.formation profile complete alignment.globals entry related agrees typed heaps
+    obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formedCopy
+    exact ⟨_, finalStore, finalMap, finalWorld, native, .value represented, finalHeaps, maps, worlds, frame, metadata⟩
   | fault failed => exact False.elim (head.excludes_fault unique failed)
 
 theorem reflects_at
@@ -660,14 +683,17 @@ theorem reflects_at
   rw [alignment.source] at found
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨nativeValue, source, native, represented⟩ := head.formation profile complete alignment.globals entry related agrees typed heaps.runtime_hasTypes
+  obtain ⟨nativeValue, captured, finalHeap, formedStore, finalMap, finalWorld, source, _, native, represented,
+      finalHeaps, maps, worlds, frame, metadata⟩ :=
+    head.formation profile complete alignment.globals entry related agrees typed heaps
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound native
   have original : Dynamic.ExpressionEvaluatesOutcome program context evidence caller.function.source environment before id
-      (.value (.closure (head.formed environment))) before := by
+      (.value (.closure (head.formed captured))) finalHeap := by
     rw [alignment.source]
     exact .value source
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size original
-  exact ⟨sourceSize, _, before, mapping, world, sized, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+  exact ⟨sourceSize, _, finalHeap, finalMap, finalWorld, sized, .value represented, finalHeaps, maps, worlds, frame,
+    metadata⟩
 
 section GenericLambda
 variable {expressionSyntax : TypedSource → ExpressionId → Prop}

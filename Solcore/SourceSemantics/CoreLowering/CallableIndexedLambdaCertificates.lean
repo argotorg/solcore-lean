@@ -2,9 +2,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedFormation
 import Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode
 import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
 
-/-! Static receipts from the actual lambda branch, including marked parameter
-allocation and both production lambda hooks. Body compilation is retained as
-an equation, with no premise about executing that body. -/
+/-! Static receipts from the actual lambda branch, including the copies of the
+captures at each call and at creation, marked parameter allocation and both
+production lambda hooks. Body compilation is retained as an equation, with no
+premise about executing that body. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCertificates
 open Core Frontend SourceInference
@@ -38,8 +39,10 @@ structure Certificate (policy : SourceCoreFunctions.Policy) (lowerBody : SourceC
     reasonAt compilation.internalReason compilation.internalReason = .ok body
   allocatedBody : Core.Expr
   allocated : parameterBody policy source scope loweredParameters resultCore body = .ok allocatedBody
+  copiedBody : Core.Expr
+  copied : SourceCoreSourceCells.copyScope policy.sourceCells source scope (· + 1) allocatedBody = .ok copiedBody
   rawBody : Core.Expr
-  bodyHook : policy.rawLambdaBody compilation source scope node parameterCore resultCore allocatedBody = .ok rawBody
+  bodyHook : policy.rawLambdaBody compilation source scope node parameterCore resultCore copiedBody = .ok rawBody
   checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reported
     (policy.callables.functionType parameterCore resultCore) = .ok ()
   rawLambda : Core.Expr
@@ -48,7 +51,11 @@ structure Certificate (policy : SourceCoreFunctions.Policy) (lowerBody : SourceC
   expression : Core.Expr
   decoration : policy.callables.decorateCallable compilation source node (.lambda id) parameterCore resultCore
     (LanguageResult.success (TaggedFunction.anonymous rawLambda)) = .ok expression
-  emitted : lowered = ⟨reported, expression⟩
+  snapshotted : Core.Expr
+  snapshot : (if policy.snapshotLambda id then
+      SourceCoreSourceCells.copyScope policy.sourceCells source scope (fun index => index) expression
+    else .ok expression) = .ok snapshotted
+  emitted : lowered = ⟨reported, snapshotted⟩
 
 private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {output : β}
     (accepted : action >>= next = .ok output) :
@@ -96,25 +103,33 @@ theorem of_accepted
           obtain ⟨body, bodyCompiled, accepted⟩ := bind_ok accepted
           have combined : (do
               let allocatedBody ← parameterBody policy source scope loweredParameters resultCore body
-              let rawBody ← policy.rawLambdaBody compilation source scope node parameterCore resultCore allocatedBody
+              let copiedBody ← SourceCoreSourceCells.copyScope policy.sourceCells source scope (· + 1) allocatedBody
+              let rawBody ← policy.rawLambdaBody compilation source scope node parameterCore resultCore copiedBody
               SourceCoreBasic.ensureType (.occurrence id.occurrence) reported (policy.callables.functionType parameterCore resultCore)
               let rawLambda ← policy.rawLambdaExpression compilation source scope node parameterCore resultCore
                 (.lambda parameterCore (LanguageResult.resultType resultCore) rawBody)
               let expression ← policy.callables.decorateCallable compilation source node (.lambda id) parameterCore resultCore
                 (LanguageResult.success (TaggedFunction.anonymous rawLambda))
-              pure (⟨reported, expression⟩ : SourceCoreBasic.LoweredExpr)) = .ok lowered := by
-            cases cells : policy.sourceCells <;>
-              simpa only [parameterBody, cells, bind, Except.bind, pure, Except.pure] using accepted
+              let snapshotted ← (if policy.snapshotLambda id then
+                SourceCoreSourceCells.copyScope policy.sourceCells source scope (fun index => index) expression
+              else .ok expression)
+              pure (⟨reported, snapshotted⟩ : SourceCoreBasic.LoweredExpr)) = .ok lowered := by
+            cases cells : policy.sourceCells <;> cases snapshot : policy.snapshotLambda id <;>
+              simpa only [parameterBody, cells, snapshot, bind, Except.bind, pure, Except.pure, ↓reduceIte,
+                Bool.false_eq_true] using accepted
           obtain ⟨allocatedBody, allocated, accepted⟩ := bind_ok combined
+          obtain ⟨copiedBody, copied, accepted⟩ := bind_ok accepted
           obtain ⟨rawBody, bodyHook, accepted⟩ := bind_ok accepted
           obtain ⟨checked, checkedType, accepted⟩ := bind_ok accepted
           cases checked
           obtain ⟨rawLambda, expressionHook, accepted⟩ := bind_ok accepted
           obtain ⟨expression, decoration, accepted⟩ := bind_ok accepted
+          obtain ⟨snapshotted, snapshot, accepted⟩ := bind_ok accepted
           cases accepted
           exact ⟨⟨parameter, parameterCore, resultCore, sourceType, bundle, parameterProjected, resultProjected,
             loweredParameters, bodyScope, parametersCompiled, body, bodyCompiled, allocatedBody, allocated,
-            rawBody, bodyHook, checkedType, rawLambda, expressionHook, expression, decoration, rfl⟩⟩
+            copiedBody, copied, rawBody, bodyHook, checkedType, rawLambda, expressionHook, expression, decoration,
+            snapshotted, snapshot, rfl⟩⟩
         · simp [bundle, resultSame, throw] at accepted
       · simp [bundle, throw] at accepted
     | «variable» | parameter | constructor | application | product | mapping | proxy | comptime | error =>

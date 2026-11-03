@@ -146,7 +146,7 @@ section OriginalClosure
 variable {program : Program} {context : SourceSemantics.Context} {caller invocation : Dynamic.EvidenceEnvironment}
   {before bound after : Dynamic.Heap} {function : Dynamic.Closure} {arguments : List Dynamic.Value}
   {bodySize : Nat} {parameterTypes : List TypeSystem.Ty} {callContext finalContext : SourceSemantics.Context}
-  {environment finalEnvironment : Dynamic.Environment}
+  {entry environment finalEnvironment : Dynamic.Environment} {copied : Dynamic.Heap}
 
 theorem original_closure_arity (mismatch : function.parameters.length ≠ arguments.length) :
     ClosureCompletion program context caller invocation before function arguments 1
@@ -156,66 +156,93 @@ theorem original_closure_arity (mismatch : function.parameters.length ≠ argume
 theorem original_closure_returned {value : Dynamic.Value}
     (same : invocation = function.evidence) (frame : Dynamic.ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes callContext)
-    (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (executed : SourceExecutionSize.FunctionStatementsExecute program bodySize callContext function.evidence function.source
       environment bound function.body finalContext (.returned value) after) :
     ClosureCompletion program context caller invocation before function arguments (SourceExecutionSize.stepSize [bodySize]) (.value value) after :=
-  closure_completed_sized (.value (.closure same frame parameters allocation executed rfl))
+  closure_completed_sized (.value (.closure same frame parameters copy allocation executed rfl))
 
 theorem original_closure_unit
     (same : invocation = function.evidence) (frame : Dynamic.ClosureFrame program function) (unit : function.resultType = .unit)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes callContext)
-    (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (executed : SourceExecutionSize.FunctionStatementsExecute program bodySize callContext function.evidence function.source
       environment bound function.body finalContext (.fallthrough finalEnvironment) after) :
     ClosureCompletion program context caller invocation before function arguments (SourceExecutionSize.stepSize [bodySize]) (.value .unit) after :=
-  closure_completed_sized (.value (.closureUnit same frame unit parameters allocation executed ⟨finalEnvironment, rfl⟩))
+  closure_completed_sized (.value (.closureUnit same frame unit parameters copy allocation executed ⟨finalEnvironment, rfl⟩))
 
 theorem original_closure_fault {reason : Dynamic.SemanticFault}
     (same : invocation = function.evidence) (frame : Dynamic.ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes callContext)
-    (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (failed : SourceExecutionSize.FunctionStatementsFault program bodySize callContext function.evidence function.source
       environment bound function.body finalContext reason after) :
     ClosureCompletion program context caller invocation before function arguments (SourceExecutionSize.stepSize [bodySize]) (.fault reason) after :=
-  closure_completed_sized (.fault (.closureBody same frame parameters allocation failed))
+  closure_completed_sized (.fault (.closureBody same frame parameters copy allocation failed))
 
 theorem original_closure_control_escape
     (same : invocation = function.evidence) (frame : Dynamic.ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes callContext)
-    (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (executed : SourceExecutionSize.FunctionStatementsExecute program bodySize callContext function.evidence function.source
       environment bound function.body finalContext (.breaking finalEnvironment) after) :
     ClosureCompletion program context caller invocation before function arguments (SourceExecutionSize.stepSize [bodySize]) (.fault .controlEscapedFunction) after :=
-  closure_completed_sized (.fault (.closureControlEscape same frame parameters allocation executed (Or.inl ⟨finalEnvironment, rfl⟩)))
+  closure_completed_sized (.fault (.closureControlEscape same frame parameters copy allocation executed (Or.inl ⟨finalEnvironment, rfl⟩)))
 
+/-- A reached closure application retains the copies of its captures, made
+from the call's heap, and the parameter allocation over the copies. -/
 theorem retained_captured_allocation {size : Nat} {outcome : Dynamic.ExpressionOutcome}
     (original : CallOutcome program size context caller invocation before (.closure function) arguments outcome after)
     (arity : function.parameters.length = arguments.length) :
-    ∃ child types childContext childEnvironment allocated,
+    ∃ child types childContext entry copied childEnvironment allocated,
       invocation = function.evidence ∧ Dynamic.ClosureFrame program function ∧
       MonoBindersExtend function.source.owner function.context function.parameters types childContext ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments childEnvironment allocated ∧
+      Dynamic.EnvironmentCopies function.source function.captured before entry copied ∧
+      Dynamic.BindersAllocate entry copied function.parameters arguments childEnvironment allocated ∧
       BodyTrace program child function childContext childEnvironment allocated outcome after ∧ child < size := by
   cases closure_completed_sized original with
   | arity mismatch => exact False.elim (mismatch arity)
-  | reached same frame parameters allocation body smaller _ => exact ⟨_, _, _, _, _, same, frame, parameters, allocation, body, smaller⟩
+  | reached same frame parameters copy allocation body smaller _ =>
+    exact ⟨_, _, _, _, _, _, _, same, frame, parameters, copy, allocation, body, smaller⟩
 
+/-- With no parameters the body runs in the copies of the captures, from the
+heap the copies end in. Both bindings of a shadowed name are copied and keep
+their order. -/
 theorem empty_arity_keeps_shadowed_captures {size : Nat} {outcome : Dynamic.ExpressionOutcome}
     {name : Resolved.LocalId} {first second : Dynamic.Location} {unused : Dynamic.Environment}
     (parameters : function.parameters = [])
     (captured : function.captured = (name, first) :: (name, second) :: unused)
     (original : CallOutcome program size context caller invocation before (.closure function) [] outcome after) :
-    ∃ child types childContext,
+    ∃ child types childContext firstCopy secondCopy unusedCopies copied,
       invocation = function.evidence ∧ Dynamic.ClosureFrame program function ∧
       MonoBindersExtend function.source.owner function.context [] types childContext ∧
-      BodyTrace program child function childContext ((name, first) :: (name, second) :: unused) before outcome after ∧ child < size := by
-  obtain ⟨child, types, childContext, childEnvironment, allocated, same, frame, typed, allocation, body, smaller⟩ :=
-    retained_captured_allocation original (by simp [parameters])
-  rw [parameters] at typed
-  rw [parameters, captured] at allocation
+      Dynamic.EnvironmentCopies function.source ((name, first) :: (name, second) :: unused) before
+        ((name, firstCopy) :: (name, secondCopy) :: unusedCopies) copied ∧
+      BodyTrace program child function childContext ((name, firstCopy) :: (name, secondCopy) :: unusedCopies)
+        copied outcome after ∧ child < size := by
+  obtain ⟨child, types, childContext, entry, copied, childEnvironment, allocated, same, frame, typed, copy,
+    allocation, body, smaller⟩ := retained_captured_allocation original (by simp [parameters])
+  rw [parameters] at typed allocation
+  rw [captured] at copy
   cases allocation
-  exact ⟨child, types, childContext, same, frame, typed, body, smaller⟩
+  have shape : ∃ firstCopy secondCopy unusedCopies,
+      entry = (name, firstCopy) :: (name, secondCopy) :: unusedCopies := by
+    cases copy with
+    | shared _ tail =>
+      cases tail with
+      | shared _ _ => exact ⟨_, _, _, rfl⟩
+      | copied _ _ _ _ => exact ⟨_, _, _, rfl⟩
+    | copied _ _ _ tail =>
+      cases tail with
+      | shared _ _ => exact ⟨_, _, _, rfl⟩
+      | copied _ _ _ _ => exact ⟨_, _, _, rfl⟩
+  obtain ⟨firstCopy, secondCopy, unusedCopies, rfl⟩ := shape
+  exact ⟨child, types, childContext, firstCopy, secondCopy, unusedCopies, copied, same, frame, typed, copy, body,
+    smaller⟩
 end OriginalClosure
 
 section ExistingNamedAndBuiltin

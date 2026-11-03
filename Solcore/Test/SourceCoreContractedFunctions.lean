@@ -57,7 +57,7 @@ private theorem artifact_exists : Nonempty
       [] .unit [] functionType (emitted descriptor)) := by
   apply DecoratedFunctionCode.lambda_of_accepted (ordinaryCells := rfl) (ordinaryBody := rfl) (ordinaryExpression := rfl) (lowerBody := lowerBody) (fuel := 0)
     (policy := policy descriptor) (context := compilation) (source := source) (scope := []) (id := id) (node := node)
-    (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl
+    (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl rfl
   · intro budget bodyScope type code accepted
     simp only [lowerBody, SourceCoreBasic.lowerStatements] at accepted
     split at accepted
@@ -137,20 +137,38 @@ private def generated : Core.Value := .pair (FunctionValues.value .unit .unit
 private theorem raw_body : (artifact descriptor).raw.rawBody = Core.LanguageResult.success .unit := by
   have binders := (artifact descriptor).raw.parametersTree.binders
   have noParameters : (artifact descriptor).raw.loweredParameters = [] := List.map_eq_nil_iff.mp binders
-  simp only [FunctionCode.LambdaCertificate.rawBody, noParameters, SourceCoreFunctions.bindParameters,
-    List.zipIdx_nil, List.foldr_nil, List.length_nil, (artifact descriptor).raw.bodyTree.2.2]
+  simp only [FunctionCode.LambdaCertificate.rawBody, SourceCoreSourceCells.copyScopePlain_nil, noParameters,
+    SourceCoreFunctions.bindParameters, List.zipIdx_nil, List.foldr_nil, List.length_nil,
+    (artifact descriptor).raw.bodyTree.2.2]
   simp only [Core.LanguageResult.success, Core.Expr.weakenAt]
 
+private def model : GenericHeap.PayloadModel catalog :=
+  ContractedFunctionValues.model catalog program bodyCertificate table
+
+/-- With no captures there is nothing to copy, so the emitted wrapper
+evaluates directly to the generated value without changing the store. -/
+private theorem formed : Core.Evaluates actual [] ((emitted descriptor).expression.rename layout.embedding)
+    (.inRight .word (generated descriptor)) [] := by
+  simpa only [emitted, generated, FunctionValues.value, Core.LanguageResult.success,
+    Core.TaggedFunction.anonymous, SourceCoreCallableContracts.Descriptor.wrap, Core.CallableContract.wrap,
+    Core.Expr.rename] using
+    (Core.Evaluates.inRight (.pair (.pair (.inLeft .unit) .lambda) .word) :
+      Core.Evaluates actual [] _ _ [])
+
+/-- Formation over the empty capture copies nothing: the source closure keeps
+its empty capture and the heap, and the emitted wrapper is `formed`. -/
 example : Dynamic.ExpressionEvaluates program context [] source [] ⟨[]⟩ id (.closure function) ⟨[]⟩ ∧
     Core.Evaluates actual [] ((emitted descriptor).expression.rename layout.embedding)
       (.inRight .word (generated descriptor)) [] := by
-  obtain ⟨sourceEval, coreEval, _⟩ := ContractedFunctionValues.formation_corresponds layout (code descriptor) ⟨[]⟩ [] rfl rfl
-  refine ⟨sourceEval, ?_⟩
-  change Core.Evaluates actual [] ((emitted descriptor).expression.rename layout.embedding)
-    (.inRight .word (ContractedFunctionValues.value (artifact descriptor).raw.parameterCore
-      (artifact descriptor).raw.resultCore (artifact descriptor).raw.rawBody layout.embedding actual descriptor.id)) [] at coreEval
-  rw [raw_body descriptor, parameter_type descriptor, result_type descriptor] at coreEval
-  exact coreEval
+  refine ⟨?_, formed descriptor⟩
+  apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound (code descriptor).artifact.raw.found)
+  · rw [(code descriptor).artifact.raw.form]
+    exact .lambda rfl (.nil _)
+  · exact .nil
+
+/-- The authenticated formation over the empty initial heap. -/
+example := ContractedFunctionValues.formation_corresponds layout (code descriptor)
+  (GenericHeap.HeapRepresents.empty (model := model (table := table))) rfl rfl
 
 example (identities : Dynamic.Value → Core.Word → Prop) :
     DataEqualityValues.Observation catalog signatures identities functionType (.closure function) (generated descriptor) := by
@@ -171,12 +189,7 @@ example : CoreProof.ContinuationAgreement actual []
     (.unit :: actual) [] (Core.LanguageResult.success .unit) := by
   apply ContractedFunctionCalls.accepted_call_agreement (contract := descriptor.id)
     (identity := .inLeft .word .unit) (parameter := .unit) (middle := []) (applied := [])
-  · have evaluated := (ContractedFunctionValues.formation layout (code descriptor) []).1
-    change Core.Evaluates actual [] ((emitted descriptor).expression.rename layout.embedding)
-      (.inRight .word (ContractedFunctionValues.value (artifact descriptor).raw.parameterCore
-        (artifact descriptor).raw.resultCore (artifact descriptor).raw.rawBody layout.embedding actual descriptor.id)) [] at evaluated
-    rw [raw_body descriptor, parameter_type descriptor, result_type descriptor] at evaluated
-    simpa only [ContractedFunctionValues.value, FunctionValues.value, Core.LanguageResult.success, Core.Expr.rename] using evaluated
+  · simpa only [generated, FunctionValues.value, Core.LanguageResult.success, Core.Expr.rename] using formed descriptor
   · simp [Core.CallableContract.decision, Core.CallableContract.Gate.reason]
   · simpa only [Core.LanguageResult.success, Core.Expr.weakenAt] using
       (Core.Evaluates.inRight (leftType := Core.Ty.word) Core.Evaluates.unit :

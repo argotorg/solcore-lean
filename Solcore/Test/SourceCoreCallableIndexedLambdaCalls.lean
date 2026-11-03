@@ -123,7 +123,16 @@ def run : IO Unit := do
           (finalStore[0]? == some (encode prepared.ancestry.layout.frame .empty))
           "lambda payload call did not restore the original caller frame"
         if name == "zero" then
-          SourceCompilerFeatureSupport.require (finalStore == store) "zero-parameter pure call changed the store"
+          -- The call only makes the marked copy of its captured seed: the
+          -- allocator's entry, the marker naming the copied snapshot cell, and
+          -- the copied payload.
+          let seed : Core.Value := .inRight .unit (.word (word 3))
+          let copied := match finalStore.drop store.length with
+            | [_, .constructed _ (.cellRef _ snapshot), payload] =>
+              payload == seed && store[snapshot]? == some seed
+            | _ => false
+          SourceCompilerFeatureSupport.require (finalStore.take store.length == store && copied)
+            "zero-parameter pure call did more than make the marked copy of its captured seed"
         else
           SourceCompilerFeatureSupport.require (finalStore.length > store.length)
             "lambda parameter/body allocations were lost"

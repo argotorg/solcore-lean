@@ -3,7 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTe
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 
 /-! The actual factory Source trace identifies the returned ordinary closure.
-The witness keeps the captured environment produced by that same trace. -/
+The witness keeps the captured environment produced by that same trace: the
+lambda copies the local's cell, and the copy holds the local's value. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedLocal
@@ -90,9 +91,10 @@ private theorem lambda_shape
     (form : node.form = .lambda [] .word body)
     (uncoerced : node.coercions = [])
     (trace : Dynamic.ExpressionEvaluates program context evidence source environment before id value after) :
-    ∃ function : Dynamic.Closure,
+    ∃ (function : Dynamic.Closure) (captured : Dynamic.Environment),
       value = .closure function ∧ function.parameters = [] ∧ function.resultType = .word ∧
-      function.captured = environment ∧ function.context = context ∧ after = before := by
+      function.captured = captured ∧ function.context = context ∧
+      Dynamic.EnvironmentCopies source environment before captured after := by
   have same {other : ExpressionNode} (contains : ContainsExpression source id other) : other = node :=
     Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   cases trace with
@@ -102,8 +104,8 @@ private theorem lambda_shape
     rw [uncoerced] at coercions
     cases coercions
     rw [form] at raw
-    cases raw
-    exact ⟨_, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    cases raw with
+    | lambda _ snapshot => exact ⟨_, _, rfl, rfl, rfl, rfl, rfl, snapshot⟩
   | generalizedLocal contains otherForm _ _ _ _ _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
@@ -248,7 +250,7 @@ theorem ActualHeader.returned_capture
       have impossible := (same contains) ▸ otherForm
       rw [observed.shape.initializedForm] at impossible
       cases impossible
-    | letGeneralized contains form _captures polymorphic _extended _allocated _next =>
+    | letGeneralized contains form _snapshot _captures polymorphic _extended _allocated _next =>
       have nodeEq := same contains
       cases nodeEq
       rw [observed.shape.initializedForm] at form
@@ -265,16 +267,23 @@ theorem ActualHeader.returned_capture
         observed.shape.initialReadForm observed.shape.initialReadCoercions
         .head parameterCell initializer.sound.value_plain
       subst_vars
-      obtain ⟨function, valueEq, params, result, captures, contextEq, heapEq⟩ :=
+      obtain ⟨function, captured, valueEq, params, result, captures, contextEq, copy⟩ :=
         lambda_shape unique expressionFound observed.lambda observed.coercions
           (returned_expression unique statementFound observed.returnStatement next)
-      refine ⟨function, valueEq, params, result, ?_, localLocation, ?_, ?_⟩
+      obtain ⟨location, lookup⟩ : ∃ location,
+          Dynamic.Environment.LooksUp captured observed.localBinder.id location := by
+        cases copy with
+        | shared _ _ => exact ⟨_, .head⟩
+        | copied _ _ _ _ => exact ⟨_, .head⟩
+      obtain ⟨original, originalLookup, reads⟩ := copy.looksUp lookup
+      have sameOriginal := originalLookup.functional .head
+      subst sameOriginal
+      refine ⟨function, valueEq, params, result, ?_, location, ?_, ?_⟩
       · rw [contextEq, ← sourceEq]
         exact extended
       · rw [captures]
-        exact .head
-      · rw [heapEq]
-        simpa only [observed.localScheme, TypeSystem.Scheme.mono] using allocated.reads_new
+        exact lookup
+      · exact reads _ (by simpa only [observed.localScheme, TypeSystem.Scheme.mono] using allocated.reads_new)
 
 /-- The structural consequence used by generic direct invocation. -/
 theorem ActualHeader.returned_closure

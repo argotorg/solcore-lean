@@ -52,9 +52,9 @@ theorem SelectedInventory.make_source_body_selected (selected : SelectedInventor
       selected.packet.header.function.source (inputEnvironment shape.principal.input before)
       (inputHeap before .bool (.bool flag)) selected.packet.header.function.body final
       (.returned (shape.value selected.packet.header.context
-        (inputEnvironment shape.principal.input before) selected.packet.header.function.evidence))
+        (snapshotEnvironment shape.principal.input before .bool (.bool flag)) selected.packet.header.function.evidence))
       (shape.principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment shape.principal.input before) (inputHeap before .bool (.bool flag))) := by
+        (snapshotEnvironment shape.principal.input before .bool (.bool flag)) (snapshotHeap before .bool (.bool flag))) := by
   let header := selected.packet.header
   have allocation : Dynamic.Heap.Allocates before .bool (some (.bool flag))
       ⟨before.cells.length⟩ (inputHeap before .bool (.bool flag)) := .append
@@ -69,6 +69,7 @@ theorem SelectedInventory.make_source_body_selected (selected : SelectedInventor
   rw [selected.make_statements shape] at typed
   obtain ⟨next, body⟩ := shape.body_from_source header.function.evidence
     (inputEnvironment shape.principal.input before) (inputHeap before .bool (.bool flag))
+    (shape.principal.input_snapshot before _ _)
     certified.runtime.graph.nodeOccurrencesUnique typed
   exact ⟨bound, next, selected.make_statements shape ▸ body⟩
 
@@ -84,9 +85,9 @@ theorem SelectedInventory.capture_source_body_selected (selected : SelectedInven
       selected.packet.header.function.source (inputEnvironment shape.principal.input before)
       (inputHeap before .word (.word seed)) selected.packet.header.function.body final
       (.returned (shape.value selected.packet.header.context
-        (inputEnvironment shape.principal.input before) selected.packet.header.function.evidence))
+        (snapshotEnvironment shape.principal.input before .word (.word seed)) selected.packet.header.function.evidence))
       (shape.principal.allocatedHeap selected.packet.header.context
-        (inputEnvironment shape.principal.input before) (inputHeap before .word (.word seed))) := by
+        (snapshotEnvironment shape.principal.input before .word (.word seed)) (snapshotHeap before .word (.word seed))) := by
   let header := selected.packet.header
   have allocation : Dynamic.Heap.Allocates before .word (some (.word seed))
       ⟨before.cells.length⟩ (inputHeap before .word (.word seed)) := .append
@@ -101,6 +102,7 @@ theorem SelectedInventory.capture_source_body_selected (selected : SelectedInven
   rw [selected.capture_statements shape] at typed
   obtain ⟨next, body⟩ := shape.body_from_source header.function.evidence
     (inputEnvironment shape.principal.input before) (inputHeap before .word (.word seed))
+    (shape.principal.input_snapshot before _ _)
     certified.runtime.graph.nodeOccurrencesUnique typed
   exact ⟨bound, next, selected.capture_statements shape ▸ body⟩
 

@@ -3,8 +3,8 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaViewCalls
 import Solcore.Test.SourceCoreCallableIndexedLambdaValues
 
 /-! Original indexed lambda completions expose a strict body witness and the
-actual typed allocation state, including complete captures and frame restore.
-The empty argument case keeps the frame/manifest boundary. Runtime regressions
+actual typed allocation state, including the copies of the complete captures
+and frame restore. The empty argument case keeps the frame/manifest boundary. Runtime regressions
 reuse real ordered-parameter, capture, fault and resume fixtures. No old Entry
 identity or source body meaning is inferred from the reached prefix. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
@@ -38,7 +38,8 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
 
 include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
 /-- The consumer keeps the body subderivation of the supplied application,
-and reads the ordered lexical prefix from its reached state. -/
+and reads the ordered lexical prefix from its reached state: the parameters
+over the copies of the captured scope, with every slot past the scope kept. -/
 theorem original_application {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -49,15 +50,17 @@ theorem original_application {size : Nat} {result : Value} {finalStore : Store}
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
         finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) ∧
-        ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-          reached.canonical = added ++ captured.canonical := by
+        ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+          reached.canonical = added ++ copied ∧
+          ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]? := by
   obtain ⟨reached, child, bodyStore, smaller, evaluated, restored⟩ :=
     application_prefix captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed completed
   exact ⟨reached, child, bodyStore, smaller, evaluated, restored, reached.spine⟩
 
 include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
 /-- Zero arguments retain the original strict body edge; the canonical
-lexical spine has no added parameter values. Administrative values remain. -/
+lexical spine has no added parameter values. The scope slots hold the copies,
+and every administrative slot past the scope keeps its index and value. -/
 theorem empty_arguments_strict {size : Nat} {result : Value} {finalStore : Store}
     (empty : nativeArguments = [])
     (completed : EvaluationSize size
@@ -69,15 +72,15 @@ theorem empty_arguments_strict {size : Nat} {result : Value} {finalStore : Store
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
         finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) ∧
-        reached.canonical = captured.canonical := by
+        ∀ slot, scope.length ≤ slot → reached.canonical[slot]? = captured.canonical[slot]? := by
   obtain ⟨reached, child, bodyStore, smaller, evaluated, restored⟩ :=
     application_prefix captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed completed
-  obtain ⟨added, length, spine⟩ := reached.spine
+  obtain ⟨added, copied, length, spine, slots⟩ := reached.spine
   have parameters : code.receipt.loweredParameters.length = 0 := by
     simpa [empty] using represented.length.2
   have noValues : added = [] := List.eq_nil_of_length_eq_zero (length.trans parameters)
-  rw [noValues] at spine
-  exact ⟨reached, child, bodyStore, smaller, evaluated, restored, by simpa using spine⟩
+  rw [noValues, List.nil_append] at spine
+  exact ⟨reached, child, bodyStore, smaller, evaluated, restored, fun slot outside => spine ▸ slots slot outside⟩
 
 include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
 /-- This consumer erases only the extracted child witness. It never chooses a

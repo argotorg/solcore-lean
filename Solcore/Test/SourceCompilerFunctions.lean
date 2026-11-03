@@ -24,14 +24,52 @@ private def workspace : Workspace.RawWorkspace := {
   ] }]
 }
 
+/-- Closures capture by value: every call starts from the closure's
+creation-time copies, and assignments in a body write only that call's copies. -/
 private def testValues (program : CheckedProgram) : IO Unit := do
-  let pair : Value := .product (scalar 4) (scalar 7)
-  for (name, expected) in [("named", scalar 3), ("returned", pair), ("shared", pair), ("selfCell", scalar 2)] do
+  let pair : Value := .product (scalar 4) (scalar 5)
+  for (name, expected) in [("named", scalar 3), ("returned", pair), ("shared", pair)] do
     let compiled ← compileNamed program name
     for _ in [0, 1] do
       require ((← compiled.run [scalar 2]) == expected)
         s!"{name}: capture, indirect call or cached entry reuse changed"
     compiled.checkResume [scalar 2] expected
+
+/-- `loop` is assigned after the closure is created, so the closure's copy of
+`loop` is uninitialized and its first recursive read fails, also after a
+resumed checkpoint. -/
+private def testSelfCell (program : CheckedProgram) : IO Unit := do
+  let compiled ← compileNamed program "selfCell"
+  let function ← match program.functions.find? (·.declaration == compiled.key.declaration) with
+    | some function => pure function | none => throw (IO.userError "selfCell source function missing")
+  let (node, binder) ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference "loop" (.local binder), .. } => some (node, binder)
+      | _ => none with
+    | some read => pure read | none => throw (IO.userError "selfCell closure-body read missing")
+  let expected : SourceCoreFaultSites.Diagnostic := {
+    error := .uninitializedLocal binder, site := .occurrence node.id.occurrence, span := some node.span }
+  for _ in [0, 1] do
+    let invocation ← compiled.invoke [scalar 2]
+    match invocation.outcome with
+    | .failed reason _ =>
+        require (decide ((← invocation.diagnostic reason) = some expected))
+          "selfCell: failure or cached entry reuse lost the uninitialized copy's read site"
+    | _ => throw (IO.userError "selfCell: closure read of its uninitialized copy did not fail")
+  let artifact ← compiled.execution.open
+  let session ← boot artifact
+  let (reason, failed) ← match ← get "complete selfCell invocation"
+      (← session.run compiled.key [scalar 2] executionOptions) with
+    | .failed reason failed => pure (reason, failed)
+    | _ => throw (IO.userError "selfCell: complete invocation did not fail")
+  let checkpoint ← match ← get "suspended selfCell invocation"
+      (← session.run compiled.key [scalar 2] {executionOptions with executionFuel := 10}) with
+    | .outOfFuel checkpoint => pure checkpoint
+    | _ => throw (IO.userError "selfCell: small execution budget did not suspend")
+  match ← checkpoint.resume 300000 1024 with
+  | .failed resumedReason resumed =>
+      require (resumedReason == reason && resumed.heapSize == failed.heapSize)
+        "selfCell: resume changed the failure or allocated native world"
+  | _ => throw (IO.userError "selfCell: resumed checkpoint did not fail")
 
 private def testFailure (program : CheckedProgram) : IO Unit := do
   let compiled ← compileNamed program "failure"
@@ -54,5 +92,6 @@ private def testFailure (program : CheckedProgram) : IO Unit := do
 def run : IO Unit := do
   let program ← get "function checking" (checkProgram workspace)
   testValues program
+  testSelfCell program
   testFailure program
 end Tests.SourceCompilerFunctions

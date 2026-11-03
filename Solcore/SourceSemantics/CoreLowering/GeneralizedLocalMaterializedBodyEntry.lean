@@ -28,6 +28,8 @@ theorem entry_exists_with_spine
     (producer : ProtectedStateTransition.CellAllocation.Producer
       (catalog := CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
       protocol compiled.indexed.layouts compiled.indexed.ancestry.layout.frame cells)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (rebinds : ProtectedStateTransition.Rebinds protocol)
     {arguments : List Dynamic.Value} {nativeArguments : List Value}
     (represented : CallableIndexedParameterMeaning.Arguments
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -47,8 +49,9 @@ theorem entry_exists_with_spine
       ∃ entry : GeneralizedLocalBodyEntry.Entry (values := .initial compiled.compatible.checked) material.origin material.captured material.code inputs
         functions registry cells arguments nativeArguments before store view.location
         view.callerNative view.callerGhost view.caller view.id view.recipe,
-        ∃ added : Environment, added.length = material.code.receipt.loweredParameters.length ∧
-          entry.entry.canonical = added ++ material.captured.canonical ∧
+        ∃ added copied : Environment, added.length = material.code.receipt.loweredParameters.length ∧
+          entry.entry.canonical = added ++ copied ∧
+          (∀ slot, material.inputs.scope.length ≤ slot → copied[slot]? = material.captured.canonical[slot]?) ∧
           ProtectedStateTransition.Transition protocol initial
             ⟨material.code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++
                 material.inputs.scope,
@@ -59,7 +62,8 @@ theorem entry_exists_with_spine
     (values := .initial compiled.compatible.checked)
     material.origin material.captured material.code inputs
     (ActualBodyInvocation.materialized_input_ids material view)
-    functions ordinaryCells protocol producer represented view.carried view.recipe heaps locals
+    (ActualBodyInvocation.materialized_copied_ids material view)
+    functions ordinaryCells protocol producer transport rebinds represented view.carried view.recipe heaps locals
     view.lexicalReference read unmapped initial readyAt
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedBodyEntry

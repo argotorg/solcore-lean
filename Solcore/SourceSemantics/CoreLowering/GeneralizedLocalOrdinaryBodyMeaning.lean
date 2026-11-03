@@ -44,7 +44,8 @@ local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel model instanc
 
 include frame raw in
 theorem heap_typed : Dynamic.HeapWellTyped inputs.context entry.entry.heap := by
-  have reached := Dynamic.BindersAllocate.preservesHeapTyping raw.heaps raw.arguments entry.entry.allocation
+  have reached := Dynamic.BindersAllocate.preservesHeapTyping (raw.heaps.copy entry.entry.copy)
+    (raw.arguments.mono entry.entry.copy.metadata_extends) entry.entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   exact reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
     frame.code.variables_closed (fields.targetResidualVariablesOpen frame.code.residual_variables_open)
@@ -57,7 +58,7 @@ def state : CellAwareLexicalBodyState.Entry functions rawRegistry instances prog
   mapping := entry.entry.mapping
   world := entry.entry.world
   administrative := material.captured.administrative
-  actualContext := CellAwareParameterTyped.prefixContext material.code.receipt.loweredParameters entry.actualContext
+  actualContext := CellAwareParameterTyped.prefixContext material.code.receipt.loweredParameters entry.entry.copiedContext
   environment := entry.entry.environment
   canonical := entry.entry.canonical
   actual := entry.entry.actualBody

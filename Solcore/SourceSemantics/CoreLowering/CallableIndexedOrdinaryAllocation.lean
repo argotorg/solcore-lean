@@ -28,12 +28,12 @@ private theorem scope_reference {catalog : SourceCoreDataCatalog.Catalog} {nativ
       subst binding
       exact ⟨target, rfl, reference.typed⟩
     | succ index => exact ih found
-  | @internal scope source canonical id location target payload reference absent tail ih =>
+  | @internal scope source canonical id target payload typed absent tail ih =>
     cases index with
     | zero =>
       have same : (id, payload) = binding := Option.some.inj found
       subst binding
-      exact ⟨target, rfl, reference.typed⟩
+      exact ⟨target, rfl, typed⟩
     | succ index => exact ih found
 
 /-- Capture values and their types follow from the mapped lexical slots, not
@@ -145,6 +145,85 @@ theorem preserves_with_captures_for_type {layouts : SourceCoreAllocationLayouts.
       allocation.entry.layout.type nativeDefinitions :=
     .constructed markerRegistered.payloadLookup (captureType.symm ▸ typed)
   obtain ⟨afterHeaps, afterReference⟩ := heap_allocate heaps
+    (SourceCoreCallableIndexedFrames.encode_runtime_typed world frameRegistered native) markerTyped cell allocated
+  exact ⟨captured, selected, typed, evaluates allocation annotation same reference read selected payloadAt,
+    afterHeaps, afterReference, allocation_frame _ _ _ _ _⟩
+
+/-- A copy of any source cell takes the same three administrative and mapped
+steps as an ordinary allocation. -/
+theorem heap_allocate_copy {mapping : LocationMap} {world : StoreTyping}
+    {before after : Dynamic.Heap} {store : Store} {copied : Dynamic.Cell} {sourceLocation : Dynamic.Location}
+    {snapshot marker payload : Value} {snapshotType markerType payloadType : Ty}
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (snapshotTyped : RuntimeValueHasType world snapshot snapshotType nativeDefinitions)
+    (markerTyped : RuntimeValueHasType world marker markerType nativeDefinitions)
+    (cell : GenericHeap.CellRepresents model mapping world copied payload payloadType)
+    (allocated : Dynamic.Heap.AllocatesCopy before copied sourceLocation after) :
+    GenericHeap.HeapRepresents model (mapping ++ [store.length + 2])
+      (world ++ [snapshotType, markerType, OptionalCell.cellType payloadType])
+      after (store ++ [snapshot, marker, payload]) ∧
+      ReferenceRepresents (mapping ++ [store.length + 2])
+        (world ++ [snapshotType, markerType, OptionalCell.cellType payloadType])
+        sourceLocation (store.length + 2) payloadType := by
+  have snapshotHeaps := heaps.allocate_administrative snapshotTyped
+  have markerHeaps := snapshotHeaps.allocate_administrative (markerTyped.weaken (show WorldExtends world (world ++ [snapshotType]) from ⟨_, rfl⟩))
+  have cells := cell.extend (LocationMap.Extends.refl mapping)
+    (show WorldExtends world ((world ++ [snapshotType]) ++ [markerType]) from ⟨[snapshotType, markerType], by simp⟩)
+  simpa [Store.allocate, List.append_assoc, Nat.add_assoc] using markerHeaps.allocate_copy cells allocated
+
+/-- A closure's marked copy of a source cell: the same native execution and
+heap relation as an ordinary marked allocation, with the copied cell, its
+type and any principal kept. -/
+theorem preserves_copy {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {request : SourceCoreSourceCells.Request} {layout : SourceCoreCallableIndexedFrames.Layout}
+    {globals : Nat} {allocate : SourceCoreSourceCells.Allocator}
+    (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active request)
+    (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated layout globals allocate request)
+    (same : annotation.original = allocation.expression)
+    (definitions : layouts.definitions = nativeDefinitions)
+    (frameRegistered : layout.Registered nativeDefinitions)
+    {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {contextLocation : Location} {native : NativeFrame}
+    {copied : Dynamic.Cell} {payload : Option Value} {sourceLocation : Dynamic.Location}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative request.scope environment canonical nativeDefinitions)
+    (agrees : EnvironmentsAgree request.references canonical actual)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (reference : actual[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals request]? =
+      some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (payloadAt : PayloadAt request actual payload)
+    (cell : GenericHeap.CellRepresents model mapping world copied (optionalValue request.payloadType payload)
+      request.payloadType)
+    (allocated : Dynamic.Heap.AllocatesCopy before copied sourceLocation after) :
+    ∃ captured,
+      Captures actual request.references request.scope captured ∧
+      RuntimeValueHasType world captured (SourceCoreSourceCells.captureType request.scope) nativeDefinitions ∧
+      Evaluates actual store annotation.expression
+        (.cellRef (OptionalCell.cellType request.payloadType) (store.length + 2))
+        (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) ∧
+      GenericHeap.HeapRepresents model (mapping ++ [store.length + 2])
+        (world ++ [layout.type, allocation.entry.layout.type, OptionalCell.cellType request.payloadType])
+        after (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) ∧
+      ReferenceRepresents (mapping ++ [store.length + 2])
+        (world ++ [layout.type, allocation.entry.layout.type, OptionalCell.cellType request.payloadType])
+        sourceLocation (store.length + 2) request.payloadType ∧
+      AdministrativePreserved mapping store (mapping ++ [store.length + 2])
+        (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) := by
+  obtain ⟨captured, selected, typed⟩ := captures_typed environments agrees
+  have captureType : allocation.entry.layout.captureType = SourceCoreSourceCells.captureType request.scope := by
+    change SourceCoreSourceCells.captureType allocation.entry.key.scope = SourceCoreSourceCells.captureType request.scope
+    rw [allocation.keyExact]
+    rfl
+  have markerRegistered : allocation.entry.layout.Registered nativeDefinitions := definitions ▸ allocation.registered
+  have markerTyped : RuntimeValueHasType world (SourceCoreHeapMarkers.markerValue allocation.entry.layout captured)
+      allocation.entry.layout.type nativeDefinitions :=
+    .constructed markerRegistered.payloadLookup (captureType.symm ▸ typed)
+  obtain ⟨afterHeaps, afterReference⟩ := heap_allocate_copy heaps
     (SourceCoreCallableIndexedFrames.encode_runtime_typed world frameRegistered native) markerTyped cell allocated
   exact ⟨captured, selected, typed, evaluates allocation annotation same reference read selected payloadAt,
     afterHeaps, afterReference, allocation_frame _ _ _ _ _⟩

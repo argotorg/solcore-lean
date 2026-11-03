@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalInversion
 
-/-! The ordinary Source declaration captures one principal descriptor and
-allocates it once. Its compiler-supported direct lambda excludes the genuine
+/-! The ordinary Source declaration copies its environment, captures one
+principal descriptor over the copies and allocates it once. Its compiler-supported direct lambda excludes the genuine
 unsupported-initializer fault without evaluating the initializer. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -27,14 +27,15 @@ theorem value (unique : NodeOccurrencesUnique source)
     (extended : BinderExtends source.owner context binder nextContext)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment
       before id finalContext outcome after) :
-    ∃ function location, size = SourceExecutionSize.stepSize [] ∧ finalContext = nextContext ∧
+    ∃ captured middle function location, size = SourceExecutionSize.stepSize [] ∧ finalContext = nextContext ∧
       outcome = .fallthrough ((binder.id, location) :: environment) ∧
-      Dynamic.GeneralizedClosureCaptures context source environment binder initializer function ∧
-      Dynamic.Heap.AllocatesGeneralized before function location after := by
+      Dynamic.EnvironmentCopies source environment before captured middle ∧
+      Dynamic.GeneralizedClosureCaptures context source captured binder initializer function ∧
+      Dynamic.Heap.AllocatesGeneralized middle function location after := by
   cases trace <;> have same := selected unique found (by assumption) <;> subst_vars <;> simp_all
-  rename_i captures _ extension allocated
+  rename_i captures snapshot _ extension allocated
   have equal := Dynamic.BinderExtends.functional extended extension
-  exact ⟨equal.symm, _, captures, allocated⟩
+  exact ⟨equal.symm, _, _, snapshot, _, captures, allocated⟩
 
 theorem fault (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
@@ -66,9 +67,10 @@ theorem generalized {mode : Bool} {invocation : Staging.Recursive.Scope} {rest :
     (capturable : ∃ function, Dynamic.GeneralizedClosureCaptures context invocation.source environment binder initializer function)
     (trace : PlainStatements program mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
-    ∃ tailSize function location bound,
-      tailSize < size ∧ Dynamic.GeneralizedClosureCaptures context invocation.source environment binder initializer function ∧
-      Dynamic.Heap.AllocatesGeneralized before function location bound ∧
+    ∃ tailSize captured middle function location bound,
+      tailSize < size ∧ Dynamic.EnvironmentCopies invocation.source environment before captured middle ∧
+      Dynamic.GeneralizedClosureCaptures context invocation.source captured binder initializer function ∧
+      Dynamic.Heap.AllocatesGeneralized middle function location bound ∧
       PlainStatements program mode tailSize invocation nextContext ((binder.id, location) :: environment)
         bound rest finalContext outcome after := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
@@ -76,17 +78,18 @@ theorem generalized {mode : Bool} {invocation : Staging.Recursive.Scope} {rest :
     ⟨_, _, _, _, _, failed⟩ | ⟨_, strict, stopped, head⟩ |
     ⟨_, tailSize, middleContext, nextEnvironment, middle, _, tailStrict, head, tail⟩
   · exact (fault unique found form polymorphic capturable failed).elim
-  · obtain ⟨function, location, rfl, equalContext, equalOutcome, captures, allocated⟩ :=
+  · obtain ⟨captured, middle, function, location, rfl, equalContext, equalOutcome, snapshot, captures, allocated⟩ :=
       value unique found form polymorphic extended head
     subst finalContext
     subst outcome
     rcases stopped with impossible | rfl
     · cases impossible
-    · exact ⟨SourceExecutionSize.stepSize [], function, location, after, strict, captures, allocated, empty_trace⟩
-  · obtain ⟨function, location, _, equalContext, equalOutcome, captures, allocated⟩ :=
+    · exact ⟨SourceExecutionSize.stepSize [], captured, middle, function, location, after, strict, snapshot, captures,
+        allocated, empty_trace⟩
+  · obtain ⟨captured, snapshotHeap, function, location, _, equalContext, equalOutcome, snapshot, captures, allocated⟩ :=
       value unique found form polymorphic extended head
     subst middleContext
     cases equalOutcome
-    exact ⟨tailSize, function, location, middle, tailStrict, captures, allocated, tail⟩
+    exact ⟨tailSize, captured, snapshotHeap, function, location, middle, tailStrict, snapshot, captures, allocated, tail⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedPlainInversion

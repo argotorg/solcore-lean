@@ -71,7 +71,7 @@ structure ForwardMeaning {fixture : CompiledFixture} {observed : ObservedProgram
   secondRead : ForwardAt (entries := ([meaning.firstEntry] ++ [meaning.secondMeaning.entry]) ++ [meaning.thirdMeaning.entry])
     meaning.support.toOrdinaryInventory receiver (.bool false) sequence.secondRead meaning.secondReadMeaning.after.heap
   repeatedRead : ForwardAt (entries := ([meaning.firstEntry] ++ [meaning.secondMeaning.entry]) ++ [meaning.thirdMeaning.entry])
-    meaning.support.toOrdinaryInventory receiver (.word (Core.Word.ofNatModulo 33)) sequence.repeatedRead meaning.repeatedReadMeaning.after.heap
+    meaning.support.toOrdinaryInventory receiver (.word seed) sequence.repeatedRead meaning.repeatedReadMeaning.after.heap
   thirdRead : ForwardAt (entries := ([meaning.firstEntry] ++ [meaning.secondMeaning.entry]) ++ [meaning.thirdMeaning.entry])
     meaning.support.toOrdinaryInventory receiver (.word (Core.Word.ofNatModulo 55)) sequence.thirdRead meaning.thirdReadMeaning.after.heap
 
@@ -138,8 +138,8 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [9,27,45,61,79,95,108,121] do
+  unless stores == [9,36,63,88,115,140,165,187] do
     throw (IO.userError s!"method scoped stores changed: {reprStr stores}")
-  IO.println "METHOD_SCOPED_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar11/false/33/55; captured value+flag writes, true/false loops"
+  IO.println "METHOD_SCOPED_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar11/false/11/55; captured value+flag writes stay in their call, true/false loops"
 
 end Tests.SourceCoreMethodScoped

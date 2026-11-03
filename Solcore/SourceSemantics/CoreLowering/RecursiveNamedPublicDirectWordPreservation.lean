@@ -106,7 +106,7 @@ theorem public_resume_has_sufficient_fuel
           actual.session.RegistryAt encodedValues.registry := by
   have arity : sources.length = function.parameters.length := by
     cases trace with
-    | closure _ _ _ allocate _ _ => exact allocate.length_eq.symm
+    | closure _ _ _ _copy allocate _ _ => exact allocate.length_eq.symm
   have imported := (history.current.2.2.2.2 entry member).1
   rw [entryType] at imported
   obtain ⟨parameterView, resultView⟩ := TypeSystem.Ty.function.inj

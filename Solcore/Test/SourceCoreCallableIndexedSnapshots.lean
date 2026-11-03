@@ -52,7 +52,7 @@ example (catalog : SourceCoreDataCatalog.Catalog) (first hidden : Resolved.Local
   have related : DataHeap.EnvRepresents catalog [0] [OptionalCell.cellType .word] []
       [(first, .word), (hidden, .word)] [(first, ⟨0⟩)]
       [.cellRef (OptionalCell.cellType .word) 0, .cellRef (OptionalCell.cellType .word) 0] :=
-    .cons reference (.internal reference (by intro location impossible; cases impossible) (.nil .nil))
+    .cons reference (.internal reference.typed (by intro location impossible; cases impossible) (.nil .nil))
   exact CallableIndexedCaptureEnvironment.captures_inserted related (fun found => found) inserted
 
 /-- A real successful callback plus an already evaluated payload is enough

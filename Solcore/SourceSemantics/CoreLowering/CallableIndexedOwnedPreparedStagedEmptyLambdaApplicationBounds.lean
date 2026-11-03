@@ -162,7 +162,8 @@ private theorem native_body_at
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [rawTypes] using argumentsTyped
-  have allocated := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped rawArguments entry.allocation
+  have allocated := Dynamic.BindersAllocate.preservesHeapTyping (beforeTyped.copy entry.copy)
+    (rawArguments.mono entry.copy.metadata_extends) entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   have heapTyped : Dynamic.HeapWellTyped inputs.context entry.heap :=
     allocated.transportClosed fields.signatures valid.code.closed (fields.targetClosed valid.code.closed)

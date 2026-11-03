@@ -28,14 +28,17 @@ variable {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadM
   {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
   {actual : Environment} {faults : FunctionCalls.FaultRep}
 
-/-- Contract wrappers do not change closure parameter allocation. All source
-metadata and mapped lexical references are constructed by the real prefix. -/
+/-- Contract wrappers do not change the copies of the captures or the closure
+parameter allocation. All source metadata and mapped lexical references are
+constructed by the real prefix. -/
 structure Entry
     (layout : FunctionCaptures.Layout catalog mapping world scope function.captured actual)
     (code : ContractedFunctionValues.Code catalog program bodyCertificate policy compilation table active
       function scope layout.administrativeContext)
     (before : Dynamic.Heap) (initialStore : Store) (context : SourceSemantics.Context)
     (arguments : List Dynamic.Value) (values : List Value) where
+  entry : Dynamic.Environment
+  copied : Dynamic.Heap
   environment : Dynamic.Environment
   heap : Dynamic.Heap
   canonical : Environment
@@ -44,7 +47,8 @@ structure Entry
   finalMap : LocationMap
   finalWorld : StoreTyping
   embedding : Renaming
-  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied
+  allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment heap
   environments : DataHeap.EnvRepresents catalog finalMap finalWorld layout.administrativeContext
     code.artifact.raw.bodyScope environment canonical
   heaps : GenericHeap.HeapRepresents model finalMap finalWorld heap store
@@ -69,17 +73,26 @@ theorem entry_exists
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured) :
     Nonempty (Entry (model := model) layout code before store context arguments values) := by
+  obtain ⟨entry, copied, copiedCanonical, copiedActual, copiedStore, copiedMap, copiedWorld, copiedEmbedding,
+      copy, copiedEnvironments, copiedHeaps, copiedMaps, copiedWorlds, copiedFrame, copiedLookups, copies⟩ :=
+    CaptureCopies.copies_prefix (pre := [DataPatternValues.packValues values])
+      (body := SourceCoreFunctions.bindParameters code.artifact.raw.loweredParameters code.artifact.raw.resultCore
+        (code.artifact.raw.bodyCode.weakenAt code.artifact.raw.loweredParameters.length))
+      layout.represented heaps
+      (EnvironmentsAgree.lift (mapping := layout.embedding) layout.lookups (DataPatternValues.packValues values))
   obtain ⟨environment, heap, canonical, bodyEnvironment, finalStore, finalMap, finalWorld, embedding,
       allocation, environments, finalHeaps, maps, worlds, frame, lookups, agreement⟩ :=
-    parameters_prefix represented (body := code.artifact.raw.bodyCode) (outputType := code.artifact.raw.resultCore)
-      layout.represented heaps (EnvironmentsAgree.lift (mapping := layout.embedding) layout.lookups
-        (DataPatternValues.packValues values))
+    parameters_prefix (represented.extend copiedMaps copiedWorlds) (body := code.artifact.raw.bodyCode)
+      (outputType := code.artifact.raw.resultCore) copiedEnvironments copiedHeaps copiedLookups
   rw [code.artifact.raw.parametersTree.binders] at allocation
   rw [parameters_scope code.artifact.raw.parametersTree] at environments
   have mono := mono_binders extension
-  exact ⟨⟨environment, heap, canonical, bodyEnvironment, finalStore, finalMap, finalWorld, embedding,
-    allocation, environments, finalHeaps, GenericLexicalContext.binders_agree mono.1 mono.2 locals allocation,
-    maps, worlds, frame, GenericLexicalContext.binders_metadata allocation, lookups, agreement⟩⟩
+  exact ⟨⟨entry, copied, environment, heap, canonical, bodyEnvironment, finalStore, finalMap, finalWorld, embedding,
+    copy, allocation, environments, finalHeaps,
+    GenericLexicalContext.binders_agree mono.1 mono.2 (copy.agrees locals) allocation,
+    copiedMaps.trans maps, copiedWorlds.trans worlds, copiedFrame.trans frame,
+    copy.metadata_extends.trans (GenericLexicalContext.binders_metadata allocation), lookups,
+    copies.trans agreement⟩⟩
 
 theorem preserves
     (layout : FunctionCaptures.Layout catalog mapping world scope function.captured actual)
@@ -102,8 +115,10 @@ theorem preserves
   have arity : function.parameters.length = arguments.length := by
     rw [← code.artifact.raw.parametersTree.binders, List.length_map]
     exact represented.length.1
-  obtain ⟨types, callContext, environment, bound, extension, allocated, trace⟩ := execution.trace arity
+  obtain ⟨types, callContext, entryEnvironment, copied, environment, bound, extension, copy, allocated, trace⟩ :=
+    execution.trace arity
   obtain ⟨entry⟩ := entry_exists layout code extension represented heaps locals
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy entry.copy
   obtain ⟨rfl, rfl⟩ := allocations_same allocated entry.allocation
   obtain ⟨_, _, typed, _⟩ := frame_body_at code.frame extension
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
@@ -134,7 +149,7 @@ theorem reflects
   obtain ⟨outcome, after, finalMap, finalWorld, trace, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
     bodyMeaning code.artifact.raw.bodyTree typed entry.environments entry.heaps entry.locals entry.lookups
       (entry.agreement.unwrap evaluated)
-  exact ⟨outcome, after, finalMap, finalWorld, trace.call code.frame extension entry.allocation,
+  exact ⟨outcome, after, finalMap, finalWorld, trace.call code.frame extension entry.copy entry.allocation,
     result, finalHeaps, entry.maps.trans maps, entry.worlds.trans worlds,
     entry.frame.trans frame, entry.metadata.trans metadata⟩
 

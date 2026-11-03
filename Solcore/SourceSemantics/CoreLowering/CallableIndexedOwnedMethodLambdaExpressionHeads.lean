@@ -183,22 +183,22 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
     have actualTyped : ExpressionHasType (head.function environment).source (head.function environment).context code.id code.sourceNode.type := by
       simpa only [code, Formation.code, Formation.function, CallableIndexedLambdaGeneration.closure,
         RecursiveNamedLambdaFormationHeads.recaptureCode, head.identifier] using typed
-    obtain ⟨result, finalStore, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
+    obtain ⟨result, finalStore, evaluated, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, _post⟩ :=
       CallableIndexedOwnedAdmittedMethodLambdaFormation.preserves_at
         (function := head.function environment) (scope := scope) (actual := actual) captured code support owner initial.val packet profile
-        wellFormed runtime covers locals actualTyped head.sourceType head.ordinary head.coercions heaps
+        wellFormed runtime covers locals actualTyped head.sourceType head.site.snapshots head.ordinary head.coercions heaps
         capturedAdmission nativeTrace
     have evaluated : Evaluates actual store (lowered.expression.rename ξ) result finalStore := by
       simpa only [code, Formation.code, RecursiveNamedLambdaFormationHeads.recaptureCode,
         head.emitted, captured, CallableIndexedOwnedMethodPrincipalCaptures.captures] using evaluated
     have represented : GenericExpressionMeaning.ResultRepresents
         (model (headers := headers) (keys := keys) (registry := registry) (faults := faults) profile)
-        mapping world code.sourceNode.type lowered.type faults outcome result := by
+        finalMap finalWorld code.sourceNode.type lowered.type faults outcome result := by
       simpa only [model, code, Formation.code, RecursiveNamedLambdaFormationHeads.recaptureCode, head.emitted] using represented
     obtain ⟨actualReached, _pool, actualRelated⟩ :=
       (bridge (headers := headers) principal owner).restore initial reached.val maps worlds frame metadata related
-    exact ⟨result, finalStore, mapping, world, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
+    exact ⟨result, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
       actualReached, actualRelated, after_expression_sized initial actualReached admitted wellFormed runtime covers locals
         typed trace frame⟩
   | call head =>
@@ -212,7 +212,7 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
       selection := ⟨head.selection.children, head.selection.nativeTypes, head.selection.escaped,
         head.selection.rawResult, head.selection.nativeResult, head.selection.stageAccepted, head.selection.arityAccepted⟩,
       sameCallee := head.sameCallee, ordinary := head.formation.ordinary, coercions := head.formation.coercions,
-      sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
+      copied := head.formation.site.snapshots, sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
       syntaxTree := head.formation.syntaxTree, parentTyped := typed }
     obtain ⟨result, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, _post⟩ :=
@@ -269,22 +269,23 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
     have actualCompleted : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) value finalStore := by
       simpa only [code, Formation.code, RecursiveNamedLambdaFormationHeads.recaptureCode,
         head.emitted, captured, CallableIndexedOwnedMethodPrincipalCaptures.captures] using completed
-    obtain ⟨sourceSize, outcome, after, trace, _native, represented, finalHeaps, maps, worlds, frame, metadata,
-        reached, related, _post⟩ :=
+    obtain ⟨sourceSize, outcome, after, trace, _native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame,
+        metadata, reached, related, _post⟩ :=
       CallableIndexedOwnedAdmittedMethodLambdaFormation.reflects_at
         (function := head.function environment) (scope := scope) (actual := actual) captured code support owner initial.val packet profile
-        wellFormed runtime covers locals actualTyped head.sourceType head.ordinary head.coercions heaps capturedAdmission actualCompleted
+        wellFormed runtime covers locals actualTyped head.sourceType head.site.snapshots head.ordinary head.coercions heaps
+        capturedAdmission actualCompleted
     have sourceTrace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         context principal.dictionary (CallableIndexedNamedGeneration.source principal.named) environment before id outcome after := by
       simpa only [code, Formation.code, Formation.function, CallableIndexedLambdaGeneration.closure,
         RecursiveNamedLambdaFormationHeads.recaptureCode, head.identifier] using trace
     have represented : GenericExpressionMeaning.ResultRepresents
         (model (headers := headers) (keys := keys) (registry := registry) (faults := faults) profile)
-        mapping world code.sourceNode.type lowered.type faults outcome value := by
+        finalMap finalWorld code.sourceNode.type lowered.type faults outcome value := by
       simpa only [model, code, Formation.code, RecursiveNamedLambdaFormationHeads.recaptureCode, head.emitted] using represented
     obtain ⟨actualReached, _pool, actualRelated⟩ :=
       (bridge (headers := headers) principal owner).restore initial reached.val maps worlds frame metadata related
-    exact ⟨sourceSize, outcome, after, mapping, world, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
+    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
       actualReached, actualRelated, after_expression_sized initial actualReached admitted wellFormed runtime covers locals
         typed sourceTrace frame⟩
   | call head =>
@@ -298,7 +299,7 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
       selection := ⟨head.selection.children, head.selection.nativeTypes, head.selection.escaped,
         head.selection.rawResult, head.selection.nativeResult, head.selection.stageAccepted, head.selection.arityAccepted⟩,
       sameCallee := head.sameCallee, ordinary := head.formation.ordinary, coercions := head.formation.coercions,
-      sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
+      copied := head.formation.site.snapshots, sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
       syntaxTree := head.formation.syntaxTree, parentTyped := typed }
     obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, _post⟩ :=

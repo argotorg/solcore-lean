@@ -3,7 +3,8 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeBody
 
 /-! The independent source success/fault consumers retain the full real heap
 and caller catalog restored by the actual payload application. The source
-allocation is matched to the generated prefix, without an old Entry identity.
+copies of the captures and the parameter allocation are matched to the
+generated prefix, without an old Entry identity.
 The native regression reuses the seven actual builtin-body lambda cases. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
@@ -97,14 +98,19 @@ theorem empty_parameters (empty : nativeArguments = []) : function.parameters = 
   rw [CallableIndexedLambdaEntryPrefix.parameters code, List.eq_nil_of_length_eq_zero count]
   rfl
 
-/-- Two independent allocations for the actual closure inputs give the same
-source environment and full heap. No equality of native prefix receipts follows. -/
+/-- Two independent copies of the captures and allocations for the actual
+closure inputs give the same copies, source environment and full heap. No
+equality of native prefix receipts follows. -/
 theorem actual_allocation
     (entry : CallableIndexedLambdaRuntimeBody.Entry captured code history body profile arguments nativeArguments before store location current currentGhost)
-    {environment : Dynamic.Environment} {bound : Dynamic.Heap}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound) :
-    entry.entry.environment = environment ∧ entry.entry.heap = bound :=
-  FunctionCallBody.allocations_same entry.entry.allocation allocated
+    {copies environment : Dynamic.Environment} {copiedHeap bound : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap)
+    (allocated : Dynamic.BindersAllocate copies copiedHeap function.parameters arguments environment bound) :
+    entry.entry.copies = copies ∧ entry.entry.copiedHeap = copiedHeap ∧
+      entry.entry.environment = environment ∧ entry.entry.heap = bound := by
+  obtain ⟨sameCopies, sameHeap⟩ := entry.entry.copy.functional copy
+  subst sameCopies sameHeap
+  exact ⟨rfl, rfl, FunctionCallBody.allocations_same entry.entry.allocation allocated⟩
 
 /-- Reuse the actual whole for/while/match/default/fault/empty-arity bodies. -/
 def run : IO Unit := Tests.SourceCoreCallableIndexedLambdaRuntimeBody.run

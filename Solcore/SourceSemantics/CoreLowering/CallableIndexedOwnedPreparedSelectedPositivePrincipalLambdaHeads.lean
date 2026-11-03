@@ -149,7 +149,8 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 include profile owners complete wellFormed runtime covers in
 /-- Actual admitted caller capture and one original formation prove the
-selected Principal lambda leaf at its unchanged canonical packet. -/
+selected Principal lambda leaf at its canonical packet, transported to the
+formed state that holds the copies of the captured cells. -/
 theorem preserves_at (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge model context principal.dictionary (source principal.named)
       (Lambdas principal selected root expressionSyntax headers (context := context) (scope := scope) children) faults size := by
@@ -167,9 +168,9 @@ theorem preserves_at (size : Nat) :
       expressionSyntax (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) principal.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
-    have qualified : (nativeFacet).principal code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Principal.actual
-        principal selected root expressionSyntax certificate receipt sameIssuer factory environment
+    have qualified : ∀ copies, (nativeFacet).principal (code.recapture copies) (support.recapture copies) :=
+      fun copies => CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Principal.actual
+        principal selected root expressionSyntax certificate receipt sameIssuer factory copies
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=
@@ -189,16 +190,14 @@ theorem preserves_at (size : Nat) :
       have codeTrace : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
           context principal.dictionary (source principal.named) environment before code.id actualValue after := by
         simpa only [identifier, closure] using valueTrace
-      obtain ⟨valueEq, heapEq⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
+      obtain ⟨copies, rfl, copy⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
         (program := Program.ofChecked compiled.sourceProgram) code support.body.unique coercions codeTrace
-      subst actualValue
-      subst after
       let packet := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Principal.packet_at_capture
         principal.named owner complete environments agrees typed initial.1 initial.2
       have admittedCapture := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Principal.admission_at_capture
         principal.named owner complete environments agrees typed initial.1 initial.2 context admitted
-      obtain ⟨sourceTrace, nativeTrace, member, post, determined⟩ :=
+      obtain ⟨formed, _sourceTrace, nativeTrace, _member, ⟨_reachedCapture, _relatedCapture, post⟩, _determined⟩ :=
         CallableIndexedOwnedPreparedFunctionModelPrincipalFormationPosts.formation_post
           (compiled := compiled) (headers := headers) (keys := keys)
           (function := closure principal.named parameters sourceResult statements context principal.dictionary environment)
@@ -211,21 +210,27 @@ theorem preserves_at (size : Nat) :
           (lift := fun member => .closure
             (CallableIndexedOwnedPreparedPositiveFunctionOrigins.closure_of_direct owners member))
           (support := support) (qualified := qualified)
-          (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.principal_prepared qualified)
+          (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.principal_prepared (qualified environment))
           (initial := initial.1) (packet := packet)
           (cells := heaps) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
           (typed := codeTyped) (sourceType := sourceType) (admitted := admittedCapture) ordinary coercions
+      obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formed.copy
       let formedValue := CallableIndexedLambdaValues.value (prepared := compiled.indexed)
         (function := closure principal.named parameters sourceResult statements context principal.dictionary environment)
-        (scope := scope) (administrative := captured.administrative) code captured.embedding
-        (initial.1.rows owner.position).authority.current actual
-      refine ⟨.inRight .word formedValue, store, mapping, world, ?_, ?_, post.cells, .refl _, .refl _, .refl _ _, .refl _,
-        initial, Relates.refl initial.1, ?_⟩
+        (scope := scope) (administrative := captured.administrative) code formed.embedding
+        (initial.1.rows owner.position).authority.current formed.closureActual
+      let reached := (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner principal.named).extend initial
+        formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+      have related := (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner principal.named).related initial
+        formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+      refine ⟨.inRight .word formedValue, formed.finalStore, formed.finalMap, formed.finalWorld, ?_, ?_, post.cells,
+        formed.maps, formed.worlds, formed.frame, formed.copy.metadata_extends, reached, related, ?_⟩
       · simpa only [emitted, sameEmbedding, formedValue,
           CallableIndexedOwnedPreparedDirectFormationReceipts.Principal.history_at, History.native] using nativeTrace
       · simpa only [sameNode, emitted, closure, formedValue,
           CallableIndexedOwnedPreparedDirectFormationReceipts.Principal.history_at, History.native] using post.result
-      · refine ⟨post.admission.rows, ?_⟩
+      · refine ⟨CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative ((bridge).pool initial)
+          ((bridge).pool reached) admitted.rows formed.frame, ?_⟩
         intro value same
         simpa only [sameNode, closure] using post.admission.successful value same
     | fault failed =>
@@ -257,9 +262,9 @@ theorem reflects_at (size : Nat) :
       expressionSyntax (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) principal.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
-    have qualified : (nativeFacet).principal code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Principal.actual
-        principal selected root expressionSyntax certificate receipt sameIssuer factory environment
+    have qualified : ∀ copies, (nativeFacet).principal (code.recapture copies) (support.recapture copies) :=
+      fun copies => CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Principal.actual
+        principal selected root expressionSyntax certificate receipt sameIssuer factory copies
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=
@@ -277,7 +282,7 @@ theorem reflects_at (size : Nat) :
       principal.named owner complete environments agrees typed initial.1 initial.2
     have admittedCapture := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Principal.admission_at_capture
       principal.named owner complete environments agrees typed initial.1 initial.2 context admitted
-    obtain ⟨sourceTrace, nativeTrace, member, post, determined⟩ :=
+    obtain ⟨formed, sourceTrace, _nativeTrace, _member, ⟨_reachedCapture, _relatedCapture, post⟩, determined⟩ :=
       CallableIndexedOwnedPreparedFunctionModelPrincipalFormationPosts.formation_post
         (compiled := compiled) (headers := headers) (keys := keys)
         (function := closure principal.named parameters sourceResult statements context principal.dictionary environment)
@@ -290,7 +295,7 @@ theorem reflects_at (size : Nat) :
           (lift := fun member => .closure
             (CallableIndexedOwnedPreparedPositiveFunctionOrigins.closure_of_direct owners member))
           (support := support) (qualified := qualified)
-        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.principal_prepared qualified)
+        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.principal_prepared (qualified environment))
         (initial := initial.1) (packet := packet)
         (cells := heaps) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
         (typed := codeTyped) (sourceType := sourceType) (admitted := admittedCapture) ordinary coercions
@@ -299,12 +304,17 @@ theorem reflects_at (size : Nat) :
     obtain ⟨rfl, rfl⟩ := determined result finalStore codeCompleted
     obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
       (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
-    refine ⟨sourceSize, .value (.closure (closure principal.named parameters sourceResult statements context principal.dictionary environment)),
-      before, mapping, world, ?_, ?_, post.cells, .refl _, .refl _, .refl _ _, .refl _,
-      initial, Relates.refl initial.1, ?_⟩
+    let reached := (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner principal.named).extend initial
+      formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+    have related := (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner principal.named).related initial
+      formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+    refine ⟨sourceSize, .value (.closure formed.closure), formed.finalHeap, formed.finalMap, formed.finalWorld, ?_, ?_,
+      post.cells,
+      formed.maps, formed.worlds, formed.frame, formed.copy.metadata_extends, reached, related, ?_⟩
     · simpa only [identifier, closure] using sized
     · simpa only [sameNode, emitted] using post.result
-    · refine ⟨post.admission.rows, ?_⟩
+    · refine ⟨CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative ((bridge).pool initial)
+        ((bridge).pool reached) admitted.rows formed.frame, ?_⟩
       intro value same
       simpa only [sameNode, closure] using post.admission.successful value same
 

@@ -6,6 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreSelectedGeneralizedLocal
 open Solcore Frontend SourceInference SourceSemantics
+open Tests.SourceSemanticsCaptureCopies
 
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
@@ -59,7 +60,7 @@ private theorem Shape.literal_typed {source : TypedSource} (shape : Shape source
             | cons literal _ => exact ⟨_, literal⟩
 
 /-- The actual generalized declaration rule derives both Word and Bool code
-frames from the lexical environment and the original typed body. -/
+frames from the copies of the lexical environment and the original typed body. -/
 theorem Shape.body_from_source {source : TypedSource} (shape : Shape source)
     {program : SourceSemantics.Program} {context final : SourceSemantics.Context}
     {control : ControlContext} {facts : BodyFacts}
@@ -88,8 +89,10 @@ theorem Shape.body_from_source {source : TypedSource} (shape : Shape source)
     rw [shape.scheme] at monomorphic
     cases monomorphic
   | letInitializedGeneralized polymorphic requirements generalizes initializer extended =>
-    have descriptorTyped := (shape.captures context environment).wellTyped runtime locals
-      polymorphic requirements generalizes initializer extended
+    have readable := Readable.of_agrees locals
+    have snapshot := copies_spec source readable
+    have descriptorTyped := (shape.captures context (copies source environment before).1).wellTyped runtime
+      (snapshot.agrees locals) polymorphic requirements generalizes initializer extended
     have fields := Dynamic.RuntimeContextFields.ofBinderExtends extended
     obtain ⟨_, _, _, returned, _⟩ := head_tail rest
     have originalReturn := form_at unique shape.returnedFound returned
@@ -114,16 +117,17 @@ theorem Shape.body_from_source {source : TypedSource} (shape : Shape source)
           ⟨scheme.binders, .builtin .bool⟩
         have descriptorNext : Dynamic.GeneralizedClosureWellTyped
             (context.withLocal shape.binder.id shape.binder.scheme shape.binder.schemeRequirements)
-            before (shape.descriptor context environment) :=
+            (copies source environment before).2 (shape.descriptor context (copies source environment before).1) :=
           ⟨descriptorTyped.same_signatures, descriptorTyped.code, descriptorTyped.captures⟩
         have different : shape.binder.id ≠ shape.flag.id := by
           intro same
           exact fresh.1 (same.symm ▸ lookup_declared locals flagLookup)
         exact ⟨_, shape.body_trace evidence environment before flag unique different
           (.intro wellformed fresh) fields scheme word boolean literal flagLookup flagRead flagDescriptor flagValue
-          (shape.frame environment before evidence catalog descriptorNext fields runtime.signatures
+          readable
+          (shape.frame _ _ evidence catalog descriptorNext fields runtime.signatures
             (fields.covers covers) scheme word)
-          (shape.frame environment before evidence catalog descriptorNext fields runtime.signatures
+          (shape.frame _ _ evidence catalog descriptorNext fields runtime.signatures
             (fields.covers covers) scheme boolean)⟩
 
 end Tests.SourceCoreSelectedGeneralizedLocal

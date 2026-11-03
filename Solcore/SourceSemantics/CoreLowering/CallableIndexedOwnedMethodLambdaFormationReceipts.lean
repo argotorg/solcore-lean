@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaValu
 /-! Actual method-principal packets supply the complete formation history and
 captured bundle. Source authority stays in the genuine same-Code support;
 native environment tags establish only the corresponding bundle observation.
-The original formation producers leave the actual pool and store unchanged. -/
+The formation copies the captured cells and extends the actual store. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaFormationReceipts
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
@@ -52,26 +52,34 @@ theorem reference_index : code.referenceIndex = scope.length + 1 + compiled.inde
 
 include packet in
 /-- Real Source and native formation, native typing and deterministic output
-follow the original producers at this exact packet and pool. -/
+follow the original producers at this exact packet and pool. The closure is
+formed over the copies of its captured cells. -/
 theorem formation
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
-    CallableIndexedOwnedMethodLambdaValues.Represents headers keys registry faults mapping world
-      (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
-      finalStore = store) := by
+    ∃ formed : Formed model captured code (history_at captured code support owner initial packet) heap store
+        owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      CallableIndexedOwnedMethodLambdaValues.Represents headers keys registry faults formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) := by
   exact CallableIndexedOwnedMethodLambdaValues.method_lambda_of_formation initial owner captured code
     (history_at captured code support owner initial packet) support
     (source_origin captured code support owner initial packet) packet.observed
-    (reference_index captured code support) rfl rfl profile stored ordinary coercions
+    (reference_index captured code support) rfl profile heaps copied ordinary coercions
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaFormationReceipts

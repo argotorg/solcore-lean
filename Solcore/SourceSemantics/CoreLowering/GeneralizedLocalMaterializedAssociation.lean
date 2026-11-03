@@ -100,6 +100,7 @@ theorem Materialization.source_receipt (material : Materialization compiled mapp
 theorem Materialization.native_type (material : Materialization compiled mapping world function) :
     material.candidate.type = CallableContract.functionType material.code.receipt.parameterCore material.code.receipt.resultCore := by
   have same := GeneralizedLocalMaterializedCode.value_eq material.indexed material.code material.lowered
+    material.policy material.codeId
     material.captured.embedding material.origin.native material.actual
   have shape := Value.closure.inj (Value.pair.inj (Value.pair.inj same).1).2
   have result := (Ty.sum.inj shape.2.1).2

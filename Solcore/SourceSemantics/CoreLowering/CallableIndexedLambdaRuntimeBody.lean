@@ -93,6 +93,18 @@ def Body.fromWith {values : SourceCoreCompatibleValues.Context} {prepared : Prep
     emitted := body.emitted, actualTree := body.actualTree, actualSites := body.actualSites,
     tree := body.tree, sites := body.sites, valid := body.valid, unique := body.unique }
 
+/-- The same static body receipt serves the closure over another captured
+environment; no receipt mentions the captured locations. -/
+def Body.recapture {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
+    {code : Code prepared function scope administrative} {program : Program}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (body : Body code program registry faults) (captured : Dynamic.Environment) :
+    Body (code.recapture captured) program registry faults :=
+  { body with
+    toContext := { body.toContext with context := body.context }
+    frame := { body.frame with code := { body.frame.code with occurrence := body.frame.code.occurrence } } }
+
 /-- The actual compiler-view Tree, its indexed diagnostics and the real flow
 acceptance construct the canonical receipt; canonical recompilation is absent. -/
 theorem Body.of_tree {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}

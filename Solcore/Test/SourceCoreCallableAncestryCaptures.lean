@@ -9,8 +9,10 @@ import Solcore.Frontend.ProgramChecking
 
 /-! Actual two-pass compilation and typed native observations establish
 provenance. Captures join by native location, not repeated source binder IDs.
-Ordered source environments preserve aliasing and opaque-prefix offsets.
-Stored lambda payloads are also joined on language failure and suspension. -/
+Closures capture by value, so each closure joins to its own snapshot cells even
+where one binder ID is allocated many times. Ordered source environments
+preserve opaque-prefix offsets. Stored lambda payloads are also joined on
+language failure and suspension. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCallableAncestryCaptures
 open Solcore Solcore.Frontend SourceInference
@@ -58,7 +60,7 @@ private def captureNamed {checked : Checked} {prepared : Prepared checked} {cach
     (auth.template.source.lambda.context.bindingAt? capture.binder).map (·.binding.binder.name) == some name).map (·.binder)
 
 private def checkPair {checked : Checked} (prepared : Prepared checked) (cache : Cache prepared)
-    (owner : Key) (arguments : List SourceTypedRuntime.Value) (shared : Bool) (name : String) : IO Unit := do
+    (owner : Key) (arguments : List SourceTypedRuntime.Value) (name : String) (allocations : Nat) : IO Unit := do
   for spent in [0, 39, 250000] do
     let first ← match prepared.runSource owner arguments spent 500 with
       | .ok first => pure first | .error error => throw (IO.userError s!"capture invocation failed: {reprStr error}")
@@ -108,13 +110,12 @@ private def checkPair {checked : Checked} (prepared : Prepared checked) (cache :
         let leftLocation := (leftJoined.environment.find? (fun binding => binding.1 == leftBinder)).map Prod.snd
         let rightLocation := (rightJoined.environment.find? (fun binding => binding.1 == rightBinder)).map Prod.snd
         assertTrue (leftLocation.isSome && rightLocation.isSome) "join dropped a captured source binder"
-        assertTrue ((leftLocation == rightLocation) == shared)
+        assertTrue (leftLocation != rightLocation)
           "join selected a repeated binder allocation by ID instead of exact native location"
         assertTrue (leftJoined.environment.all (fun binding => initial.length ≤ binding.2.index))
           "new closure capture escaped into the inert source prefix"
-        if !shared then
-          assertTrue ((ledger.ledger.rows.filter (fun row => row.entry.key.binder.id == leftBinder)).length == 6)
-            "fixture failed to allocate the same recursive binder six times"
+        assertTrue ((ledger.ledger.rows.filter (fun row => row.entry.key.binder.id == leftBinder)).length == allocations)
+          "fixture failed to allocate the same binder once per input, copy and snapshot"
       | observation => throw (IO.userError s!"capture pair did not succeed: {reprStr observation}")
     else throw (IO.userError "capture pair result projection changed")
 
@@ -153,9 +154,12 @@ def run : IO Unit := do
     | .ok prepared => pure prepared | .error error => throw (IO.userError s!"capture marked compiler failed: {reprStr error}")
   let cache ← match SourceCoreCallableAncestryTemplates.prepare prepared with
     | .ok cache => pure cache | .error error => throw (IO.userError s!"capture template cache failed: {reprStr error}")
-  checkPair prepared cache (← key program "escaped") [.word (w 3)] true "seed"
-  checkPair prepared cache (← key program "repeated") [] false "value"
+  -- `seed`: the input, the generalized `outer`'s snapshot, and for each call of
+  -- `outer` its copy and the snapshot of the inner lambda it returns.
+  checkPair prepared cache (← key program "escaped") [.word (w 3)] "seed" 6
+  -- `value`: in each of the two chains, three inputs and the returned lambda's snapshot.
+  checkPair prepared cache (← key program "repeated") [] "value" 8
   checkStored prepared cache (← key program "failure") false
   checkStored prepared cache (← key program "suspended") true
-  IO.println "actual native capture joins, ordered aliasing/prefix offsets/recursive rows/failure/suspension GREEN"
+  IO.println "actual native capture joins, ordered snapshots/prefix offsets/recursive rows/failure/suspension GREEN"
 end Tests.SourceCoreCallableAncestryCaptures

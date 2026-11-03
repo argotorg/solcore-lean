@@ -168,6 +168,6 @@ theorem code_at_read
   obtain ⟨code, compilation, active, id, lowered, policy, lowerBody, fuel, descriptor, certificate, codeView, reasons⟩ :=
     indexed.code_at_read _ captured.administrative parameters result body profile view typedLowered
   exact ⟨code, compilation, active, id, lowered, policy, lowerBody, fuel, descriptor, certificate, codeView, reasons,
-    GeneralizedLocalMaterializedCode.value_eq indexed code lowered captured.embedding native actual⟩
+    GeneralizedLocalMaterializedCode.value_eq indexed code lowered policy id captured.embedding native actual⟩
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalContextualMaterialization

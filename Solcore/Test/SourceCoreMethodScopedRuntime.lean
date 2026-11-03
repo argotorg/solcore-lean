@@ -62,12 +62,12 @@ structure ObservedSequence (fixture : CompiledFixture) (observed : ObservedProgr
   secondRead : ObservedCall third.completion.session observed.useBoolRow.row.key [.function second.handle]
   secondValue : secondRead.completion.value = .bool false
   repeatedRead : ObservedCall secondRead.completion.session observed.useWordRow.row.key [.function first.handle]
-  repeatedValue : repeatedRead.completion.value = .word (Core.Word.ofNatModulo 33)
+  repeatedValue : repeatedRead.completion.value = .word seed
   thirdRead : ObservedCall repeatedRead.completion.session observed.useWordRow.row.key [.function third.handle]
   thirdValue : thirdRead.completion.value = .word (Core.Word.ofNatModulo 55)
   heapSizes : [first.session.heapSize, first.completion.session.heapSize, second.completion.session.heapSize,
     firstRead.completion.session.heapSize, third.completion.session.heapSize, secondRead.completion.session.heapSize,
-    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [9,27,45,61,79,95,108,121]
+    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [9,36,63,88,115,140,165,187]
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -87,11 +87,11 @@ def observeSequence (fixture : CompiledFixture) (program : ObservedProgram fixtu
   let secondRead ← observeCall third.completion.session program.useBoolRow.row.key [.function second.handle]
   let ⟨secondValue⟩ ← observed (secondRead.completion.value = .bool false) "Bool compiled indirect output"
   let repeatedRead ← observeCall secondRead.completion.session program.useWordRow.row.key [.function first.handle]
-  let ⟨repeatedValue⟩ ← observed (repeatedRead.completion.value = .word (Core.Word.ofNatModulo 33)) "retained first compiled indirect output"
+  let ⟨repeatedValue⟩ ← observed (repeatedRead.completion.value = .word seed) "retained first compiled indirect output"
   let thirdRead ← observeCall repeatedRead.completion.session program.useWordRow.row.key [.function third.handle]
   let ⟨thirdValue⟩ ← observed (thirdRead.completion.value = .word (Core.Word.ofNatModulo 55)) "third compiled indirect output"
   let ⟨heapSizes⟩ ← observed ([first.session.heapSize, first.completion.session.heapSize, second.completion.session.heapSize,
     firstRead.completion.session.heapSize, third.completion.session.heapSize, secondRead.completion.session.heapSize,
-    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [9,27,45,61,79,95,108,121]) "exact seven-session heap sequence"
+    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [9,36,63,88,115,140,165,187]) "exact seven-session heap sequence"
   return {first, second, secondType, firstRead, firstValue, third, thirdType, firstSecond, firstThird, secondThird, secondRead, secondValue, repeatedRead, repeatedValue, thirdRead, thirdValue, heapSizes}
 end Tests.SourceCoreMethodScoped

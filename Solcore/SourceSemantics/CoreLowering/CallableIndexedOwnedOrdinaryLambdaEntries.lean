@@ -44,13 +44,14 @@ theorem source_packet
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
     CallableIndexedOwnedNestedCanonicalState.Packet owner support.caller _ reached :=
   CallableIndexedOwnedLambdaNestedEntries.source_packet captured code history support.body.toContext
-    functions owner support.caller observed prefixContext sourceOrigin.metadata caller entry added length spine reached
+    functions owner support.caller observed prefixContext sourceOrigin.metadata caller entry added length copied spine kept reached
 
 include observed prefixContext sourceOrigin in
 /-- The independent native Prefix keeps its real spine, read and full seed. -/
@@ -78,7 +79,8 @@ def source_admitted_entry
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -88,7 +90,7 @@ def source_admitted_entry
   CallableIndexedOwnedLambdaNestedReadyContinuations.source_admitted_entry
     captured code history support.body.toContext functions owner caller (support.body_origin escaped)
     beforeTyped argumentsTyped stable support.caller observed prefixContext sourceOrigin.metadata
-    entry added length spine reached
+    entry added length copied spine kept reached
 
 include observed prefixContext sourceOrigin beforeTyped argumentsTyped stable in
 /-- Native admission uses the same actual Prefix allocation and reached pool;
@@ -114,12 +116,13 @@ theorem source_pool
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
     (source_admitted_entry captured code history support sourceOrigin functions owner observed prefixContext caller
-      escaped beforeTyped argumentsTyped stable entry added length spine reached).original.initial.val = reached := rfl
+      escaped beforeTyped argumentsTyped stable entry added length copied spine kept reached).original.initial.val = reached := rfl
 
 include observed prefixContext sourceOrigin beforeTyped argumentsTyped stable in
 /-- Native packaging retains the independent Prefix producer's same pool. -/

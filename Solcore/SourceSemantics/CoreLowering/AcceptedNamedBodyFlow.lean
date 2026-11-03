@@ -60,8 +60,12 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (generated : policy.lowerExpression fuel source scope expression reasonAt = .ok child)
       (childType : SourceCoreBasic.ensureType (.binder binder.id) payload child.type = .ok ())
       (remaining : Tree policy source result reasonAt mode escaped fuel ((binder.id, payload) :: scope) rest tail)
-      (allocated : SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id binder
-        (LocalLoop.controlType result) payload child.expression tail = .ok code) :
+      (allocated : (if binder.scheme.quantified.isEmpty then
+          SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id binder
+            (LocalLoop.controlType result) payload child.expression tail
+        else
+          SourceCoreSourceCells.letInitializedSnapshot policy.sourceCells source scope binder
+            (LocalLoop.controlType result) payload child.expression tail) = .ok code) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | absent {mode escaped fuel scope id rest node stored binder payload tail code}
       (read : policy.readStatement source id = .ok (node, stored))

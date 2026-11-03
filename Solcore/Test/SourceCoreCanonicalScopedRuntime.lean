@@ -82,7 +82,7 @@ structure ObservedSequence (fixture : CompiledFixture) (observed : ObservedProgr
   secondRead : ObservedInvocation intervening.completion.session second.handle (packed secondNext true false)
   secondValue : secondRead.completion.value = .word secondSeed
   repeatedRead : ObservedInvocation secondRead.completion.session first.handle (packed repeatedNext false false)
-  repeatedValue : repeatedRead.completion.value = .word firstNext
+  repeatedValue : repeatedRead.completion.value = .word seed
 
 def observeSequence (fixture : CompiledFixture) (observed : ObservedProgram fixture) :
     IO (ObservedSequence fixture observed) := do
@@ -95,9 +95,9 @@ def observeSequence (fixture : CompiledFixture) (observed : ObservedProgram fixt
       let secondRead ← observeInvocation intervening.completion.session second.handle (packed secondNext true false)
       if secondValue : secondRead.completion.value = .word secondSeed then
         let repeatedRead ← observeInvocation secondRead.completion.session first.handle (packed repeatedNext false false)
-        if repeatedValue : repeatedRead.completion.value = .word firstNext then
+        if repeatedValue : repeatedRead.completion.value = .word seed then
           return {first, second, distinct, firstRead, firstValue, intervening, secondRead, secondValue, repeatedRead, repeatedValue}
-        else throw (IO.userError "scoped direct captured mutation did not persist")
+        else throw (IO.userError "scoped direct captured mutation reached the next call")
       else throw (IO.userError "closure direct second capture not20")
     else throw (IO.userError "closure direct first capture not10")
   else throw (IO.userError "closure direct lost distinct captures")

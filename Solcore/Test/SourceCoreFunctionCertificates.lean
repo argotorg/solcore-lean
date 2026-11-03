@@ -48,7 +48,7 @@ private def emitted : SourceCoreBasic.LoweredExpr := ⟨functionType,
 private theorem artifact_exists : Nonempty
     (LambdaCertificate bodyCertificate policy source scope id node [] .unit [] functionType emitted) := by
   apply lambda_of_accepted (ordinaryCells := rfl) (ordinaryBody := rfl) (ordinaryExpression := rfl) (lowerBody := lowerBody) (fuel := 1) (context := compilation)
-    (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl rfl
+    (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl rfl rfl
   · intro budget bodyScope type code accepted
     simp only [lowerBody, SourceCoreBasic.lowerStatements] at accepted
     split at accepted
@@ -136,15 +136,6 @@ private noncomputable def code : FunctionValues.Code catalog program bodyCertifi
 /-- The source cell can be uninitialized when the closure captures it. -/
 example : FunctionValues.SourceCapturesValid sourceHeap (.closure function) := captures.sourceMetadata
 
-/-- The actual lowering certificate gives independent source formation and a
-Core closure whose capture includes the inserted Integer slot. -/
-example : Dynamic.ExpressionEvaluates program context [] source function.captured sourceHeap id (.closure function) sourceHeap ∧
-    Core.Evaluates actual store (emitted.expression.rename layout.embedding)
-      (.inRight .word (FunctionValues.value code.artifact.parameterCore code.artifact.resultCore
-        code.artifact.rawBody layout.embedding actual)) store := by
-  exact ⟨(FunctionValues.formation_corresponds layout code sourceHeap store rfl rfl).1,
-    (FunctionValues.formation_corresponds layout code sourceHeap store rfl rfl).2.1⟩
-
 private def model : GenericHeap.PayloadModel catalog := FunctionValues.model catalog program bodyCertificate policy
 private noncomputable def generated : Core.Value :=
   FunctionValues.value artifact.parameterCore artifact.resultCore artifact.rawBody layout.embedding actual
@@ -159,6 +150,19 @@ private theorem initialHeap : GenericHeap.HeapRepresents model [2] world sourceH
   have empty := GenericHeap.HeapRepresents.empty (model := model)
   have administrative := (empty.allocate_administrative (.word (value := Core.Word.zero))).allocate_administrative .unit
   exact (administrative.allocate (.uninitialized rfl) .append).1
+
+/-- The actual lowering certificate gives independent source formation and a
+Core closure over its copies of the creation environment, which keep the
+inserted Integer slot. -/
+example : ∃ captured finalHeap finalStore,
+    Dynamic.ExpressionEvaluates program context [] source function.captured sourceHeap id
+      (.closure { function with captured := captured }) finalHeap ∧
+    ∃ embedding closureActual, Core.Evaluates actual store (emitted.expression.rename layout.embedding)
+      (.inRight .word (FunctionValues.value code.artifact.parameterCore code.artifact.resultCore
+        code.artifact.rawBody embedding closureActual)) finalStore := by
+  obtain ⟨captured, finalHeap, finalStore, _, _, closureActual, embedding, formed, evaluated, _⟩ :=
+    FunctionValues.formation_corresponds layout code initialHeap rfl rfl
+  exact ⟨captured, finalHeap, finalStore, formed, embedding, closureActual, evaluated⟩
 
 private def installedHeap : Dynamic.Heap := ⟨[⟨sourceType, some (.closure function), none⟩]⟩
 private noncomputable def installedStore : Core.Store := [.word Core.Word.zero, .unit, .inRight .unit generated]

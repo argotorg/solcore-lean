@@ -35,17 +35,17 @@ theorem Applies.value_plain {program : Program} {registry : Registry} {scope : S
       exact .global instantiates rfl covers
         (.unit covers typeEq roots parameters allocate
           (by simpa only [source, evidence, callableEvidence] using Statements.fallthrough_plain body) ⟨_, rfl⟩)
-  | @closure _ _ _ _ _ function _ _ _ _ _ child _ _
-      selected valid parameters allocate body resultRule =>
+  | @closure _ _ _ _ _ _ function _ _ _ _ _ _ child _ _
+      selected valid parameters copy allocate body resultRule =>
     have source : child.source = function.source := registry.source selected
     have evidence : child.evidence = function.evidence := registry.evidence selected
     generalize typeEq : function.resultType = type at resultRule
     cases resultRule with
     | returned =>
-      exact .closure rfl valid parameters allocate
+      exact .closure rfl valid parameters copy allocate
         (by simpa only [source, evidence, callableEvidence] using Statements.returned_plain body) rfl
     | unit =>
-      exact .closureUnit rfl valid typeEq parameters allocate
+      exact .closureUnit rfl valid typeEq parameters copy allocate
         (by simpa only [source, evidence, callableEvidence] using Statements.fallthrough_plain body) ⟨_, rfl⟩
 
 theorem Applies.semanticFault_plain {program : Program} {registry : Registry} {scope : Scope}
@@ -72,18 +72,18 @@ theorem Applies.semanticFault_plain {program : Program} {registry : Registry} {s
       exact .globalBody instantiates rfl
         (.statements roots parameters allocate
           (by simpa only [source, evidence, callableEvidence] using Statements.semanticFault_plain body))
-  | @closure _ _ _ _ _ function _ _ _ _ _ child _ _
-      selected valid parameters allocate body resultRule =>
+  | @closure _ _ _ _ _ _ function _ _ _ _ _ _ child _ _
+      selected valid parameters copy allocate body resultRule =>
     have source : child.source = function.source := registry.source selected
     have evidence : child.evidence = function.evidence := registry.evidence selected
     generalize typeEq : function.resultType = type at resultRule
     cases resultRule with
     | breaking =>
-      exact .closureControlEscape rfl valid parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.breaking_plain body) (Or.inl ⟨_, rfl⟩)
+      exact .closureControlEscape rfl valid parameters copy allocate (by simpa only [source, evidence, callableEvidence] using Statements.breaking_plain body) (Or.inl ⟨_, rfl⟩)
     | continuing =>
-      exact .closureControlEscape rfl valid parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.continuing_plain body) (Or.inr ⟨_, rfl⟩)
+      exact .closureControlEscape rfl valid parameters copy allocate (by simpa only [source, evidence, callableEvidence] using Statements.continuing_plain body) (Or.inr ⟨_, rfl⟩)
     | fault =>
-      exact .closureBody rfl valid parameters allocate
+      exact .closureBody rfl valid parameters copy allocate
         (by simpa only [source, evidence, callableEvidence] using Statements.semanticFault_plain body)
 
 end Solcore.SourceSemantics.Staging.Recursive

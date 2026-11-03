@@ -138,7 +138,7 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [11,29,47,93,111,157,203,239] do
+  unless stores == [11,38,65,120,147,202,257,302] do
     throw (IO.userError s!"method scoped stores changed: {reprStr stores}")
   IO.println "METHOD_IMPLEMENTATION_SCOPED_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar33/true/33/55; constrained named relay and implementation method locals with loops"
 

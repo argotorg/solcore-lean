@@ -114,34 +114,42 @@ variable {sourceContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
     headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
 
 include chosen observed in
-/-- The original formation producer runs once. The same complete tuple and
-known formed member retain the positive chosen-factory companion. -/
+/-- The original formation producer runs once over the copies. The same
+complete tuple and known formed member retain the positive chosen-factory
+companion at the formed closure's literal index. -/
 theorem formation_member_with_factory
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)
+      mapping world heap store) :
     let i := index receipt environment captured prefixContext
     let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
       i.captured i.code i.support owner initial packet
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
-      i.function.source i.function.captured heap i.code.id (.closure i.function) heap ∧
-    Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
-      (.inRight .word (value i.code i.captured.embedding history.native actual)) store ∧
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
-      registry mapping world (FunctionValues.sourceType i.function) (.closure i.function)
-      (value i.code i.captured.embedding history.native actual)
-      (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
-      result = .inRight .word (value i.code i.captured.embedding history.native actual) ∧ finalStore = store) ∧
-    CallableIndexedOwnedPreparedOrdinaryFormedMembers.FormedAt headers keys registry faults
-      mapping world (FunctionValues.sourceType i.function) (.closure i.function)
-      (value i.code i.captured.embedding history.native actual)
-      (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
-    FactoryMember root expressionSyntax i := by
-  obtain ⟨sourceTrace, evaluated, related, determined, formed⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile))
+        i.captured i.code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
+        i.function.source i.function.captured heap i.code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
+        (.inRight .word (value i.code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
+        registry formed.finalMap formed.finalWorld (FunctionValues.sourceType i.function) (.closure formed.closure)
+        (value i.code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
+        result = .inRight .word (value i.code formed.embedding history.native formed.closureActual) ∧
+          finalStore = formed.finalStore) ∧
+      CallableIndexedOwnedPreparedOrdinaryFormedMembers.FormedAt headers keys registry faults
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType i.function) (.closure formed.closure)
+        (value i.code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
+      FactoryMember root expressionSyntax (index receipt formed.captured formed.captures rfl) := by
+  obtain ⟨formed, sourceTrace, evaluated, related, determined, member⟩ :=
     CallableIndexedOwnedPreparedOrdinaryFormedMembers.formation_member
-      (capture_at receipt environment captured prefixContext) (receipt.formation.code environment) (receipt.formation.support environment)
-      (receipt.formation.prepared environment) owner initial packet profile rfl observed stored
-      receipt.formation.ordinary receipt.formation.coercions
-  exact ⟨sourceTrace, evaluated, related, determined, formed, .formed receipt chosen environment captured prefixContext⟩
+      (capture_at receipt environment captured prefixContext) (receipt.formation.code environment)
+      (receipt.formation.support environment) (receipt.formation.prepared environment) owner initial packet profile rfl
+      observed heaps receipt.formation.ordinary receipt.formation.coercions
+  exact ⟨formed, sourceTrace, evaluated, related, determined, member,
+    .formed receipt chosen formed.captured formed.captures rfl⟩
 
 include chosen in
 /-- A real certificate of this same recaptured Support is interpreted by the

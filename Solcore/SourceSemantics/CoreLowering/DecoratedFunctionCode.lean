@@ -1,7 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.FunctionCodeCertificates
 
 /-! Actual lambda compilation with a callable representation hook. The raw
-lambda code certificate is retained beneath the hook's exact accepted result.
+lambda code certificate is retained beneath the hook's exact accepted result,
+and the creation-time copies of the captures wrap the decorated callable.
 The parameter wrapper uses ordinary source-cell allocation and the unchanged
 raw lambda-body hook. The hook is not
 assumed to preserve meaning: the concrete representation layer
@@ -32,8 +33,9 @@ structure LambdaCertificate (bodyCertificate : BodyCertificate)
   checkedType : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
     (policy.callables.functionType raw.parameterCore raw.resultCore) = .ok ()
   decoration : policy.callables.decorateCallable context source node (.lambda id)
-    raw.parameterCore raw.resultCore rawLowered.expression = .ok expression
-  emitted : lowered = ⟨reportedType, expression⟩
+    raw.parameterCore raw.resultCore raw.callable = .ok expression
+  emitted : lowered = ⟨reportedType,
+    SourceCoreSourceCells.copyScopePlain source scope (fun index => index) expression⟩
 
 /-- Successful ordinary traversal supplies the real metadata, parameter/body
 certificates and exact hook result. No child execution is a premise. -/
@@ -48,6 +50,7 @@ theorem lambda_of_accepted
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
+    (snapshot : policy.snapshotLambda id = true)
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
     (form : node.form = .lambda parameters resultType statements)
@@ -102,7 +105,7 @@ theorem lambda_of_accepted
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
                     simp only [compiledBody, ordinaryCells, ordinaryBody, SourceCoreFunctions.unchangedLambdaBody, ordinaryExpression, SourceCoreFunctions.unchangedLambdaExpression,
-                      pure, Except.pure] at accepted
+                      SourceCoreSourceCells.copyScope_none, snapshot, ↓reduceIte, pure, Except.pure] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (policy.callables.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
@@ -111,8 +114,9 @@ theorem lambda_of_accepted
                       simp only [checked] at accepted
                       let rawExpression := Core.LanguageResult.success (Core.TaggedFunction.anonymous
                         (.lambda parameterCore (Core.LanguageResult.resultType resultCore)
-                          (SourceCoreFunctions.bindParameters loweredParameters resultCore
-                            (bodyCode.weakenAt loweredParameters.length))))
+                          (SourceCoreSourceCells.copyScopePlain source scope (· + 1)
+                            (SourceCoreFunctions.bindParameters loweredParameters resultCore
+                              (bodyCode.weakenAt loweredParameters.length)))))
                       cases decorated : policy.callables.decorateCallable context source node (.lambda id)
                           parameterCore resultCore rawExpression with
                       | error error => simp [rawExpression] at decorated; simp [decorated] at accepted
@@ -144,6 +148,7 @@ theorem lambda_of_accepted_metadata
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
+    (snapshot : policy.snapshotLambda id = true)
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
     (readSound : ∀ selected type, policy.readExpression source id = .ok (selected, type) →
@@ -173,6 +178,7 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression snapshot found read form
+      extractBody accepted⟩
 
 end Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode

@@ -191,8 +191,10 @@ def run : IO Unit := do
   let w := Word.ofNatModulo
   let mapping : SourceCoreExecution.Value := .mapping .word .word
     [(.word (w 7), .word (w 13)), (.word (w 7), .word (w 90)), (.word (w 9), .word (w 29))]
+  -- The bound closure captures `marker = 10` by value; each call starts again
+  -- from it, so `f(3)` returns 13.
   for (name, inputs, expected) in [
-      ("closure", [.word (w 10)], (.word (w 15) : SourceCoreExecution.Value)),
+      ("closure", [.word (w 10)], (.word (w 13) : SourceCoreExecution.Value)),
       ("mapping", [mapping], .word (w 42)), ("wildcard", [mapping], .word (w 41)),
       ("numeric", [.word (w 0)], .word (w 1)), ("numeric", [.word (w 9)], .word (w 9))] do
     let entry ← SourceCompilerFeatureSupport.compileNamed program name

@@ -112,7 +112,7 @@ theorem of_expression
       profile (by rw [← support.source]; exact code.viewOfSource)
       (by rw [← support.source]; exact found) form viewFound rfl recipe.sourceCells
       (by simpa only [support.compilation, support.active, CallableIndexedNamedGeneration.context, CompatibleNamedBody.bodyContext] using code.manifest)
-      hook callables recipe.projectType native
+      hook callables recipe.projectType (by rw [recipe.snapshotLambda]) native
   have issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained support.caller.named site.code := by
     apply CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes (rootFuel := rootFuel)
       compilation issued (sameBody.trans bodyRecipe) _ site.compilation

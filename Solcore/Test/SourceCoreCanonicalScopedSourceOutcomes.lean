@@ -82,8 +82,8 @@ def run : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.intervening.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize]
-  unless stores == [4,7,10,44,47,81,106] do
+  unless stores == [4,10,16,53,59,96,124] do
     throw (IO.userError s!"scoped source outcomes changed original stores: {reprStr stores}")
-  IO.println "SCOPED_SOURCE_OUTCOMES_PASS: original C6 at checker1000; six independent Dynamic applications; three exact packed retained-closure calls; make10/make20/A10/make30/B20/A11; captured values, reached heaps and all six forward bounds"
+  IO.println "SCOPED_SOURCE_OUTCOMES_PASS: original C6 at checker1000; six independent Dynamic applications; three exact packed retained-closure calls; make10/make20/A10/make30/B20/A10; captured values, reached heaps and all six forward bounds"
 
 end Tests.SourceCoreCanonicalScoped.SourceOutcomes

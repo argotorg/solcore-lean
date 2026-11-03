@@ -49,6 +49,15 @@ structure PolicyLaws (definitions : DataEnvironment) (administrative : Core.Cont
     SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id
       binder output payload initializer body = .ok code →
     HasType (context scope administrative) code (LanguageResult.resultType output) definitions
+  /-- A generalized local copies its scope around its initializer and binder. -/
+  initializedSnapshot : ∀ source scope binder payload output initializer body code,
+    admitted source scope → payload.WellFormed definitions → output.WellFormed definitions →
+    HasType (context scope administrative) initializer (LanguageResult.resultType payload) definitions →
+    HasType (context ((binder.id, payload) :: scope) administrative) body
+      (LanguageResult.resultType output) definitions →
+    SourceCoreSourceCells.letInitializedSnapshot policy.sourceCells source scope
+      binder output payload initializer body = .ok code →
+    HasType (context scope administrative) code (LanguageResult.resultType output) definitions
   assignment : ∀ fuel source scope site assignment operator rhs output body reasonAt code,
     admitted source scope → output.WellFormed definitions →
     HasType (context scope administrative) body (LanguageResult.resultType output) definitions →
@@ -120,8 +129,11 @@ theorem header_native {definitions : DataEnvironment} {administrative : Core.Con
           have same := ensure_same checked
           have initializerTyped := laws.expression fuel source scope initializer reasonAt lowered allowed loweredAccepted
           rw [← same] at initializerTyped
-          exact laws.initialized source scope binder payload _ lowered.expression body code
-            allowed payloadWF controlWF initializerTyped bodyTyped emitted
+          split at emitted
+          · exact laws.initialized source scope binder payload _ lowered.expression body code
+              allowed payloadWF controlWF initializerTyped bodyTyped emitted
+          · exact laws.initializedSnapshot source scope binder payload _ lowered.expression body code
+              allowed payloadWF controlWF initializerTyped bodyTyped emitted
       | expression expression =>
         obtain ⟨lowered, generated, accepted⟩ := bind_ok accepted
         obtain ⟨body, compiled, emitted⟩ := bind_ok accepted
@@ -192,8 +204,11 @@ theorem flow_native {definitions : DataEnvironment} {administrative : Core.Conte
           obtain ⟨body, compiled, emitted⟩ := bind_ok accepted
           have typed := laws.expression fuel source scope initializer reasonAt lowered allowed generated
           rw [← ensure_same checked] at typed
-          exact laws.initialized source scope binder payload _ lowered.expression body code
-            allowed payloadWF controlWF typed (ih extended wellFormed compiled) emitted
+          split at emitted
+          · exact laws.initialized source scope binder payload _ lowered.expression body code
+              allowed payloadWF controlWF typed (ih extended wellFormed compiled) emitted
+          · exact laws.initializedSnapshot source scope binder payload _ lowered.expression body code
+              allowed payloadWF controlWF typed (ih extended wellFormed compiled) emitted
       | assignValue assignment operator rhs =>
         simp only [form] at accepted
         obtain ⟨_, _, accepted⟩ := bind_ok accepted

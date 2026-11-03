@@ -75,7 +75,8 @@ def of_source_entry
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -83,7 +84,7 @@ def of_source_entry
   ⟨owner, function, scope, captured.administrative, code, history, support, sourceOrigin,
     leading, escaped, syntaxTree,
     (CallableIndexedOwnedMethodLambdaEntries.source_admitted_entry captured code history support sourceOrigin functions
-      owner observed leading caller escaped beforeTyped argumentsTyped stable entry added length spine reached).source.runtime⟩
+      owner observed leading caller escaped beforeTyped argumentsTyped stable entry added length copied spine kept reached).source.runtime⟩
 
 /-- Native prefix admission supplies its own genuine runtime receipt without
 identifying the independent reflected Source grade with native execution. -/
@@ -114,11 +115,11 @@ theorem source_continuation (budget : Nat)
           functions (Program.ofChecked compiled.sourceProgram) (origin index))) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history support.body.toContext functions owner caller (support.body_origin escaped) budget := by
-  intro entry added length spine reached child strict outcome after trace
+  intro entry added length copied spine kept reached child strict outcome after trace
   let index := of_source_entry captured code history support sourceOrigin functions owner observed leading caller
-    escaped beforeTyped argumentsTyped stable syntaxTree entry added length spine reached
+    escaped beforeTyped argumentsTyped stable syntaxTree entry added length copied spine kept reached
   let actualEntry := CallableIndexedOwnedMethodLambdaEntries.source_admitted_entry captured code history support sourceOrigin functions
-    owner observed leading caller escaped beforeTyped argumentsTyped stable entry added length spine reached
+    owner observed leading caller escaped beforeTyped argumentsTyped stable entry added length copied spine kept reached
   have ready := below index child strict
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds,
       frame, metadata, exit, returned, related, _post⟩ :=

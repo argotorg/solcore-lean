@@ -226,6 +226,8 @@ private def gapBinder (compiled : SourceCoreUnifiedCompilation.Compiled) (name b
   | [binder] => pure binder.id
   | _ => throw (IO.userError "protected for headers exact fault binder missing")
 
+/-- Cells after the inert prefix: `raw`, `seed`, the snapshot of `seed` and
+`raw` that `saved` takes when it is created, `saved` and `index`. -/
 private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : String)
     (updated counter : Nat) : IO Unit := do
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr (final.heap.take initial.heap.length) == reprStr initial.heap)
@@ -234,16 +236,19 @@ private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : St
     | some cell => pure cell | none => throw (IO.userError "protected for headers missing root mapping")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr raw.value == reprStr (some (table updated)))
     s!"protected for headers raw mapping/default/duplicate order changed {name}"
-  let index ← match final.heap[initial.heap.length + 3]? with
+  let index ← match final.heap[initial.heap.length + 5]? with
     | some cell => pure cell | none => throw (IO.userError "protected for headers missing index")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr index.value == reprStr (some (wordValue counter)))
     s!"protected for headers writes changed {name}"
-  match final.heap[initial.heap.length + 2]? with
+  let snapshot := ((final.heap.drop (initial.heap.length + 2)).take 2).map (·.value)
+  SourceCoreUnifiedCorpusSupport.assertTrue (reprStr snapshot == reprStr [some (wordValue 7), some (table 10)])
+    s!"protected for headers captured snapshot values changed {name}"
+  match final.heap[initial.heap.length + 4]? with
   | some ⟨_, some (.closure parameters result body source owner captures _)⟩ =>
     SourceCoreUnifiedCorpusSupport.assertTrue (parameters.length == 1 && result == .word && !body.isEmpty && source.owner == owner.declaration)
       s!"protected for headers captured closure metadata changed {name}"
-    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 1, initial.heap.length])
-      s!"protected for headers captured source aliases changed {name}"
+    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 2, initial.heap.length + 3])
+      s!"protected for headers captured snapshot locations changed {name}"
   | other => throw (IO.userError s!"protected for headers lost stored captured closure {name}: {reprStr other}")
 
 def run : IO Unit := do
@@ -279,6 +284,6 @@ def run : IO Unit := do
     | other => throw (IO.userError s!"protected for headers exact absent unary fault: {reprStr other}")
     if fuel == 400000 then baseline := current
     else SourceCoreUnifiedCorpusSupport.assertTrue (current == baseline) "protected for headers resume changed observations"
-  IO.println "protected for headers: concrete named prefix/post, fresh marked locals, outer entry restoration, continue/fallthrough, break/return skip, seven-slot assignments/unary, exact first faults, raw duplicates/capture aliases and resume GREEN"
+  IO.println "protected for headers: concrete named prefix/post, fresh marked locals, outer entry restoration, continue/fallthrough, break/return skip, seven-slot assignments/unary, exact first faults, raw duplicates/capture snapshots and resume GREEN"
 
 end Tests.SourceCoreProtectedForHeaders

@@ -84,7 +84,8 @@ theorem lambda_of_accepted_with_inputs
   obtain ⟨site, identifier, emitted, samePolicy, sameBody, sameFuel, sameView, sameReason, sameSourceNode,
       _sameNode, sameCertificate⟩ :=
     of_certificate compiled.indexed sourceContext evidence [] certificate accepted profile viewOfSource sourceFound
-      sourceForm found form root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType typed
+      sourceForm found form root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType
+      (by rw [root.compilerPolicy.snapshotLambda]) typed
   have compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code := by
     apply CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes (rootFuel := rootFuel) compilation
       (sameBody.trans root.selected.recipe) _ site.compilation

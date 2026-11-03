@@ -74,14 +74,14 @@ def run : IO Unit := do
   let progressed ← match ← saved.resume 37 with
     | .outOfFuel checkpoint => pure checkpoint | _ => throw (IO.userError "direct call did not preserve partial checkpoint")
   let resumed ← success "direct resume" (.ok (← progressed.resume 300000))
-  require (first.value == word 14 && resumed.value == word 19 && resumed.session.installedGlobalsPresent)
-    "direct closure mutation or native resume lost the retained world"
+  require (first.value == word 14 && resumed.value == word 15 && resumed.session.installedGlobalsPresent)
+    "direct closure call did not restart from its captured value or native resume lost the retained world"
   let pair ← execute resumed.session (← key "twins") [word 30]
   let (left, right) ← match pair.value with
-    | .product left right => pure (left, right) | _ => throw (IO.userError "shared direct closures missing")
+    | .product left right => pure (left, right) | _ => throw (IO.userError "twin direct closures missing")
   let leftCall ← invoke pair.session left (word 3)
   let rightCall ← invoke leftCall.session right (word 4)
-  require (leftCall.value == word 33 && rightCall.value == word 37) "direct handles copied shared captures"
+  require (leftCall.value == word 33 && rightCall.value == word 34) "direct handles shared a captured cell instead of each keeping its own value"
   let failedPair ← execute rightCall.session (← key "failurePair") [word 70]
   let (fails, observes) ← match failedPair.value with
     | .product fails observes => pure (fails, observes) | _ => throw (IO.userError "direct failure closures missing")
@@ -97,7 +97,7 @@ def run : IO Unit := do
         | _ => throw (IO.userError "direct fault lost exact source read diagnostic")
     | _ => throw (IO.userError "direct fault changed classification")
   let observed ← invoke faulted observes .unit
-  require (observed.value == word 74) "direct language failure rolled back captured writes"
+  require (observed.value == word 70) "a write before a direct language failure reached another closure's captured value"
   let builtin ← get "direct builtin" (← observed.session.builtin .integerAdd)
   let integer ← invoke builtin.session builtin.value (.product (.integer 900000000000000000000000000000000000) (.integer 7))
   require (integer.value == .integer 900000000000000000000000000000000007) "packed builtin lost native Integer arithmetic"
@@ -124,6 +124,6 @@ def run : IO Unit := do
   match foreign.startHandlePacked spinningHandle .unit with
   | .error {code := .foreignSession, ..} => pure ()
   | _ => throw (IO.userError "direct invocation accepted a foreign session handle")
-  IO.println "direct owned packed invocation, source arity, stage guards, shared writes and native resume GREEN"
+  IO.println "direct owned packed invocation, source arity, stage guards, by-value captures and native resume GREEN"
 
 end Tests.SourceCoreIndexedSessionInvocation

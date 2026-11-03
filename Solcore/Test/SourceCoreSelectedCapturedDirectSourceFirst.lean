@@ -16,8 +16,9 @@ variable {recipe : SourceCoreIndexedSession.Recipe} (issued : Profiled recipe)
   (shape : Shape header.function.source) (word : Word)
   {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
 
-/-- The actual prior factory result fixes the captured cell. This next-call law
-has only a start receipt; the direct call has not executed yet. -/
+/-- The actual prior factory result fixes the closure's snapshot, and the call
+reads its own copy. This next-call law has only a start receipt; the direct
+call has not executed yet. -/
 theorem direct_from_captured (entry : Entry)
     (state : issued.toIssued.State header session [entry])
     (heap : state.heap = capturedHeap word)
@@ -30,12 +31,12 @@ theorem direct_from_captured (entry : Entry)
     (invocation : Staging.Recursive.Scope) :
     Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) header.function.context
       invocation.evidence (Staging.Recursive.callableEvidence entry.source)
-      state.heap entry.source [] (.word word) state.heap ∧
+      state.heap entry.source [] (.word word) (calledHeap word) ∧
     ((Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram)
         (SelectedCompilationPhysicalProgramSupport.stages recipe.compiled) invocation
-        header.function.context state.heap entry.source [] (.value (.word word)) state.heap ∧
+        header.function.context state.heap entry.source [] (.value (.word word)) (calledHeap word) ∧
       SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows header issued.initial
-        issued.support.profile recipe [entry] (.word word) checkpoint state.heap) ∨
+        issued.support.profile recipe [entry] (.word word) checkpoint (calledHeap word)) ∨
       SelectedCompilationStageClosedDirectForward.StageStopped issued state entry checkpoint invocation []) := by
   have typed := (state.history.semantic.current.2.2.2.2 entry (List.mem_singleton_self _)).2.2
   rw [entryType, source, heap] at typed
@@ -43,7 +44,7 @@ theorem direct_from_captured (entry : Entry)
     (SelectedCompilationPublicHistorySourceInputs.header_runtime issued.support.bodyTyping header).signatures typed
   have ordinary : Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) header.function.context
       invocation.evidence (Staging.Recursive.callableEvidence entry.source)
-      state.heap entry.source [] (.word word) state.heap := by
+      state.heap entry.source [] (.word word) (calledHeap word) := by
     simpa only [source, heap, Staging.Recursive.callableEvidence] using plain
   have input : RecursiveNamedPublicFunctionHistoryInputs.Input [entry] header.function.context
       .unit .unit .unit := .data ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩ ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
@@ -69,16 +70,16 @@ def ForwardChain (shape : Shape initial.header.function.source) (invocation : St
             completion.session.startHandlePacked entry.handle .unit fuel = .ok checkpoint →
             Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) initial.header.function.context
               invocation.evidence (Staging.Recursive.callableEvidence entry.source)
-              state.heap entry.source [] (.word word) state.heap ∧
+              state.heap entry.source [] (.word word) (calledHeap word) ∧
             ((Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram)
                 (SelectedCompilationPhysicalProgramSupport.stages recipe.compiled) invocation
-                initial.header.function.context state.heap entry.source [] (.value (.word word)) state.heap ∧
+                initial.header.function.context state.heap entry.source [] (.value (.word word)) (calledHeap word) ∧
               SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows initial.header
-                issued.initial issued.support.profile recipe [entry] (.word word) checkpoint state.heap) ∨
+                issued.initial issued.support.profile recipe [entry] (.word word) checkpoint (calledHeap word)) ∨
               SelectedCompilationStageClosedDirectForward.StageStopped issued state entry checkpoint invocation [])
 
-/-- The lambda captures the original parameter allocation, and the subsequent
-ordinary read drives the closed direct public theorem. -/
+/-- The lambda copies the original parameter allocation, and the subsequent
+ordinary read of a call's copy drives the closed direct public theorem. -/
 theorem initial_source_first (shape : Shape initial.header.function.source)
     (resultType : initial.header.function.resultType = .function .unit .word)
     (invocation : Staging.Recursive.Scope) :

@@ -112,9 +112,9 @@ def run : IO Unit := do
   assertTrue (made.session.functionCount == 1 && made.session.heapSize > 0) "returned closure was not privately registered"
   let first ← execute made.session (← key "use") [made.value, word 2]
   assertTrue (first.value == word 13 && first.session.heapSize > made.session.heapSize)
-    "owned closure lost its old global references or shared capture during world extension"
+    "owned closure lost its old global references or captured value during world extension"
   let second ← execute first.session (← key "use") [made.value, word 3]
-  assertTrue (second.value == word 16) "reused closure did not retain its mutable capture"
+  assertTrue (second.value == word 14) "reused closure did not restart from its captured value"
   let mirrored ← execute second.session (← key "mirror") [made.value]
   assertTrue (mirrored.value == made.value && mirrored.session.functionCount == 1)
     "function export did not reuse the exact existing handle"
@@ -152,8 +152,8 @@ def run : IO Unit := do
     | _ => throw (IO.userError "shared closure product changed shape")
   let leftResult ← execute twins.session (← key "use") [left, word 2]
   let rightResult ← execute leftResult.session (← key "use") [right, word 3]
-  assertTrue (leftResult.value == word 22 && rightResult.value == word 25)
-    "separately exported closures stopped sharing the same source cell"
+  assertTrue (leftResult.value == word 22 && rightResult.value == word 23)
+    "closures created together shared a captured cell instead of each keeping its own value"
   let paired := Value.product (word 9) right
   let pairEcho ← execute rightResult.session (← key "echoPair") [paired]
   assertTrue (pairEcho.value == paired) "deep function product roundtrip changed its handle"
@@ -209,7 +209,7 @@ def run : IO Unit := do
     | .ok (.failed _ session) => pure session
     | _ => throw (IO.userError "language failure did not retain the owned heap")
   let afterFailure ← execute failedSession (← key "get") [getter]
-  assertTrue (afterFailure.value == word 34) "effects before language failure were lost"
+  assertTrue (afterFailure.value == word 30) "a write before a language failure reached another closure's captured value"
 
   let checkpoint ← match afterFailure.session.start (← key "use") [right, word 1] with
     | .ok checkpoint => pure checkpoint
@@ -223,8 +223,8 @@ def run : IO Unit := do
   let direct ← match ← checkpoint.resume 65538 with
     | .succeeded completion => pure completion
     | _ => throw (IO.userError "typed session combined fuel failed")
-  assertTrue (resumed.value == word 26 && direct.value == resumed.value && direct.session.heapSize == resumed.session.heapSize)
-    "resume changed capture mutation or heap extension"
+  assertTrue (resumed.value == word 21 && direct.value == resumed.value && direct.session.heapSize == resumed.session.heapSize)
+    "resume changed the captured value or heap extension"
   assertTrue ((resumed.session.authenticate 1024 functionType right).isOk)
     "checkpoint world extension invalidated an existing owned handle"
   let pureNext ← match checkpoint.suspend? 2 with
@@ -240,7 +240,7 @@ def run : IO Unit := do
         pure session
     | _ => throw (IO.userError "zero export fuel did not retain the certified native heap")
   let afterExportError ← execute exportSession (← key "use") [right, word 1]
-  assertTrue (afterExportError.value == word 27) "export failure invalidated existing handles or heap effects"
+  assertTrue (afterExportError.value == word 21) "export failure invalidated existing handles or their captured values"
   let factoryArtifact ← prepare program plan
   let factorySession ← factoryArtifact.newSession
   assertTrue ((← reject factorySession functionType right).code == .foreignArtifact)

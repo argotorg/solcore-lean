@@ -138,7 +138,7 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [9,15,21,27,33,39,45,51] do
+  unless stores == [9,18,27,36,45,54,63,72] do
     throw (IO.userError s!"method closure stores changed: {reprStr stores}")
   IO.println "METHOD_CLOSURE_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar11/false/11/33"
 

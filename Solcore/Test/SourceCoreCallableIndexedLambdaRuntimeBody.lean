@@ -114,15 +114,19 @@ private def containsLambda : Nat → Core.Expr → Core.Expr → Bool
     | .matchData _ _ a branches => recurse a || branches.any recurse
     | _ => false
 
+/-- Each call first copies the lambda's captures, most recent binding first,
+from the values they had when the lambda was created; the parameter and the
+body's binders follow. -/
 private def expectedRows (name : String) : List (String × TypeSystem.Ty × Option Core.Value) :=
   let w := fun n => some (Core.Value.word (Word.ofNatModulo n))
   match name with
-  | "loops" => [("item", .word, w 4), ("sum", .word, w 9), ("i", .word, w 4)]
-  | "first" => [("item", .word, w 0), ("", .product .word .word, some (.pair (.word (Word.ofNatModulo 0)) (.word (Word.ofNatModulo 3)))), ("chosen", .word, w 3)]
-  | "selected" => [("item", .word, w 4), ("", .product .word .word, some (.pair (.word (Word.ofNatModulo 4)) (.word (Word.ofNatModulo 3)))), ("left", .word, w 4), ("right", .word, w 3)]
-  | "defaulted" => [("item", .word, w 4), ("", .word, w 4), ("extra", .word, w 7)]
-  | "failed" => [("item", .word, w 4), ("", .word, w 4), ("prior", .word, w 7), ("missing", .word, none)]
-  | "scrutinee" => [("item", .word, w 4), ("missing", .word, none)]
+  | "loops" => [("unused", .word, w 99), ("seed", .word, w 3), ("item", .word, w 4), ("sum", .word, w 9), ("i", .word, w 4)]
+  | "first" => [("seed", .word, w 3), ("item", .word, w 0), ("", .product .word .word, some (.pair (.word (Word.ofNatModulo 0)) (.word (Word.ofNatModulo 3)))), ("chosen", .word, w 3)]
+  | "selected" => [("seed", .word, w 3), ("item", .word, w 4), ("", .product .word .word, some (.pair (.word (Word.ofNatModulo 4)) (.word (Word.ofNatModulo 3)))), ("left", .word, w 4), ("right", .word, w 3)]
+  | "defaulted" => [("seed", .word, w 3), ("item", .word, w 4), ("", .word, w 4), ("extra", .word, w 7)]
+  | "failed" => [("seed", .word, w 3), ("item", .word, w 4), ("", .word, w 4), ("prior", .word, w 7), ("missing", .word, none)]
+  | "scrutinee" => [("seed", .word, w 3), ("item", .word, w 4), ("missing", .word, none)]
+  | "zero" => [("seed", .word, w 3)]
   | _ => []
 
 private def native_bodies : IO Unit := do
@@ -203,5 +207,5 @@ private def native_bodies : IO Unit := do
 
 def run : IO Unit := do
   native_bodies
-  IO.println "runtime lambda static bodies: actual view / full imperative tree / captured frame / ordered parameters and match binders / complete ledger / caller restore and full resume GREEN"
+  IO.println "runtime lambda static bodies: actual view / full imperative tree / captured frame / ordered capture copies, parameters and match binders / complete ledger / caller restore and full resume GREEN"
 end Tests.SourceCoreCallableIndexedLambdaRuntimeBody

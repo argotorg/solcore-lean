@@ -59,6 +59,7 @@ variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   (sameCallee : compiler.calleeCode = code.lowered)
   (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
   (coercions : code.sourceNode.coercions = [])
+  (copied : code.policy.snapshotLambda code.id = true)
   (sourceArguments : ExpressionsHaveTypes function.source function.context ids support.body.types)
   (sourceCount : support.body.types.length = metadata.argumentCount)
   (syntaxTree : GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
@@ -72,12 +73,15 @@ variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   (admitted : Admission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
     function.context ⟨initial, packet⟩)
 
-include wellFormed runtime covers locals admitted sourceArguments in
+include wellFormed runtime covers sourceArguments in
 /-- Original Source argument preservation supplies both raw parameter types
 and deep typing of the actual argument heap. Native vectors are independent. -/
-private theorem arguments_admitted {size : Nat} {arguments : List Dynamic.Value} {middle : Dynamic.Heap}
+private theorem arguments_admitted {start : Dynamic.Heap}
+    (startLocals : Dynamic.EnvironmentAgrees start function.context.locals function.captured)
+    (startTyped : Dynamic.HeapWellTyped function.context start)
+    {size : Nat} {arguments : List Dynamic.Value} {middle : Dynamic.Heap}
     (trace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) size
-      function.context function.evidence function.source function.captured heap ids arguments middle) :
+      function.context function.evidence function.source function.captured start ids arguments middle) :
     Dynamic.ValuesHaveTypes function.context middle arguments support.body.types ∧
       Dynamic.HeapWellTyped function.context middle := by
   have expressionPreserves : Dynamic.ExpressionExecutionPreserves (Program.ofChecked compiled.sourceProgram)
@@ -85,14 +89,39 @@ private theorem arguments_admitted {size : Nat} {arguments : List Dynamic.Value}
     intro before after id value type covers locals heapTyped typed execution
     exact wellFormed.wholeLanguagePreservation.expression function.context function.evidence function.source
       function.captured before after id value type runtime covers locals heapTyped typed execution
-  have reached := Dynamic.ExpressionsEvaluate.preserves expressionPreserves covers locals admitted.heap sourceArguments trace.sound
+  have reached := Dynamic.ExpressionsEvaluate.preserves expressionPreserves covers startLocals startTyped sourceArguments trace.sound
   exact ⟨reached.1, reached.2.1⟩
 
 variable {certificates : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram) →
     SourceSemantics.Context → GenericExpressionMeaning.Certificate}
   {expressionSyntax : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram) → ExpressionId → Prop}
+  (formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+    functions) captured code
+    (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet) heap store
+    owner.key.frameLocation)
 
-include inclusion ordinary coercions heaps admitted selection sourceArguments in
+/-- The caller packet, transported to the formed state that holds the copies
+of the callee's captured cells. -/
+def formedState : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
+    ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, captured.canonical⟩ :=
+  (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner support.principal.named).extend ⟨initial, packet⟩
+    formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+
+/-- Transport relates the caller packet to its formed state. -/
+theorem formedState_related : Relates initial (formedState captured code support owner initial packet functions formed).val :=
+  (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner support.principal.named).related ⟨initial, packet⟩
+    formed.maps formed.worlds formed.frame formed.copy.metadata_extends
+
+include admitted in
+/-- Admission holds at the formed state: copies keep the heap typing, and rows
+stay stable across the administrative extension. -/
+theorem formedState_admitted : Admission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
+    function.context (formedState captured code support owner initial packet functions formed) :=
+  ⟨admitted.heap.copy formed.copy,
+    CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative initial (formedState captured code support owner initial packet functions formed).val
+      admitted.rows formed.frame⟩
+
+include profile heaps admitted selection sourceArguments in
 /-- The genuine formation value is the real guard prefix of the unchanged
 admitted sequence fold. Its Source typing row stays independent of Tree types. -/
 theorem sequence_preserves (budget : Nat)
@@ -106,25 +135,23 @@ theorem sequence_preserves (budget : Nat)
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget := by
+        functions) (formedState captured code support owner initial packet functions formed) budget := by
   intro size outcome after trace bounded
-  obtain ⟨_source, _native, represented, _determined⟩ :=
-    CallableIndexedOwnedAdmittedMethodLambdaFormationWithFunctions.formation captured code support owner initial packet profile functions inclusion
-      heaps.runtime_hasTypes ordinary coercions
-  have closureTyped := functions.runtime_hasType
-    (registry := registry) represented
+  have closureTyped := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
+    (registry := registry) (formed.represents heaps.runtime_hasTypes)
   exact CallableIndexedOwnedAdmittedSequenceProducer.preserves
     (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-    ⟨initial, packet⟩ admitted selection.children support.unique sourceArguments captured.represented heaps locals
+    (formedState captured code support owner initial packet functions formed) (formedState_admitted captured code support owner initial packet functions admitted formed) selection.children support.unique sourceArguments
+    (captured.represented.extend formed.maps formed.worlds) formed.heaps (locals.mono formed.copy.metadata_extends)
     (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix captured.agrees _) .unit)
-    (.cons .unit (.cons closureTyped captured.typed)) budget children trace bounded
+    (.cons .unit (.cons closureTyped (captured.typed.weaken formed.worlds))) budget children trace bounded
 
-include inclusion ordinary coercions heaps admitted selection sourceArguments in
+include profile heaps admitted selection sourceArguments in
 /-- Native arguments use the same actual guarded input and independent Source
 row, preserving the original strict sequence grade. -/
 theorem sequence_reflects (budget : Nat)
@@ -138,23 +165,21 @@ theorem sequence_reflects (budget : Nat)
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget := by
+        functions) (formedState captured code support owner initial packet functions formed) budget := by
   intro size result finalStore trace bounded
-  obtain ⟨_source, _native, represented, _determined⟩ :=
-    CallableIndexedOwnedAdmittedMethodLambdaFormationWithFunctions.formation captured code support owner initial packet profile functions inclusion
-      heaps.runtime_hasTypes ordinary coercions
-  have closureTyped := functions.runtime_hasType
-    (registry := registry) represented
+  have closureTyped := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
+    (registry := registry) (formed.represents heaps.runtime_hasTypes)
   exact CallableIndexedOwnedAdmittedSequenceProducer.reflects
     (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-    ⟨initial, packet⟩ admitted selection.children support.unique sourceArguments captured.represented heaps locals
+    (formedState captured code support owner initial packet functions formed) (formedState_admitted captured code support owner initial packet functions admitted formed) selection.children support.unique sourceArguments
+    (captured.represented.extend formed.maps formed.worlds) formed.heaps (locals.mono formed.copy.metadata_extends)
     (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix captured.agrees _) .unit)
-    (.cons .unit (.cons closureTyped captured.typed)) budget children trace bounded
+    (.cons .unit (.cons closureTyped (captured.typed.weaken formed.worlds))) budget children trace bounded
 
 include syntaxTree wellFormed runtime covers locals admitted sourceArguments selection in
 /-- The actual ordered argument post supplies raw Source admission and its
@@ -165,30 +190,30 @@ theorem arguments_preserves
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget)
+        functions) (formedState captured code support owner initial packet functions formed) budget)
     (below : PreservingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)
       functions wellFormed budget)
     {argumentsSize callSize : Nat} {arguments : List Dynamic.Value} {middle after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) argumentsSize
-      function.context function.evidence function.source function.captured heap ids arguments middle)
+      function.context function.evidence function.source function.captured formed.finalHeap ids arguments middle)
     (argumentsWithin : argumentsSize ≤ budget)
     (called : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) callSize
-      function.context function.evidence function.evidence middle (.closure function) arguments outcome after)
+      function.context function.evidence function.evidence middle (.closure formed.closure) arguments outcome after)
     (callWithin : callSize ≤ budget) :
     ∃ payloads middleStore result finalStore finalMap finalWorld,
-      Evaluates (.unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
-        store (((SourceCoreCalls.packArguments compiler.codes).expression.rename captured.embedding).weakenAt 0 |>.weakenAt 0)
+      Evaluates (.unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
+        formed.finalStore (((SourceCoreCalls.packArguments compiler.codes).expression.rename captured.embedding).weakenAt 0 |>.weakenAt 0)
         (.inRight .word (DataPatternValues.packValues payloads)) middleStore ∧
       Evaluates (DataPatternValues.packValues payloads :: SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native :: actual)
-        middleStore (code.body.rename captured.embedding.lift.lift) result finalStore ∧
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native :: formed.closureActual)
+        middleStore (code.body.rename formed.embedding.lift.lift) result finalStore ∧
       FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         functions)
         finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
@@ -205,37 +230,49 @@ theorem arguments_preserves
   | @values sources payloads represented =>
     rw [selection.nativeTypes] at represented
     have representedArguments := arguments_of_values code.receipt.loweredParameters represented
-    let future := captured.extend argumentMaps argumentWorlds
-    let history := CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet
-    have raw := arguments_admitted captured code support owner initial packet sourceArguments wellFormed runtime covers locals admitted argumentsTrace
-    have stable := CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative initial argumentState.val admitted.rows argumentFrame
+    let future := formed.captures.extend argumentMaps argumentWorlds
+    let history := formed.closureHistory
+    have raw := arguments_admitted captured code support sourceArguments wellFormed runtime covers
+      (locals.mono formed.copy.metadata_extends) (admitted.heap.copy formed.copy) argumentsTrace
+    have stable := CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative initial argumentState.val admitted.rows (formed.frame.trans argumentFrame)
     obtain ⟨currentMetadata, currentCarried⟩ := stable owner.position
     have reference : future.canonical[code.referenceIndex]? =
         some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
       rw [CallableIndexedOwnedMethodLambdaFormationReceipts.reference_index captured code support]
-      exact packet.observed.reference
-    have capturesValid : FunctionValues.SourceCapturesValid middle (.closure function) :=
-      (show FunctionValues.SourceCapturesValid heap (.closure function) from locals).extend argumentMetadata
+      exact (packet.observed.of_slots formed.slots).reference
+    have capturesValid : FunctionValues.SourceCapturesValid middle (.closure formed.closure) :=
+      (show FunctionValues.SourceCapturesValid formed.finalHeap (.closure formed.closure) from
+        formed.copy.agrees locals).extend argumentMetadata
+    let recaptured : Support formed.closureCode registry faults := (CallableIndexedOwnedMethodLambdaValues.recaptureSupport support formed.captured)
+    have recapturedSyntax : GenericImperativeMatch.Syntax function.source (recaptured.expressionSyntax function.source)
+        recaptured.body.context (.statements true function.body) function.resultType := syntaxTree
     have meaning := CallableIndexedOwnedExtendedJointReadyContinuations.method_lambda_source_continuation
-      (nativeArguments := payloads) functions wellFormed
-      future code history support (CallableIndexedOwnedMethodLambdaFormationReceipts.source_origin captured code support owner initial packet)
-      owner packet.observed (CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code support owner initial packet)
-      argumentState.val selection.escaped raw.2 raw.1 stable syntaxTree budget below
+      (nativeArguments := payloads) (function := formed.closure) functions wellFormed
+      future formed.closureCode history recaptured
+      (CallableIndexedOwnedMethodLambdaValues.recaptureOrigin
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.source_origin captured code support owner initial packet) formed.captured)
+      owner (packet.observed.of_slots formed.slots)
+      (CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code support owner initial packet)
+      argumentState.val selection.escaped raw.2 raw.1 stable recapturedSyntax budget below
     obtain ⟨result, finalStore, finalMap, finalWorld, bodyEvaluation, resultRep, finalHeaps,
         maps, worlds, frame, metadata, finalState, related⟩ :=
-      CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_at
-        future code history support.body.toContext functions
+      CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_at (function := formed.closure)
+        future formed.closureCode history recaptured.body.toContext functions
         representedArguments owner argumentState.val middleHeaps capturesValid reference currentCarried
-        (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) (support.body_origin selection.escaped)
+        (CallableIndexedLambdaTemplatePermission.lambda_allowed formed.closureCode history)
+        (recaptured.body_origin selection.escaped)
         budget meaning called callWithin
     obtain ⟨returned, _samePool, relatedCaller⟩ :=
       (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named).restore
-        ⟨initial, packet⟩ finalState (argumentMaps.trans maps) (argumentWorlds.trans worlds)
-        (argumentFrame.trans frame) (argumentMetadata.trans metadata) (argumentRelated.trans related)
+        ⟨initial, packet⟩ finalState (formed.maps.trans (argumentMaps.trans maps))
+        (formed.worlds.trans (argumentWorlds.trans worlds)) (formed.frame.trans (argumentFrame.trans frame))
+        (formed.copy.metadata_extends.trans (argumentMetadata.trans metadata))
+        ((formedState_related captured code support owner initial packet functions formed).trans (argumentRelated.trans related))
     rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentEvaluation
     exact ⟨_, middleStore, result, finalStore, finalMap, finalWorld, argumentEvaluation, bodyEvaluation,
-      resultRep, finalHeaps, argumentMaps.trans maps, argumentWorlds.trans worlds,
-      argumentFrame.trans frame, argumentMetadata.trans metadata, returned, relatedCaller⟩
+      resultRep, finalHeaps, formed.maps.trans (argumentMaps.trans maps), formed.worlds.trans (argumentWorlds.trans worlds),
+      formed.frame.trans (argumentFrame.trans frame), formed.copy.metadata_extends.trans (argumentMetadata.trans metadata),
+      returned, relatedCaller⟩
 
 include syntaxTree wellFormed runtime covers locals admitted sourceArguments selection in
 /-- The native argument completion reconstructs its own Source grade before
@@ -245,30 +282,30 @@ theorem arguments_reflects (budget : Nat)
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget)
+        functions) (formedState captured code support owner initial packet functions formed) budget)
     (below : ReflectingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)
       functions wellFormed budget)
     {argumentsSize bodySize : Nat} {argumentInput : Ty} {argument result : Value} {middleStore finalStore : Store}
-    (argumentsTrace : EvaluationSize argumentsSize (.unit :: value code captured.embedding
-      (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
-      store (((SourceCoreCalls.packArguments compiler.codes).expression.rename captured.embedding).weakenAt 0 |>.weakenAt 0)
+    (argumentsTrace : EvaluationSize argumentsSize (.unit :: value code formed.embedding
+      (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
+      formed.finalStore (((SourceCoreCalls.packArguments compiler.codes).expression.rename captured.embedding).weakenAt 0 |>.weakenAt 0)
       (.inRight argumentInput argument) middleStore)
     (argumentsWithin : argumentsSize < budget)
     (bodyTrace : EvaluationSize bodySize (argument :: SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame
-      (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native :: actual)
-      middleStore (code.body.rename captured.embedding.lift.lift) result finalStore)
+      (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native :: formed.closureActual)
+      middleStore (code.body.rename formed.embedding.lift.lift) result finalStore)
     (bodyWithin : bodySize ≤ budget) :
     ∃ sourceArgumentsSize sourceCallSize arguments middle outcome after finalMap finalWorld,
       SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) sourceArgumentsSize
-        function.context function.evidence function.source function.captured heap ids arguments middle ∧
+        function.context function.evidence function.source function.captured formed.finalHeap ids arguments middle ∧
       RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) sourceCallSize
-        function.context function.evidence function.evidence middle (.closure function) arguments outcome after ∧
+        function.context function.evidence function.evidence middle (.closure formed.closure) arguments outcome after ∧
       FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         functions)
         finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
@@ -288,36 +325,48 @@ theorem arguments_reflects (budget : Nat)
     | values sourceArgumentsTrace =>
       rw [selection.nativeTypes] at represented
       have representedArguments := arguments_of_values code.receipt.loweredParameters represented
-      let future := captured.extend argumentMaps argumentWorlds
-      let history := CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet
-      have raw := arguments_admitted captured code support owner initial packet sourceArguments wellFormed runtime covers locals admitted sourceArgumentsTrace
-      have stable := CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative initial argumentState.val admitted.rows argumentFrame
+      let future := formed.captures.extend argumentMaps argumentWorlds
+      let history := formed.closureHistory
+      have raw := arguments_admitted captured code support sourceArguments wellFormed runtime covers
+        (locals.mono formed.copy.metadata_extends) (admitted.heap.copy formed.copy) sourceArgumentsTrace
+      have stable := CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative initial argumentState.val admitted.rows (formed.frame.trans argumentFrame)
       obtain ⟨currentMetadata, currentCarried⟩ := stable owner.position
       have reference : future.canonical[code.referenceIndex]? =
           some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
         rw [CallableIndexedOwnedMethodLambdaFormationReceipts.reference_index captured code support]
-        exact packet.observed.reference
-      have capturesValid : FunctionValues.SourceCapturesValid middle (.closure function) :=
-        (show FunctionValues.SourceCapturesValid heap (.closure function) from locals).extend argumentMetadata
+        exact (packet.observed.of_slots formed.slots).reference
+      have capturesValid : FunctionValues.SourceCapturesValid middle (.closure formed.closure) :=
+        (show FunctionValues.SourceCapturesValid formed.finalHeap (.closure formed.closure) from
+          formed.copy.agrees locals).extend argumentMetadata
+      let recaptured : Support formed.closureCode registry faults := (CallableIndexedOwnedMethodLambdaValues.recaptureSupport support formed.captured)
+      have recapturedSyntax : GenericImperativeMatch.Syntax function.source (recaptured.expressionSyntax function.source)
+          recaptured.body.context (.statements true function.body) function.resultType := syntaxTree
       have meaning := CallableIndexedOwnedExtendedJointReadyContinuations.method_lambda_native_continuation
-        functions wellFormed
-        future code history support (CallableIndexedOwnedMethodLambdaFormationReceipts.source_origin captured code support owner initial packet)
-        owner packet.observed (CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code support owner initial packet)
-        argumentState.val selection.escaped raw.2 raw.1 stable syntaxTree budget below
+        (function := formed.closure) functions wellFormed
+        future formed.closureCode history recaptured
+        (CallableIndexedOwnedMethodLambdaValues.recaptureOrigin
+          (CallableIndexedOwnedMethodLambdaFormationReceipts.source_origin captured code support owner initial packet) formed.captured)
+        owner (packet.observed.of_slots formed.slots)
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code support owner initial packet)
+        argumentState.val selection.escaped raw.2 raw.1 stable recapturedSyntax budget below
       obtain ⟨sourceCallSize, outcome, after, finalMap, finalWorld, called, resultRep, finalHeaps,
           maps, worlds, frame, metadata, finalState, related⟩ :=
-        CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_at
-          future code history support.body.toContext functions
+        CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_at (function := formed.closure)
+          future formed.closureCode history recaptured.body.toContext functions
           representedArguments owner argumentState.val middleHeaps capturesValid reference currentCarried
-          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) (support.body_origin selection.escaped)
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed formed.closureCode history)
+          (recaptured.body_origin selection.escaped)
           budget meaning bodyTrace bodyWithin
       obtain ⟨returned, _samePool, relatedCaller⟩ :=
         (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named).restore
-          ⟨initial, packet⟩ finalState (argumentMaps.trans maps) (argumentWorlds.trans worlds)
-          (argumentFrame.trans frame) (argumentMetadata.trans metadata) (argumentRelated.trans related)
+          ⟨initial, packet⟩ finalState (formed.maps.trans (argumentMaps.trans maps))
+          (formed.worlds.trans (argumentWorlds.trans worlds)) (formed.frame.trans (argumentFrame.trans frame))
+          (formed.copy.metadata_extends.trans (argumentMetadata.trans metadata))
+          ((formedState_related captured code support owner initial packet functions formed).trans (argumentRelated.trans related))
       exact ⟨sourceArgumentsSize, sourceCallSize, sources, middle, outcome, after, finalMap, finalWorld,
-        sourceArgumentsTrace, called, resultRep, finalHeaps, argumentMaps.trans maps, argumentWorlds.trans worlds,
-        argumentFrame.trans frame, argumentMetadata.trans metadata, returned, relatedCaller⟩
+        sourceArgumentsTrace, called, resultRep, finalHeaps, formed.maps.trans (argumentMaps.trans maps),
+        formed.worlds.trans (argumentWorlds.trans worlds), formed.frame.trans (argumentFrame.trans frame),
+        formed.copy.metadata_extends.trans (argumentMetadata.trans metadata), returned, relatedCaller⟩
 
 include selection in
 /-- The same original parent type and projected result are retained. -/
@@ -355,7 +404,7 @@ def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap) (resul
     PostAdmission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
       function.context compiler.original.type outcome reached
 
-include inclusion selection sameCallee ordinary coercions parent sourceCount sourceArguments syntaxTree
+include inclusion selection sameCallee copied ordinary coercions parent sourceCount sourceArguments syntaxTree
   wellFormed runtime covers locals heaps admitted parentTyped in
 /-- The original method-lambda formation closes the callee internally. Ordered
 admitted children and the strict dependent body IH close the whole call. -/
@@ -375,31 +424,33 @@ theorem preserves_bounded (budget : Nat)
     ∃ result finalStore finalMap finalWorld,
       Evaluates actual store (lowered.expression.rename captured.embedding) result finalStore ∧
       ResultAt captured code support owner initial packet functions compiler outcome after result finalStore finalMap finalWorld := by
-  obtain ⟨calleeSize, argumentsSize, callSize, calleeTrace, suffix, _calleeSmall, argumentsSmall, callWithin⟩ :=
+  obtain ⟨calleeSize, argumentsSize, callSize, calleeCaptured, calleeHeap, calleeTrace, calleeCopy, suffix,
+      _calleeSmall, argumentsSmall, callWithin⟩ :=
     CallableIndexedOwnedSelectedIndirectHeads.suffix_of_source compiler.found compiler.originalForm parent.coercions
       compiler.argumentCoercions parent.arity (lambda captured code coercions) support.unique wellFormed runtime covers locals
       admitted.heap sourceArguments sourceCount trace
-  rw [lambda_function captured code coercions] at calleeTrace suffix
-  obtain ⟨_source, formed, _represented, _determined⟩ :=
+  obtain ⟨formed, _source, nativeFormed, _represented, _determined⟩ :=
     CallableIndexedOwnedAdmittedMethodLambdaFormationWithFunctions.formation captured code support owner initial packet profile functions inclusion
-      heaps.runtime_hasTypes ordinary coercions
+      heaps copied ordinary coercions
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional calleeCopy formed.copy
+  rw [lambda_function captured code coercions] at calleeTrace suffix
   have calleeEvaluation : Evaluates actual store (compiler.calleeCode.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual)) store := by
-    rw [sameCallee]; exact formed
+      (.inRight .word (value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual)) formed.finalStore := by
+    rw [sameCallee]; exact nativeFormed
   have sequence : ProtectedStateExpressionSequenceProducer.Preserves
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget := by
+        functions) (formedState captured code support owner initial packet functions formed) budget := by
     intro size outcome after childTrace childBound
-    exact sequence_preserves captured code support owner initial packet profile functions inclusion compiler prepared selection
-      ordinary coercions sourceArguments heaps admitted budget children locals childTrace childBound
+    exact sequence_preserves captured code support owner initial packet profile functions compiler prepared selection
+      sourceArguments heaps admitted formed budget children locals childTrace childBound
   have emitted := prepared.lowered_rename compiler captured.embedding
   rw [selection.nativeResult] at emitted
   cases suffix with
@@ -415,13 +466,15 @@ theorem preserves_bounded (budget : Nat)
       rw [← emitted] at whole
       exact ⟨_, finalStore, finalMap, finalWorld, whole,
         parent_result captured code functions compiler prepared selection (.fault matched), finalHeaps,
-        maps, worlds, frame, metadata, reached, related,
-        after_expression_sized (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals parentTyped trace frame⟩
+        formed.maps.trans maps, formed.worlds.trans worlds, formed.frame.trans frame,
+        formed.copy.metadata_extends.trans metadata, reached, (formedState_related captured code support owner initial packet functions formed).trans related,
+        after_expression_sized (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals
+          parentTyped trace (formed.frame.trans frame)⟩
   | called argumentsTrace called =>
     obtain ⟨payloads, middleStore, result, finalStore, finalMap, finalWorld, argumentEvaluation, bodyEvaluation,
         resultRep, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
       arguments_preserves captured code support owner initial packet functions compiler prepared selection sourceArguments
-        syntaxTree wellFormed runtime covers locals admitted budget sequence below argumentsTrace
+        syntaxTree wellFormed runtime covers locals admitted formed budget sequence below argumentsTrace
         (Nat.le_trans (Nat.le_of_lt argumentsSmall) within) called (Nat.le_trans callWithin within)
     have whole := CallableContract.call_success prepared.site.gates native.diagnostics.unknown calleeEvaluation
       selection.stageAccepted argumentEvaluation selection.arityAccepted bodyEvaluation
@@ -431,7 +484,7 @@ theorem preserves_bounded (budget : Nat)
       maps, worlds, frame, metadata, reached, related,
       after_expression_sized (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals parentTyped trace frame⟩
 
-include inclusion selection sameCallee ordinary coercions parent sourceCount sourceArguments syntaxTree
+include inclusion selection sameCallee copied ordinary coercions parent sourceCount sourceArguments syntaxTree
   wellFormed runtime covers locals heaps admitted parentTyped in
 /-- The original native call exposes its measured arguments and body children.
 Reflection reconstructs the whole Source parent with independent grades. -/
@@ -451,30 +504,30 @@ theorem reflects_bounded (budget : Nat)
       RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         function.context function.evidence function.source function.captured heap id outcome after ∧
       ResultAt captured code support owner initial packet functions compiler outcome after result finalStore finalMap finalWorld := by
-  obtain ⟨sourceCallee, formed, _represented, _determined⟩ :=
+  obtain ⟨formed, sourceCallee, nativeFormed, _represented, _determined⟩ :=
     CallableIndexedOwnedAdmittedMethodLambdaFormationWithFunctions.formation captured code support owner initial packet profile functions inclusion
-      heaps.runtime_hasTypes ordinary coercions
+      heaps copied ordinary coercions
   obtain ⟨calleeSize, calleeTrace⟩ := SourceExecutionSize.ExpressionEvaluates.has_size sourceCallee
   have calleeEvaluation : Evaluates actual store (compiler.calleeCode.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual)) store := by
-    rw [sameCallee]; exact formed
+      (.inRight .word (value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual)) formed.finalStore := by
+    rw [sameCallee]; exact nativeFormed
   have sequence : ProtectedStateExpressionSequenceProducer.Reflects
       (protocol := CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
       (program := Program.ofChecked compiled.sourceProgram) (context := function.context) (evidence := function.evidence)
       (source := function.source) (environment := function.captured)
-      (actual := .unit :: value code captured.embedding
-        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native actual :: actual)
+      (actual := .unit :: value code formed.embedding
+        (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet).native formed.closureActual :: actual)
       (ξ := (Renaming.insertion 0).comp ((Renaming.insertion 0).comp captured.embedding)) (ids := ids)
       (sourceTypes := code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) (codes := compiler.codes) (faults := faults)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        functions) ⟨initial, packet⟩ budget := by
+        functions) (formedState captured code support owner initial packet functions formed) budget := by
     intro size result finalStore childTrace childBound
-    exact sequence_reflects captured code support owner initial packet profile functions inclusion compiler prepared selection
-      ordinary coercions sourceArguments heaps admitted budget children locals childTrace childBound
+    exact sequence_reflects captured code support owner initial packet profile functions compiler prepared selection
+      sourceArguments heaps admitted formed budget children locals childTrace childBound
   have emitted := prepared.lowered_rename compiler captured.embedding
   rw [emitted, selection.nativeResult] at trace
-  cases completed captured code (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet)
+  cases completed code (CallableIndexedOwnedMethodLambdaFormationReceipts.history_at captured code support owner initial packet) formed.embedding formed.closureActual
       calleeEvaluation selection.stageAccepted selection.arityAccepted trace within with
   | failed argumentsTrace argumentsStrict =>
     rw [← GenericExpressionMeaning.rename_prefix, ← GenericExpressionMeaning.rename_prefix] at argumentsTrace
@@ -486,20 +539,25 @@ theorem reflects_bounded (budget : Nat)
       | fault failed =>
         obtain ⟨sourceSize, sourceTrace⟩ := CallableIndexedOwnedIndirectSourceAdapters.SourceSuffix.to_expression
           compiler.found compiler.originalForm parent.requirements parent.coercions compiler.argumentCoercions parent.arity
-          wellFormed runtime covers locals admitted.heap sourceArguments sourceCount calleeTrace
+          wellFormed runtime covers (locals.mono formed.copy.metadata_extends) (admitted.heap.copy formed.copy)
+          sourceArguments sourceCount calleeTrace
           (CallableIndexedOwnedIndirectExpressionHeads.SourceSuffix.argumentFault failed)
         exact ⟨sourceSize, _, after, finalMap, finalWorld, sourceTrace,
           parent_result captured code functions compiler prepared selection (.fault matched), finalHeaps,
-          maps, worlds, frame, metadata, reached, related,
-          after_expression_sized (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals parentTyped sourceTrace frame⟩
+          formed.maps.trans maps, formed.worlds.trans worlds, formed.frame.trans frame,
+          formed.copy.metadata_extends.trans metadata, reached, (formedState_related captured code support owner initial packet functions formed).trans related,
+          after_expression_sized (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals
+            parentTyped sourceTrace (formed.frame.trans frame)⟩
   | applied argumentsTrace bodyTrace argumentsStrict bodyStrict =>
     obtain ⟨sourceArgumentsSize, sourceCallSize, arguments, middle, outcome, after, finalMap, finalWorld,
         sourceArgumentsTrace, called, resultRep, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
       arguments_reflects captured code support owner initial packet functions compiler prepared selection sourceArguments
-        syntaxTree wellFormed runtime covers locals admitted budget sequence below argumentsTrace argumentsStrict bodyTrace (Nat.le_of_lt bodyStrict)
+        syntaxTree wellFormed runtime covers locals admitted formed budget sequence below argumentsTrace argumentsStrict
+        bodyTrace (Nat.le_of_lt bodyStrict)
     obtain ⟨sourceSize, sourceTrace⟩ := CallableIndexedOwnedIndirectSourceAdapters.SourceSuffix.to_expression
       compiler.found compiler.originalForm parent.requirements parent.coercions compiler.argumentCoercions parent.arity
-      wellFormed runtime covers locals admitted.heap sourceArguments sourceCount calleeTrace
+      wellFormed runtime covers (locals.mono formed.copy.metadata_extends) (admitted.heap.copy formed.copy)
+      sourceArguments sourceCount calleeTrace
       (CallableIndexedOwnedIndirectExpressionHeads.SourceSuffix.called sourceArgumentsTrace called)
     exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace,
       parent_result captured code functions compiler prepared selection resultRep, finalHeaps,
@@ -529,6 +587,7 @@ theorem preserves_at_receipt (issued : Receipt captured code support compiler ce
     (initial := initial) (packet := packet) (profile := profile) (functions := functions) (inclusion := inclusion) (compiler := compiler)
     (prepared := issued.prepared) (parent := issued.parent) (selection := issued.selection)
     (sameCallee := issued.sameCallee) (ordinary := issued.ordinary) (coercions := issued.coercions)
+    (copied := issued.copied)
     (sourceArguments := issued.sourceArguments) (sourceCount := issued.sourceCount) (syntaxTree := issued.syntaxTree)
     (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals) (heaps := heaps)
     (admitted := admitted) (parentTyped := issued.parentTyped) budget children below trace within
@@ -556,6 +615,7 @@ theorem reflects_at_receipt (issued : Receipt captured code support compiler cer
     (initial := initial) (packet := packet) (profile := profile) (functions := functions) (inclusion := inclusion) (compiler := compiler)
     (prepared := issued.prepared) (parent := issued.parent) (selection := issued.selection)
     (sameCallee := issued.sameCallee) (ordinary := issued.ordinary) (coercions := issued.coercions)
+    (copied := issued.copied)
     (sourceArguments := issued.sourceArguments) (sourceCount := issued.sourceCount) (syntaxTree := issued.syntaxTree)
     (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals) (heaps := heaps)
     (admitted := admitted) (parentTyped := issued.parentTyped) budget children below trace within

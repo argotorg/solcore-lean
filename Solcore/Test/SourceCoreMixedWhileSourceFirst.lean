@@ -57,9 +57,9 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
   obtain ⟨_,_,_,returnTyped,_⟩ := head_tail tail5
   obtain ⟨fTrace,fState,fStored,fExtended⟩ := generalized_step shape.f shape.fLet state wellFormed fTyped
   let base := identityHeap shape.f context environment before
-  let outer : Dynamic.Environment := (shape.f.binder.id,⟨before.cells.length⟩) :: environment
-  have baseAppend : HeapAppends before base := ⟨_,rfl⟩
-  have flagAtF := (flagStored.mono baseAppend).under ⟨before.cells.length⟩ shape.fFlag
+  let outer : Dynamic.Environment := (shape.f.binder.id,(identityLocation source environment before)) :: environment
+  have baseAppend : HeapAppends before base := identityHeap_appends shape.f context environment before
+  have flagAtF := (flagStored.mono baseAppend).under (identityLocation source environment before) shape.fFlag
   obtain ⟨activeTrace,activeState,_,activeExtended⟩ := ordinary_step shape.activeLet fState wellFormed
     (by rw [shape.activeScheme]; rfl) activeTyped (read_value shape.inputRead flagAtF)
   let activeHeap := valueHeap base shape.active (.bool flag)

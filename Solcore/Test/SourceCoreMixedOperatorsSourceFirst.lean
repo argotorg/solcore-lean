@@ -55,13 +55,14 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
   cases original with
   | returnValue tupleTyped =>
     obtain ⟨leftType,rightType,leftTyped,rightTyped⟩ := shape.calls_typed state.runtime.graph.nodeOccurrencesUnique tupleTyped
-    have allocatedPrefix : HeapAppends before (identityHeap shape.f context environment before) := ⟨_,rfl⟩
-    have flagNext := (flagStored.mono allocatedPrefix).under ⟨before.cells.length⟩ shape.fFlag
+    have allocatedPrefix : HeapAppends before (identityHeap shape.f context environment before) :=
+      identityHeap_appends shape.f context environment before
+    have flagNext := (flagStored.mono allocatedPrefix).under (identityLocation source environment before) shape.fFlag
     obtain ⟨leftHeap,leftTrace,leftAppend⟩ := stored.invoke stateNext wellFormed shape.firstCall (.inr rfl)
       leftTyped (read_value shape.flagRead flagNext)
     have leftState := stateNext.after_expression wellFormed leftTyped leftTrace
     have chosen : ∃ after, Dynamic.ExpressionEvaluates program middle evidence source
-        ((shape.f.binder.id,⟨before.cells.length⟩) :: environment)
+        ((shape.f.binder.id,(identityLocation source environment before)) :: environment)
         (identityHeap shape.f context environment before) shape.binary.id (.bool flag) after ∧
         HeapAppends (identityHeap shape.f context environment before) after := by
       cases flag with
@@ -75,7 +76,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
         obtain ⟨after,rightTrace,rightAppend⟩ := (stored.mono leftAppend).invoke leftState wellFormed
           shape.secondCall (.inr rfl) rightTyped (boolean_value shape.falseNode)
         have negatedTrace : Dynamic.ExpressionEvaluates program middle evidence source
-            ((shape.f.binder.id,⟨before.cells.length⟩) :: environment)
+            ((shape.f.binder.id,(identityLocation source environment before)) :: environment)
             leftHeap shape.negated.id (.bool true) after := by
           apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.negatedFound)
           · rw [shape.negatedForm,shape.negatedRequirements,shape.negatedCoercions]
@@ -88,14 +89,14 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
         · rw [shape.binaryCoercions]; exact .nil
     obtain ⟨after, binaryTrace, append⟩ := chosen
     have builtinTrace : Dynamic.ExpressionEvaluates program middle evidence source
-        ((shape.f.binder.id,⟨before.cells.length⟩) :: environment) after shape.builtin.id
+        ((shape.f.binder.id,(identityLocation source environment before)) :: environment) after shape.builtin.id
         (.builtin ⟨.wordToInteger⟩) after := by
       apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.builtinFound)
       · rw [shape.builtinForm,shape.builtinRequirements,shape.builtinCoercions]
         exact .builtinFunction rfl
       · rw [shape.builtinCoercions]; exact .nil
     have tupleTrace : Dynamic.ExpressionEvaluates program middle evidence source
-        ((shape.f.binder.id,⟨before.cells.length⟩) :: environment)
+        ((shape.f.binder.id,(identityLocation source environment before)) :: environment)
         (identityHeap shape.f context environment before) shape.tuple.id
         (.product (.bool flag) (.builtin ⟨.wordToInteger⟩)) after := by
       apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.tupleFound)

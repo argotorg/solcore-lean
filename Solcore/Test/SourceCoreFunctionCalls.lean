@@ -80,7 +80,7 @@ example {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadMo
   have trace : Trace program function callContext entry.environment entry.heap (.value .unit) entry.heap :=
     .unit resultUnit (by rw [code.artifact.bodyTree.1]; exact .nil)
   have sourceCall : Outcome program context caller function.evidence before (.closure function) arguments (.value .unit) entry.heap :=
-    trace.call code.frame extension entry.allocation
+    trace.call code.frame extension entry.copy entry.allocation
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
     FunctionCalls.preserves layout code (empty_preserves (faults := fun _ _ => False) unitRep resultUnit)
       represented heaps locals sourceCall

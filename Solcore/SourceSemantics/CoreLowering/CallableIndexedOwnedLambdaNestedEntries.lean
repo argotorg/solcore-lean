@@ -37,13 +37,14 @@ theorem source_packet
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
     CallableIndexedOwnedNestedCanonicalState.Packet owner principal _ reached := by
   apply CallableIndexedOwnedNestedCanonicalState.packet_of_stable_read owner principal reached
-  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
       entry.entry.reference⟩
   · exact entry.entry.environments
   · rw [prefixContext]
@@ -60,9 +61,9 @@ theorem native_packet
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩) :
     CallableIndexedOwnedNestedCanonicalState.Packet owner principal _ reached := by
-  obtain ⟨added, length, spine⟩ := entry.spine
+  obtain ⟨added, copied, length, spine, kept⟩ := entry.spine
   apply CallableIndexedOwnedNestedCanonicalState.packet_of_stable_read owner principal reached
-  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
       entry.reference⟩
   · exact entry.environments
   · rw [prefixContext]
@@ -76,7 +77,8 @@ def source_entry
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -89,7 +91,7 @@ def source_entry
       change CallableIndexedOwnedNestedCanonicalState.Packet owner principal
         ⟨body.origin.scope, entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ reached
       rw [body.scope_eq]
-      exact source_packet captured code history inputs functions owner principal observed prefixContext sourceSeed caller entry added length spine reached)
+      exact source_packet captured code history inputs functions owner principal observed prefixContext sourceSeed caller entry added length copied spine kept reached)
 
 include observed prefixContext sourceSeed in
 def native_entry
@@ -118,7 +120,8 @@ theorem source_continuation_of_nested (budget : Nat)
         captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
       (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-      (spine : entry.entry.canonical = added ++ captured.canonical)
+      (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+      (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
       (reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩),
@@ -127,13 +130,13 @@ theorem source_continuation_of_nested (budget : Nat)
         (protocol := CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner principal)
         (conditionGate := CallableIndexedOwnedAllocationProducer.StableOwner keys) (origin := body.origin)
         functions program (source_entry captured code history inputs functions owner principal observed prefixContext sourceSeed
-          caller body entry added length spine reached))) :
+          caller body entry added length copied spine kept reached))) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached child strict
+  intro entry added length copied spine kept reached child strict
   exact CallableIndexedOwnedBodyNestedEntries.preserves_of_nested functions owner principal
     (CallableIndexedOwnedLambdaInvocationBounds.source_entry captured code history inputs functions owner caller body entry reached)
-    _ (meaning entry added length spine reached child strict)
+    _ (meaning entry added length copied spine kept reached child strict)
 
 include observed prefixContext sourceSeed in
 /-- Native reflection uses its own real measured prefix. The independent

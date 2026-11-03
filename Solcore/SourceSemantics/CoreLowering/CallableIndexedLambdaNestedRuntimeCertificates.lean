@@ -44,6 +44,7 @@ structure Lambda (support : RankedSupport (indexed := indexed)) (rank : Nat)
   nativeType : lowered.type = CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore
   requirements : code.sourceNode.requirements = []
   coercions : code.sourceNode.coercions = []
+  snapshots : code.policy.snapshotLambda code.id = true
 
 theorem Lambda.of_site {support : RankedSupport (indexed := indexed)} {rank childRank : Nat}
     {parameters : List TypedBinder} {result : TypeSystem.Ty} {statements : List StatementId}
@@ -59,7 +60,8 @@ theorem Lambda.of_site {support : RankedSupport (indexed := indexed)} {rank chil
   ⟨{parameters := parameters, result := result, statements := statements, code := site.code,
     childRank := childRank, smaller := smaller, body := body, compilation := site.compilation,
     active := site.active, identifier := rfl, emitted := rfl, found := found, sourceType := sourceType,
-    nativeType := site_native_type site, requirements := requirements, coercions := coercions}⟩
+    nativeType := site_native_type site, requirements := requirements, coercions := coercions,
+    snapshots := site.snapshots}⟩
 
 inductive Head (support : RankedSupport (indexed := indexed)) (rank : Nat)
     (caller : Header indexed.ancestry values indexed.layouts.definitions program)

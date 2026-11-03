@@ -128,6 +128,19 @@ private def source : String := String.intercalate "\n" [
   "}"
 ]
 
+/-- The binder of the local `name` declared in the checked source of
+`function`. -/
+private def localBinder (compiled : Compiled) (function name : String) : IO Resolved.LocalId := do
+  let owner ← key compiled.sourceProgram function
+  match compiled.sourceProgram.functions.find? (·.declaration == owner.declaration) with
+  | some checked =>
+      match checked.typedBody.nodes.filterMap (fun
+          | .statement { form := .letDecl binder _, .. } => if binder.name == name then some binder.id else none
+          | _ => none) with
+      | [binder] => pure binder
+      | _ => throw (IO.userError s!"{function} lost its local {name}")
+  | none => throw (IO.userError s!"{function} source missing")
+
 def run : IO Unit := do
   let compiled ← prepare "first-class evidence/state" source ["globalValue", "globalAliasCall", "orderedAliasCall",
     "qualifiedLocalAliasCall", "genericRecursiveClosureCall", "applyStored", "capturedStateEntry",
@@ -153,9 +166,14 @@ def run : IO Unit := do
   match rejected.observation with
   | .fault (.typeMismatch _ _) state => assertTrue state.heap.isEmpty "missing evidence was rejected after allocation"
   | other => throw (IO.userError s!"missing constrained function evidence was accepted: {reprStr other}")
-  let mutated ← expect compiled "capturedStateEntry" [.word (word 19)] (.word (word 9))
-  assertTrue (hasWord mutated 3) "generic constrained capture mutation lost its shared total"
-  for (input, expected, capturedExpected) in [(true, 42, 86), (false, 8, 18)] do
+  /- Closures capture by value. `mutate` writes its own copies of `total` and
+  `table`: the call returns 3, while the enclosing `total` stays 1 and
+  `table[7]` stays 0. -/
+  let mutated ← expect compiled "capturedStateEntry" [.word (word 19)] (.word (word 4))
+  assertTrue (hasWord mutated 3) "generic constrained closure call lost the write to its copy of total"
+  /- The coerced closure keeps the method's `scratch` as it was when the
+  closure was created, and each call starts again from it. -/
+  for (input, expected, capturedExpected) in [(true, 42, 84), (false, 8, 16)] do
     let state ← expect compiled "coercionMapping" [.bool input] (.word (word expected))
     assertTrue (state.heap.any fun cell => match cell.value with
       | some (.mapping _ _ entries) => entries.any fun entry => match entry.2 with
@@ -163,7 +181,17 @@ def run : IO Unit := do
       | _ => false) "coercion method mapping write was not exported"
     discard <| expect compiled "coercionCapturedState" [.bool input] (.word (word capturedExpected)) 37
   discard <| expect compiled "proxyKeyEntry" [.word (word 5)] (.word (word 73))
-  discard <| expect compiled "recursiveClosureEntry" [.word (word 67)] (.word (word 67)) 37
+  /- `loop` is assigned after the closure is created, so the closure's copy of
+  `loop` is uninitialized and the first recursive call faults on it. -/
+  let loop ← localBinder compiled "recurseClosure" "loop"
+  let first ← execute compiled "recursiveClosureEntry" [.word (word 67)] 37
+  let final ← get "recursive closure native resume" (SourceCoreUnifiedCompilation.Result.resume first 300000)
+  match final.observation with
+  | .fault (.uninitializedLocal binder) state =>
+    assertTrue (binder == loop &&
+        state.isDeeplySafe 500 compiled.indexed.base.sourceProgram.signatures compiled.indexed.base.plan)
+      "recursive closure self-cell faulted on another binder or left an unsafe source heap"
+  | other => throw (IO.userError s!"recursive closure self-cell did not fault on its uninitialized copy: {reprStr other}")
   IO.println "Core-only constrained named/local/helper evidence and stateful coercion corpus GREEN"
 
 end Tests.SourceCoreUnifiedEvidenceCorpus

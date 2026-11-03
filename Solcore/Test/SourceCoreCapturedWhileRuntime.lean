@@ -1,7 +1,8 @@
 import Solcore.Test.SourceCoreCapturedWhileFixture
 
 /-! Actual public calls retain each returned session and opaque handle.
-Interleaving a fresh allocation separates the two mutable captured cells. -/
+Captures are by value: every call starts again from the seed its closure
+captured, and its loop writes only that call's copy. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedWhile

@@ -83,7 +83,8 @@ def run : IO Unit := do
   let choose ← entryFor program checked "choose"
   expect choose [.bool true, word 9] (leaf 9)
   expect choose [.bool false, word 9] (pair (leaf 9) (leaf 10))
-  expect (← entryFor program checked "mutate") [leaf 1, pair (leaf 8) (leaf 9)] (pair (leaf 8) (leaf 9))
+  -- The setter assigns only its call's copy of the captured `value`.
+  expect (← entryFor program checked "mutate") [leaf 1, pair (leaf 8) (leaf 9)] (leaf 1)
   expect (← entryFor program checked "through") [leaf 7] (pair (leaf 7) (leaf 7))
   let recursive ← entryFor program checked "recurse"
   let twice := pair (leaf 4) (leaf 4)

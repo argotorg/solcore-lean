@@ -212,7 +212,7 @@ def runForward : IO Unit := do
     sequence.named.completion.session.heapSize, sequence.construction.completion.session.heapSize,
     sequence.newRead.completion.session.heapSize, sequence.intervening.completion.session.heapSize,
     sequence.priorRead.completion.session.heapSize, sequence.builtinRead.completion.session.heapSize]
-  unless stores == [3,6,6,6,6,21,21,24,24,24] do
+  unless stores == [3,9,9,9,9,27,30,36,39,39] do
     throw (IO.userError s!"constructor profile stores changed: {reprStr stores}")
   IO.println s!"CONSTRUCTOR_COMPILER_PROFILE_FORWARD_PASS: original checker1000/cache2/table2; one complete profile and automatic catalog; original nine operations and ordered nested payload; exact three issuance identities, six Dynamic execution outcomes, sufficient fuel for every output selection and later word outputs; new20/factory30export/old10/builtin37; stores {reprStr stores}"
 

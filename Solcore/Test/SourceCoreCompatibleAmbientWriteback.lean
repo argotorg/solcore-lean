@@ -11,7 +11,9 @@ import Solcore.Frontend.ProgramChecking
 with its function model and native checker receipts. The universal expression
 IH and actual static layout remain explicit intermediate obligations. Runtime
 regressions store fresh capturing closures and preserve source mapping order;
-this does not infer source closure authenticity from native typing alone. -/
+this does not infer source closure authenticity from native typing alone.
+Closures capture by value, so an RHS closure that assigns the root changes only
+its call's copy and the setter writes the live root. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCompatibleAmbientWriteback
 open Solcore Solcore.Core Solcore.Frontend Solcore.Frontend.SourceInference
@@ -129,25 +131,42 @@ def run : IO Unit := do
       | .succeeded (.word value) _ => require (value == w 22) "writeback fresh closure or named sibling changed"
       | other => throw (IO.userError s!"writeback invocation failed: {reprStr other}")
     else
+      -- Closures capture by value: the RHS's `root = empty` assigns only its
+      -- call's copy of `root`, so the setter still finds key 1 in the live root.
       match completed.result.native.observation with
-      | .failed token _ =>
-        match completed.result.diagnostics.diagnostic? token with
-        | some diagnostic =>
-          require (decide (diagnostic.error = .typeMismatch functionType none)) "setter fault used the old raw default type"
-          require diagnostic.span.isSome "setter fault lost its assignment span"
-        | none => throw (IO.userError "writeback missing-default diagnostic absent")
-      | other => throw (IO.userError s!"latest-root removal did not fault: {reprStr other}")
+      | .succeeded (.word value) _ => require (value == w 999) "writeback after the RHS replaced its own root copy changed the result"
+      | other => throw (IO.userError s!"RHS root replacement reached the setter's root: {reprStr other}")
       let rootBinder ← match artifact.base.functions.find? (·.specialized.key == owner) with
         | some function => match function.specialized.function.typedBody.inputs with
           | root :: _ => pure root | _ => throw (IO.userError "removed root binder absent")
         | none => throw (IO.userError "removed function absent")
-      let ledger ← get "writeback failure ledger" (SourceCoreCallableIndexedLedger.scan completed)
-      let row ← match ledger.ledger.rows.filter (·.entry.key.binder.id == rootBinder.id) with
-        | [row] => pure row | _ => throw (IO.userError "removed root ledger not unique")
-      let native ← match row.payload with
-        | some native => pure native | none => throw (IO.userError "removed root became absent")
-      let after ← get "writeback remaining root" (SourceCoreCompatibleValues.decode 500 completed.result.context rootType native)
-      require (after == .mapping .word functionType []) "setter fault overwrote the RHS's latest empty root"
+      let ledger ← get "writeback ledger" (SourceCoreCallableIndexedLedger.scan completed)
+      -- The root's own row, the RHS's snapshot, the RHS call's copy and the
+      -- returned lambda's snapshot.
+      let (own, callCopy) ← match ledger.ledger.rows.filter (·.entry.key.binder.id == rootBinder.id) with
+        | [own, _, callCopy, _] => pure (own, callCopy) | _ => throw (IO.userError "removed root rows changed")
+      let copied ← match callCopy.payload with
+        | some native => pure native | none => throw (IO.userError "removed root copy became absent")
+      let replaced ← get "writeback RHS root copy" (SourceCoreCompatibleValues.decode 500 completed.result.context rootType copied)
+      require (replaced == .mapping .word functionType []) "the RHS's empty root left its call's copy"
+      let snapshot ← get "writeback ledger snapshot" (SourceCoreCallableIndexedOutputs.snapshot outputs completed)
+      match present : own.payload with
+      | none => throw (IO.userError "removed root became absent")
+      | some native =>
+        match accepted : automatic.checked.catalog.project rootType with
+        | .error error => throw (IO.userError s!"writeback root projection: {reprStr error}")
+        | .ok type =>
+          if same : type = own.entry.key.payloadType then
+            let after ← get "writeback remaining root" (SourceCoreCallableIndexedOutputs.decodeData outputs completed ledger
+              snapshot rootType native own.entry.key.payloadType (same ▸ accepted) (own.payload_typed ledger.typed present))
+            match after.source with
+            | .mapping rawKey rawValue [(.word first, .closure _ _ _ _ _ captures _), (.word second, .global duplicate _), (.word third, .global other _)] =>
+              require (rawKey == .comptime .word && rawValue == .comptime functionType) "setter changed the live root's raw header"
+              require (first == w 1 && second == w 1 && third == w 2 && duplicate == inc && other == inc)
+                "setter changed the live root's ordered duplicates or sibling"
+              require (!captures.isEmpty) "setter lost the RHS closure's captures"
+            | other => throw (IO.userError s!"setter did not store the RHS closure in the live root: {reprStr other}")
+          else throw (IO.userError "removed root projection changed")
   IO.println "compatible ambient writeback and fresh function payloads GREEN"
 
 end Tests.SourceCoreCompatibleAmbientWriteback

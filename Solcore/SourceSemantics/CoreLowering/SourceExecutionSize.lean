@@ -235,20 +235,21 @@ mutual
           (.conditional condition thenBranch elseBranch) requirements coercions
           value after
     | lambda
-        {context evidence source environment heap parameters returnType body
-          requirements coercions}
-        (layout : OrdinaryRequirementLayout requirements coercions []) :
-        ExpressionFormEvaluates program (stepSize []) context evidence source environment heap
+        {context evidence source environment before after captured parameters returnType
+          body requirements coercions}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (snapshot : EnvironmentCopies source environment before captured after) :
+        ExpressionFormEvaluates program (stepSize []) context evidence source environment before
           (.lambda parameters returnType body) requirements coercions
           (.closure {
             parameters := parameters
             resultType := returnType
             body := body
             source := source
-            captured := environment
+            captured := captured
             context := context
             evidence := evidence
-          }) heap
+          }) after
     | directCall
         {size_arguments_evaluate size_applies : Nat}
         {context evidence source environment before argumentsHeap after
@@ -558,14 +559,15 @@ mutual
           (.global function) arguments result after
     | closure
         {size_execute : Nat}
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment outcome result parameterTypes callContext
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment outcome result parameterTypes callContext
           finalContext}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program size_execute callContext function.evidence
           function.source environment bound function.body finalContext outcome after)
@@ -574,14 +576,15 @@ mutual
           (.closure function) arguments result after
     | closureUnit
         {size_execute : Nat}
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment outcome parameterTypes callContext finalContext}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment outcome parameterTypes callContext finalContext}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (result_unit : function.resultType = .unit)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program size_execute callContext function.evidence
           function.source environment bound function.body finalContext outcome after)
@@ -652,15 +655,16 @@ mutual
         StatementExecutes program (stepSize [size_evaluate]) context evidence source environment before id
           finalContext (.fallthrough ((binder.id, location) :: environment)) after
     | letInitializedGeneralized
-        {context finalContext evidence source environment before after id node binder
-          initializer function location}
+        {context finalContext evidence source environment before middle after id node
+          binder initializer captured function location}
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder (some initializer))
-        (captures : GeneralizedClosureCaptures context source environment binder
+        (snapshot : EnvironmentCopies source environment before captured middle)
+        (captures : GeneralizedClosureCaptures context source captured binder
           initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends source.owner context binder finalContext)
-        (allocate : Heap.AllocatesGeneralized before function location after) :
+        (allocate : Heap.AllocatesGeneralized middle function location after) :
         StatementExecutes program (stepSize []) context evidence source environment before id
           finalContext (.fallthrough ((binder.id, location) :: environment)) after
     | returnUnit
@@ -947,13 +951,14 @@ mutual
           (.letDecl binder (some initializer)) finalContext
           ((binder.id, location) :: environment) after
     | letInitializedGeneralized
-        {context finalContext evidence source environment before after binder
-          initializer function location}
-        (captures : GeneralizedClosureCaptures context source environment binder
+        {context finalContext evidence source environment before middle after binder
+          initializer captured function location}
+        (snapshot : EnvironmentCopies source environment before captured middle)
+        (captures : GeneralizedClosureCaptures context source captured binder
           initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends source.owner context binder finalContext)
-        (allocate : Heap.AllocatesGeneralized before function location after) :
+        (allocate : Heap.AllocatesGeneralized middle function location after) :
         ForItemExecutes program (stepSize []) context evidence source environment before
           (.letDecl binder (some initializer)) finalContext
           ((binder.id, location) :: environment) after
@@ -1160,8 +1165,8 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
     exact .conditionalTrue layout (ExpressionEvaluates.sound condition_evaluates) (ExpressionEvaluates.sound branch_evaluates)
   | .conditionalFalse layout condition_evaluates branch_evaluates =>
     exact .conditionalFalse layout (ExpressionEvaluates.sound condition_evaluates) (ExpressionEvaluates.sound branch_evaluates)
-  | .lambda layout =>
-    exact .lambda layout
+  | .lambda layout snapshot =>
+    exact .lambda layout snapshot
   | .directCall callee_contains callee_form callee_requirements callee_coercions valid arguments_evaluate call_evidence applies =>
     exact .directCall callee_contains callee_form callee_requirements callee_coercions valid (ExpressionsEvaluate.sound arguments_evaluate) call_evidence (CallableApplies.sound applies)
   | .builtinCall layout arguments_evaluate applies =>
@@ -1264,10 +1269,10 @@ theorem CallableApplies.sound {program : Program} {size : Nat} {a0 : Context} {a
     exact .builtin applies
   | .global instantiates invocation_eq covers invokes =>
     exact .global instantiates invocation_eq covers (BodyInvokes.sound invokes)
-  | .closure invocation_eq frame parameters_extend allocate execute returned =>
-    exact .closure invocation_eq frame parameters_extend allocate (FunctionStatementsExecute.sound execute) returned
-  | .closureUnit invocation_eq frame result_unit parameters_extend allocate execute fell_through =>
-    exact .closureUnit invocation_eq frame result_unit parameters_extend allocate (FunctionStatementsExecute.sound execute) fell_through
+  | .closure invocation_eq frame parameters_extend copy allocate execute returned =>
+    exact .closure invocation_eq frame parameters_extend copy allocate (FunctionStatementsExecute.sound execute) returned
+  | .closureUnit invocation_eq frame result_unit parameters_extend copy allocate execute fell_through =>
+    exact .closureUnit invocation_eq frame result_unit parameters_extend copy allocate (FunctionStatementsExecute.sound execute) fell_through
 termination_by structural trace
 
 theorem BodyInvokes.sound {program : Program} {size : Nat} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : Value} {a5 : Heap}
@@ -1286,8 +1291,8 @@ theorem StatementExecutes.sound {program : Program} {size : Nat} {a0 : Context} 
     exact .letUninitialized contains form_eq monomorphic extension allocate
   | .letInitialized contains form_eq evaluate monomorphic extension allocate =>
     exact .letInitialized contains form_eq (ExpressionEvaluates.sound evaluate) monomorphic extension allocate
-  | .letInitializedGeneralized contains form_eq captures polymorphic extension allocate =>
-    exact .letInitializedGeneralized contains form_eq captures polymorphic extension allocate
+  | .letInitializedGeneralized contains form_eq snapshot captures polymorphic extension allocate =>
+    exact .letInitializedGeneralized contains form_eq snapshot captures polymorphic extension allocate
   | .returnUnit contains form_eq =>
     exact .returnUnit contains form_eq
   | .returnValue contains form_eq evaluate =>
@@ -1355,8 +1360,8 @@ theorem ForItemExecutes.sound {program : Program} {size : Nat} {a0 : Context} {a
     exact .letUninitialized monomorphic extension allocate
   | .letInitialized evaluate monomorphic extension allocate =>
     exact .letInitialized (ExpressionEvaluates.sound evaluate) monomorphic extension allocate
-  | .letInitializedGeneralized captures polymorphic extension allocate =>
-    exact .letInitializedGeneralized captures polymorphic extension allocate
+  | .letInitializedGeneralized snapshot captures polymorphic extension allocate =>
+    exact .letInitializedGeneralized snapshot captures polymorphic extension allocate
   | .expression evaluate =>
     exact .expression (ExpressionEvaluates.sound evaluate)
   | .assignValue execute =>
@@ -1462,8 +1467,8 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
     obtain ⟨size_condition_evaluates, condition_evaluates⟩ := ExpressionEvaluates.has_size condition_evaluates
     obtain ⟨size_branch_evaluates, branch_evaluates⟩ := ExpressionEvaluates.has_size branch_evaluates
     exact ⟨_, .conditionalFalse layout condition_evaluates branch_evaluates⟩
-  | .lambda layout =>
-    exact ⟨_, .lambda layout⟩
+  | .lambda layout snapshot =>
+    exact ⟨_, .lambda layout snapshot⟩
   | .directCall callee_contains callee_form callee_requirements callee_coercions valid arguments_evaluate call_evidence applies =>
     obtain ⟨size_arguments_evaluate, arguments_evaluate⟩ := ExpressionsEvaluate.has_size arguments_evaluate
     obtain ⟨size_applies, applies⟩ := CallableApplies.has_size applies
@@ -1595,12 +1600,12 @@ theorem CallableApplies.has_size {program : Program} {a0 : Context} {a1 : Eviden
   | .global instantiates invocation_eq covers invokes =>
     obtain ⟨size_invokes, invokes⟩ := BodyInvokes.has_size invokes
     exact ⟨_, .global instantiates invocation_eq covers invokes⟩
-  | .closure invocation_eq frame parameters_extend allocate execute returned =>
+  | .closure invocation_eq frame parameters_extend copy allocate execute returned =>
     obtain ⟨size_execute, execute⟩ := FunctionStatementsExecute.has_size execute
-    exact ⟨_, .closure invocation_eq frame parameters_extend allocate execute returned⟩
-  | .closureUnit invocation_eq frame result_unit parameters_extend allocate execute fell_through =>
+    exact ⟨_, .closure invocation_eq frame parameters_extend copy allocate execute returned⟩
+  | .closureUnit invocation_eq frame result_unit parameters_extend copy allocate execute fell_through =>
     obtain ⟨size_execute, execute⟩ := FunctionStatementsExecute.has_size execute
-    exact ⟨_, .closureUnit invocation_eq frame result_unit parameters_extend allocate execute fell_through⟩
+    exact ⟨_, .closureUnit invocation_eq frame result_unit parameters_extend copy allocate execute fell_through⟩
 termination_by structural trace
 
 theorem BodyInvokes.has_size {program : Program} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : Value} {a5 : Heap}
@@ -1622,8 +1627,8 @@ theorem StatementExecutes.has_size {program : Program} {a0 : Context} {a1 : Evid
   | .letInitialized contains form_eq evaluate monomorphic extension allocate =>
     obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
     exact ⟨_, .letInitialized contains form_eq evaluate monomorphic extension allocate⟩
-  | .letInitializedGeneralized contains form_eq captures polymorphic extension allocate =>
-    exact ⟨_, .letInitializedGeneralized contains form_eq captures polymorphic extension allocate⟩
+  | .letInitializedGeneralized contains form_eq snapshot captures polymorphic extension allocate =>
+    exact ⟨_, .letInitializedGeneralized contains form_eq snapshot captures polymorphic extension allocate⟩
   | .returnUnit contains form_eq =>
     exact ⟨_, .returnUnit contains form_eq⟩
   | .returnValue contains form_eq evaluate =>
@@ -1718,8 +1723,8 @@ theorem ForItemExecutes.has_size {program : Program} {a0 : Context} {a1 : Eviden
   | .letInitialized evaluate monomorphic extension allocate =>
     obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
     exact ⟨_, .letInitialized evaluate monomorphic extension allocate⟩
-  | .letInitializedGeneralized captures polymorphic extension allocate =>
-    exact ⟨_, .letInitializedGeneralized captures polymorphic extension allocate⟩
+  | .letInitializedGeneralized snapshot captures polymorphic extension allocate =>
+    exact ⟨_, .letInitializedGeneralized snapshot captures polymorphic extension allocate⟩
   | .expression evaluate =>
     obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
     exact ⟨_, .expression evaluate⟩
@@ -1855,7 +1860,7 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_condition_evaluates, size_branch_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @conditionalFalse size_condition_evaluates size_branch_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_condition_evaluates, size_branch_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
-  | @lambda _ _ _ _ _ _ _ _ _ _ _ =>
+  | @lambda _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @directCall size_arguments_evaluate size_applies _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_arguments_evaluate, size_applies], rfl, fun _ member => child_lt_stepSize member⟩
@@ -2039,9 +2044,9 @@ theorem CallableApplies.children_below {program : Program} {size : Nat} {a0 : Co
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @global size_invokes _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_invokes], rfl, fun _ member => child_lt_stepSize member⟩
-  | @closure size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @closure size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_execute], rfl, fun _ member => child_lt_stepSize member⟩
-  | @closureUnit size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @closureUnit size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_execute], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem BodyInvokes.positive {program : Program} {size : Nat} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : Value} {a5 : Heap}
@@ -2077,7 +2082,7 @@ theorem StatementExecutes.children_below {program : Program} {size : Nat} {a0 : 
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @letInitialized size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
-  | @letInitializedGeneralized _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @letInitializedGeneralized _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @returnUnit _ _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
@@ -2170,7 +2175,7 @@ theorem ForItemExecutes.children_below {program : Program} {size : Nat} {a0 : Co
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @letInitialized size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
-  | @letInitializedGeneralized _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @letInitializedGeneralized _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @expression size_evaluate _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
@@ -2930,13 +2935,14 @@ mutual
           (.argumentArityMismatch function.parameters.length arguments.length) heap
     | closureBody
         {size_fault : Nat}
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment parameterTypes callContext finalContext reason}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment parameterTypes callContext finalContext reason}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (fault : FunctionStatementsFault program size_fault callContext function.evidence
           function.source environment bound function.body finalContext reason after) :
@@ -2944,13 +2950,14 @@ mutual
           (.closure function) arguments reason after
     | closureControlEscape
         {size_execute : Nat}
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment parameterTypes callContext finalContext outcome}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment parameterTypes callContext finalContext outcome}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program size_execute callContext function.evidence
           function.source environment bound function.body finalContext outcome after)
@@ -3822,10 +3829,10 @@ theorem CallableFaults.sound {program : Program} {size : Nat} {a0 : Context} {a1
     exact .globalBody instantiates invocation_eq (BodyFaults.sound fault)
   | .closureArity mismatch =>
     exact .closureArity mismatch
-  | .closureBody invocation_eq frame parameters_extend allocate fault =>
-    exact .closureBody invocation_eq frame parameters_extend allocate (FunctionStatementsFault.sound fault)
-  | .closureControlEscape invocation_eq frame parameters_extend allocate execute escaped =>
-    exact .closureControlEscape invocation_eq frame parameters_extend allocate (FunctionStatementsExecute.sound execute) escaped
+  | .closureBody invocation_eq frame parameters_extend copy allocate fault =>
+    exact .closureBody invocation_eq frame parameters_extend copy allocate (FunctionStatementsFault.sound fault)
+  | .closureControlEscape invocation_eq frame parameters_extend copy allocate execute escaped =>
+    exact .closureControlEscape invocation_eq frame parameters_extend copy allocate (FunctionStatementsExecute.sound execute) escaped
 termination_by structural trace
 
 theorem BodyFaults.sound {program : Program} {size : Nat} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : SemanticFault} {a5 : Heap}
@@ -4250,12 +4257,12 @@ theorem CallableFaults.has_size {program : Program} {a0 : Context} {a1 : Evidenc
     exact ⟨_, .globalBody instantiates invocation_eq fault⟩
   | .closureArity mismatch =>
     exact ⟨_, .closureArity mismatch⟩
-  | .closureBody invocation_eq frame parameters_extend allocate fault =>
+  | .closureBody invocation_eq frame parameters_extend copy allocate fault =>
     obtain ⟨size_fault, fault⟩ := FunctionStatementsFault.has_size fault
-    exact ⟨_, .closureBody invocation_eq frame parameters_extend allocate fault⟩
-  | .closureControlEscape invocation_eq frame parameters_extend allocate execute escaped =>
+    exact ⟨_, .closureBody invocation_eq frame parameters_extend copy allocate fault⟩
+  | .closureControlEscape invocation_eq frame parameters_extend copy allocate execute escaped =>
     obtain ⟨size_execute, execute⟩ := FunctionStatementsExecute.has_size execute
-    exact ⟨_, .closureControlEscape invocation_eq frame parameters_extend allocate execute escaped⟩
+    exact ⟨_, .closureControlEscape invocation_eq frame parameters_extend copy allocate execute escaped⟩
 termination_by structural trace
 
 theorem BodyFaults.has_size {program : Program} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : SemanticFault} {a5 : Heap}
@@ -4764,9 +4771,9 @@ theorem CallableFaults.children_below {program : Program} {size : Nat} {a0 : Con
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
   | @closureArity _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
-  | @closureBody size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @closureBody size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
-  | @closureControlEscape size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @closureControlEscape size_execute _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_execute], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem BodyFaults.positive {program : Program} {size : Nat} {a0 : BodyInstance} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : List Value} {a4 : SemanticFault} {a5 : Heap}

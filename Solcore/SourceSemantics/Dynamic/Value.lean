@@ -28,11 +28,13 @@ structure Location where
   index : Nat
   deriving Repr, BEq, DecidableEq
 
-/-- Lexical bindings point to cells so closures observe later mutations. -/
+/-- Lexical bindings point to cells.  A closure's captured environment points
+to its own snapshot cells, which only closure applications copy. -/
 abbrev Environment := List (Resolved.LocalId × Location)
 
-/-- A source closure contains code and captured locations, but no recursive
-value payload.  This separation keeps the value carrier strictly positive. -/
+/-- A source closure contains code and the locations of its snapshot cells,
+but no recursive value payload.  This separation keeps the value carrier
+strictly positive. -/
 structure Closure where
   parameters : List TypedBinder
   resultType : Ty

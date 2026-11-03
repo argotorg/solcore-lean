@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Value
+import Solcore.SourceSemantics.CaptureBinders
 
 /-!
 Declarative environment and heap operations for source evaluation.
@@ -110,6 +111,11 @@ inductive AllocatesGeneralized (heap : Heap) (function : GeneralizedClosure) :
           value := none
           generalized := some function
         }]⟩
+
+/-- Allocate a copy of an existing cell, type, optional value and principal
+alike, at the fresh final location. -/
+inductive AllocatesCopy (heap : Heap) (cell : Cell) : Location → Heap → Prop where
+  | append : AllocatesCopy heap cell ⟨heap.cells.length⟩ ⟨heap.cells ++ [cell]⟩
 
 /-- Write only the optional value of one existing cell. -/
 inductive Writes (heap : Heap) (location : Location)
@@ -305,6 +311,48 @@ theorem preserves_read
 
 end AllocatesGeneralized
 
+namespace AllocatesCopy
+
+theorem location_fresh {heap : Heap} {cell : Cell} {location : Location} {updated : Heap}
+    (allocation : AllocatesCopy heap cell location updated) :
+    location.index = heap.cells.length := by
+  cases allocation
+  rfl
+
+theorem length_eq_succ {heap : Heap} {cell : Cell} {location : Location} {updated : Heap}
+    (allocation : AllocatesCopy heap cell location updated) :
+    updated.cells.length = heap.cells.length + 1 := by
+  cases allocation
+  simp
+
+theorem reads_new {heap : Heap} {cell : Cell} {location : Location} {updated : Heap}
+    (allocation : AllocatesCopy heap cell location updated) :
+    Reads updated location cell := by
+  cases allocation
+  exact .intro (CellAt.append_last heap.cells cell)
+
+theorem preserves_read {heap : Heap} {cell : Cell} {location : Location} {updated : Heap}
+    (allocation : AllocatesCopy heap cell location updated)
+    {oldLocation : Location} {oldCell : Cell}
+    (read : Reads heap oldLocation oldCell) :
+    Reads updated oldLocation oldCell := by
+  cases allocation
+  cases read with
+  | intro selected => exact .intro selected.append_left
+
+/-- An ordinary cell's copy is that cell's ordinary allocation. -/
+theorem allocates {heap : Heap} {cell : Cell} {location : Location} {updated : Heap}
+    (allocation : AllocatesCopy heap cell location updated) (ordinary : cell.generalized = none) :
+    Allocates heap cell.type cell.value location updated := by
+  cases allocation
+  cases cell with
+  | mk type value generalized =>
+      simp only at ordinary
+      subst generalized
+      exact .append
+
+end AllocatesCopy
+
 namespace Writes
 
 theorem length_eq
@@ -392,6 +440,13 @@ theorem of_generalized_allocation
   intro oldLocation cell read
   exact ⟨cell, allocation.preserves_read read, rfl, rfl⟩
 
+theorem of_copy
+    {before after : Heap} {copied : Cell} {location : Location}
+    (allocation : Heap.AllocatesCopy before copied location after) :
+    HeapMetadataExtend before after := by
+  intro oldLocation cell read
+  exact ⟨cell, allocation.preserves_read read, rfl, rfl⟩
+
 theorem of_write
     {before after : Heap} {writtenLocation : Location}
     {value : Option Value}
@@ -407,6 +462,167 @@ theorem of_write
   · exact ⟨cell, write.preserves_other same read, rfl, rfl⟩
 
 end HeapMetadataExtend
+
+/-- Copy a captured environment by value, most recent binding first. A binding
+whose identifier has a single monomorphic declaration in `source` is copied:
+a fresh cell receives a copy of its cell, and the copy binds the same
+identifier. Every other binding keeps its location. A generalized local holds
+an immutable principal, so sharing it is the same as copying it; a hidden
+match scrutinee has no declaration and no binding. A lambda copies its
+creation environment, and each closure application copies the closure's
+captured environment again, so assignments never cross a closure boundary in
+either direction. -/
+inductive EnvironmentCopies (source : Frontend.SourceInference.TypedSource) :
+    Environment → Heap → Environment → Heap → Prop where
+  | nil (heap : Heap) : EnvironmentCopies source [] heap [] heap
+  | shared
+      {id : Resolved.LocalId} {location : Location}
+      {environment copies : Environment} {heap after : Heap}
+      (uncopied : CaptureBinders.copiedBinder? source id = none)
+      (tail : EnvironmentCopies source environment heap copies after) :
+      EnvironmentCopies source ((id, location) :: environment) heap
+        ((id, location) :: copies) after
+  | copied
+      {id : Resolved.LocalId} {binder : Frontend.SourceInference.TypedBinder}
+      {location copy : Location} {cell : Cell}
+      {environment copies : Environment} {heap middle after : Heap}
+      (copiedBinder : CaptureBinders.copiedBinder? source id = some binder)
+      (read : Heap.Reads heap location cell)
+      (allocate : Heap.AllocatesCopy heap cell copy middle)
+      (tail : EnvironmentCopies source environment middle copies after) :
+      EnvironmentCopies source ((id, location) :: environment) heap
+        ((id, copy) :: copies) after
+
+namespace EnvironmentCopies
+
+variable {source : Frontend.SourceInference.TypedSource}
+
+/-- Copying never changes or removes an existing cell. -/
+theorem preserves_read {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after)
+    {location : Location} {cell : Cell}
+    (read : Heap.Reads before location cell) :
+    Heap.Reads after location cell := by
+  induction copy with
+  | nil => exact read
+  | shared _ _ ih => exact ih read
+  | copied _ _ allocate _ ih => exact ih (allocate.preserves_read read)
+
+theorem length_le {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    before.cells.length ≤ after.cells.length := by
+  induction copy with
+  | nil => exact Nat.le_refl _
+  | shared _ _ ih => exact ih
+  | copied _ _ allocate _ ih =>
+      rw [allocate.length_eq_succ] at ih
+      omega
+
+theorem metadata_extends {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    HeapMetadataExtend before after := by
+  intro location cell read
+  exact ⟨cell, copy.preserves_read read, rfl, rfl⟩
+
+/-- The copy binds exactly the original identifiers, in the original order. -/
+theorem identifiers {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    copies.map Prod.fst = environment.map Prod.fst := by
+  induction copy with
+  | nil => rfl
+  | shared _ _ ih => simp [ih]
+  | copied _ _ _ _ ih => simp [ih]
+
+/-- After copying, every binding of the copy reads the same cell as the
+original binding of its identifier, when the original location holds one. -/
+theorem looksUp {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after)
+    {id : Resolved.LocalId} {location : Location}
+    (lookup : Environment.LooksUp copies id location) :
+    ∃ original, Environment.LooksUp environment id original ∧
+      ∀ cell, Heap.Reads before original cell → Heap.Reads after location cell := by
+  induction copy generalizing location with
+  | nil => cases lookup
+  | @shared other shared _ _ heap _ _ tail ih =>
+      cases lookup with
+      | head => exact ⟨shared, .head, fun _ read => tail.preserves_read read⟩
+      | tail different rest =>
+          obtain ⟨original, originalLookup, reads⟩ := ih rest
+          exact ⟨original, .tail different originalLookup, reads⟩
+  | @copied other _ original copied cell _ _ heap middle _ _ read allocate tail ih =>
+      cases lookup with
+      | head =>
+          refine ⟨original, .head, fun other otherRead => ?_⟩
+          have same := read.functional otherRead
+          subst same
+          exact tail.preserves_read allocate.reads_new
+      | tail different rest =>
+          obtain ⟨found, originalLookup, reads⟩ := ih rest
+          refine ⟨found, .tail different originalLookup, fun cell foundRead => ?_⟩
+          exact reads cell (allocate.preserves_read foundRead)
+
+/-- Copying depends on the source only through its copy decision. -/
+theorem of_copiedBinder {other : Frontend.SourceInference.TypedSource}
+    (same : CaptureBinders.copiedBinder? source = CaptureBinders.copiedBinder? other)
+    {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    EnvironmentCopies other environment before copies after := by
+  induction copy with
+  | nil heap => exact .nil heap
+  | shared uncopied _ ih => exact .shared (same ▸ uncopied) ih
+  | copied copiedBinder read allocate _ ih => exact .copied (same ▸ copiedBinder) read allocate ih
+
+/-- Copying depends on the source only through which identifiers it copies. -/
+theorem of_copiedIds {other : Frontend.SourceInference.TypedSource}
+    (same : ∀ id, (CaptureBinders.copiedBinder? source id).isSome = (CaptureBinders.copiedBinder? other id).isSome)
+    {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    EnvironmentCopies other environment before copies after := by
+  induction copy with
+  | nil heap => exact .nil heap
+  | @shared id _ _ _ _ _ uncopied _ ih =>
+      refine .shared ?_ ih
+      have absent := same id
+      rw [uncopied] at absent
+      cases found : CaptureBinders.copiedBinder? other id with
+      | none => rfl
+      | some _ => rw [found] at absent; simp at absent
+  | @copied id _ _ _ _ _ _ _ _ _ copiedBinder read allocate _ ih =>
+      have present := same id
+      rw [copiedBinder] at present
+      cases found : CaptureBinders.copiedBinder? other id with
+      | none => rw [found] at present; simp at present
+      | some binder => exact .copied found read allocate ih
+
+/-- Copying is deterministic. -/
+theorem functional {environment left right : Environment} {before leftHeap rightHeap : Heap}
+    (first : EnvironmentCopies source environment before left leftHeap)
+    (second : EnvironmentCopies source environment before right rightHeap) :
+    left = right ∧ leftHeap = rightHeap := by
+  induction first generalizing right rightHeap with
+  | nil => cases second; exact ⟨rfl, rfl⟩
+  | shared uncopied _ ih =>
+      cases second with
+      | shared _ tail =>
+          obtain ⟨rfl, rfl⟩ := ih tail
+          exact ⟨rfl, rfl⟩
+      | copied copiedBinder _ _ _ =>
+          rw [uncopied] at copiedBinder
+          cases copiedBinder
+  | copied copiedBinder read allocate _ ih =>
+      cases second with
+      | shared uncopied _ =>
+          rw [uncopied] at copiedBinder
+          cases copiedBinder
+      | copied _ otherRead otherAllocate tail =>
+          have same := read.functional otherRead
+          subst same
+          cases allocate
+          cases otherAllocate
+          obtain ⟨rfl, rfl⟩ := ih tail
+          exact ⟨rfl, rfl⟩
+
+end EnvironmentCopies
 
 /-- Allocation followed by first-match lexical extension. -/
 inductive Binds (environment : Environment) (heap : Heap)

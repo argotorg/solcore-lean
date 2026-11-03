@@ -103,7 +103,8 @@ def SourceContinuation (budget : Nat) : Prop :=
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment), added.length = code.receipt.loweredParameters.length →
-      entry.entry.canonical = added ++ captured.canonical →
+  ∀ copied : Environment, entry.entry.canonical = added ++ copied →
+    (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) →
   ∀ reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩,

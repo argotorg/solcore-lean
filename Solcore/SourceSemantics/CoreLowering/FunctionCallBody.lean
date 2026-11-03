@@ -1,10 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
 import Solcore.SourceSemantics.CoreLowering.FunctionArguments
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalContext
+import Solcore.SourceSemantics.CoreLowering.CaptureCopies
 
 /-! Ordinary closure invocation uses the independent source call rules. This
-module factors their body outcomes and constructs the actual parameter prefix.
-It assumes no body execution when authenticating code or allocating arguments.
+module factors their body outcomes and constructs the actual entry prefix: the
+copies of the captured cells, then the parameters. It assumes no body
+execution when authenticating code, copying captures or allocating arguments.
 The source heap metadata invariant remains separate from Core world typing. -/
 
 set_option autoImplicit false
@@ -47,46 +49,52 @@ inductive Trace (program : Program) (function : Dynamic.Closure) (context : Sour
 variable {program : Program} {function : Dynamic.Closure}
 
 theorem Trace.call {context callContext : SourceSemantics.Context}
-    {caller : Dynamic.EvidenceEnvironment} {before bound after : Dynamic.Heap}
-    {arguments : List Dynamic.Value} {environment : Dynamic.Environment}
+    {caller : Dynamic.EvidenceEnvironment} {before copied bound after : Dynamic.Heap}
+    {arguments : List Dynamic.Value} {entry environment : Dynamic.Environment}
     {types : List TypeSystem.Ty} {outcome : Dynamic.ExpressionOutcome}
     (frame : Dynamic.ClosureFrame program function)
     (extension : MonoBindersExtend function.source.owner function.context function.parameters types callContext)
-    (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (trace : Trace program function callContext environment bound outcome after) :
     Outcome program context caller function.evidence before (.closure function) arguments outcome after := by
   cases trace with
-  | returned execution => exact .value (.closure rfl frame extension allocation execution rfl)
-  | unit resultUnit execution => exact .value (.closureUnit rfl frame resultUnit extension allocation execution ⟨_, rfl⟩)
-  | fault execution => exact .fault (.closureBody rfl frame extension allocation execution)
-  | escaped execution escape => exact .fault (.closureControlEscape rfl frame extension allocation execution escape)
+  | returned execution => exact .value (.closure rfl frame extension copy allocation execution rfl)
+  | unit resultUnit execution =>
+      exact .value (.closureUnit rfl frame resultUnit extension copy allocation execution ⟨_, rfl⟩)
+  | fault execution => exact .fault (.closureBody rfl frame extension copy allocation execution)
+  | escaped execution escape =>
+      exact .fault (.closureControlEscape rfl frame extension copy allocation execution escape)
 
-/-- A finite source closure call exposes a body trace after source-order
-parameter allocation. The represented argument list rules out arity faults. -/
+/-- A finite source closure call exposes a body trace after copying the
+captures and allocating the parameters in source order. The represented
+argument list rules out arity faults. -/
 theorem Outcome.trace {context : SourceSemantics.Context} {caller : Dynamic.EvidenceEnvironment}
     {before after : Dynamic.Heap} {arguments : List Dynamic.Value} {outcome : Dynamic.ExpressionOutcome}
     (arity : function.parameters.length = arguments.length)
     (execution : Outcome program context caller function.evidence before (.closure function) arguments outcome after) :
-    ∃ types callContext environment bound,
+    ∃ types callContext entry copied environment bound,
       MonoBindersExtend function.source.owner function.context function.parameters types callContext ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+      Dynamic.EnvironmentCopies function.source function.captured before entry copied ∧
+      Dynamic.BindersAllocate entry copied function.parameters arguments environment bound ∧
       Trace program function callContext environment bound outcome after := by
   cases execution with
   | value execution =>
     cases execution with
-    | closure _ _ extended allocated executed returned =>
+    | closure _ _ extended copy allocated executed returned =>
       subst returned
-      exact ⟨_, _, _, _, extended, allocated, .returned executed⟩
-    | closureUnit _ _ resultUnit extended allocated executed fellThrough =>
+      exact ⟨_, _, _, _, _, _, extended, copy, allocated, .returned executed⟩
+    | closureUnit _ _ resultUnit extended copy allocated executed fellThrough =>
       obtain ⟨_, rfl⟩ := fellThrough
-      exact ⟨_, _, _, _, extended, allocated, .unit resultUnit executed⟩
+      exact ⟨_, _, _, _, _, _, extended, copy, allocated, .unit resultUnit executed⟩
   | fault execution =>
     cases execution with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity mismatch => exact False.elim (mismatch arity)
-    | closureBody _ _ extended allocated fault => exact ⟨_, _, _, _, extended, allocated, .fault fault⟩
-    | closureControlEscape _ _ extended allocated executed escape =>
-      exact ⟨_, _, _, _, extended, allocated, .escaped executed escape⟩
+    | closureBody _ _ extended copy allocated fault =>
+      exact ⟨_, _, _, _, _, _, extended, copy, allocated, .fault fault⟩
+    | closureControlEscape _ _ extended copy allocated executed escape =>
+      exact ⟨_, _, _, _, _, _, extended, copy, allocated, .escaped executed escape⟩
 
 theorem mono_binders {owner : Resolved.DeclarationId} {context finalContext : SourceSemantics.Context}
     {parameters : List TypedBinder} {types : List TypeSystem.Ty}
@@ -140,9 +148,9 @@ private theorem parameters_scope {policy : SourceCoreFunctions.Policy} {source :
   | nil => rfl
   | cons _ _ ih => exact ih
 
-/-- A body entry records the real administrative captures and temporary slots.
-The continuation agreement is bidirectional and applies to arbitrary bodies,
-including bodies that construct new closures. -/
+/-- A body entry records the copied captures, the real administrative captures
+and the temporary slots. The continuation agreement is bidirectional and
+applies to arbitrary bodies, including bodies that construct new closures. -/
 structure Entry {catalog : SourceCoreDataCatalog.Catalog}
     (model : GenericHeap.PayloadModel catalog) {bodyCertificate : FunctionCode.BodyCertificate}
     {policy : SourceCoreFunctions.Policy} {scope : SourceCoreLocalCell.Scope}
@@ -151,6 +159,8 @@ structure Entry {catalog : SourceCoreDataCatalog.Catalog}
     (code : FunctionValues.Code catalog program bodyCertificate policy function scope layout.administrativeContext)
     (before : Dynamic.Heap) (initialStore : Store) (context : SourceSemantics.Context)
     (arguments : List Dynamic.Value) (values : List Value) where
+  entry : Dynamic.Environment
+  copied : Dynamic.Heap
   environment : Dynamic.Environment
   heap : Dynamic.Heap
   canonical : Environment
@@ -159,7 +169,8 @@ structure Entry {catalog : SourceCoreDataCatalog.Catalog}
   mapping : LocationMap
   world : StoreTyping
   embedding : Renaming
-  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied
+  allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment heap
   environments : DataHeap.EnvRepresents catalog mapping world layout.administrativeContext
     code.artifact.bodyScope environment canonical
   heaps : GenericHeap.HeapRepresents model mapping world heap store
@@ -172,8 +183,9 @@ structure Entry {catalog : SourceCoreDataCatalog.Catalog}
   agreement : ContinuationAgreement (DataPatternValues.packValues values :: entryActual) initialStore
     (code.artifact.rawBody.rename layout.embedding.lift) actual store (code.artifact.bodyCode.rename embedding)
 
-/-- Installing the real parameter prefix constructs all heap and lexical facts.
-No source or Core evaluation of the body is a premise. -/
+/-- Copying the captures and installing the real parameter prefix constructs
+all heap and lexical facts. No source or Core evaluation of the body is a
+premise. -/
 theorem entry_exists {catalog : SourceCoreDataCatalog.Catalog}
     {model : GenericHeap.PayloadModel catalog} {bodyCertificate : FunctionCode.BodyCertificate}
     {policy : SourceCoreFunctions.Policy} {scope : SourceCoreLocalCell.Scope}
@@ -187,17 +199,26 @@ theorem entry_exists {catalog : SourceCoreDataCatalog.Catalog}
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured) :
     Nonempty (Entry model layout code before store context arguments values) := by
+  obtain ⟨entry, copied, copiedCanonical, copiedActual, copiedStore, copiedMap, copiedWorld, copiedEmbedding,
+      copy, copiedEnvironments, copiedHeaps, copiedMaps, copiedWorlds, copiedFrame, copiedLookups, copies⟩ :=
+    CaptureCopies.copies_prefix (pre := [DataPatternValues.packValues values])
+      (body := SourceCoreFunctions.bindParameters code.artifact.loweredParameters code.artifact.resultCore
+        (code.artifact.bodyCode.weakenAt code.artifact.loweredParameters.length))
+      layout.represented heaps
+      (EnvironmentsAgree.lift (mapping := layout.embedding) layout.lookups (DataPatternValues.packValues values))
   obtain ⟨environment, heap, canonical, actual, finalStore, finalMap, finalWorld, embedding,
       allocation, environments, finalHeaps, maps, worlds, frame, lookups, agreement⟩ :=
-    parameters_prefix represented (body := code.artifact.bodyCode) (outputType := code.artifact.resultCore)
-      layout.represented heaps (EnvironmentsAgree.lift (mapping := layout.embedding) layout.lookups
-        (DataPatternValues.packValues values))
+    parameters_prefix (represented.extend copiedMaps copiedWorlds) (body := code.artifact.bodyCode)
+      (outputType := code.artifact.resultCore) copiedEnvironments copiedHeaps copiedLookups
   rw [code.artifact.parametersTree.binders] at allocation
   rw [parameters_scope code.artifact.parametersTree] at environments
   have mono := mono_binders extension
-  exact ⟨⟨environment, heap, canonical, actual, finalStore, finalMap, finalWorld, embedding,
-    allocation, environments, finalHeaps, GenericLexicalContext.binders_agree mono.1 mono.2 locals allocation,
-    maps, worlds, frame, GenericLexicalContext.binders_metadata allocation, lookups, agreement⟩⟩
+  exact ⟨⟨entry, copied, environment, heap, canonical, actual, finalStore, finalMap, finalWorld, embedding,
+    copy, allocation, environments, finalHeaps,
+    GenericLexicalContext.binders_agree mono.1 mono.2 (copy.agrees locals) allocation,
+    copiedMaps.trans maps, copiedWorlds.trans worlds, copiedFrame.trans frame,
+    copy.metadata_extends.trans (GenericLexicalContext.binders_metadata allocation), lookups,
+    copies.trans agreement⟩⟩
 
 /-- Independent source parameter allocation is deterministic. -/
 theorem allocations_same {environment leftEnv rightEnv : Dynamic.Environment}

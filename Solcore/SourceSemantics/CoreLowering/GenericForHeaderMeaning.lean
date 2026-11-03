@@ -103,7 +103,7 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
             preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata), ?_⟩
           rw [sequence_rename]
           exact (ContinuationAgreement.bind initialEval).trans ((ContinuationAgreement.letE allocationEval).trans agreement)
-      | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+      | letInitializedGeneralized _ captures poly other allocated => exact False.elim (poly mono)
   | discard found child remaining ih =>
     cases trace with | cons first rest =>
       cases first with | expression childTrace =>
@@ -241,7 +241,7 @@ theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.C
             maps.trans ((show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩).trans finalMaps),
             worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
             preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata)⟩
-      | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+      | letInitializedGeneralized _ captures poly other allocated => exact False.elim (poly mono)
   | @discard context scope expression expressionNode rest lowered body found child remaining remainingErrors ih =>
     rw [LoopRenaming.discard]
     cases trace with

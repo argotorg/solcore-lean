@@ -129,7 +129,7 @@ def runForwardAt1000 : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [13,31,49,122,140,213,286,340] do
+  unless stores == [13,40,67,149,176,258,340,403] do
     throw (IO.userError s!"method scoped stores changed: {reprStr stores}")
   IO.println "METHOD_ORIGIN_EVIDENCE_FUEL_1000_PASS: original checker1000; selected method checker1024; one original method; seven Source calls and all seven public forward bounds; scalar33/true/33/55"
 

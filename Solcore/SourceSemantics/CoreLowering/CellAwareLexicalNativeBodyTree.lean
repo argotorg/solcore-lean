@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareNativeBodyTree
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInitializerPackets
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotCode
 
 /-! The additive lexical tree permits ordinary and generalized declarations
 in any order, while retaining the existing terminal body receipt unchanged.
@@ -51,10 +52,15 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
         (prepared.layouts.allocatorAt named.signature.key [] (fun error => .sourceAllocation (reprStr error)))
         (initializedRequest (source named) scope binder lowered.type))
       (same : annotation.original = allocation.expression)
+      {captured : Expr}
+      (copied : SourceCoreSourceCells.copyScope (some (CallableIndexedNamedGeneration.allocator prepared named))
+        (source named) scope (fun index => index)
+        (CellAwareGeneralizedSnapshotCode.snapshotInner lowered.type lowered.expression annotation.expression) =
+          .ok captured)
       (remaining : Tree prepared named compiled certificates administrative reasonAt
         nextContext ((binder.id, lowered.type) :: scope) mode rest expected type body) :
       Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
-        expected type (sequence type lowered.expression annotation.expression body)
+        expected type (CellAwareGeneralizedSnapshotCode.snapshotSequence type captured body)
   | initialized {sourceContext nextContext scope mode id node binder initializer initializerNode rest expected type lowered body}
       (found : (source named).lookupStatement? id = some node)
       (form : node.form = .letDecl binder (some initializer))

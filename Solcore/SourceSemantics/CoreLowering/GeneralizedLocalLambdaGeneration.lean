@@ -102,9 +102,16 @@ theorem of_packet {checked : SourceCoreCompatibleCatalog.Checked}
           (SourceCoreCallableIndexedAncestry.creationReferenceIndex
             (context inputs packet.original.emission.prepared) inputs.scope)
           packet.certificate.parameterCore packet.certificate.resultCore packet.certificate.rawBody))) := by
+    have unsnapshotted : packet.certificate.snapshotted = packet.certificate.expression := by
+      have snapshot := packet.certificate.snapshot
+      have off : (policy inputs packet.original.emission.prepared packet.fuel).snapshotLambda
+          inputs.initializer = false := by
+        simp [policy]
+      simp only [off, Bool.false_eq_true, ↓reduceIte, Except.ok.injEq] at snapshot
+      exact snapshot.symm
     apply (congrArg SourceCoreBasic.LoweredExpr.expression packet.certificate.emitted).trans
-    change packet.certificate.expression = _
-    rw [decoration, emitted, sameOrigin, ← bodyEq]
+    change packet.certificate.snapshotted = _
+    rw [unsnapshotted, decoration, emitted, sameOrigin, ← bodyEq]
     rfl
   have rawEq := packet.original.extracted.symm.trans exactExpression
   have reportedType : packet.reported =

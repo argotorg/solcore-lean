@@ -129,19 +129,19 @@ theorem preserves_at (size : Nat) :
       code.id code.sourceNode.type := by
     simpa only [sameSource, code, Formation.code, Formation.function,
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.identifier] using typed
-  obtain ⟨result, finalStore, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨result, finalStore, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.preserves_at
       (function := head.function environment) (actual := actual)
       captured code support owner initial.val initial.property profile rfl observed functions inclusion
       wellFormed (by simpa only [sameSource, Formation.function, CallableIndexedLambdaGeneration.closure] using runtime) covers locals actualTyped head.sourceType
-      head.ordinary head.coercions heaps admitted original
+      head.site.snapshots head.ordinary head.coercions heaps admitted original
   have native : Evaluates actual store (lowered.expression.rename ξ) result finalStore := by
     simpa only [code, Formation.code, recaptureCode, head.emitted, captured, captures_for] using native
   have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-      mapping world code.sourceNode.type lowered.type faults outcome result := by
+      finalMap finalWorld code.sourceNode.type lowered.type faults outcome result := by
     simpa only [model, code, Formation.code, recaptureCode, head.emitted] using represented
-  exact ⟨result, finalStore, mapping, world, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨result, finalStore, finalMap, finalWorld, native, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 include inclusion complete globals slots prefixZero wellFormed runtime covers sameSource in
@@ -180,21 +180,21 @@ theorem reflects_at (size : Nat) :
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.identifier] using typed
   have actualCompleted : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) value finalStore := by
     simpa only [code, Formation.code, recaptureCode, head.emitted, captured, captures_for] using completed
-  obtain ⟨sourceSize, outcome, after, trace, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨sourceSize, outcome, after, trace, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.reflects_at
       (function := head.function environment) (actual := actual)
       captured code support owner initial.val initial.property profile rfl observed functions inclusion
       wellFormed (by simpa only [sameSource, Formation.function, CallableIndexedLambdaGeneration.closure] using runtime) covers locals actualTyped head.sourceType
-      head.ordinary head.coercions heaps admitted actualCompleted
+      head.site.snapshots head.ordinary head.coercions heaps admitted actualCompleted
   have sourceTrace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
       context evidence source environment before id outcome after := by
     simpa only [sameSource, code, Formation.code, Formation.function,
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.identifier] using trace
   have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-      mapping world code.sourceNode.type lowered.type faults outcome value := by
+      finalMap finalWorld code.sourceNode.type lowered.type faults outcome value := by
     simpa only [model, code, Formation.code, recaptureCode, head.emitted] using represented
-  exact ⟨sourceSize, outcome, after, mapping, world, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryLambdaFormationHeads

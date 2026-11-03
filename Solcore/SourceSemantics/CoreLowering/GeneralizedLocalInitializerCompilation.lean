@@ -172,7 +172,7 @@ theorem namedPolicy_recipe {checked : SourceCoreCompatibleCatalog.Checked}
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Core.Expr}
     (compiled : CallableIndexedNamedGeneration.Compilation prepared named diagnostics code) (rootFuel : Nat) :
     CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compiled rootFuel (namedPolicy compiled rootFuel) :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 theorem named_contextual {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : SourceCoreGeneralFunctions.Function}

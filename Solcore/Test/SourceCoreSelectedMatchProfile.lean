@@ -174,7 +174,7 @@ def run : IO Unit := do
     let .succeeded next ← nextCheckpoint.resume 100000 1000
       | throw (IO.userError "match captured reuse failed")
     require (next.value == word 23) "match captured reuse result changed"
-    require ([initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize] == [2, 5, 14, 23])
+    require ([initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize] == [2, 8, 20, 32])
       "match captured native heap changed"
     IO.println s!"MATCH_CAPTURE_HEAPS: {[initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize]}"
   IO.println "MATCH_COMPILER_PROFILE_FORWARD_PASS"

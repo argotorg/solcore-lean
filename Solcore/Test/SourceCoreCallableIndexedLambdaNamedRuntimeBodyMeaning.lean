@@ -124,17 +124,20 @@ private def containsLambda : Nat → Core.Expr → Core.Expr → Bool
     | .matchData _ _ a branches => recurse a || branches.any recurse
     | _ => false
 
+/-- Each lambda call first copies the lambda's captures, most recent binding
+first, from their creation-time values; the parameter, the body's binders and
+the named callees' cells follow. -/
 private def expectedRows (name : String) : List (String × TypeSystem.Ty × Option Core.Value) :=
   let w := fun n => some (Core.Value.word (Word.ofNatModulo n))
   match name with
-  | "named" => [("item", .word, w 4), ("prior", .word, w 7), ("value", .word, w 7)]
-  | "nested" => [("item", .word, w 4), ("value", .word, w 7), ("value", .word, w 8)]
-  | "recursive" => [("item", .word, w 4), ("value", .word, w 4), ("value", .word, w 3), ("value", .word, w 2), ("value", .word, w 1), ("value", .word, w 0)]
-  | "direct" => [("item", .word, w 4), ("value", .word, w 7)]
-  | "firstfault" => [("item", .word, w 4), ("gap", .word, none)]
-  | "laterfault" => [("item", .word, w 4), ("value", .word, w 3), ("written", .word, w 4), ("gap", .word, none)]
-  | "bodyfault" => [("item", .word, w 4), ("value", .word, w 4), ("gap", .word, none)]
-  | "zero" => [("value", .word, w 3)]
+  | "named" => [("unused", .word, w 99), ("seed", .word, w 3), ("item", .word, w 4), ("prior", .word, w 7), ("value", .word, w 7)]
+  | "nested" => [("seed", .word, w 3), ("item", .word, w 4), ("value", .word, w 7), ("value", .word, w 8)]
+  | "recursive" => [("seed", .word, w 3), ("item", .word, w 4), ("value", .word, w 4), ("value", .word, w 3), ("value", .word, w 2), ("value", .word, w 1), ("value", .word, w 0)]
+  | "direct" => [("seed", .word, w 3), ("item", .word, w 4), ("value", .word, w 7)]
+  | "firstfault" => [("seed", .word, w 3), ("item", .word, w 4), ("gap", .word, none)]
+  | "laterfault" => [("seed", .word, w 3), ("item", .word, w 4), ("value", .word, w 3), ("written", .word, w 4), ("gap", .word, none)]
+  | "bodyfault" => [("seed", .word, w 3), ("item", .word, w 4), ("value", .word, w 4), ("gap", .word, none)]
+  | "zero" => [("seed", .word, w 3), ("value", .word, w 3)]
   | _ => []
 
 private def native_bodies : IO Unit := do

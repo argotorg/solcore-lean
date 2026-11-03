@@ -25,8 +25,8 @@ theorem arity_of_value {program : Program} {context : Context}
     cases invoked with
     | returned _ _ _ allocated _ _ => exact allocated.length_eq ▸ .global instantiates
     | unit _ _ _ _ allocated _ _ => exact allocated.length_eq ▸ .global instantiates
-  | closure _ _ _ allocated _ _ => exact allocated.length_eq ▸ .closure _
-  | closureUnit _ _ _ _ allocated _ _ => exact allocated.length_eq ▸ .closure _
+  | closure _ _ _ _ allocated _ _ => exact allocated.length_eq ▸ .closure _
+  | closureUnit _ _ _ _ _ allocated _ _ => exact allocated.length_eq ▸ .closure _
 
 variable {recipe : SourceCoreIndexedSession.Recipe} (issued : Profiled recipe)
   {anchor : Header recipe.compiled (Program.ofChecked recipe.compiled.sourceProgram)}

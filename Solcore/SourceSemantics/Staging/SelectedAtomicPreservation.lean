@@ -52,7 +52,7 @@ theorem atomic_value
       | proxy valid => exact ⟨.proxy _, before_typed, .refl _⟩
   | lambda parameters returnType body =>
     cases evaluation with
-    | lambda layout =>
+    | @lambda _ _ _ _ _ after captured _ _ _ _ _ layout snapshot =>
       cases typing with
       | @lambda _ lambdaContext finalContext parameters parameterTypes returnType
           body bodyFacts names_unique parameters_extend body_type body_completes =>
@@ -61,7 +61,7 @@ theorem atomic_value
         have form_typed := ExpressionFormHasRawType.lambda names_unique parameters_extend body_type body_completes
         have code : ClosureCodeValid context {
             parameters := parameters, resultType := returnType, body := body,
-            source := source, captured := environment, context := context, evidence := evidence } := {
+            source := source, captured := captured, context := context, evidence := evidence } := {
           owner := runtime.owner
           closed := runtime.closed
           variables_closed := runtime.variables_closed
@@ -71,15 +71,16 @@ theorem atomic_value
           occurrence := ⟨id, node, contains, node_form, by simpa [body_types] using node_raw, by
             rw [node_form]; simpa [body_types] using form_typed⟩ }
         exact ⟨by
-          simpa [body_types] using (ValueHasType.closure (context := context) (heap := before)
+          simpa [body_types] using (ValueHasType.closure (context := context) (heap := after)
             (function := {
               parameters := parameters
               resultType := returnType
               body := body
               source := source
-              captured := environment
+              captured := captured
               context := context
               evidence := evidence })
-            rfl code evidence_covers environment_agrees), before_typed, .refl _⟩
+            rfl code evidence_covers (snapshot.agrees environment_agrees)),
+          before_typed.copy snapshot, snapshot.metadata_extends⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

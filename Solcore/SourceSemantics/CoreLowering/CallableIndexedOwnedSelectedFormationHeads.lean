@@ -89,6 +89,7 @@ structure Method where
   locals : Dynamic.EnvironmentAgrees heap function.context.locals function.captured
   typed : ExpressionHasType function.source function.context code.id code.sourceNode.type
   sourceType : code.sourceNode.type = FunctionValues.sourceType function
+  copied : code.policy.snapshotLambda code.id = true
   ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions []
   coercions : code.sourceNode.coercions = []
   heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
@@ -154,7 +155,8 @@ theorem preserves_at (selected : Selected (headers := headers) (keys := keys) (r
   | method receipt =>
     exact CallableIndexedOwnedAdmittedMethodLambdaFormation.preserves_at receipt.captured receipt.code receipt.support
       receipt.owner receipt.initial receipt.packet profile receipt.wellFormed receipt.runtime receipt.covers receipt.locals
-      receipt.typed receipt.sourceType receipt.ordinary receipt.coercions receipt.heaps receipt.admitted trace
+      receipt.typed receipt.sourceType receipt.copied receipt.ordinary receipt.coercions receipt.heaps receipt.admitted
+      trace
 
 /-- Reflection reuses each original native producer and independently sized
 Source result, preserving that branch's exact pool and principal packet. -/
@@ -172,14 +174,21 @@ theorem reflects_at (selected : Selected (headers := headers) (keys := keys) (re
   | method receipt =>
     exact CallableIndexedOwnedAdmittedMethodLambdaFormation.reflects_at receipt.captured receipt.code receipt.support
       receipt.owner receipt.initial receipt.packet profile receipt.wellFormed receipt.runtime receipt.covers receipt.locals
-      receipt.typed receipt.sourceType receipt.ordinary receipt.coercions receipt.heaps receipt.admitted completed
+      receipt.typed receipt.sourceType receipt.copied receipt.ordinary receipt.coercions receipt.heaps receipt.admitted
+      completed
 
 /-- The original ordinary producer retains its complete stronger closure
-receipt, including exact captures, Header support and full Source history. -/
-def ordinary_closure (receipt : Ordinary (headers := headers) (keys := keys) (registry := registry) (faults := faults) profile) :=
+receipt, including exact captures, Header support and full Source history, for
+a formed closure over its copies. -/
+def ordinary_closure (receipt : Ordinary (headers := headers) (keys := keys) (registry := registry) (faults := faults) profile)
+    (formedRecord : CallableIndexedOwnedLambdaFormationReceipts.FormedRecord receipt.head receipt.complete receipt.globals
+      receipt.initial receipt.owner receipt.prefixZero receipt.packet.observed receipt.packet.carried receipt.packet.bundle
+      receipt.related receipt.agrees receipt.nativeTyped
+      (model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedMethodLambdaValues.model headers keys registry faults profile))) :=
   CallableIndexedOwnedLambdaFormationReceipts.of_formation receipt.head profile receipt.complete receipt.globals receipt.slots
     receipt.initial receipt.owner receipt.prefixZero receipt.packet.observed receipt.packet.carried receipt.packet.bundle
-    receipt.related receipt.agrees receipt.nativeTyped receipt.heaps.runtime_hasTypes
+    receipt.related receipt.agrees receipt.nativeTyped receipt.heaps formedRecord
 
 /-- The method producer uses this same actual principal row's complete history. -/
 def method_history (receipt : Method (headers := headers) (keys := keys) (registry := registry) (faults := faults) profile) :=

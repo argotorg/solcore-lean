@@ -25,10 +25,12 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 
 include observed in
 /-- Ordered real parameter additions shift scope and captures by exactly the
-same length, preserving every original selected named slot. -/
+same length; the copies keep every slot past the scope, so every original
+selected named slot is preserved. -/
 theorem globals_after_prefix {canonical : Environment} (added : Environment)
-    (length : added.length = code.receipt.loweredParameters.length)
-    (spine : canonical = added ++ captured.canonical) :
+    (length : added.length = code.receipt.loweredParameters.length) (copied : Environment)
+    (spine : canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) :
     Globals (headers := headers) owner callerPrefix
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) canonical := by
   intro header member
@@ -36,7 +38,7 @@ theorem globals_after_prefix {canonical : Environment} (added : Environment)
   simp only [List.length_append, List.length_map, List.length_reverse]
   have index : code.receipt.loweredParameters.length + scope.length + callerPrefix + header.slot =
       added.length + (scope.length + callerPrefix + header.slot) := by omega
-  rw [index, List.getElem?_append_right (by omega)]
+  rw [index, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left, kept _ (by omega)]
   simpa using observed.globals header member
 
 variable (history : History code)
@@ -55,7 +57,8 @@ def source_entry
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -63,7 +66,7 @@ def source_entry
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) body.origin functions :=
   CallableIndexedOwnedBodyCanonicalEntries.wrap functions owner callerPrefix
     (CallableIndexedOwnedLambdaInvocationBounds.source_entry captured code history inputs functions owner caller body entry reached)
-    (by simpa only [body.scope_eq, CallableIndexedOwnedLambdaInvocationBounds.source_entry] using globals_after_prefix captured code owner callerPrefix observed added length spine)
+    (by simpa only [body.scope_eq, CallableIndexedOwnedLambdaInvocationBounds.source_entry] using globals_after_prefix captured code owner callerPrefix observed added length copied spine kept)
 
 include observed in
 /-- Native reflection uses the full spine already retained by its actual prefix. -/
@@ -79,8 +82,9 @@ def native_entry
   CallableIndexedOwnedBodyCanonicalEntries.wrap functions owner callerPrefix
     (CallableIndexedOwnedLambdaInvocationBounds.native_entry captured code history inputs functions owner caller body entry reached)
     (by
-      obtain ⟨added, length, spine⟩ := entry.spine
-      simpa only [body.scope_eq, CallableIndexedOwnedLambdaInvocationBounds.native_entry] using globals_after_prefix captured code owner callerPrefix observed added length spine)
+      obtain ⟨added, copied, length, spine, kept⟩ := entry.spine
+      simpa only [body.scope_eq, CallableIndexedOwnedLambdaInvocationBounds.native_entry] using
+        globals_after_prefix captured code owner callerPrefix observed added length copied spine kept)
 
 /-- A strict canonical family is specialized to the exact source-produced
 entry, then only its proof wrapper is forgotten at the actual body post. -/
@@ -89,7 +93,8 @@ theorem source_continuation_of_canonical (budget : Nat)
         captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
       (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-      (spine : entry.entry.canonical = added ++ captured.canonical)
+      (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+      (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
       (reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩),
@@ -99,13 +104,13 @@ theorem source_continuation_of_canonical (budget : Nat)
         (protocol := argumentProtocol (headers := headers) owner callerPrefix)
         (conditionGate := CallableIndexedOwnedAllocationProducer.StableOwner keys) (origin := body.origin)
         functions program (source_entry captured code owner callerPrefix observed history inputs functions caller body
-          entry added length spine reached))) :
+          entry added length copied spine kept reached))) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached child strict
+  intro entry added length copied spine kept reached child strict
   exact CallableIndexedOwnedBodyCanonicalEntries.preserves_of_canonical functions owner callerPrefix
     (CallableIndexedOwnedLambdaInvocationBounds.source_entry captured code history inputs functions owner caller body entry reached)
-    _ (meaning entry added length spine reached child strict)
+    _ (meaning entry added length copied spine kept reached child strict)
 
 /-- The original independently measured native prefix feeds its own canonical
 family entry and receives the same base pool after the actual body. -/

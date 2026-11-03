@@ -101,7 +101,8 @@ theorem source_body_at
       arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨parameterScope code, entry.entry.mapping, entry.entry.world, entry.entry.heap,
         entry.entry.store, entry.entry.canonical⟩)
@@ -136,7 +137,7 @@ theorem source_body_at
     exact ordinary.body.frame.code.graph.nodeOccurrencesUnique
   have actualPacket := CallableIndexedOwnedLambdaNestedEntries.source_packet
     captured code history inputs functions owner ordinary.caller observed prefixContext origin.metadata
-    caller entry added length spine reached
+    caller entry added length copied spine kept reached
   let initial : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers)
       owner ordinary.caller).State
       ⟨parameterScope code, entry.entry.mapping, entry.entry.world, entry.entry.heap,
@@ -214,7 +215,8 @@ theorem native_body_at
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [rawTypes] using argumentsTyped
-  have allocated := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped rawArguments entry.allocation
+  have allocated := Dynamic.BindersAllocate.preservesHeapTyping (beforeTyped.copy entry.copy)
+    (rawArguments.mono entry.copy.metadata_extends) entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields ordinary.body.extended
   have heapTyped : Dynamic.HeapWellTyped ordinary.body.context entry.heap :=
     allocated.transportClosed fields.signatures valid.code.closed (fields.targetClosed valid.code.closed)

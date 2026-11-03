@@ -2,8 +2,10 @@ import Solcore.SourceSemantics.CoreLowering.FunctionCallBody
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
+import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
 
-/-! Parameter installation reaches the actual monomorphic call context. Its
+/-! A closure's entry copies its captured cells and then installs its
+parameters, reaching the actual monomorphic call context. Its
 finite continuation agreement comes from the production allocation receipts;
 the compiler view is retained independently of the canonical closure source.
 Body correspondence remains a separate concrete static certificate. -/
@@ -41,6 +43,9 @@ structure Entry (layout : SourceCoreCallableIndexedFrames.Layout) (globals : Nat
     (arguments : List Dynamic.Value) (before : Dynamic.Heap) (initialStore : Store)
     (initialMap : LocationMap) (initialWorld : StoreTyping) (administrative actualContext : Core.Context)
     (actual : Environment) (ξ : Renaming) (parameterCode body : Expr) where private mk ::
+  copies : Dynamic.Environment
+  copiedHeap : Dynamic.Heap
+  copiedContext : Core.Context
   environment : Dynamic.Environment
   heap : Dynamic.Heap
   canonical : Environment
@@ -49,7 +54,8 @@ structure Entry (layout : SourceCoreCallableIndexedFrames.Layout) (globals : Nat
   mapping : LocationMap
   world : StoreTyping
   embedding : Renaming
-  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  copy : Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap
+  allocation : Dynamic.BindersAllocate copies copiedHeap function.parameters arguments environment heap
   environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
     administrative
     (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) environment canonical ambient.definitions
@@ -61,7 +67,7 @@ structure Entry (layout : SourceCoreCallableIndexedFrames.Layout) (globals : Nat
   metadata : Dynamic.HeapMetadataExtend before heap
   lookups : EnvironmentsAgree embedding canonical actualBody
   actualTyped : RuntimeEnvironmentHasTypes world actualBody
-    (CallableIndexedParameterTyped.prefixContext bindings actualContext) ambient.definitions
+    (CallableIndexedParameterTyped.prefixContext bindings copiedContext) ambient.definitions
   reference : canonical[(bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + globals]? =
     some (.cellRef layout.type contextLocation)
   read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native)
@@ -79,11 +85,13 @@ private theorem liftMany_insertion (count cutoff : Nat) :
 
 namespace Stateful
 
-/-- Actual prefix receipts construct parameter allocation, the typed body
-environment and the surviving context-reference slot. Its read and unmapped
-status follow from allocation preservation. No final body facts are assumed. -/
-
-theorem entry_of_accepted_with_spine_of_input_ids
+/-- The entry copies the closure's captured cells through the marked
+allocator, then the actual prefix receipts construct parameter allocation, the
+typed body environment and the surviving context-reference slot. Its read and
+unmapped status follow from allocation preservation. The protected state
+crosses the copies administratively and is rebound to the copied slots. No
+final body facts are assumed. -/
+theorem entry_of_accepted_with_spine_of_copies
     {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
     (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
     {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -92,12 +100,19 @@ theorem entry_of_accepted_with_spine_of_input_ids
     {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
     (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol layouts layout
       (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (rebinds : ProtectedStateTransition.Rebinds protocol)
     {function : Dynamic.Closure} {view : TypedSource} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
-    {scope : Scope} {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    {scope : Scope} {bindings : List Binding} {output : Ty} {body allocatedCode parameterCode : Expr}
     (inputIds : function.source.inputs.map TypedBinder.id = view.inputs.map TypedBinder.id)
+    (copies : SourceSemantics.CaptureBinders.copiedBinder? function.source =
+      SourceSemantics.CaptureBinders.copiedBinder? view)
     (accepted : SourceCoreSourceCells.bindParameters
       (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
-      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok parameterCode)
+      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok allocatedCode)
+    (copied : SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError)))
+      view scope (· + 1) allocatedCode = .ok parameterCode)
     (parameters : function.parameters = bindings.map Prod.fst)
     (kinds : ∀ binding ∈ bindings, function.source.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
     (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
@@ -112,6 +127,8 @@ theorem entry_of_accepted_with_spine_of_input_ids
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
     (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
     (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (types : Renaming.Respects ξ (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) ::
+      (SourceCoreLocalCell.coreContext scope ++ administrative)) actualContext)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
@@ -120,19 +137,35 @@ theorem entry_of_accepted_with_spine_of_input_ids
     (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary contextLocation native) :
     ∃ entry : Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body,
-      ∃ added : Environment, added.length = bindings.length ∧ entry.canonical = added ++ canonical ∧
+      ∃ added copied : Environment, added.length = bindings.length ∧ entry.canonical = added ++ copied ∧
+        (∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) ∧
         ProtectedStateTransition.Transition protocol initial
           ⟨bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
             entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩ := by
+  obtain ⟨copiesEnvironment, copiedHeap, copiedCanonical, copiedActual, copiedContext, copiedStore, copiedMap,
+      copiedWorld, copiedEmbedding, copy, copiedEnvironments, slots, copiedHeaps, copiedMaps, copiedWorlds,
+      copiedFrame, copiedRead, copiedLookups, _copiedTypes, copiedTyped, copyAgreement⟩ :=
+    CaptureCopies.marked_copies_prefix (pre := [DataPatternValues.packValues nativeArguments])
+      (preContext := [SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd)])
+      copied definitions registered environments heaps actualLayout rfl types actualTyped reference read
+  have sourceCopy := copy.of_copiedBinder copies.symm
+  obtain ⟨copiedUnmapped, _⟩ := copiedFrame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1
+  obtain ⟨extendedState, extendedRelated⟩ := ProtectedStateTransition.AdministrativeTransport.transition protocol
+    transport initial copiedMaps copiedWorlds copiedFrame sourceCopy.metadata_extends
+  obtain ⟨reboundState, reboundRelated⟩ := rebinds extendedState copiedCanonical slots
+  have copiedReference : copiedCanonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation) := by
+    rw [slots _ (by omega)]
+    exact reference
   have tree := CallableIndexedParameterCertificates.of_accepted onError accepted
-  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) canonical
-      (DataPatternValues.packValues nativeArguments :: canonical) := by
+  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) copiedCanonical
+      (DataPatternValues.packValues nativeArguments :: copiedCanonical) := by
     intro index value found; exact found
   have length : (bindings.map Prod.snd).length = nativeArguments.length := by simpa using represented.length.2
   obtain ⟨environment, heap, finalCanonical, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding,
       allocated, finalEnvironments, finalHeaps, maps, worlds, preservation, sourceLayout, lookups, spine, finalTyped, agreement, transition⟩ :=
-    CallableIndexedParameterTyped.Stateful.prefix_typed tree protocol producer definitions registered represented environments heaps
-      sourceLayout actualLayout actualTyped (allTypes := bindings.map Prod.snd) (named := false) rfl (by simp) length
+    CallableIndexedParameterTyped.Stateful.prefix_typed tree protocol producer definitions registered
+      (represented.extend copiedMaps copiedWorlds) copiedEnvironments copiedHeaps
+      sourceLayout copiedLookups copiedTyped (allTypes := bindings.map Prod.snd) (named := false) rfl (by simp) length
       (fun {_ _} found => by simpa using found)
       (by
         intro binding member
@@ -140,7 +173,7 @@ theorem entry_of_accepted_with_spine_of_input_ids
           ids.any (fun id => decide (id = binding.1.id))) inputIds
         simp only [List.any_map] at same
         exact same.symm.trans (kinds binding member))
-      (by simpa using reference) read unmapped initial readyAt
+      (by simpa using copiedReference) copiedRead copiedUnmapped reboundState readyAt
   obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
   have finalReference : finalCanonical[(bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + globals]? =
       some (.cellRef layout.type contextLocation) := by
@@ -148,7 +181,7 @@ theorem entry_of_accepted_with_spine_of_input_ids
     simp only [List.length_append, List.length_map, List.length_reverse]
     have index : bindings.length + scope.length + 1 + globals = added.length + (scope.length + 1 + globals) := by omega
     rw [index, List.getElem?_append_right (by omega)]
-    simpa using reference
+    simpa using copiedReference
   have finalLookups : EnvironmentsAgree (Renaming.comp embedding (Renaming.insertion bindings.length))
       finalCanonical finalActual := by
     intro index value found
@@ -159,15 +192,24 @@ theorem entry_of_accepted_with_spine_of_input_ids
       body.rename (Renaming.comp embedding (Renaming.insertion bindings.length)) := by
     rw [← Expr.rename_insertion, Expr.rename_comp]
   rw [bodyEq] at agreement
-  obtain ⟨finalUnmapped, unchanged⟩ := preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1
+  obtain ⟨finalUnmapped, unchanged⟩ := preservation contextLocation copiedUnmapped (List.getElem?_eq_some_iff.mp copiedRead).1
   rw [← parameters] at allocated
   have mono := FunctionCallBody.mono_binders extended
-  refine ⟨⟨environment, heap, finalCanonical, finalActual, finalStore, finalMap, finalWorld, Renaming.comp embedding (Renaming.insertion bindings.length),
-    allocated, by simpa [CallableIndexedParameters.scope_eq] using finalEnvironments, finalHeaps,
-    GenericLexicalContext.binders_agree mono.1 mono.2 initialLocals allocated,
-    maps, worlds, preservation, GenericLexicalContext.binders_metadata allocated, finalLookups, finalTyped,
-    finalReference, unchanged.trans read, finalUnmapped, agreement⟩, added, prefixLength, canonicalEq, ?_⟩
-  simpa only [CallableIndexedParameters.scope_eq] using transition
+  have copiedLocals := Dynamic.EnvironmentCopies.agrees initialLocals sourceCopy
+  refine ⟨⟨copiesEnvironment, copiedHeap, copiedContext, environment, heap, finalCanonical, finalActual, finalStore,
+    finalMap, finalWorld, Renaming.comp embedding (Renaming.insertion bindings.length),
+    sourceCopy, allocated, by simpa [CallableIndexedParameters.scope_eq] using finalEnvironments, finalHeaps,
+    GenericLexicalContext.binders_agree mono.1 mono.2 copiedLocals allocated,
+    copiedMaps.trans maps, copiedWorlds.trans worlds, copiedFrame.trans preservation,
+    sourceCopy.metadata_extends.trans (GenericLexicalContext.binders_metadata allocated), finalLookups, finalTyped,
+    finalReference, unchanged.trans copiedRead, finalUnmapped, copyAgreement.continuation.trans agreement⟩,
+    added, copiedCanonical, prefixLength, canonicalEq, slots, ?_⟩
+  have composed : ProtectedStateTransition.Transition protocol initial
+      ⟨bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope,
+        finalMap, finalWorld, heap, finalStore, finalCanonical⟩ := by
+    obtain ⟨reached, related⟩ := transition
+    exact ⟨reached, protocol.trans (protocol.trans extendedRelated reboundRelated) related⟩
+  simpa only [CallableIndexedParameters.scope_eq] using composed
 
 /-- Compatibility with the original full metadata-view receipt. -/
 theorem entry_of_accepted_with_spine
@@ -179,12 +221,17 @@ theorem entry_of_accepted_with_spine
     {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
     (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol layouts layout
       (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (rebinds : ProtectedStateTransition.Rebinds protocol)
     {function : Dynamic.Closure} {view : TypedSource} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
-    {scope : Scope} {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    {scope : Scope} {bindings : List Binding} {output : Ty} {body allocatedCode parameterCode : Expr}
     (viewOfSource : LambdaMetadataViews.MetadataView function.source view)
     (accepted : SourceCoreSourceCells.bindParameters
       (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
-      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok parameterCode)
+      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok allocatedCode)
+    (copied : SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError)))
+      view scope (· + 1) allocatedCode = .ok parameterCode)
     (parameters : function.parameters = bindings.map Prod.fst)
     (kinds : ∀ binding ∈ bindings, function.source.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
     (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
@@ -199,6 +246,8 @@ theorem entry_of_accepted_with_spine
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
     (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
     (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (types : Renaming.Respects ξ (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) ::
+      (SourceCoreLocalCell.coreContext scope ++ administrative)) actualContext)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
@@ -207,14 +256,15 @@ theorem entry_of_accepted_with_spine
     (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary contextLocation native) :
     ∃ entry : Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body,
-      ∃ added : Environment, added.length = bindings.length ∧ entry.canonical = added ++ canonical ∧
+      ∃ added copied : Environment, added.length = bindings.length ∧ entry.canonical = added ++ copied ∧
+        (∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) ∧
         ProtectedStateTransition.Transition protocol initial
           ⟨bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
             entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩ := by
-  exact entry_of_accepted_with_spine_of_input_ids functions onError protocol producer
-    (congrArg (List.map TypedBinder.id) viewOfSource.inputs) accepted parameters kinds extended
-    definitions registered represented environments heaps initialLocals actualLayout actualTyped
-    reference read unmapped initial readyAt
+  exact entry_of_accepted_with_spine_of_copies functions onError protocol producer transport rebinds
+    (congrArg (List.map TypedBinder.id) viewOfSource.inputs) (LambdaMetadataViews.MetadataView.copiedBinder viewOfSource)
+    accepted copied parameters kinds extended definitions registered represented environments heaps initialLocals
+    actualLayout types actualTyped reference read unmapped initial readyAt
 
 end Stateful
 
@@ -225,11 +275,14 @@ theorem entry_of_accepted_with_spine
     {active : TypeSystem.Substitution} {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
     (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
     {function : Dynamic.Closure} {view : TypedSource} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
-    {scope : Scope} {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    {scope : Scope} {bindings : List Binding} {output : Ty} {body allocatedCode parameterCode : Expr}
     (viewOfSource : LambdaMetadataViews.MetadataView function.source view)
     (accepted : SourceCoreSourceCells.bindParameters
       (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
-      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok parameterCode)
+      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok allocatedCode)
+    (copied : SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError)))
+      view scope (· + 1) allocatedCode = .ok parameterCode)
     (parameters : function.parameters = bindings.map Prod.fst)
     (kinds : ∀ binding ∈ bindings, function.source.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
     (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
@@ -244,20 +297,24 @@ theorem entry_of_accepted_with_spine
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
     (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
     (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (types : Renaming.Respects ξ (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) ::
+      (SourceCoreLocalCell.coreContext scope ++ administrative)) actualContext)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
     (unmapped : contextLocation ∉ mapping) :
     ∃ entry : Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body,
-      ∃ added : Environment, added.length = bindings.length ∧ entry.canonical = added ++ canonical := by
-  obtain ⟨entry, added, length, spine, _transition⟩ :=
+      ∃ added copied : Environment, added.length = bindings.length ∧ entry.canonical = added ++ copied ∧
+        (∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) := by
+  obtain ⟨entry, added, copied, length, spine, slots, _transition⟩ :=
     Stateful.entry_of_accepted_with_spine functions onError ProtectedStateTransition.OrdinaryAllocation.unitProtocol
       (ProtectedStateTransition.MarkedAllocation.unitProducer layouts layout
         (CompatibleAmbientHeap.payloadModel values.checked registry functions))
-      viewOfSource accepted parameters kinds extended definitions registered represented environments heaps initialLocals
-      actualLayout actualTyped reference read unmapped () (by intro index state read; trivial)
-  exact ⟨entry, added, length, spine⟩
+      ProtectedStateTransition.OrdinaryAllocation.unitTransport ProtectedStateTransition.OrdinaryAllocation.unitRebinds
+      viewOfSource accepted copied parameters kinds extended definitions registered represented environments heaps
+      initialLocals actualLayout types actualTyped reference read unmapped () (by intro index state read; trivial)
+  exact ⟨entry, added, copied, length, spine, slots⟩
 
 /-- The original receipt forgets only the certified canonical allocation prefix. -/
 theorem entry_of_accepted
@@ -267,11 +324,14 @@ theorem entry_of_accepted
     {active : TypeSystem.Substitution} {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
     (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
     {function : Dynamic.Closure} {view : TypedSource} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
-    {scope : Scope} {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    {scope : Scope} {bindings : List Binding} {output : Ty} {body allocatedCode parameterCode : Expr}
     (viewOfSource : LambdaMetadataViews.MetadataView function.source view)
     (accepted : SourceCoreSourceCells.bindParameters
       (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
-      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok parameterCode)
+      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok allocatedCode)
+    (copied : SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError)))
+      view scope (· + 1) allocatedCode = .ok parameterCode)
     (parameters : function.parameters = bindings.map Prod.fst)
     (kinds : ∀ binding ∈ bindings, function.source.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
     (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
@@ -286,14 +346,17 @@ theorem entry_of_accepted
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
     (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
     (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (types : Renaming.Respects ξ (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) ::
+      (SourceCoreLocalCell.coreContext scope ++ administrative)) actualContext)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
     (unmapped : contextLocation ∉ mapping) :
     Nonempty (Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body) := by
-  obtain ⟨entry, _⟩ := entry_of_accepted_with_spine functions onError viewOfSource accepted parameters kinds extended
-    definitions registered represented environments heaps initialLocals actualLayout actualTyped reference read unmapped
+  obtain ⟨entry, _⟩ := entry_of_accepted_with_spine functions onError viewOfSource accepted copied parameters kinds
+    extended definitions registered represented environments heaps initialLocals actualLayout types actualTyped
+    reference read unmapped
   exact ⟨entry⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaViewPrefix

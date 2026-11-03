@@ -40,7 +40,8 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 
 /-- All configured rows come from the unchanged complete original program.
 The bootstrap-to-mapping theorem is constructed before execution. Ordered key
-calls, fault prefixes, header controls and repeated capture are runtime companions. -/
+calls, fault prefixes, header controls and repeated calls of a retained closure,
+each starting from its creation-time capture, are runtime companions. -/
 def run : IO Unit := do
   let fixture ← compileFixture
   let observed ← observeProgram fixture
@@ -93,9 +94,9 @@ def run : IO Unit := do
   let pending ← get "projected captured reuse" (first.session.startHandlePacked handle (word 7))
   let .succeeded last ← pending.resume 100000 1000
     | throw (IO.userError "projected captured reuse failed")
-  require (first.value == word 5 && last.value == word 6) "projected captured result changed"
+  require (first.value == word 5 && last.value == word 5) "projected captured result changed"
   heaps := heaps ++ [made.session.heapSize, first.session.heapSize, last.session.heapSize]
-  require (heaps == [16, 22, 40, 58, 76, 97, 133, 163, 182, 198, 205, 223, 250, 262, 280, 283, 298, 313])
+  require (heaps == [16, 22, 40, 58, 76, 97, 133, 163, 182, 198, 205, 223, 250, 262, 280, 286, 304, 322])
     "projected exact native heaps changed"
   IO.println s!"PROJECTED_CACHE: cache{fixture.recipe.compiled.indexed.base.functions.length}/table{profile.table.rows.length}"
   IO.println s!"PROJECTED_NATIVE_HEAPS: {heaps}"

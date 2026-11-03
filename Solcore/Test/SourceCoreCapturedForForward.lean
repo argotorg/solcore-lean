@@ -116,13 +116,13 @@ def ForwardMeaning {fixture : CompiledFixture} {observed : ObservedFactory fixtu
         SourceInvocation support scope third.heap secondEntry.source false (Core.Word.ofNatModulo 21) false
           (.value (.word (Core.Word.ofNatModulo 20))) other.heap ∧
         SourceInvocation support scope other.heap firstEntry.source true (Core.Word.ofNatModulo 12) false
-          (.value (.word (Core.Word.ofNatModulo 11))) final.heap ∧
+          (.value (.word (Core.Word.ofNatModulo 10))) final.heap ∧
         ForwardWordAt support sequence.second.completion.session [firstEntry, secondEntry] sequence.first.handle
           true (Core.Word.ofNatModulo 11) false (Core.Word.ofNatModulo 10) written.heap ∧
         ForwardWordAt support sequence.third.completion.session [firstEntry, secondEntry, thirdEntry] sequence.second.handle
           false (Core.Word.ofNatModulo 21) false (Core.Word.ofNatModulo 20) other.heap ∧
         ForwardWordAt support sequence.secondCall.completion.session [firstEntry, secondEntry, thirdEntry] sequence.first.handle
-          true (Core.Word.ofNatModulo 12) false (Core.Word.ofNatModulo 11) final.heap
+          true (Core.Word.ofNatModulo 12) false (Core.Word.ofNatModulo 10) final.heap
 
 /-- Both nonempty and zero-iteration paths have a forward public
 fuel guarantee on their original checkpoints, with exact Source post-heaps. -/

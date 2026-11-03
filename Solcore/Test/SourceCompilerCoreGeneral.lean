@@ -1,8 +1,9 @@
 import Solcore.Test.SourceCompilerFeatureSupport
 
 /-! One cached compiler artifact supplies public data/function sessions and
-internal native boundary checks. Metadata, ordered duplicates, captured mutable
-cells and globals survive repeated invocation and checkpoint resumption. -/
+internal native boundary checks. Metadata, ordered duplicates, captured values
+and globals survive repeated invocation and checkpoint resumption; every call
+of a closure starts again from the values it captured. -/
 set_option autoImplicit false
 namespace Tests.SourceCompilerCoreGeneral
 open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
@@ -129,8 +130,8 @@ def run : IO Unit := do
   require (invoked.value == .constructed resultMetadata [scalar 13])
     "cached artifact lost original global/capture references"
   let again ← ownedRun invoked.session step.key (.constructed invokeMetadata [.function handle, scalar 3])
-  require (again.value == .constructed resultMetadata [scalar 16] && again.session.heapSize > invoked.session.heapSize)
-    "owned session lost capture mutation across world extension"
+  require (again.value == .constructed resultMetadata [scalar 14] && again.session.heapSize > invoked.session.heapSize)
+    "owned session closure did not restart from its captured value across world extension"
   let checkpoint ← get "owned checkpoint" (again.session.start step.key
     [.constructed invokeMetadata [.function handle, scalar 1]])
   let next ← match ← checkpoint.resume 2 with
@@ -138,7 +139,7 @@ def run : IO Unit := do
     | _ => throw (IO.userError "owned checkpoint did not suspend")
   match ← next.resume 300000 with
   | .succeeded completion =>
-      require (completion.value == .constructed resultMetadata [scalar 17]) "owned resume changed capture state"
+      require (completion.value == .constructed resultMetadata [scalar 12]) "owned resume changed the captured value"
   | _ => throw (IO.userError "owned resume failed")
   let separate ← step.execution.open
   let other ← boot separate

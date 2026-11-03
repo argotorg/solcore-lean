@@ -98,7 +98,7 @@ def run : IO Unit := do
           require (thirdReturned.value == publicOutput true) "third duplicate/captured/numeric public value"
           let heaps := [firstStart.session.heapSize, firstReturned.session.heapSize,
             secondReturned.session.heapSize, thirdReturned.session.heapSize]
-          require (heaps == [2,26,50,74]) "generalized lexical body Source-certified repeated native heaps changed"
+          require (heaps == [2,35,68,101]) "generalized lexical body Source-certified repeated native heaps changed"
           IO.println "GENERALIZED_LEXICAL_BODY_SOURCE_PUBLIC: originals1/cache1/typing1/profile1; proof before every resume"
           IO.println s!"GENERALIZED_LEXICAL_BODY_SOURCE_HEAPS: {heaps}"
           IO.println "GENERALIZED_LEXICAL_BODY_SOURCE_PUBLIC_PASS"

@@ -61,6 +61,7 @@ theorem tree_of_lowerForItems
           obtain ⟨value, compiledValue, accepted⟩ := bind_ok accepted
           obtain ⟨checkedUnit, checked, accepted⟩ := bind_ok accepted
           cases checkedUnit
+          simp only [certificate.monomorphic, List.isEmpty_nil, ↓reduceIte] at accepted
           cases accepted
           obtain ⟨_, _, valueTree⟩ := PrimitiveExpressions.tree_of_lowerExpression unique compiledValue
           rw [← ensureType_ok checked] at valueTree

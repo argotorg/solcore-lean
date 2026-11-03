@@ -138,9 +138,28 @@ theorem Represents.closure_cases {keys : List (Key compiled (Program.ofChecked c
   | method_lambda owner captured code history body origin globals referenceIndex typed =>
     exact Or.inr ⟨owner, _, _, _, captured, code, history, body, origin, globals, referenceIndex, rfl, rfl, rfl, typed⟩
 
+/-- Recapture keeps the method support of the same code. -/
+def recaptureSupport {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {code : Code compiled.indexed function scope administrative}
+    (support : Support code registry faults) (environment : Dynamic.Environment) :
+    Support (code.recapture environment) registry faults :=
+  { support with
+    body := RecursiveNamedLambdaFormationHeads.recaptureBodyWith (values := .initial compiled.compatible.checked)
+      code support.body environment }
+
+/-- Recapture keeps the full Source seed of the same history. -/
+theorem recaptureOrigin {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {code : Code compiled.indexed function scope administrative} {history : History code}
+    {support : Support code registry faults}
+    (origin : SourceOrigin support history) (environment : Dynamic.Environment) :
+    SourceOrigin (recaptureSupport support environment) (history.recapture environment) :=
+  ⟨origin.metadata⟩
+
 /-- Genuine method-site formation reads the existing physical frame and
-retains its actual full owned row. The original primitive producers establish
-Source formation, emitted completion and native typing internally. -/
+retains its actual full owned row. The value copies its captured cells, and
+the copies keep the catalog slots and the frame cell. -/
 theorem method_lambda_of_formation
     {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
     {bodyRegistry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -157,20 +176,25 @@ theorem method_lambda_of_formation
       headers owner.key.locations callerPrefix scope captured.canonical owner.key.frameLocation)
     (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
     (current : (pool.rows owner.position).authority.current = history.native)
-    (ghost : (pool.rows owner.position).authority.ghost = history.ghost)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    Represents headers keys bodyRegistry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding history.native actual) ∧ finalStore = store) := by
+    ∃ formed : Formed model captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      Represents headers keys bodyRegistry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding history.native formed.closureActual) ∧
+          finalStore = formed.finalStore) := by
   have reference : captured.canonical[code.referenceIndex]? =
       some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
     rw [referenceIndex]
@@ -180,15 +204,13 @@ theorem method_lambda_of_formation
     have actualRead := (pool.rows owner.position).authority.frame.read
     rw [(pool.rows owner.position).frame_eq, current] at actualRead
     exact actualRead
-  have sameHistory : Current compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
-      history.native history.ghost := by
-    simpa only [current, ghost] using (pool.rows owner.position).authority.frame.history
-  have sourceTrace := source_formation code (Program.ofChecked compiled.sourceProgram) heap ordinary coercions
-  have nativeTrace := formation_evaluates captured code history reference read
-  have related := formation_represents captured code history stored reference read
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation captured code history copied referenceIndex heaps reference read
   have typed := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
-    (registry := bodyRegistry) related
-  exact ⟨sourceTrace, nativeTrace, .method_lambda owner captured code history body origin globals referenceIndex typed,
-    fun _ _ completed => Core.evaluation_deterministic completed nativeTrace⟩
+    (registry := bodyRegistry) (formed.represents heaps.runtime_hasTypes)
+  exact ⟨formed, formed.source _ ordinary coercions, formed.evaluated,
+    .method_lambda (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (recaptureSupport body formed.captured) (recaptureOrigin origin formed.captured) (globals.of_slots formed.slots)
+      referenceIndex typed,
+    fun _ _ completed => Core.evaluation_deterministic completed formed.evaluated⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaValues

@@ -45,7 +45,8 @@ structure Packets where
       captured code history body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment), added.length = code.receipt.loweredParameters.length →
-      entry.entry.canonical = added ++ captured.canonical →
+    ∀ copied : Environment, entry.entry.canonical = added ++ copied →
+      (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) →
     ∀ reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩,
@@ -142,8 +143,8 @@ theorem source_continuation (budget : Nat)
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
       (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history body.toContext functions owner caller budget := by
-  intro entry added length spine reached child strict outcome after trace
-  let selected := packets.source entry added length spine reached
+  intro entry added length copied spine kept reached child strict outcome after trace
+  let selected := packets.source entry added length copied spine kept reached
   have source := CallableIndexedOwnedTypedLambdaBodyContinuations.source_receipt
     captured code history body functions owner caller beforeTyped argumentsTyped entry
   have admitted : Admission bridge body.context selected.val := by

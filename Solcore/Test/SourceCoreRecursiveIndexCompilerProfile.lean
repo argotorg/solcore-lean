@@ -209,7 +209,7 @@ def runForward : IO Unit := do
     sequence.firstRead.completion.session.heapSize, sequence.intervening.completion.session.heapSize,
     sequence.secondSelect.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.failed.returned.heapSize, sequence.repeatedRead.completion.session.heapSize]
-  unless stores == [5,8,11,25,25,28,42,42,56,56] do
+  unless stores == [5,11,17,31,34,40,54,57,71,74] do
     throw (IO.userError s!"index profile stores changed: {reprStr stores}")
   IO.println s!"INDEX_COMPILER_PROFILE_FORWARD_PASS: original checker1000/cache4/table4; one complete profile and automatic catalog; original nine operations, independent Dynamic outcomes and all sufficient public fuel bounds; mapping selections A10/B20; missing-key diagnostic; old A10 after failure; stores {reprStr stores}"
 

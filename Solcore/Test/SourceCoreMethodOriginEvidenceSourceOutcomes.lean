@@ -91,7 +91,7 @@ def run : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [13,31,49,122,140,213,286,340] do
+  unless stores == [13,40,67,149,176,258,340,403] do
     throw (IO.userError s!"ordinary source outcomes changed original stores: {reprStr stores}")
   IO.println "METHOD_SOURCE_OUTCOMES_PASS: actual profile X7 at checker1024 and1000; seven independent Dynamic applications; exact named dictionaries, retained closures and Source heaps; scalar33/true/33/55; original stores and forward bounds"
 

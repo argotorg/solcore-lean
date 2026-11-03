@@ -4,10 +4,11 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryIn
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedCallerProtocol
 
 /-! One real formation and one marked allocation connect the accepted lambda
-initializer to its actual admitted parent entry. The original formation history
-is retained through allocation; the parent index uses the same extended capture.
-Initial heap, frame, capture, all-row admission and allocator readiness remain
-genuine inputs. No body execution law is an input. -/
+initializer to its actual admitted parent entry. The actual creation scope is
+empty, so the formation copies no cell and forms over the original capture.
+The original formation history is retained through allocation; the parent index
+uses the same extended capture. Initial heap, frame, capture, all-row admission
+and allocator readiness remain genuine inputs. No body execution law is an input. -/
 set_option autoImplicit false
 set_option quotPrecheck false
 set_option Elab.async false
@@ -66,6 +67,28 @@ variable
     (chosen.chosen.formation.function []).captured actual)
   (prefixContext : captured.administrative = RecursiveNamedLambdaFormationHeads.nativePrefix
     (values := .initial fixture.packet.compiled.compatible.checked) caller)
+
+/-- A lambda over an empty creation scope emits no copies: its emitted
+expression is the decorated lambda itself. -/
+theorem emitted_without_copies {checked : SourceCoreCompatibleCatalog.Checked}
+    {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    (code : Code prepared function scope administrative) (empty : scope = [])
+    (copied : code.policy.snapshotLambda code.id = true) :
+    code.lowered.expression = code.expression := by
+  have accepted := code.emitted_copied copied
+  subst empty
+  have identity : SourceCoreSourceCells.scopeCopyRenaming code.view [] (fun index => index) = Renaming.id := by
+    funext index
+    simp [SourceCoreSourceCells.scopeCopyRenaming, SourceCoreSourceCells.copiedSlots,
+      SourceCoreSourceCells.copyRenaming, Renaming.id]
+  simp only [SourceCoreSourceCells.copyScope, SourceCoreSourceCells.copyChain, identity, Expr.rename_id] at accepted
+  exact (Except.ok.inj accepted).symm
+
+include checked in
+/-- The actual named body has no inputs, so the lambda's creation scope is empty. -/
+theorem initial_scope_empty : initialScope fixture.packet = [] := by
+  simp only [initialScope, checked.named_inputs, List.reverse_nil, List.map_nil]
 
 /-- Recapture retains the actual accepted initializer expression and renaming. -/
 theorem initializer_expression :
@@ -148,8 +171,9 @@ def InitializedAt : Prop :=
           (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) reached
 
 include atHeader shape typing checked in
-/-- The genuine Source initializer is formed once, then its actual marked
-allocator runs once. Input captures, heap and every caller row stay explicit. -/
+/-- The genuine Source initializer is formed once over the empty creation
+scope, which copies nothing, then its actual marked allocator runs once. Input
+captures, heap and every caller row stay explicit. -/
 theorem initialized_entry
     (observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := fixture.packet.compiled.indexed)
       (values := .initial fixture.packet.compiled.compatible.checked)
@@ -180,10 +204,44 @@ theorem initialized_entry
     InitializedAt fixture inventory root chosen outer captured prefixContext owner initial packet
       (registry := registry) (faults := faults) (administrative := administrative) (after := after)
       (contextLocation := contextLocation) (native := native) (location := location) := by
-  obtain ⟨sourceTrace, evaluated, _represented, determined, _formed, member⟩ :=
-    CallableIndexedOwnedChosenOrdinaryStoredMembers.formation_chosen_member (registry := registry) (faults := faults) (heap := before) root.root
-      (SourceCoreChosenOrdinaryAcceptedLiteralFactory.literalSyntax fixture) chosen.chosen chosen.factory []
-      captured prefixContext owner initial packet inventory.contracts observed stored
+  have lowered := emitted_without_copies (i0).code (initial_scope_empty fixture checked)
+    (chosen.chosen.formation.snapshots [])
+  have frameReference : (i0).captured.canonical[(i0).code.referenceIndex]? =
+      some (.cellRef (frame).type owner.key.frameLocation) := by
+    rw [CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index (i0).captured (i0).code (i0).support]
+    exact observed.reference
+  have frameRead : store.read? owner.key.frameLocation =
+      some (SourceCoreCallableIndexedFrames.encode frame (history0).native) := by
+    have actualRead := (initial.rows owner.position).authority.frame.read
+    rw [(initial.rows owner.position).frame_eq] at actualRead
+    exact actualRead
+  have evaluated : Evaluates actual store ((i0).code.lowered.expression.rename (i0).captured.embedding)
+      (.inRight .word closureValue) store := by
+    rw [lowered]
+    exact CallableIndexedLambdaValues.expression_evaluates (i0).captured (i0).code history0 frameReference frameRead
+  have determined : ∀ result finalStore,
+      Evaluates actual store ((i0).code.lowered.expression.rename (i0).captured.embedding) result finalStore →
+        result = .inRight .word closureValue ∧ finalStore = store :=
+    fun _ _ completed => evaluation_deterministic completed evaluated
+  obtain ⟨future, _, finalStored, resultTyped⟩ := evaluation_preserves_type evaluated
+    ((i0).code.typed.rename (i0).captured.respects) (i0).captured.typed stored
+  have sameWorld : future = world := finalStored.world_eq.trans stored.world_eq.symm
+  subst future
+  have nativeTyped : RuntimeValueHasType world closureValue
+      (CallableContract.functionType (i0).code.receipt.parameterCore (i0).code.receipt.resultCore)
+      fixture.packet.compiled.indexed.layouts.definitions := by
+    cases resultTyped with
+    | inRight typed => exact typed
+  have member : CallableIndexedOwnedChosenOrdinaryStoredMembers.ChosenAt root.root
+      (SourceCoreChosenOrdinaryAcceptedLiteralFactory.literalSyntax fixture) headers keys registry faults i0 history0 :=
+    .ordinary owner (.formed chosen.chosen chosen.factory [] captured prefixContext)
+      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin (i0).captured (i0).code (i0).support
+        owner initial packet) rfl observed
+      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index (i0).captured (i0).code (i0).support)
+      nativeTyped
+  have sourceTrace := CallableIndexedLambdaValues.source_formation (i0).code
+    (Program.ofChecked fixture.packet.compiled.sourceProgram) (.nil before)
+    chosen.chosen.formation.ordinary chosen.chosen.formation.coercions
   have valueTyped := SourceCoreChosenOrdinaryAcceptedInitializerAdmission.receipt_value_has_type
     fixture shape [] atHeader chosen.chosen locals
   rw [SourceCoreChosenOrdinaryAcceptedOuterCompilerReceipts.raw_initializer_type fixture typing] at valueTyped

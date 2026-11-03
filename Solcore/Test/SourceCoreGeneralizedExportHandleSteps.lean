@@ -25,9 +25,13 @@ structure IdentityPlan (history : FullHistory context session wordHandle boolHan
     {parameter result : TypeSystem.Ty} (identity : IdentityEntry history.pair.entries handle parameter result)
     (argument : SourceCorePublicValues.Value) (sourceArgument : Dynamic.Value)
     (call : StartedCall session handle argument runOptions.inputValidationFuel) where
+  environment : Dynamic.Environment
+  copied : Dynamic.Heap
+  copy : Dynamic.EnvironmentCopies (identity.source.applySubstitution identity.substitution) identity.captured
+    history.pair.retained.state.heap environment copied
   plan : HandleSourcePlan context.first history.pair.retained identity.entry (atEntry identity.handleEq call)
     parameter result sourceArgument sourceArgument
-    ⟨history.pair.retained.state.heap.cells ++
+    ⟨copied.cells ++
       [{type := (identity.shape.principal.parameter.applySubstitution identity.substitution).scheme.body, value := some sourceArgument}]⟩
 
 theorem FullHistory.plan_identity (history : FullHistory context session wordHandle boolHandle captureHandle seed)
@@ -37,10 +41,11 @@ theorem FullHistory.plan_identity (history : FullHistory context session wordHan
       parameter argument sourceArgument)
     (call : StartedCall session handle argument runOptions.inputValidationFuel) :
     Nonempty (IdentityPlan history identity argument sourceArgument call) := by
-  obtain ⟨plan⟩ := identity_plan context.first history.pair.retained identity.entry (atEntry identity.handleEq call)
-    identity.member identity.entryType (history.pair.origins identity.entry identity.member) input identity.shape
-    identity.definitionContext identity.captured identity.substitution identity.evidence identity.sourceEq observed.typing
-  exact ⟨⟨plan⟩⟩
+  obtain ⟨environment, copied, copy, ⟨plan⟩⟩ := identity_plan context.first history.pair.retained identity.entry
+    (atEntry identity.handleEq call) identity.member identity.entryType (history.pair.origins identity.entry identity.member)
+    input identity.shape identity.definitionContext identity.captured identity.substitution identity.evidence
+    identity.sourceEq observed.typing
+  exact ⟨⟨environment, copied, copy, plan⟩⟩
 
 theorem IdentityPlan.retained {history : FullHistory context session wordHandle boolHandle captureHandle seed}
     {parameter result : TypeSystem.Ty} {identity : IdentityEntry history.pair.entries handle parameter result}
@@ -51,19 +56,24 @@ theorem IdentityPlan.retained {history : FullHistory context session wordHandle 
     (resumed : call.checkpoint.ResumeAt executionFuel outputFuel (.succeeded returned)) :
     Nonempty (FullHistory context returned.session wordHandle boolHandle captureHandle seed) := by
   obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_selected_retained observed.typing observed.cache history.pair.origins resumed
-  have allocated : Dynamic.Heap.Allocates history.pair.retained.state.heap
+  have allocated : Dynamic.Heap.Allocates planned.copied
       (identity.shape.principal.parameter.applySubstitution identity.substitution).scheme.body (some sourceArgument)
-      ⟨history.pair.retained.state.heap.cells.length⟩
-      ⟨history.pair.retained.state.heap.cells ++
+      ⟨planned.copied.cells.length⟩
+      ⟨planned.copied.cells ++
         [{type := (identity.shape.principal.parameter.applySubstitution identity.substitution).scheme.body, value := some sourceArgument}]⟩ := .append
   exact ⟨⟨⟨_,continued,origins,history.pair.wordEntry,history.pair.boolEntry⟩,
-    {history.captured with read := heapEq.symm ▸ allocated.preserves_read history.captured.read}⟩⟩
+    {history.captured with
+      read := heapEq.symm ▸ allocated.preserves_read (planned.copy.preserves_read history.captured.read)}⟩⟩
 
 structure CapturedPlan (history : FullHistory context session wordHandle boolHandle captureHandle seed)
     (flag : Bool) (call : StartedCall session captureHandle (.bool flag) runOptions.inputValidationFuel) where
+  environment : Dynamic.Environment
+  copied : Dynamic.Heap
+  copy : Dynamic.EnvironmentCopies (history.captured.source.applySubstitution history.captured.substitution)
+    history.captured.captured history.pair.retained.state.heap environment copied
   plan : HandleSourcePlan context.first history.pair.retained history.captured.entry (atEntry history.captured.handleEq call)
     .bool .word (.bool flag) (.word seed)
-    ⟨history.pair.retained.state.heap.cells ++
+    ⟨copied.cells ++
       [{type := (history.captured.shape.principal.parameter.applySubstitution history.captured.substitution).scheme.body, value := some (.bool flag)}]⟩
 
 theorem FullHistory.plan_captured (history : FullHistory context session wordHandle boolHandle captureHandle seed)
@@ -72,12 +82,12 @@ theorem FullHistory.plan_captured (history : FullHistory context session wordHan
   have input : RecursiveNamedPublicFunctionHistoryInputs.Input history.pair.entries
       context.selected.packet.header.function.context .bool (.bool flag) (.bool flag) :=
     .data ⟨.bool flag,by simp [SourceCoreIndexedSession.DataInput.publicValue],.bool flag⟩ ⟨.bool flag,by simp [SourceCoreIndexedSession.DataInput.publicValue],.bool flag⟩
-  obtain ⟨plan⟩ := captured_plan context.first history.pair.retained history.captured.entry
+  obtain ⟨environment, copied, copy, ⟨plan⟩⟩ := captured_plan context.first history.pair.retained history.captured.entry
     (atEntry history.captured.handleEq call) history.captured.member history.captured.entryType
     (history.pair.origins history.captured.entry history.captured.member) input history.captured.shape
     history.captured.definitionContext history.captured.captured history.captured.substitution history.captured.evidence
     history.captured.sourceEq history.captured.lookup history.captured.read rfl rfl observed.typing
-  exact ⟨⟨plan⟩⟩
+  exact ⟨⟨environment, copied, copy, plan⟩⟩
 
 theorem CapturedPlan.retained {history : FullHistory context session wordHandle boolHandle captureHandle seed}
     {flag : Bool} {call : StartedCall session captureHandle (.bool flag) runOptions.inputValidationFuel}
@@ -86,12 +96,13 @@ theorem CapturedPlan.retained {history : FullHistory context session wordHandle 
     (resumed : call.checkpoint.ResumeAt executionFuel outputFuel (.succeeded returned)) :
     Nonempty (FullHistory context returned.session wordHandle boolHandle captureHandle seed) := by
   obtain ⟨continued,heapEq,origins⟩ := planned.plan.observed_selected_retained observed.typing observed.cache history.pair.origins resumed
-  have allocated : Dynamic.Heap.Allocates history.pair.retained.state.heap
+  have allocated : Dynamic.Heap.Allocates planned.copied
       (history.captured.shape.principal.parameter.applySubstitution history.captured.substitution).scheme.body (some (.bool flag))
-      ⟨history.pair.retained.state.heap.cells.length⟩
-      ⟨history.pair.retained.state.heap.cells ++
+      ⟨planned.copied.cells.length⟩
+      ⟨planned.copied.cells ++
         [{type := (history.captured.shape.principal.parameter.applySubstitution history.captured.substitution).scheme.body, value := some (.bool flag)}]⟩ := .append
   exact ⟨⟨⟨_,continued,origins,history.pair.wordEntry,history.pair.boolEntry⟩,
-    {history.captured with read := heapEq.symm ▸ allocated.preserves_read history.captured.read}⟩⟩
+    {history.captured with
+      read := heapEq.symm ▸ allocated.preserves_read (planned.copy.preserves_read history.captured.read)}⟩⟩
 
 end Tests.SourceCoreGeneralizedExport

@@ -157,21 +157,38 @@ private def success (compiled : Compiled) (expected : Core.Value) : IO Core.Stor
       pure store
   | result => throw (IO.userError s!"function-value execution failed: {reprStr result}")
 
+/-- Closures capture by value: every call starts from the closure's
+creation-time copies, and assignments in a body write only that call's copies. -/
 private def testFunctionValues (program : CheckedProgram) : IO Unit := do
   discard <| success (← compile program "named" [argument 4]) (scalar 5)
   let shared ← compile program "shared" [argument 4]
-  let store ← success shared (.pair (scalar 6) (scalar 9))
-  assertTrue (store[shared.globals.length]? == some (present (scalar 9)))
-    "two closures did not share the same mutable captured parameter"
+  let store ← success shared (.pair (scalar 6) (scalar 7))
+  assertTrue (store[shared.globals.length]? == some (present (scalar 4)))
+    "a closure call wrote the enclosing parameter instead of its own copy"
+  /- `loop` is assigned after the closure is created, so the closure's copy of
+  `loop` is uninitialized and the first recursive read in its body fails. -/
   let selfCell ← compile program "selfCell" [argument 7]
-  let store ← success selfCell (scalar 7)
-  assertTrue (store.length == selfCell.globals.length + 6) "self-cell calls lost parameter allocation identity"
+  let innerRead ← match selfCell.entry.function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference "loop" (.local _), .. } => some node
+      | _ => none with
+    | some node => pure node
+    | none => throw (IO.userError "self-cell read in the closure body missing")
+  let sites ← match selfCell.diagnostics.find? selfCell.entry.key with
+    | some sites => pure sites
+    | none => throw (IO.userError "self-cell diagnostic table missing")
+  match execute selfCell with
+  | .failed reason store =>
+      assertTrue (reason == sites.table.reasonAt innerRead.id)
+        "self-cell closure failure lost its uninitialized copy's read site"
+      assertTrue (store.length == selfCell.globals.length + 7)
+        "self-cell call changed its snapshot, copy or parameter allocations"
+  | result => throw (IO.userError s!"self-cell closure read of its uninitialized copy did not fail: {reprStr result}")
   match execute selfCell 15 with
   | .outOfFuel checkpoint =>
       assertTrue (Core.LanguageResult.observeResult (Core.runStateful 20000 checkpoint) == execute selfCell 20015)
         "capturing self-cell checkpoint did not resume consistently"
   | _ => throw (IO.userError "capturing self-cell execution did not suspend")
-  discard <| success (← compile program "nestedCapture" [argument 4]) (scalar 13)
+  discard <| success (← compile program "nestedCapture" [argument 4]) (scalar 8)
   discard <| success (← compile program "lambdaGlobal" [argument 8]) (scalar 11)
   discard <| success (← compile program "closureLoop" [argument 8]) (scalar 11)
   for (name, same) in [("sameName", true), ("names", false)] do
@@ -195,8 +212,10 @@ private def testIndirectFailure (program : CheckedProgram) : IO Unit := do
         | some sites => pure sites
         | none => throw (IO.userError "root diagnostic table missing")
       assertTrue (reason == sites.table.reasonAt node.id) "indirect callee failure lost its source site"
+      /- The argument closure would write only its own copy of `marker`, so
+      this cell no longer shows whether the argument was evaluated. -/
       assertTrue (store[compiled.globals.length + 1]? == some (present (scalar 0)))
-        "indirect call evaluated argument effects after its callee failed"
+        "failed indirect callee changed the enclosing marker"
   | result => throw (IO.userError s!"uninitialized function did not fail: {reprStr result}")
   let compiled ← compile program "argumentFailure" []
   match execute compiled with

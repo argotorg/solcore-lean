@@ -5,7 +5,7 @@ import Solcore.Test.SourceCoreUnifiedCorpusSupport
 #check_failure Solcore.SourceSemantics.CoreLowering.BuiltinNamedBody.Certificate.mk
 /-! Whole finite protected while consumers with no external runtime child/body
 meaning contract. Actual checked Core runs cover many frame-restored iterations,
-raw mapping duplicate order, captured aliases, first faults and real resume.
+raw mapping duplicate order, captured snapshots, first faults and real resume.
 Break/continue and nested loops are outside the concrete body profile here. -/
 set_option autoImplicit false
 set_option maxHeartbeats 4000000
@@ -118,6 +118,8 @@ private def gapBinder (compiled : SourceCoreUnifiedCompilation.Compiled) (name :
   | [binder] => pure binder.id
   | _ => throw (IO.userError "protected finite while exact fault binder missing")
 
+/-- Cells after the inert prefix: `raw`, `seed`, the snapshot of `seed` and
+`raw` that `saved` takes when it is created, `saved` and `index`. -/
 private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : String)
     (updated counter : Nat) : IO Unit := do
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr (final.heap.take initial.heap.length) == reprStr initial.heap)
@@ -126,16 +128,19 @@ private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : St
     | some cell => pure cell | none => throw (IO.userError "protected finite while missing root mapping")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr raw.value == reprStr (some (table updated)))
     s!"protected finite while raw mapping/default/duplicate order changed {name}"
-  let index ← match final.heap[initial.heap.length + 3]? with
+  let index ← match final.heap[initial.heap.length + 5]? with
     | some cell => pure cell | none => throw (IO.userError "protected finite while missing index")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr index.value == reprStr (some (wordValue counter)))
     s!"protected finite while writes changed {name}"
-  match final.heap[initial.heap.length + 2]? with
+  let snapshot := ((final.heap.drop (initial.heap.length + 2)).take 2).map (·.value)
+  SourceCoreUnifiedCorpusSupport.assertTrue (reprStr snapshot == reprStr [some (wordValue 7), some (table 10)])
+    s!"protected finite while captured snapshot values changed {name}"
+  match final.heap[initial.heap.length + 4]? with
   | some ⟨_, some (.closure parameters result body source owner captures _)⟩ =>
     SourceCoreUnifiedCorpusSupport.assertTrue (parameters.length == 1 && result == .word && !body.isEmpty && source.owner == owner.declaration)
       s!"protected finite while captured closure metadata changed {name}"
-    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 1, initial.heap.length])
-      s!"protected finite while captured source aliases changed {name}"
+    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 2, initial.heap.length + 3])
+      s!"protected finite while captured snapshot locations changed {name}"
   | other => throw (IO.userError s!"protected finite while lost stored captured closure {name}: {reprStr other}")
 
 def run : IO Unit := do
@@ -171,7 +176,7 @@ def run : IO Unit := do
     | other => throw (IO.userError s!"protected finite while Unit body: {reprStr other}")
     if fuel == 400000 then baseline := current
     else SourceCoreUnifiedCorpusSupport.assertTrue (current == baseline) "protected finite while resume changed exact source observations"
-  IO.println "protected named finite while: whole-head preservation/reflection, retained entry, repeated raw mapping/capture aliases, condition/body faults, Unit/early return and real resume GREEN"
+  IO.println "protected named finite while: whole-head preservation/reflection, retained entry, repeated raw mapping/capture snapshots, condition/body faults, Unit/early return and real resume GREEN"
 
 
 end Tests.SourceCoreProtectedNamedWhileStatements

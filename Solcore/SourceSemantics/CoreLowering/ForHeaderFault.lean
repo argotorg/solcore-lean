@@ -17,7 +17,7 @@ private theorem item_context_extends
     (executed : Dynamic.ForItemExecutes program context evidence source environment heap item finalContext finalEnvironment after) :
     ContextExtends source.owner context finalContext := by
   cases executed with
-  | letUninitialized _ extension _ | letInitialized _ _ extension _ | letInitializedGeneralized _ _ extension _ =>
+  | letUninitialized _ extension _ | letInitialized _ _ extension _ | letInitializedGeneralized _ _ _ extension _ =>
       exact .binder extension
   | expression | assignValue | assignBitNot => exact .refl _ _
 

@@ -3,7 +3,10 @@ import Solcore.Frontend.SourceCoreLoops
 
 /-! Real shared traversal uses source allocation hooks for lets and lambda
 parameters. Parameter markers skip the packed argument and temporary payload
-while preserving the order of earlier parameter and outer lexical references. -/
+while preserving the order of earlier parameter and outer lexical references.
+A lambda captures by value: it copies the outer cell when it is created and
+again at each call, so the parameters' outer lexical reference is the call's
+copy. -/
 
 set_option autoImplicit false
 namespace Tests.SourceCoreSourceCells
@@ -62,15 +65,23 @@ def run : IO Unit := do
       (TaggedFunction.call .bool lowered.expression (LanguageResult.success (.pair (.bool false) (.bool true)))),
     definitions⟩
   assertTrue program.check "marked lambda parameters failed whole Core checking"
+  /- The store holds the outer cell, the creation copy of it (marker 1 and
+  payload 2), the call's copy (marker 3, payload 4), then the parameters
+  `first` (marker 5, payload 6) and `second` (marker 7, payload 8). -/
   match program.runStateful 10000 with
   | .done value store =>
-      assertTrue (value == .inRight .word (.bool false) && store.length == 5)
+      assertTrue (value == .inRight .word (.bool false) && store.length == 9)
         "marked parameter order or source result changed"
       assertTrue (SourceCoreHeapMarkers.completedPair ⟨⟨1⟩, reference⟩ store 1 ==
-        some (.cellRef (OptionalCell.cellType .bool) 0, .inRight .unit (.bool false)))
+          some (.cellRef (OptionalCell.cellType .bool) 0, .inRight .unit (.bool true)) &&
+        SourceCoreHeapMarkers.completedPair ⟨⟨1⟩, reference⟩ store 3 ==
+          some (.cellRef (OptionalCell.cellType .bool) 2, .inRight .unit (.bool true)))
+        "creation or call copy of the outer cell changed its marker or payload"
+      assertTrue (SourceCoreHeapMarkers.completedPair ⟨⟨1⟩, reference⟩ store 5 ==
+        some (.cellRef (OptionalCell.cellType .bool) 4, .inRight .unit (.bool false)))
         "first parameter captured the argument bundle or temporary payload"
-      assertTrue (SourceCoreHeapMarkers.completedPair ⟨⟨2⟩, .product reference reference⟩ store 3 ==
-        some (.pair (.cellRef (OptionalCell.cellType .bool) 2) (.cellRef (OptionalCell.cellType .bool) 0),
+      assertTrue (SourceCoreHeapMarkers.completedPair ⟨⟨2⟩, .product reference reference⟩ store 7 ==
+        some (.pair (.cellRef (OptionalCell.cellType .bool) 6) (.cellRef (OptionalCell.cellType .bool) 4),
           .inRight .unit (.bool true)))
         "second parameter changed lexical capture order"
   | other => throw (IO.userError s!"marked parameter execution failed: {reprStr other}")
@@ -120,13 +131,15 @@ def run : IO Unit := do
       assertTrue (value == LocalLoop.returnedValue (.bool false) && store.length == 2)
         "marked for declaration changed its scope or source cells"
   | other => throw (IO.userError s!"marked for declaration execution failed: {reprStr other}")
+  /- The first parameter's marker-only boundary follows the outer cell and its
+  two copies; the range covers completion after the copies. -/
   let mut sawPartial := false
-  for fuel in List.range 160 do
+  for fuel in List.range 200 do
     match program.runStateful fuel with
     | .outOfFuel checkpoint =>
-        if checkpoint.store.length == 2 then
+        if checkpoint.store.length == 6 then
           sawPartial := true
-          assertTrue ((SourceCoreHeapMarkers.completedPair ⟨⟨1⟩, reference⟩ checkpoint.store 1).isNone)
+          assertTrue ((SourceCoreHeapMarkers.completedPair ⟨⟨1⟩, reference⟩ checkpoint.store 5).isNone)
             "unfinished parameter allocation exported a source payload"
         match Core.runStateful 10000 checkpoint with
         | .done value _ => assertTrue (value == .inRight .word (.bool false)) "marked parameter resume changed"

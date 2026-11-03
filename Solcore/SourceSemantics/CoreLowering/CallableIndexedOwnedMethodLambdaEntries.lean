@@ -47,13 +47,14 @@ theorem source_packet
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
     CallableIndexedOwnedOriginCanonicalState.Packet owner support.principal.named _ reached := by
   apply CallableIndexedOwnedOriginCanonicalState.packet_of_stable_read owner support.principal.named reached
-  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
       entry.entry.reference⟩
   · exact entry.entry.environments
   · exact leading
@@ -71,9 +72,9 @@ theorem native_packet
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩) :
     CallableIndexedOwnedOriginCanonicalState.Packet owner support.principal.named _ reached := by
-  obtain ⟨added, length, spine⟩ := entry.spine
+  obtain ⟨added, copied, length, spine, kept⟩ := entry.spine
   apply CallableIndexedOwnedOriginCanonicalState.packet_of_stable_read owner support.principal.named reached
-  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+  · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
       entry.reference⟩
   · exact entry.environments
   · exact leading
@@ -93,7 +94,8 @@ def source_admitted_entry
       captured code history support.body.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -104,7 +106,7 @@ def source_admitted_entry
     captured code history support.body.toContext functions owner caller (support.body_origin escaped)
     beforeTyped argumentsTyped stable entry reached
   exact ⟨{ base.original with initial := ⟨reached,
-    source_packet captured code history support sourceOrigin functions owner observed leading caller entry added length spine reached⟩ },
+    source_packet captured code history support sourceOrigin functions owner observed leading caller entry added length copied spine kept reached⟩ },
     base.source, base.rows⟩
 
 include observed leading sourceOrigin beforeTyped argumentsTyped stable in

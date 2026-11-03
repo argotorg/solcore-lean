@@ -138,13 +138,13 @@ def run : IO Unit := do
     | throw (IO.userError "captured mapping retained first failed")
   let capturedAgain ← get "captured mapping retained second"
     (capturedFirst.session.startHandlePacked capturedHandle (word 7))
-  let .succeeded capturedRestored ← capturedAgain.resume 100000 1000
-    | throw (IO.userError "captured mapping retained restore failed")
-  require (capturedFirst.value == complement 4 && capturedRestored.value == word 4)
-    "captured mapping same-handle complement/restore changed"
+  let .succeeded capturedRepeated ← capturedAgain.resume 100000 1000
+    | throw (IO.userError "captured mapping retained repeat failed")
+  require (capturedFirst.value == complement 4 && capturedRepeated.value == complement 4)
+    "captured mapping same-handle complement changed"
   let capturedHeaps := [capturedStarted.session.heapSize, capturedMade.session.heapSize,
-    capturedFirst.session.heapSize, capturedRestored.session.heapSize]
-  require (capturedHeaps == [14,17,32,47]) "captured mapping exact native heaps changed"
+    capturedFirst.session.heapSize, capturedRepeated.session.heapSize]
+  require (capturedHeaps == [14,20,38,56]) "captured mapping exact native heaps changed"
   IO.println s!"PROJECTED_BITNOT_CAPTURED_SOURCE_CHAIN_HEAPS: {capturedHeaps}"
   let keyRow ← observeRow fixture "key"
   let started ← observeStarted fixture keyRow.original.key [word 7]
@@ -190,11 +190,11 @@ def run : IO Unit := do
   let pending ← get "projected captured reuse" (first.session.startHandlePacked handle (word 7))
   let .succeeded last ← pending.resume 100000 1000
     | throw (IO.userError "projected captured reuse failed")
-  require (first.value == complement 4 && last.value == word 4) "projected captured result changed"
+  require (first.value == complement 4 && last.value == complement 4) "projected captured result changed"
   heaps := heaps ++ [made.session.heapSize, first.session.heapSize, last.session.heapSize]
-  require (heaps == [14,20,35,50,83,104,120,136,143,158,167,182,206,221,224,239,254])
+  require (heaps == [14,20,35,50,83,104,120,136,143,158,167,182,206,221,227,245,263])
     "projected bit-not exact native heaps changed"
-  IO.println s!"PROJECTED_BITNOT_COMPLETE_PROFILE: originals13/cache{recipe.compiled.indexed.base.functions.length}/table{fullProfile.table.rows.length}; captured Source/public complement and restore"
+  IO.println s!"PROJECTED_BITNOT_COMPLETE_PROFILE: originals13/cache{recipe.compiled.indexed.base.functions.length}/table{fullProfile.table.rows.length}; captured Source/public complement on both calls"
   IO.println s!"PROJECTED_BITNOT_NATIVE_HEAPS: {heaps}"
   IO.println "PROJECTED_BITNOT_COMPILER_PROFILE_FORWARD_PASS"
 

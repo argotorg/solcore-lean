@@ -52,7 +52,8 @@ theorem of_contextual_with_issued_recipe_exact {checked : SourceCoreCompatibleCa
     contextual_certificate_with_policy_recipe prepared compiled record found (form.trans sourceForm) owner requirements coercions ordinary read accepted
   obtain ⟨site, identifier, emitted, samePolicy, sameBody, sameFuel, sameView, sameReasonAt, _sourceNode, _node, _receipt⟩ :=
     of_certificate prepared sourceContext evidence captured receipt accepted profile viewOfSource
-      sourceFound sourceForm found form allocationProfile manifest expressionProfile callables projector typed
+      sourceFound sourceForm found form allocationProfile manifest expressionProfile callables projector
+      (by rw [policyRecipe.snapshotLambda]) typed
   have actualBody : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compiled site.code :=
     sameBody.trans bodyRecipe
   have actualPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe

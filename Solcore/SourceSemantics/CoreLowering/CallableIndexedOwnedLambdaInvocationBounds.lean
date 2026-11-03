@@ -106,8 +106,9 @@ entry and capture spine accompany its reached pool. -/
 theorem parameters_with_state :
     ∃ entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked) captured code history inputs functions registry arguments nativeArguments
       before store owner.key.frameLocation (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost,
-    ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-      entry.entry.canonical = added ++ captured.canonical ∧
+    ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+      entry.entry.canonical = added ++ copied ∧
+      (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) ∧
       ProtectedStateTransition.Transition (protocol headers keys) caller
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
@@ -129,11 +130,12 @@ theorem parameters_with_state :
     CallableIndexedOwnedAllocationProducer.readyAt_of_stable_read
     (headers := headers) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
     owner.position nextHistory
-  obtain ⟨entry, added, length, spine, reached, parameterRelated⟩ :=
+  obtain ⟨entry, added, copied, length, spine, slots, reached, parameterRelated⟩ :=
     CallableIndexedLambdaEntryPrefix.Stateful.entry_exists_for_with_spine (values := .initial compiled.compatible.checked) captured code history inputs functions
-      (protocol headers keys) producer represented heaps locals reference read currentCarried unmapped allowed initial readyAt
+      (protocol headers keys) producer (administrativeTransport headers keys) (rebinds headers keys) represented heaps
+      locals reference read currentCarried unmapped allowed initial readyAt
   have installedRelated : Relates caller initial := install_related caller owner.position (.stable nextHistory)
-  exact ⟨entry, added, length, spine, reached, installedRelated.trans parameterRelated⟩
+  exact ⟨entry, added, copied, length, spine, slots, reached, installedRelated.trans parameterRelated⟩
 
 include captured code history inputs functions represented caller heaps locals reference currentCarried allowed in
 /-- The original native lambda completion selects a strict body child and its
@@ -172,7 +174,8 @@ theorem body_prefix_with_state {size : Nat} {result : Value} {finalStore : Store
   obtain ⟨reached, child, bodyStore, smaller, bodyCompleted, restored, post, parameterRelated⟩ :=
     CallableIndexedLambdaEntryBounds.Stateful.body_prefix_for (values := .initial compiled.compatible.checked) captured code history inputs functions
       represented heaps locals reference read currentCarried unmapped allowed
-      (protocol headers keys) producer initial readyAt completed
+      (protocol headers keys) producer (administrativeTransport headers keys) (rebinds headers keys) initial readyAt
+      completed
   have installedRelated : Relates caller initial := install_related caller owner.position (.stable nextHistory)
   exact ⟨reached, child, bodyStore, smaller, bodyCompleted, restored, post, installedRelated.trans parameterRelated⟩
 
@@ -208,34 +211,35 @@ private theorem source_body {size : Nat} {callContext : SourceSemantics.Context}
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome program size callContext callerEvidence function.evidence before
       (.closure function) arguments outcome after) :
-    ∃ child environment heap,
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap ∧
+    ∃ child copies copied environment heap,
+      Dynamic.EnvironmentCopies function.source function.captured before copies copied ∧
+      Dynamic.BindersAllocate copies copied function.parameters arguments environment heap ∧
       RecursiveNamedCallBounds.BodyTrace program child function inputs.context environment heap outcome after ∧ child < size := by
   cases trace with
   | value executed =>
     cases executed with
-    | closure _ _ extended allocated executed returned =>
+    | closure _ _ extended copy allocated executed returned =>
       have same := binders_context_eq extended inputs.extended
       subst same
       subst returned
-      exact ⟨_, _, _, allocated, .returned executed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | closureUnit _ _ resultUnit extended allocated executed fellThrough =>
+      exact ⟨_, _, _, _, _, copy, allocated, .returned executed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | closureUnit _ _ resultUnit extended copy allocated executed fellThrough =>
       have same := binders_context_eq extended inputs.extended
       subst same
       obtain ⟨_, rfl⟩ := fellThrough
-      exact ⟨_, _, _, allocated, .unit resultUnit executed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+      exact ⟨_, _, _, _, _, copy, allocated, .unit resultUnit executed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
   | fault failed =>
     cases failed with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity mismatch => exact False.elim (mismatch arity)
-    | closureBody _ _ extended allocated failed =>
+    | closureBody _ _ extended copy allocated failed =>
       have same := binders_context_eq extended inputs.extended
       subst same
-      exact ⟨_, _, _, allocated, .fault failed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | closureControlEscape _ _ extended allocated executed escaped =>
+      exact ⟨_, _, _, _, _, copy, allocated, .fault failed, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | closureControlEscape _ _ extended copy allocated executed escaped =>
       have same := binders_context_eq extended inputs.extended
       subst same
-      exact ⟨_, _, _, allocated, .escaped executed escaped, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+      exact ⟨_, _, _, _, _, copy, allocated, .escaped executed escaped, SourceExecutionSize.child_lt_stepSize (by simp)⟩
 
 include inputs in
 /-- Native reflection reconstructs the original four closure exit receipts at
@@ -243,15 +247,17 @@ its independent Source grade, using the authentic full parameter allocation. -/
 private theorem call_of_body_with_frame (frame : Dynamic.ClosureFrame program function) {size : Nat} {callContext : SourceSemantics.Context}
     {callerEvidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
     {heap after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment heap)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function inputs.context environment heap outcome after) :
     RecursiveNamedCallBounds.CallOutcome program (SourceExecutionSize.stepSize [size]) callContext callerEvidence function.evidence before
       (.closure function) arguments outcome after := by
   cases trace with
-  | returned executed => exact .value (.closure rfl frame inputs.extended allocated executed rfl)
-  | unit same executed => exact .value (.closureUnit rfl frame same inputs.extended allocated executed ⟨_, rfl⟩)
-  | fault failed => exact .fault (.closureBody rfl frame inputs.extended allocated failed)
-  | escaped executed escape => exact .fault (.closureControlEscape rfl frame inputs.extended allocated executed escape)
+  | returned executed => exact .value (.closure rfl frame inputs.extended copy allocated executed rfl)
+  | unit same executed => exact .value (.closureUnit rfl frame same inputs.extended copy allocated executed ⟨_, rfl⟩)
+  | fault failed => exact .fault (.closureBody rfl frame inputs.extended copy allocated failed)
+  | escaped executed escape => exact .fault (.closureControlEscape rfl frame inputs.extended copy allocated executed escape)
 
 
 include body in
@@ -260,11 +266,13 @@ its independent Source grade, using the authentic full parameter allocation. -/
 private theorem call_of_body {size : Nat} {callContext : SourceSemantics.Context}
     {callerEvidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
     {heap after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment heap)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function inputs.context environment heap outcome after) :
     RecursiveNamedCallBounds.CallOutcome program (SourceExecutionSize.stepSize [size]) callContext callerEvidence function.evidence before
       (.closure function) arguments outcome after := by
-  exact call_of_body_with_frame captured code inputs body.frame allocated trace
+  exact call_of_body_with_frame captured code inputs body.frame copy allocated trace
 
 /-- The source-produced entry is packaged without changing its reached pool,
 captured canonical spine or selected physical frame. -/
@@ -285,7 +293,7 @@ def source_entry
   heap := entry.entry.heap
   store := entry.entry.store
   embedding := entry.entry.embedding
-  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters entry.actualContext
+  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters entry.entry.copiedContext
   frameLocation := owner.key.frameLocation
   native := entry.next
   environments := by simpa only [body.administrative_eq, body.scope_eq, CallableIndexedAmbient.ambientDefinitions] using entry.entry.environments
@@ -340,7 +348,8 @@ def SourceContinuation (budget : Nat) : Prop :=
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment), added.length = code.receipt.loweredParameters.length →
-    entry.entry.canonical = added ++ captured.canonical →
+  ∀ copied : Environment, entry.entry.canonical = added ++ copied →
+    (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) →
   ∀ reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩,
@@ -392,14 +401,18 @@ theorem invocation_preserves_bounded_at_with_continuation (budget : Nat)
   have arity : function.parameters.length = arguments.length := by
     rw [CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) code, List.length_map]
     exact represented.length.1
-  obtain ⟨child, environment, bound, allocated, bodyTrace, smaller⟩ := source_body captured code inputs arity trace
-  obtain ⟨entry, added, length, spine, parameterState, parameterRelated⟩ :=
+  obtain ⟨child, copies, copied, environment, bound, copy, allocated, bodyTrace, smaller⟩ :=
+    source_body captured code inputs arity trace
+  obtain ⟨entry, added, copiedCanonical, length, spine, slots, parameterState, parameterRelated⟩ :=
     parameters_with_state captured code history inputs functions represented owner caller heaps locals reference currentCarried allowed
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨value, bodyStore, finalMap, finalWorld, originalBody, representedResult, finalHeaps,
       bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
-    bodyMeaning entry added length spine parameterState child (Nat.lt_of_lt_of_le smaller within) bodyTrace
+    bodyMeaning entry added length copiedCanonical spine slots parameterState child (Nat.lt_of_lt_of_le smaller within)
+      bodyTrace
   have maps := entry.entry.maps.trans bodyMaps
   have worlds := entry.entry.worlds.trans bodyWorlds
   have frame := entry.entry.frame.trans bodyFrame
@@ -434,14 +447,14 @@ theorem invocation_preserves_bounded_at (budget : Nat)
         ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
   apply invocation_preserves_bounded_at_with_continuation captured code history inputs functions represented
     owner caller heaps locals reference currentCarried allowed budget
-  · intro entry added length spine reached child strict outcome after trace
+  · intro entry added length copiedCanonical spine slots reached child strict outcome after trace
     have actualTrace : RecursiveNamedCallBounds.BodyTrace program child body.origin.function body.origin.context
         (source_entry captured code history inputs functions owner caller body entry reached).environment
         (source_entry captured code history inputs functions owner caller body entry reached).heap outcome after := by
       simpa only [body.function_eq, body.context_eq, source_entry] using trace
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps,
         maps, worlds, frame, metadata, exit, finalState, related⟩ :=
-      bodyMeaning entry added length spine reached child strict actualTrace
+      bodyMeaning entry added length copiedCanonical spine slots reached child strict actualTrace
     refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, metadata, ?_, ?_⟩
     · simpa only [body.code_eq, source_entry] using evaluated
     · simpa only [body.function_eq, body.output_eq, SourceCoreCompatibleValues.Context.initial] using result
@@ -489,7 +502,8 @@ theorem invocation_reflects_bounded_at_with_continuation
     CallableIndexedOwnedBodyRestoration.restore_return caller bodyState owner.position
       (CallableIndexedAmbient.frame_registered compiled.indexed) finalHeaps worlds administrativeFrame related
   subst finalStore
-  exact ⟨_, outcome, after, finalMap, finalWorld, call_of_body_with_frame captured code inputs frame entry.allocation originalTrace,
+  exact ⟨_, outcome, after, finalMap, finalWorld,
+    call_of_body_with_frame captured code inputs frame entry.copy entry.allocation originalTrace,
     representedResult, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
 
 
@@ -558,7 +572,7 @@ theorem invocation_preserves_bounded_with (budget : Nat)
         ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
   exact invocation_preserves_bounded_at captured code history inputs functions represented owner caller heaps locals
     reference currentCarried allowed body budget
-    (fun entry _added _length _spine reached child strict =>
+    (fun entry _added _length _copied _spine _kept reached child strict =>
       bodyMeaning child strict (source_entry captured code history inputs functions owner caller body entry reached)) trace within
 
 include body inputs represented heaps locals reference currentCarried allowed in

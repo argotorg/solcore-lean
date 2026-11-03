@@ -130,7 +130,9 @@ def run : IO Unit := do
   let withClosure : SourceTypedRuntime.RuntimeState := {
     heap := initial.heap ++ [{type := .function .unit .word, value := some closure}] }
   let (_, reused) ← completed factory [] withClosure
-  assertTrue (reprStr (reused.heap.take withClosure.heap.length) == reprStr withClosure.heap && reused.heap.length == 3)
+  /- Each run allocates `captured` and the returned closure's snapshot copy of
+  it, after the given prefix. -/
+  assertTrue (reprStr (reused.heap.take withClosure.heap.length) == reprStr withClosure.heap && reused.heap.length == 5)
     "accepted existing closure heap prefix changed"
   /- Old code validation checks capture readability, not lexical type alignment.
   This prefix cannot be reached by any accepted public function input. -/
@@ -148,9 +150,12 @@ def run : IO Unit := do
     "uninitialized open source prefix was rejected or changed"
   let unused ← compile program "unusedPoly"
   let unusedState ← wordResult unused [.word (word 8)] 8
+  /- The generalized `let` copies `captured` before its principal, which
+  captures the copy. -/
   match unusedState.heap with
-  | [_, {type := .function _ _, value := some (.closure _ _ _ _ _ captures _)}] =>
-      assertTrue (captures.map (fun capture => capture.2.index) == [0]) "unused principal closure lost its source capture"
+  | [_, _, {type := .function _ _, value := some (.closure _ _ _ _ _ captures _)}] =>
+      assertTrue (captures.map (fun capture => capture.2.index) == [1])
+        "unused principal closure did not capture its snapshot copy"
   | _ => throw (IO.userError "unused generalized source binding did not retain its principal closure heap cell")
   let key : SourceSpecialization.SpecializationKey ← match program.signatures.functions.filter (·.name == "scalar") with
     | [signature] => pure ⟨signature.id, []⟩

@@ -392,11 +392,12 @@ mutual
         (body : StatementsIn program registry true child bodyContext environment bound roots finalContext outcome after)
         (resultRule : BodyResult bodyInstance.resultType outcome result) :
         Applies program registry scope context before (.global function) arguments result after
-    | closure {scope context before bound after function arguments environment parameterTypes bodyContext finalContext child outcome result}
+    | closure {scope context before copied bound after function arguments entry environment parameterTypes bodyContext finalContext child outcome result}
         (selected : registry.Closure function child)
         (valid : ClosureFrame program function)
         (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes bodyContext)
-        (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters arguments environment bound)
         (body : StatementsIn program registry true child bodyContext environment bound function.body finalContext outcome after)
         (resultRule : BodyResult function.resultType outcome result) :
         Applies program registry scope context before (.closure function) arguments result after
@@ -723,14 +724,15 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : StatementsIn program registry mode scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
-    | letGeneralized {mode scope context middleContext finalContext environment before bound after
-          id rest node binder initializer function location outcome}
+    | letGeneralized {mode scope context middleContext finalContext environment before snapshotHeap bound after
+          id rest node binder initializer captured function location outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .letDecl binder (some initializer))
-        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (snapshot : EnvironmentCopies scope.source environment before captured snapshotHeap)
+        (captures : GeneralizedClosureCaptures context scope.source captured binder initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
-        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (allocate : Heap.AllocatesGeneralized snapshotHeap function location bound)
         (next : StatementsIn program registry mode scope middleContext
           ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
@@ -832,12 +834,13 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : ForItems program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry scope context environment before (.letDecl binder (some initializer) :: rest) finalContext outcome after
-    | initializedGeneralized {scope context middleContext finalContext environment before bound after
-          binder initializer rest function location outcome}
-        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+    | initializedGeneralized {scope context middleContext finalContext environment before snapshotHeap bound
+          after binder initializer rest captured function location outcome}
+        (snapshot : EnvironmentCopies scope.source environment before captured snapshotHeap)
+        (captures : GeneralizedClosureCaptures context scope.source captured binder initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
-        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (allocate : Heap.AllocatesGeneralized snapshotHeap function location bound)
         (next : ForItems program registry scope middleContext
           ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry scope context environment before

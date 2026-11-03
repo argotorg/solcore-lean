@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ImperativeNativePolicyTyping
+import Solcore.SourceSemantics.CoreLowering.CaptureCopyTyping
 import Solcore.Test.SourceCompilerFeatureSupport
 
 /-! A concrete typed callback profile exercises the actual statement/header
@@ -57,6 +58,8 @@ theorem callback_laws (definitions : DataEnvironment) (administrative : Core.Con
     cases accepted
     exact LocalSequence.letInitialized_hasType outputWF initialTyped
       (by simpa [context, SourceCoreLocalCell.coreContext, OptionalCell.referenceType] using bodyTyped)
+  · intro source scope binder payload output initializer body code _ payloadWF outputWF initialTyped bodyTyped accepted
+    exact CaptureCopyTyping.letInitializedSnapshot_none_hasType payloadWF outputWF initialTyped bodyTyped accepted
   · intro fuel source scope site assignment operator rhs output body reasonAt code _ _ _ accepted
     cases operator <;> simp [SourceCoreLoops.assignValue, policy, bind, Except.bind] at accepted
   · intro callback source scope site assignment output body code selected

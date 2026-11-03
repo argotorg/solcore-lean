@@ -65,8 +65,9 @@ theorem for_items_step (size : Nat)
                 (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
                 childPost.heap_extends.trans (allocationExtends.trans post.heap_extends), post.done⟩
           | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
-  | @initializedGeneralized nextSize scope context middleContext finalContext environment before bound after
-      binder initializer rest function location outcome captures polymorphic extended allocated next =>
+  | @initializedGeneralized nextSize scope context middleContext finalContext environment before snapshotHeap bound
+      after binder initializer rest captured function location outcome snapshot captures polymorphic extended
+      allocated next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
@@ -74,9 +75,11 @@ theorem for_items_step (size : Nat)
           | letInitializedGeneralized staticPolymorphic requirements generalizes initializerTyped staticExtended =>
               have same := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extended staticExtended
               cases same
-              have functionTyped := captures.wellTyped runtime locals staticPolymorphic requirements generalizes initializerTyped staticExtended
-              have allocationExtends := HeapTypesExtend.of_generalized_allocation allocated
-              have boundTyped := heap.allocateGeneralized functionTyped allocated
+              have functionTyped := captures.wellTyped runtime (snapshot.agrees locals) staticPolymorphic requirements
+                generalizes initializerTyped staticExtended
+              have allocationExtends :=
+                snapshot.metadata_extends.trans (HeapTypesExtend.of_generalized_allocation allocated)
+              have boundTyped := (heap.copy snapshot).allocateGeneralized functionTyped allocated
               have boundLocals : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
                 cases extended
                 exact .cons allocated.reads_new

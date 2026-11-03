@@ -66,8 +66,9 @@ theorem reference_index : head.code.referenceIndex = scope.length + 1 + indexed.
   simp only [Code.referenceIndex, head.compilation, SourceCoreCallableIndexedAncestry.creationReferenceIndex,
     CallableIndexedNamedGeneration.context, CompatibleNamedBody.bodyContext]
 
-/-- No current ghost is replaced while forming the nested value. Captured
-history and the finite global prefix are built from the same reached state. -/
+/-- No current ghost is replaced while forming the nested value. The value
+copies its captured cells; captured history and the finite global prefix are
+built from the same reached state and kept by the copies. -/
 theorem formation
     (profile : values.checked.catalog.callableContracts = true)
     (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
@@ -81,23 +82,24 @@ theorem formation
       mapping world administrative scope environment canonical indexed.layouts.definitions)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions)
-    (stored : RuntimeStoreHasTypes world store indexed.layouts.definitions) :
-    ∃ value,
+    (heaps : GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry
+      (model headers locations registry faults profile)) mapping world heap store) :
+    ∃ value captured finalHeap finalStore finalMap finalWorld,
       Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-        environment heap id (.closure (formed head environment)) heap ∧
-      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) store ∧
+        environment heap id (.closure (formed head captured)) finalHeap ∧
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment heap captured
+        finalHeap ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) finalStore ∧
       CompatiblePayload.ValueRep values.checked registry
         (model headers locations registry faults profile)
-        mapping world head.code.sourceNode.type (.closure (formed head environment)) value lowered.type := by
+        finalMap finalWorld head.code.sourceNode.type (.closure (formed head captured)) value lowered.type ∧
+      GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry
+        (model headers locations registry faults profile)) finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap finalHeap := by
   let captured : Captures indexed mapping world scope environment actual := captures_for complete globals entry related agrees typed
   let code : Code indexed (formed head environment) scope captured.administrative := actualCode head environment
   let history : History code := historyAt head entry environment
-  let body : Support headers registry faults code := actualSupport head environment
-  have supported : Condition (registry := registry) (faults := faults) headers locations
-      (function := formed head environment) (scope := scope) (mapping := mapping) (world := world) (actual := actual) captured code history body := by
-    change history.metadata = CallableIndexedNamedGeneration.state caller.named ∧ ∃ location,
-      CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope captured.canonical location
-    exact ⟨rfl, entry.catalog.authority.frameLocation, capture_globals_for complete globals slots entry related agrees typed⟩
   have reference : captured.canonical[code.referenceIndex]? =
       some (.cellRef indexed.ancestry.layout.frame.type entry.catalog.authority.frameLocation) := by
     have bound : head.code.referenceIndex < scope.length + (nativePrefix caller).length := by
@@ -107,17 +109,30 @@ theorem formation
     change (canonical.take (scope.length + (nativePrefix caller).length))[head.code.referenceIndex]? = _
     rw [List.getElem?_take, if_pos bound, reference_index head, ← globals]
     exact entry.reference
+  obtain ⟨formedRecord⟩ := CallableIndexedLambdaValues.formation captured code history head.snapshots
+    (reference_index head) heaps reference entry.catalog.authority.frame.read
+  let body : Support headers registry faults formedRecord.closureCode := actualSupport head formedRecord.captured
+  have supported : Condition (registry := registry) (faults := faults) headers locations
+      (function := formedRecord.closure) formedRecord.captures formedRecord.closureCode formedRecord.closureHistory
+      body := by
+    change formedRecord.closureHistory.metadata = CallableIndexedNamedGeneration.state caller.named ∧ ∃ location,
+      CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope formedRecord.canonical location
+    exact ⟨rfl, entry.catalog.authority.frameLocation,
+      (capture_globals_for complete globals slots entry related agrees typed).of_slots formedRecord.slots⟩
   obtain ⟨sourceValue, native, represented⟩ := CallableIndexedLambdaRuntimeValues.formation_with
-    indexed program (function := formed head environment) (scope := scope)
-    (support := Support headers registry faults) (P := Condition headers locations)
-    captured code history body supported profile stored reference entry.catalog.authority.frame.read heap
+    indexed program (support := Support headers registry faults) (P := Condition headers locations)
+    formedRecord body supported profile heaps.runtime_hasTypes
     (by change Dynamic.OrdinaryRequirementLayout head.code.sourceNode.requirements head.code.sourceNode.coercions []; rw [head.requirements, head.coercions]; rfl) head.coercions
-  refine ⟨CallableIndexedLambdaValues.value code captured.embedding history.native actual, ?_, ?_, ?_⟩
+  refine ⟨CallableIndexedLambdaValues.value code formedRecord.embedding history.native formedRecord.closureActual,
+    formedRecord.captured, formedRecord.finalHeap, formedRecord.finalStore, formedRecord.finalMap,
+    formedRecord.finalWorld, ?_, formedRecord.copy, ?_, ?_, formedRecord.heaps, formedRecord.maps,
+    formedRecord.worlds, formedRecord.frame, formedRecord.copy.metadata_extends⟩
   · change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-      environment heap head.code.id (.closure (formed head environment)) heap at sourceValue
+      environment heap head.code.id (.closure (formed head formedRecord.captured)) formedRecord.finalHeap at sourceValue
     simpa only [head.identifier] using sourceValue
   · exact Eq.mp (congrArg (fun expression => Evaluates actual store expression
-      (.inRight .word (CallableIndexedLambdaValues.value code captured.embedding history.native actual)) store)
+      (.inRight .word (CallableIndexedLambdaValues.value code formedRecord.embedding history.native
+        formedRecord.closureActual)) formedRecord.finalStore)
       (congrArg (fun output : SourceCoreBasic.LoweredExpr => output.expression.rename ξ) head.emitted)) native
   · rw [head.sourceType, head.nativeType]
     exact .function represented
@@ -148,11 +163,15 @@ theorem preserves_leaf_at
   | value evaluated =>
     rename_i result
     have original : Dynamic.ExpressionEvaluates program (formed leaf environment).context (formed leaf environment).evidence
-        (formed leaf environment).source (formed leaf environment).captured before leaf.code.id result after := by
+        (formed leaf environment).source environment before leaf.code.id result after := by
       simpa only [formed, CallableIndexedLambdaGeneration.closure, leaf.identifier] using evaluated
-    obtain ⟨rfl, rfl⟩ := source_value_of_code (actualCode leaf environment) unique leaf.coercions original
-    obtain ⟨value, _, native, represented⟩ := formation leaf profile complete globals slots entry related agrees typed heaps.runtime_hasTypes
-    exact ⟨.inRight .word value, store, mapping, world, native, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+    obtain ⟨captured, rfl, copy⟩ := source_value_of_code (actualCode leaf environment) unique leaf.coercions original
+    obtain ⟨value, formedCaptured, finalHeap, finalStore, finalMap, finalWorld, _, formedCopy, native, represented,
+        finalHeaps, maps, worlds, frame, metadata⟩ :=
+      formation leaf profile complete globals slots entry related agrees typed heaps
+    obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formedCopy
+    exact ⟨.inRight .word value, finalStore, finalMap, finalWorld, native, .value represented, finalHeaps, maps, worlds,
+      frame, metadata⟩
   | fault failed =>
     rename_i reason
     apply False.elim
@@ -179,13 +198,16 @@ theorem reflects_leaf_at
   rw [sameSource] at found
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨nativeValue, sourceValue, native, represented⟩ := formation leaf profile complete globals slots entry related agrees typed heaps.runtime_hasTypes
+  obtain ⟨nativeValue, captured, finalHeap, formedStore, finalMap, finalWorld, sourceValue, _, native, represented,
+      finalHeaps, maps, worlds, frame, metadata⟩ :=
+    formation leaf profile complete globals slots entry related agrees typed heaps
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound native
   have original : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id
-      (.value (.closure (formed leaf environment))) before := by
+      (.value (.closure (formed leaf captured))) finalHeap := by
     simpa only [sameSource] using (Dynamic.ExpressionEvaluatesOutcome.value sourceValue)
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size original
-  exact ⟨sourceSize, _, before, mapping, world, sized, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+  exact ⟨sourceSize, _, finalHeap, finalMap, finalWorld, sized, .value represented, finalHeaps, maps, worlds, frame,
+    metadata⟩
 
 end Leaf
 

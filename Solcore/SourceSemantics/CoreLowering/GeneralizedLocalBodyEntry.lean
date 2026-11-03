@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyEntry
 open Core Frontend SourceInference GeneralHeap ReadOnly CoreProof CompatiblePayload
 open CallableIndexedHistory CallableIndexedLambdaValues SourceCoreCallableIndexedFrames
-open CallableIndexedLambdaEntryPrefix (parameters prefix_accepted bodyEmbedding)
+open CallableIndexedLambdaEntryPrefix (parameters prefix_accepted copies_accepted bodyEmbedding body_respects)
 open CallableIndexedParameterCertificates CallableIndexedParameterMeaning
 open GeneralizedLocalDescriptorOrigin
 
@@ -59,7 +59,7 @@ structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
   entry : CellAwareLambdaViewPrefix.Entry prepared.ancestry.layout.frame prepared.base.globals.length
     location next values functions registry cells function inputs.context scope code.receipt.loweredParameters
     arguments before (store.set location (encode prepared.ancestry.layout.frame next)) mapping world
-    captured.administrative actualContext actual embedding code.receipt.allocatedBody code.receipt.body
+    captured.administrative actualContext actual embedding code.receipt.copiedBody code.receipt.body
   wrap : ∀ {result bodyStore}, Evaluates entry.actualBody entry.store
       (code.receipt.body.rename entry.embedding) result bodyStore →
     Evaluates (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame origin.native :: capturedActual)
@@ -88,6 +88,8 @@ theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValue
     {viewRelation : TypedSource → TypedSource → Prop}
     (code : Code prepared function scope captured.administrative viewRelation) (inputs : CallableIndexedLambdaEntryPrefix.Context code)
     (inputIds : function.source.inputs.map TypedBinder.id = code.view.inputs.map TypedBinder.id)
+    (copiedIds : ∀ id, (SourceSemantics.CaptureBinders.copiedBinder? function.source id).isSome =
+      (SourceSemantics.CaptureBinders.copiedBinder? code.view id).isSome)
     (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
     {registry : SourceCoreRawMetadata.Registry} {cells : GenericHeap.CellModel prepared.layouts.definitions}
     (ordinaryCells : GenericHeap.OrdinaryCells
@@ -96,6 +98,8 @@ theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValue
     (producer : ProtectedStateTransition.CellAllocation.Producer
       (catalog := CompatibleEquality.storageCatalog values.checked.catalog) protocol prepared.layouts
       prepared.ancestry.layout.frame cells)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (rebinds : ProtectedStateTransition.Rebinds protocol)
     {arguments : List Dynamic.Value} {nativeArguments : List Value}
     (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       mapping world code.receipt.loweredParameters arguments nativeArguments)
@@ -120,8 +124,9 @@ theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValue
         (SourceCoreCallableIndexedDispatch.readFrame id code.descriptor.id callerNative))) :
     ∃ entry : Entry origin captured code inputs functions registry cells arguments nativeArguments before store
       location callerNative callerGhost caller id recipe,
-      ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-        entry.entry.canonical = added ++ captured.canonical ∧
+      ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ copied ∧
+        (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) ∧
         ProtectedStateTransition.Transition protocol initial
           ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
             entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
@@ -153,14 +158,15 @@ theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValue
       (.cons (CallableIndexedParameters.Arguments.pack_typed represented)
         (.cons (encode_runtime_typed world registered origin.native) captured.typed)))
   obtain ⟨manifest, manifestTyped, manifestAgreement⟩ := CallableIndexedLambdaManifest.agreement
-    captured.represented actualLayout manifestDescriptor fields code.receipt.allocatedBody
+    captured.represented actualLayout manifestDescriptor fields code.receipt.copiedBody
       (store.set location (encode layout next))
-  obtain ⟨entry, added, prefixLength, canonicalEq, transition⟩ :=
-    CellAwareLambdaViewPrefix.Stateful.entry_of_accepted_with_spine_of_input_ids functions ordinaryCells code.allocationError
-      protocol producer inputIds (prefix_accepted code) (parameters code) inputs.kinds inputs.extended
+  obtain ⟨entry, added, copiedCanonical, prefixLength, canonicalEq, slots, transition⟩ :=
+    CellAwareLambdaViewPrefix.Stateful.entry_of_accepted_with_spine_of_copies functions ordinaryCells
+      code.allocationError protocol producer transport rebinds inputIds copiedIds (prefix_accepted code)
+      (copies_accepted code) (parameters code) inputs.kinds inputs.extended
       rfl registered represented captured.represented installedHeaps locals
-      (GenericExpressionMeaning.agree_prefix actualLayout manifest) (.cons manifestTyped actualTyped)
-      (inputs.referenceIndex ▸ reference) installedRead unmapped initial readyAt
+      (GenericExpressionMeaning.agree_prefix actualLayout manifest) (body_respects captured.respects _ layout.type _)
+      (.cons manifestTyped actualTyped) (inputs.referenceIndex ▸ reference) installedRead unmapped initial readyAt
   have agreement : ContinuationAgreement actual (store.set location (encode layout next))
       (code.receipt.rawBody.rename (bodyEmbedding captured.embedding)) entry.actualBody entry.store
       (code.receipt.body.rename entry.embedding) := by
@@ -173,7 +179,7 @@ theorem entry_exists_with_spine_of_input_ids {values : SourceCoreCompatibleValue
     fun evaluated => by
       obtain ⟨bodyStore, bodyEval, finalEq⟩ := frame.2 evaluated
       exact ⟨bodyStore, agreement.unwrap bodyEval, finalEq⟩,
-    unmapped, refTyped, read⟩, added, prefixLength, canonicalEq, transition⟩
+    unmapped, refTyped, read⟩, added, copiedCanonical, prefixLength, canonicalEq, slots, transition⟩
 
 /-- Compatibility with full-table view evidence. -/
 theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
@@ -191,6 +197,8 @@ theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {p
     (producer : ProtectedStateTransition.CellAllocation.Producer
       (catalog := CompatibleEquality.storageCatalog values.checked.catalog) protocol prepared.layouts
       prepared.ancestry.layout.frame cells)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (rebinds : ProtectedStateTransition.Rebinds protocol)
     {arguments : List Dynamic.Value} {nativeArguments : List Value}
     (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       mapping world code.receipt.loweredParameters arguments nativeArguments)
@@ -215,14 +223,17 @@ theorem entry_exists_with_spine {values : SourceCoreCompatibleValues.Context} {p
         (SourceCoreCallableIndexedDispatch.readFrame id code.descriptor.id callerNative))) :
     ∃ entry : Entry origin captured code inputs functions registry cells arguments nativeArguments before store
       location callerNative callerGhost caller id recipe,
-      ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-        entry.entry.canonical = added ++ captured.canonical ∧
+      ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ copied ∧
+        (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) ∧
         ProtectedStateTransition.Transition protocol initial
           ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
             entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
   exact entry_exists_with_spine_of_input_ids origin captured code inputs
-    (congrArg (List.map TypedBinder.id) code.viewOfSource.inputs) functions ordinaryCells protocol producer
-    represented callerCarried recipe heaps locals reference read unmapped initial readyAt
+    (congrArg (List.map TypedBinder.id) code.viewOfSource.inputs)
+    (fun id => by rw [LambdaMetadataViews.MetadataView.copiedBinder code.viewOfSource]) functions ordinaryCells
+    protocol producer transport rebinds represented callerCarried recipe heaps locals reference read unmapped initial
+    readyAt
 
 end Stateful
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyEntry

@@ -96,8 +96,10 @@ theorem preserves
   have arity : function.parameters.length = arguments.length := by
     rw [← code.artifact.parametersTree.binders, List.length_map]
     exact represented.length.1
-  obtain ⟨types, callContext, environment, bound, extension, allocated, trace⟩ := execution.trace arity
+  obtain ⟨types, callContext, entryEnvironment, copied, environment, bound, extension, copy, allocated, trace⟩ :=
+    execution.trace arity
   obtain ⟨entry⟩ := entry_exists layout code extension represented heaps locals
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy entry.copy
   obtain ⟨rfl, rfl⟩ := allocations_same allocated entry.allocation
   obtain ⟨_, _, typed, _⟩ := frame_body_at code.frame extension
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
@@ -130,7 +132,7 @@ theorem reflects
   obtain ⟨outcome, after, finalMap, finalWorld, trace, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
     bodyMeaning code.artifact.bodyTree typed entry.environments entry.heaps entry.locals entry.lookups
       (entry.agreement.unwrap evaluated)
-  exact ⟨outcome, after, finalMap, finalWorld, trace.call code.frame extension entry.allocation,
+  exact ⟨outcome, after, finalMap, finalWorld, trace.call code.frame extension entry.copy entry.allocation,
     result, finalHeaps, entry.maps.trans maps, entry.worlds.trans worlds,
     entry.frame.trans frame, entry.metadata.trans metadata⟩
 
@@ -178,7 +180,8 @@ theorem reflects_done
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  reflects layout code bodyMeaning context caller represented heaps locals (runStateful_evaluation_sound completed)
+  reflects layout code bodyMeaning context caller represented heaps locals
+    (runStateful_evaluation_sound completed)
 
 /-- The last application expression emitted by the tagged call helper enters
 exactly the captured body and actual environment authenticated above. -/

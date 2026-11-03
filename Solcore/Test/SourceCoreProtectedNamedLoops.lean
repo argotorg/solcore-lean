@@ -205,6 +205,8 @@ private def gapBinder (compiled : SourceCoreUnifiedCompilation.Compiled) (name :
   | [binder] => pure binder.id
   | _ => throw (IO.userError "protected named recursive loops exact fault binder missing")
 
+/-- Cells after the inert prefix: `raw`, `seed`, the snapshot of `seed` and
+`raw` that `saved` takes when it is created, `saved` and `index`. -/
 private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : String)
     (updated counter : Nat) : IO Unit := do
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr (final.heap.take initial.heap.length) == reprStr initial.heap)
@@ -213,16 +215,19 @@ private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : St
     | some cell => pure cell | none => throw (IO.userError "protected named recursive loops missing root mapping")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr raw.value == reprStr (some (table updated)))
     s!"protected named recursive loops raw mapping/default/duplicate order changed {name}"
-  let index ← match final.heap[initial.heap.length + 3]? with
+  let index ← match final.heap[initial.heap.length + 5]? with
     | some cell => pure cell | none => throw (IO.userError "protected named recursive loops missing index")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr index.value == reprStr (some (wordValue counter)))
     s!"protected named recursive loops writes changed {name}"
-  match final.heap[initial.heap.length + 2]? with
+  let snapshot := ((final.heap.drop (initial.heap.length + 2)).take 2).map (·.value)
+  SourceCoreUnifiedCorpusSupport.assertTrue (reprStr snapshot == reprStr [some (wordValue 7), some (table 10)])
+    s!"protected named recursive loops captured snapshot values changed {name}"
+  match final.heap[initial.heap.length + 4]? with
   | some ⟨_, some (.closure parameters result body source owner captures _)⟩ =>
     SourceCoreUnifiedCorpusSupport.assertTrue (parameters.length == 1 && result == .word && !body.isEmpty && source.owner == owner.declaration)
       s!"protected named recursive loops captured closure metadata changed {name}"
-    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 1, initial.heap.length])
-      s!"protected named recursive loops captured source aliases changed {name}"
+    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 2, initial.heap.length + 3])
+      s!"protected named recursive loops captured snapshot locations changed {name}"
   | other => throw (IO.userError s!"protected named recursive loops lost stored captured closure {name}: {reprStr other}")
 
 def run : IO Unit := do
@@ -259,6 +264,6 @@ def run : IO Unit := do
       | other => throw (IO.userError s!"protected named recursive failure {name}: {reprStr other}")
     if fuel == 400000 then baseline := current
     else SourceCoreUnifiedCorpusSupport.assertTrue (current == baseline) "protected named recursive resume changed observations"
-  IO.println "protected named recursive loops contracts: same recursive Tree consumers, nested loops/break/continue/return, condition/key/RHS/body first faults, raw duplicate/capture aliases and resume GREEN"
+  IO.println "protected named recursive loops contracts: same recursive Tree consumers, nested loops/break/continue/return, condition/key/RHS/body first faults, raw duplicate/capture snapshots and resume GREEN"
 
 end Tests.SourceCoreProtectedNamedLoops

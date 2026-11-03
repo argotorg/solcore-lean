@@ -151,7 +151,8 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 include profile owners member complete wellFormed runtime covers in
 /-- Actual admitted caller capture and one original formation prove the
-ordinary native-qualified lambda leaf at its unchanged canonical packet. -/
+ordinary native-qualified lambda leaf at its canonical packet, transported to
+the formed state that holds the copies of the captured cells. -/
 theorem preserves_at (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge model context evidence (source caller.named)
       (Lambdas selected root expressionSyntax headers (context := context) (evidence := evidence) (scope := scope) children) faults size := by
@@ -168,8 +169,9 @@ theorem preserves_at (size : Nat) :
       expressionSyntax (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) caller.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
-    have qualified : (nativeFacet).ordinary code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory environment
+    have qualified : ∀ copies, (nativeFacet).ordinary (code.recapture copies) (support.recapture copies) :=
+      fun copies => CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled)
+        member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory copies
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=
@@ -187,7 +189,7 @@ theorem preserves_at (size : Nat) :
         context evidence (source caller.named) environment before code.id outcome after := by
       rw [identifier]
       exact trace
-    obtain ⟨result, finalStore, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
+    obtain ⟨result, finalStore, evaluated, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, post, _member⟩ :=
       CallableIndexedOwnedPreparedFunctionModelFormationBounds.Ordinary.preserves_at
         (compiled := compiled) (headers := headers) (keys := keys)
@@ -201,7 +203,7 @@ theorem preserves_at (size : Nat) :
         (lift := fun member => .closure
           (CallableIndexedOwnedPreparedPositiveFunctionOrigins.closure_of_direct owners member))
         (support := support) (qualified := qualified)
-        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.ordinary_prepared (compiled := compiled) (headers := headers) (code := code) (support := support) qualified)
+        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.ordinary_prepared (compiled := compiled) (headers := headers) (code := code) (support := support) (qualified environment))
         (initial := initial.1) (packet := initial.2)
         (prefixContext := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Ordinary.captured_prefix
           owner complete environments agrees typed caller initial.1 initial.2)
@@ -210,7 +212,7 @@ theorem preserves_at (size : Nat) :
         (cells := heaps) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
         (typed := codeTyped) (sourceType := sourceType) (ordinary := ordinary) (coercions := coercions)
         (admitted := admitted) codeTrace
-    refine ⟨result, finalStore, mapping, world, ?_, ?_, finalHeaps, maps, worlds, frame, metadata,
+    refine ⟨result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, metadata,
       reached, related, ?_⟩
     · simpa only [emitted, sameEmbedding] using evaluated
     · simpa only [sameNode, emitted] using represented
@@ -237,8 +239,9 @@ theorem reflects_at (size : Nat) :
       expressionSyntax (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) caller.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
-    have qualified : (nativeFacet).ordinary code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory environment
+    have qualified : ∀ copies, (nativeFacet).ordinary (code.recapture copies) (support.recapture copies) :=
+      fun copies => CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled)
+        member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory copies
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=
@@ -254,8 +257,8 @@ theorem reflects_at (size : Nat) :
     rw [← receipt.sourceNodeEq] at coercions
     have codeCompleted : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) result finalStore := by
       simpa only [emitted, sameEmbedding] using completed
-    obtain ⟨sourceSize, outcome, after, sourceTrace, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
-        reached, related, post, _member⟩ :=
+    obtain ⟨sourceSize, outcome, after, sourceTrace, evaluated, finalMap, finalWorld, represented, finalHeaps, maps,
+        worlds, frame, metadata, reached, related, post, _member⟩ :=
       CallableIndexedOwnedPreparedFunctionModelFormationBounds.Ordinary.reflects_at
         (compiled := compiled) (headers := headers) (keys := keys)
         (function := closure caller.named parameters sourceResult statements context evidence environment)
@@ -268,7 +271,7 @@ theorem reflects_at (size : Nat) :
         (lift := fun member => .closure
           (CallableIndexedOwnedPreparedPositiveFunctionOrigins.closure_of_direct owners member))
         (support := support) (qualified := qualified)
-        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.ordinary_prepared (compiled := compiled) (headers := headers) (code := code) (support := support) qualified)
+        (prepared := CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.ordinary_prepared (compiled := compiled) (headers := headers) (code := code) (support := support) (qualified environment))
         (initial := initial.1) (packet := initial.2)
         (prefixContext := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Ordinary.captured_prefix
           owner complete environments agrees typed caller initial.1 initial.2)
@@ -277,7 +280,7 @@ theorem reflects_at (size : Nat) :
         (cells := heaps) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
         (typed := codeTyped) (sourceType := sourceType) (ordinary := ordinary) (coercions := coercions)
         (admitted := admitted) codeCompleted
-    refine ⟨sourceSize, outcome, after, mapping, world, ?_, ?_, finalHeaps, maps, worlds, frame, metadata,
+    refine ⟨sourceSize, outcome, after, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, metadata,
       reached, related, ?_⟩
     · simpa only [identifier, closure] using sourceTrace
     · simpa only [sameNode, emitted] using represented

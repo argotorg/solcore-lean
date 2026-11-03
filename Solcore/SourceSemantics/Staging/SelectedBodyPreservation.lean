@@ -136,14 +136,15 @@ theorem body_success {size : Nat}
     heap_extends := allocate.extendsHeapTypes.trans preserved.heap_extends
   }
 
-/-- Closure invocation keeps every captured cell and the complete code and evidence
-receipt obtained from the typed callable. -/
+/-- Closure invocation copies every captured cell and keeps the complete code and
+evidence receipt obtained from the typed callable. -/
 theorem closure_success {size : Nat}
     (statementsIH : BodySuccessAt program registry size)
     {context : Context} {source : TypedSource} {child : Scope} {function : Dynamic.Closure}
-    {before bound after : Heap} {arguments : List Dynamic.Value} {packed value : Dynamic.Value}
+    {before copied bound after : Heap} {arguments : List Dynamic.Value} {packed value : Dynamic.Value}
     {parameterType resultType : Ty} {parameterTypes : List Ty}
-    {bodyContext finalContext : Context} {environment : Dynamic.Environment} {outcome : BodyOutcome}
+    {bodyContext finalContext : Context} {entry environment : Dynamic.Environment}
+    {outcome : BodyOutcome}
     (runtime : SourceRuntimeValid program context source)
     (beforeTyped : HeapWellTyped context before)
     (callableTyped : ValueHasType context before (.closure function) (.function parameterType resultType))
@@ -151,7 +152,8 @@ theorem closure_success {size : Nat}
     (selected : registry.Closure function child) (frame : ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters
       parameterTypes bodyContext)
-    (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : EnvironmentCopies function.source function.captured before entry copied)
+    (allocate : BindersAllocate entry copied function.parameters arguments environment bound)
     (body : Size.StatementsIn program registry true size child bodyContext environment bound
       function.body finalContext outcome after)
     (resultRule : BodyResult function.resultType outcome (.value value)) :
@@ -178,10 +180,12 @@ theorem closure_success {size : Nat}
     have argumentsLength : arguments.length =
         (function.parameters.map fun binder => binder.scheme.body).length := by
       simpa using allocate.length_eq.symm
-    have argumentsTyped := packing.unpackTypes closurePackedTyped argumentsLength
-    have boundTyped := allocate.preservesHeapTyping closureBeforeTyped argumentsTyped
+    have argumentsTyped := (packing.unpackTypes closurePackedTyped argumentsLength).mono
+      copy.metadata_extends
+    have boundTyped := allocate.preservesHeapTyping (closureBeforeTyped.copy copy) argumentsTyped
     have boundEnvironment := allocate.preservesEnvironmentAgreement
-      (monoBinders_toBinders staticParameters) (monoBinders_monomorphic staticParameters) captures
+      (monoBinders_toBinders staticParameters) (monoBinders_monomorphic staticParameters)
+      (copy.agrees captures)
     have fields := MonoBindersExtend.runtimeContextFields staticParameters
     have callClosed := fields.targetClosed code.closed
     have boundAtCall := boundTyped.transportClosed fields.signatures code.closed callClosed
@@ -211,7 +215,8 @@ theorem closure_success {size : Nat}
         runtime.closed (fields.targetVariablesClosed code.variables_closed) runtime.residual_variables_open
       heap_typed := preserved.heap_typed.transportClosed outerSignatures callClosed
         runtime.closed (fields.targetVariablesClosed code.variables_closed) runtime.residual_variables_open
-      heap_extends := allocate.extendsHeapTypes.trans preserved.heap_extends
+      heap_extends := copy.metadata_extends.trans
+        (allocate.extendsHeapTypes.trans preserved.heap_extends)
     }
 
 /-- The strict child is the actual selected body. Unselected original functions
@@ -255,10 +260,11 @@ theorem applies_step (selectedBodies : GlobalBodiesTyped program registry) (size
         rootsEq selected parameters allocate body resultRule
     · rcases staged with ⟨inner, impossible, innerTyped⟩
       cases impossible
-  | @closure bodySize scope context before bound after function arguments environment
+  | @closure bodySize scope context before copied bound after function arguments entry environment
       parameterTypes bodyContext finalContext child outcome result
-      selected frame parameters allocate body resultRule =>
+      selected frame parameters copy allocate body resultRule =>
     exact closure_success (statementsIH bodySize (Size.child_lt_stepSize (by simp)))
-      runtime beforeTyped callableTyped packing packedTyped selected frame parameters allocate body resultRule
+      runtime beforeTyped callableTyped packing packedTyped selected frame parameters copy allocate
+      body resultRule
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

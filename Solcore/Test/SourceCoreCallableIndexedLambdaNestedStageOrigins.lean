@@ -40,7 +40,8 @@ theorem recaptured_source
       (formed head environment).source ∧ NodeOccurrencesUnique (formed head environment).source :=
   CallableIndexedLambdaNestedStageOrigins.support_provenance compiled (actualSupport head environment)
 
-/-- The same formation evaluation and ValueRep also supply its stage origin. -/
+/-- The same formation evaluation and ValueRep, over the copies of the captured
+cells, also supply its stage origin. -/
 theorem formed_origin
     {caller : Header compiled.indexed.ancestry (.initial compiled.compatible.checked) compiled.indexed.layouts.definitions program}
     {rank : Nat} {source : TypedSource} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -61,17 +62,19 @@ theorem formed_origin
       mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
-    ∃ value,
+    (heaps : GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (F profile))
+      mapping world heap store) :
+    ∃ value captured finalHeap finalStore finalMap finalWorld,
       Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-        environment heap id (.closure (formed head environment)) heap ∧
-      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) store ∧
-      ValueRep compiled.compatible.checked registry (F profile) mapping world head.code.sourceNode.type
-        (.closure (formed head environment)) value lowered.type ∧
-      CallableLedger.OriginRep sidecar.plan site.table (.closure (formed head environment)) value := by
-  obtain ⟨value, sourceValue, nativeValue, represented⟩ :=
-    formation head profile complete globals slots entry related agrees typed stored
-  exact ⟨value, sourceValue, nativeValue, represented,
+        environment heap id (.closure (formed head captured)) finalHeap ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) finalStore ∧
+      ValueRep compiled.compatible.checked registry (F profile) finalMap finalWorld head.code.sourceNode.type
+        (.closure (formed head captured)) value lowered.type ∧
+      CallableLedger.OriginRep sidecar.plan site.table (.closure (formed head captured)) value := by
+  obtain ⟨value, captured, finalHeap, finalStore, finalMap, finalWorld, sourceValue, _copy, nativeValue, represented,
+      _heaps, _maps, _worlds, _frame, _metadata⟩ :=
+    formation head profile complete globals slots entry related agrees typed heaps
+  exact ⟨value, captured, finalHeap, finalStore, finalMap, finalWorld, sourceValue, nativeValue, represented,
     CompatibleAmbientStageOrigins.related_origin
       (CallableIndexedLambdaNestedStageOrigins.function_origins compiled profile samePlan sameTable)
       represented (.closure _)⟩

@@ -86,7 +86,7 @@ theorem Context.collected {executionFuel outputFuel : Nat}
     pair_selected typeEq valueEq selectedLeaves
   subst entries
   let shape := context.selected.make_shape observed.makeShape
-  let captured := inputEnvironment shape.principal.input ⟨[]⟩
+  let captured := snapshotEnvironment shape.principal.input ⟨[]⟩ .bool (.bool true)
   refine ⟨⟨_,retained,CellAwareMaterializedRetainedEntries.Retained.of_selected
     (owner observed.fixture.original.recipe.compiled) materialized,?_,?_⟩⟩
   · exact ⟨⟨.function .word .word,

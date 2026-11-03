@@ -56,8 +56,9 @@ theorem source_parent_at_body (evidence : caller.function.evidence = [])
   | returned trace =>
     have body : RecursiveNamedLoopContracts.ExecutesAt size true _ _ _ _ _ _ _ _ _ _ :=
       .control (by simpa only [atHeader.context, atHeader.source, atHeader.statements, evidence] using trace)
-    obtain ⟨_, _initializerSize, parentSize, location, allocated, parentOutcome, _initializer,
-      allocation, parent, sameControl, _initializerSmall, parentSmall⟩ := invert body
+    obtain ⟨_, _initializerSize, parentSize, _captured, _copied, location, allocated, parentOutcome, copies,
+      _initializer, allocation, parent, sameControl, _initializerSmall, parentSmall⟩ := invert body
+    cases copies
     rw [← closureEq] at allocation
     cases parentOutcome with
     | value value => cases sameControl; exact ⟨parentSize, location, allocated, allocation, parent, parentSmall⟩
@@ -65,8 +66,9 @@ theorem source_parent_at_body (evidence : caller.function.evidence = [])
   | fault trace =>
     have body : RecursiveNamedLoopContracts.ExecutesAt size true _ _ _ _ _ _ _ _ _ _ :=
       .fault (by simpa only [atHeader.context, atHeader.source, atHeader.statements, evidence] using trace)
-    obtain ⟨_, _initializerSize, parentSize, location, allocated, parentOutcome, _initializer,
-      allocation, parent, sameControl, _initializerSmall, parentSmall⟩ := invert body
+    obtain ⟨_, _initializerSize, parentSize, _captured, _copied, location, allocated, parentOutcome, copies,
+      _initializer, allocation, parent, sameControl, _initializerSmall, parentSmall⟩ := invert body
+    cases copies
     rw [← closureEq] at allocation
     cases parentOutcome with
     | value _ => cases sameControl
@@ -75,8 +77,8 @@ theorem source_parent_at_body (evidence : caller.function.evidence = [])
   | escaped trace escape =>
     have body : RecursiveNamedLoopContracts.ExecutesAt size true _ _ _ _ _ _ _ _ _ _ :=
       .control (by simpa only [atHeader.context, atHeader.source, atHeader.statements, evidence] using trace)
-    obtain ⟨_, _initializerSize, _parentSize, _location, _allocated, parentOutcome, _initializer,
-      _allocation, _parent, sameControl, _initializerSmall, _parentSmall⟩ := invert body
+    obtain ⟨_, _initializerSize, _parentSize, _captured, _copied, _location, _allocated, parentOutcome, _copies,
+      _initializer, _allocation, _parent, sameControl, _initializerSmall, _parentSmall⟩ := invert body
     rcases escape with ⟨_, same⟩ | ⟨_, same⟩ <;> cases parentOutcome <;> rw [same] at sameControl <;> cases sameControl
 
 variable
@@ -269,7 +271,7 @@ theorem reflects_body (evidence : caller.function.evidence = []) (budget : Nat)
   subst finalStore
   obtain ⟨sourceSize, sourceBody, _sourceParentSmall⟩ :=
     SourceCoreChosenOrdinaryAcceptedOuterSourceConstruction.body_trace_at_header fixture atHeader chosen.chosen typing
-      evidence allocatedSource parentTrace
+      evidence (.nil before) allocatedSource parentTrace
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceBody,
     body_post_of_parent fixture atHeader typing inventory root chosen outer owner initial packet reached related maps worlds
       allocationFrame allocationMetadata post⟩

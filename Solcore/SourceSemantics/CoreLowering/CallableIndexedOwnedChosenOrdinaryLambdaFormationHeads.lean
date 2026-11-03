@@ -113,33 +113,29 @@ theorem preserves_head_at (size : Nat) :
         code.id code.sourceNode.type := by
       simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, sameSource, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, Formation.function,
         CallableIndexedLambdaGeneration.closure, recaptureCode, head.produced.identifier] using typed
-    obtain ⟨result, finalStore, native, represented, finalHeaps, maps, worlds, frame, metadata,
+    obtain ⟨result, finalStore, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, post⟩ :=
       CallableIndexedOwnedPreparedOrdinaryLambdaFormation.preserves_at_with_member
         (function := head.function environment) (actual := actual)
         captured code support owner initial.val initial.property profile observed functions
         wellFormed (by simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, sameSource, Formation.function, CallableIndexedLambdaGeneration.closure] using runtime) covers locals actualTyped head.sourceType
-        head.ordinary head.coercions heaps admitted
-        (fun nativeTyped =>
-          let history : History code := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
-            captured code support owner initial.val initial.property
+        (head.snapshots environment) head.ordinary head.coercions heaps admitted
+        (fun formed nativeTyped =>
+          let formedIndex := CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt formed.captured formed.captures rfl
           have positive : CallableIndexedOwnedChosenOrdinaryStoredMembers.ChosenAt
-              root expressionSyntax headers keys registry faults i history := by
-            exact .ordinary owner (.formed receipt chosen environment originalCapture rfl)
-              (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin
-                captured code support owner initial.val initial.property) rfl observed
-              (by
-                change code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length
-                exact CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index captured code support)
-              (by simpa only [i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, captured, code, head, history, CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at] using nativeTyped)
-          by simpa only [i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, captured, code, head, history, CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at] using members i history positive) original
+              root expressionSyntax headers keys registry faults formedIndex formed.closureHistory :=
+            .ordinary owner (.formed receipt chosen formed.captured formed.captures rfl)
+              ⟨(CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin
+                captured code support owner initial.val initial.property).metadata⟩ rfl (observed.of_slots formed.slots)
+              (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index captured code support) nativeTyped
+          members formedIndex formed.closureHistory positive) original
     have native : Evaluates actual store (lowered.expression.rename ξ) result finalStore := by
       simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, recaptureCode, head.produced.emitted, captured, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index,
         CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, originalCapture, captures_for] using native
     have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-        mapping world code.sourceNode.type lowered.type faults outcome result := by
+        finalMap finalWorld code.sourceNode.type lowered.type faults outcome result := by
       simpa only [head, receipt.formation.produced.emitted, model, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, recaptureCode, head.produced.emitted] using represented
-    exact ⟨result, finalStore, mapping, world, native, represented, finalHeaps, maps, worlds, frame, metadata,
+    exact ⟨result, finalStore, finalMap, finalWorld, native, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩
 
 include profile members complete globals slots prefixZero wellFormed runtime covers sameSource in
@@ -183,34 +179,30 @@ theorem reflects_head_at (size : Nat) :
     have actualCompleted : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) value finalStore := by
       simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, recaptureCode, head.produced.emitted, captured, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index,
         CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, originalCapture, captures_for] using completed
-    obtain ⟨sourceSize, outcome, after, trace, native, represented, finalHeaps, maps, worlds, frame, metadata,
+    obtain ⟨sourceSize, outcome, after, trace, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
         reached, related, post⟩ :=
       CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reflects_at_with_member
         (function := head.function environment) (actual := actual)
         captured code support owner initial.val initial.property profile observed functions
         wellFormed (by simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, sameSource, Formation.function, CallableIndexedLambdaGeneration.closure] using runtime) covers locals actualTyped head.sourceType
-        head.ordinary head.coercions heaps admitted
-        (fun nativeTyped =>
-          let history : History code := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
-            captured code support owner initial.val initial.property
+        (head.snapshots environment) head.ordinary head.coercions heaps admitted
+        (fun formed nativeTyped =>
+          let formedIndex := CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt formed.captured formed.captures rfl
           have positive : CallableIndexedOwnedChosenOrdinaryStoredMembers.ChosenAt
-              root expressionSyntax headers keys registry faults i history := by
-            exact .ordinary owner (.formed receipt chosen environment originalCapture rfl)
-              (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin
-                captured code support owner initial.val initial.property) rfl observed
-              (by
-                change code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length
-                exact CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index captured code support)
-              (by simpa only [i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, captured, code, head, history, CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at] using nativeTyped)
-          by simpa only [i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at, captured, code, head, history, CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at] using members i history positive) actualCompleted
+              root expressionSyntax headers keys registry faults formedIndex formed.closureHistory :=
+            .ordinary owner (.formed receipt chosen formed.captured formed.captures rfl)
+              ⟨(CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin
+                captured code support owner initial.val initial.property).metadata⟩ rfl (observed.of_slots formed.slots)
+              (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index captured code support) nativeTyped
+          members formedIndex formed.closureHistory positive) actualCompleted
     have sourceTrace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         context evidence source environment before id outcome after := by
       simpa only [head, receipt.formation.produced.identifier, receipt.formation.produced.emitted, sameSource, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, Formation.function,
         CallableIndexedLambdaGeneration.closure, recaptureCode, head.produced.identifier] using trace
     have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-        mapping world code.sourceNode.type lowered.type faults outcome value := by
+        finalMap finalWorld code.sourceNode.type lowered.type faults outcome value := by
       simpa only [head, receipt.formation.produced.emitted, model, code, i, CallableIndexedOwnedChosenOrdinaryFormedMembers.index, Formation.code, recaptureCode, head.produced.emitted] using represented
-    exact ⟨sourceSize, outcome, after, mapping, world, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
+    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩
 
 

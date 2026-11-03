@@ -241,6 +241,8 @@ theorem post_correct (budget : Nat)
       remaining allocated tailIH =>
     intro covered members control context final signatures typed native
     obtain ⟨mono, covered⟩ := covered
+    have monomorphic : binder.scheme.quantified.isEmpty = true := by rw [mono]; rfl
+    rw [if_pos monomorphic] at allocated
     cases typed with
     | @cons _ _ middle _ _ _ headTyped restTyped =>
     have typedInitializer : ExpressionHasType index.source context expression binder.scheme.body ∧
@@ -496,6 +498,8 @@ theorem initial_correct (budget : Nat)
       remaining allocated tailIH =>
     intro covered members context signatures typed native
     obtain ⟨mono, covered⟩ := covered
+    have monomorphic : binder.scheme.quantified.isEmpty = true := by rw [mono]; rfl
+    rw [if_pos monomorphic] at allocated
     cases typed with
     | @cons _ _ middle _ _ _ headTyped restTyped =>
     have typedInitializer : ExpressionHasType index.source context expression binder.scheme.body ∧

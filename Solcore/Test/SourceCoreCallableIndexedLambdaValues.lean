@@ -24,25 +24,34 @@ theorem anonymous_comparison {checked : SourceCoreCompatibleCatalog.Checked} (pr
   | false => exact evaluated
   | true => have impossible := (equivalent.mp rfl).2; cases impossible
 
-/-- The completion is consumed after the actual renamed formation code, with
-source captures and both full worlds retained. No body execution is supplied. -/
+/-- The completion is consumed after the actual renamed formation code, which
+first copies the captured cells of the creation environment, with source
+captures and both full worlds retained. The completed store is the formed one,
+and the source lambda forms the same closure over the same copies. No body
+execution is supplied. -/
 theorem completed_source {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap}
-    {world : StoreTyping} {actual : Core.Environment}
-    (captured : Captures prepared mapping world scope function.captured actual)
+    {world : StoreTyping} {actual : Core.Environment} {environment : Dynamic.Environment}
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog checked.catalog) projects
+      prepared.layouts.definitions}
+    (captured : Captures prepared mapping world scope environment actual)
     (code : Code prepared function scope captured.administrative) (history : History code)
+    (copied : code.policy.snapshotLambda code.id = true)
+    (referenceIndex : code.referenceIndex = scope.length + 1 + prepared.base.globals.length)
     (program : SourceSemantics.Program) (heap : Dynamic.Heap)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = [])
     {before after : Store} {location : Location} {result : Core.Value}
-    (stored : RuntimeStoreHasTypes world before prepared.layouts.definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world heap before)
     (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
     (read : before.read? location = some (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame history.native))
     (completed : Evaluates actual before (code.lowered.expression.rename captured.embedding) result after) :
-    after = before ∧ Dynamic.ExpressionEvaluates program function.context function.evidence function.source
-      function.captured heap code.id (.closure function) heap := by
-  have reflected := reflects captured code history program heap ordinary coercions stored reference read completed
-  exact ⟨reflected.2.1, reflected.2.2.1⟩
+    ∃ formed : Formed model captured code history heap before location,
+      after = formed.finalStore ∧ Dynamic.ExpressionEvaluates program function.context function.evidence
+        function.source environment heap code.id (.closure formed.closure) formed.finalHeap := by
+  obtain ⟨formed⟩ := formation captured code history copied referenceIndex heaps reference read
+  exact ⟨formed, (formed.reflects completed).2, formed.source program ordinary coercions⟩
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
@@ -123,7 +132,8 @@ def run : IO Unit := do
             (.apply (.second (.first (.var 0))) (.word (word 20)))
           match runStateful 100000 (.initial applyTwice [right, left] store) with
           | .done (.inRight .word (.pair (.word first) (.word second))) finalStore =>
-            SourceCompilerFeatureSupport.require (first == word 13 && second == word 33) "shared captured source cell stopped aliasing"
+            SourceCompilerFeatureSupport.require (first == word 13 && second == word 23)
+              "a call of the returned lambda did not restart from its creation-time seed"
             SourceCompilerFeatureSupport.require (finalStore[0]? == some (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame .empty))
               "lambda invocation did not restore its caller"
           | other => throw (IO.userError s!"lambda native reuse {reprStr other}")

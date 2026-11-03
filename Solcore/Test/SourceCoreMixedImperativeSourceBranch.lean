@@ -56,9 +56,9 @@ theorem Shape.branch_trace {program : SourceSemantics.Program} {source : TypedSo
       obtain ⟨discardContext,_,_,discardTyped,_⟩ := head_tail discardTypedList
       obtain ⟨gTrace,gState,gStored,gExtended⟩ := generalized_step shape.g shape.gLet state wellFormed gTyped
       let gHeap := identityHeap shape.g context environment before
-      have gAppended : HeapAppends before gHeap := ⟨_,rfl⟩
-      have fAtG := (fStored.mono gAppended).under shape.g.binder ⟨before.cells.length⟩ shape.gF gExtended
-      have firstAtG := (firstStored.mono gAppended).under ⟨before.cells.length⟩ shape.gFirst
+      have gAppended : HeapAppends before gHeap := identityHeap_appends shape.g context environment before
+      have fAtG := (fStored.mono gAppended).under shape.g.binder (identityLocation source environment before) shape.gF gExtended
+      have firstAtG := (firstStored.mono gAppended).under (identityLocation source environment before) shape.gFirst
       have chosenInitializer := initializer_typed shape.chosenLet state.runtime.graph.nodeOccurrencesUnique
         (by rw [shape.chosenScheme]; rfl) chosenTyped
       obtain ⟨middle,chosenCallTrace,chosenCallAppend⟩ := gStored.invoke gState wellFormed shape.chosenCall (.inl rfl)

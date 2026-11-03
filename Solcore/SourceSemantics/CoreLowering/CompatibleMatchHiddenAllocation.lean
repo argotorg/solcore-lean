@@ -77,7 +77,7 @@ theorem preserves_cells_with_state {layouts : SourceCoreAllocationLayouts.Prepar
       (ordinaryCells.inject (GenericHeap.CellRepresents.initialized represented)) (.ordinary allocated) initial ready
   refine ⟨captured, CallableIndexedAllocationRenaming.transport allocation annotation same (Or.inr rfl)
     evaluated (agrees.lift value),
-    .internal nextReference (environments.fresh_absent fresh) (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩),
+    .internal nextReference.typed (environments.fresh_absent fresh) (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩),
     nextHeaps, preserved, ?_, transition⟩
   simp [Store.read?]
 

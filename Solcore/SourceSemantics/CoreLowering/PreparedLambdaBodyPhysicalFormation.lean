@@ -5,7 +5,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 
 /-! Actual formation attaches the full captured slot receipt to the same Code,
 history and original Source origin. The capture proof is supplied by the real
-input environment before the freshly formed value enters the positive model. -/
+input environment before the freshly formed value enters the positive model.
+The formation copies the captured cells, and the copies keep every global slot. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.PreparedLambdaBodyPhysicalFormation
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
@@ -17,6 +18,28 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
   {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
+
+/-- The prepared seed of a code is the seed of the same code over other
+captures. -/
+theorem prepared_recapture {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {support : Support code} (prepared : PreparedAt code support) (environment : Dynamic.Environment) :
+    PreparedAt (code.recapture environment) (support.recapture environment) := by
+  cases prepared with
+  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView bodyReasons declarations _ =>
+    exact .recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView bodyReasons declarations environment
+
+/-- A prepared code is the lambda of a Site, which copies its captures. -/
+theorem prepared_snapshots {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {support : Support code} (prepared : PreparedAt code support) :
+    code.policy.snapshotLambda code.id = true := by
+  cases prepared with
+  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView bodyReasons declarations environment =>
+    exact site.snapshots
 
 section Formation
 variable {scope : SourceCoreLocalCell.Scope} {actual canonical : Environment}
@@ -57,21 +80,29 @@ theorem reference_index : code.referenceIndex = scope.length + 1 + compiled.inde
 include profile prefixContext observed provenance allSlots callerReceipt in
 /-- One original contextual formation retains its complete traces and
 represented value, plus the same static member for later initialized reads.
-The factory is used once, without an escaped-token hypothesis. -/
+The factory is used once, without an escaped-token hypothesis. The member is
+the formed closure over the copies of its captured cells. -/
 theorem formation_member
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
-      finalStore = store) ∧
-    CallableIndexedOwnedPreparedPhysicalClosureAssociation.StaticMember headers keys registry faults mapping world function
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore := by
+    ∃ formed : Formed model captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) ∧
+      CallableIndexedOwnedPreparedPhysicalClosureAssociation.StaticMember headers keys registry faults formed.finalMap
+        formed.finalWorld formed.closure
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore := by
   let history := history_at captured code support owner initial packet
   have reference : captured.canonical[code.referenceIndex]? =
       some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
@@ -82,15 +113,16 @@ theorem formation_member
     have actualRead := (initial.rows owner.position).authority.frame.read
     rw [(initial.rows owner.position).frame_eq] at actualRead
     exact actualRead
-  obtain ⟨sourceTrace, nativeTrace, represented⟩ := CallableIndexedLambdaValues.formation
-    captured code history (Program.ofChecked compiled.sourceProgram) heap ordinary coercions stored reference read
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation captured code history (prepared_snapshots provenance)
+    (reference_index captured code support) heaps reference read
   have typed := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
-    (registry := registry) represented
-  exact ⟨sourceTrace, nativeTrace,
-    (fun _ _ completed => Core.evaluation_deterministic completed nativeTrace),
-    ⟨.preparedBranching owner captured code history support
-      (source_origin captured code support owner initial packet) prefixContext observed
-      (reference_index captured code support) typed provenance allSlots callerReceipt⟩⟩
+    (registry := registry) (formed.represents heaps.runtime_hasTypes)
+  exact ⟨formed, formed.source _ ordinary coercions, formed.evaluated,
+    (fun _ _ completed => Core.evaluation_deterministic completed formed.evaluated),
+    ⟨.preparedBranching (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (support.recapture formed.captured) ⟨(source_origin captured code support owner initial packet).metadata⟩
+      prefixContext (observed.of_slots formed.slots) (reference_index captured code support) typed
+      (prepared_recapture provenance formed.captured) (allSlots.of_slots formed.slots) callerReceipt⟩⟩
 
 end Formation
 

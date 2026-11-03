@@ -491,20 +491,21 @@ mutual
           (.conditional condition thenBranch elseBranch) requirements coercions
           value after
     | lambda
-        {context evidence source environment heap parameters returnType body
-          requirements coercions}
-        (layout : OrdinaryRequirementLayout requirements coercions []) :
-        ExpressionFormEvaluates program context evidence source environment heap
+        {context evidence source environment before after captured parameters
+          returnType body requirements coercions}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (snapshot : EnvironmentCopies source environment before captured after) :
+        ExpressionFormEvaluates program context evidence source environment before
           (.lambda parameters returnType body) requirements coercions
           (.closure {
             parameters := parameters
             resultType := returnType
             body := body
             source := source
-            captured := environment
+            captured := captured
             context := context
             evidence := evidence
-          }) heap
+          }) after
     | directCall
         {context evidence source environment before argumentsHeap after
           callee arguments instantiation requirements coercions argumentValues
@@ -808,14 +809,15 @@ mutual
         CallableApplies program context callerEvidence invocationEvidence before
           (.global function) arguments result after
     | closure
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment outcome result parameterTypes callContext
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment outcome result parameterTypes callContext
           finalContext}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program callContext function.evidence
           function.source environment bound function.body finalContext outcome after)
@@ -823,14 +825,15 @@ mutual
         CallableApplies program context callerEvidence invocationEvidence before
           (.closure function) arguments result after
     | closureUnit
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment outcome parameterTypes callContext finalContext}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment outcome parameterTypes callContext finalContext}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (result_unit : function.resultType = .unit)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program callContext function.evidence
           function.source environment bound function.body finalContext outcome after)
@@ -903,15 +906,16 @@ mutual
         StatementExecutes program context evidence source environment before id
           finalContext (.fallthrough ((binder.id, location) :: environment)) after
     | letInitializedGeneralized
-        {context finalContext evidence source environment before after id node binder
-          initializer function location}
+        {context finalContext evidence source environment before middle after id node
+          binder initializer captured function location}
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder (some initializer))
-        (captures : GeneralizedClosureCaptures context source environment binder
+        (snapshot : EnvironmentCopies source environment before captured middle)
+        (captures : GeneralizedClosureCaptures context source captured binder
           initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends source.owner context binder finalContext)
-        (allocate : Heap.AllocatesGeneralized before function location after) :
+        (allocate : Heap.AllocatesGeneralized middle function location after) :
         StatementExecutes program context evidence source environment before id
           finalContext (.fallthrough ((binder.id, location) :: environment)) after
     | returnUnit
@@ -1183,13 +1187,14 @@ mutual
           (.letDecl binder (some initializer)) finalContext
           ((binder.id, location) :: environment) after
     | letInitializedGeneralized
-        {context finalContext evidence source environment before after binder
-          initializer function location}
-        (captures : GeneralizedClosureCaptures context source environment binder
+        {context finalContext evidence source environment before middle after binder
+          initializer captured function location}
+        (snapshot : EnvironmentCopies source environment before captured middle)
+        (captures : GeneralizedClosureCaptures context source captured binder
           initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends source.owner context binder finalContext)
-        (allocate : Heap.AllocatesGeneralized before function location after) :
+        (allocate : Heap.AllocatesGeneralized middle function location after) :
         ForItemExecutes program context evidence source environment before
           (.letDecl binder (some initializer)) finalContext
           ((binder.id, location) :: environment) after

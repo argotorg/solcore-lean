@@ -1,8 +1,9 @@
 import Solcore.Test.SourceCompilerFeatureSupport
 
-/-! Actual checked local polymorphic lambdas run through Core. Every concrete
-instance captures the original lexical cells, and nested choices retain their
-full cumulative contexts. -/
+/-! Actual checked local polymorphic lambdas run through Core. A generalized
+local copies its lexical cells once, every concrete instance shares that
+snapshot, and each call starts again from it; nested choices retain their full
+cumulative contexts. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreLocalPolymorphicExecution
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -24,7 +25,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function recursiveContext(flag: Bool) returns (Word, Bool) { let outer = lam(value) { let middle = lam(item) { let inner = lam(innerValue) { return identity(innerValue); }; return inner(item); }; return middle(value); }; return (outer(15), outer(flag)); }",
     "function sameInnerType(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; return (outer(1), outer(flag)); }",
     "function dependentInner(flag: Bool) returns ((Word, Word), (Bool, Bool)) { let outer = lam(value) { let inner = lam(item) { return (value, item); }; return inner(value); }; return (outer(1), outer(flag)); }",
-    "function sharedCapture(flag: Bool) returns (Word) { let total: Word = 0; let f = lam(item) { total += 1; return item; }; f(1); f(flag); f(2); return total; }",
+    "function repeatedCapture(flag: Bool) returns (Word) { let total: Word = 0; let f = lam(item) { total += 1; return item; }; f(1); f(flag); f(2); return total; }",
     "function unused() returns (Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(value); }; return 9; }",
     "enum Box<T> { Full(T) }",
     "function intermediate(flag: Bool) returns (Word, Bool) { let f = lam(item) { let box = Box.Full(item); match (box) { case .Full(value) { return value; } } }; return (f(17), f(flag)); }"
@@ -45,13 +46,14 @@ def run : IO Unit := do
   for flag in [true, false] do
     check program "qualified" [.bool flag] (.product (.word (w 19)) (.bool flag))
     check program "qualifiedNested" [.bool flag] (.product (.word (w 1)) (.word (w 1)))
-    check program "qualifiedCapture" [.bool flag] (.word (w 2))
+    -- Each instance call assigns only its own copy of the captured counter.
+    check program "qualifiedCapture" [.bool flag] (.word (w 0))
     check program "local" [.bool flag] (.product (.word (w 11)) (.bool flag))
     check program "nested" [.bool flag] (.product (.word (w 13)) (.bool flag))
     check program "recursiveContext" [.bool flag] (.product (.word (w 15)) (.bool flag))
     check program "sameInnerType" [.bool flag] (.product (.word (w 1)) (.word (w 1)))
     check program "dependentInner" [.bool flag] (.product (.product (.word (w 1)) (.word (w 1))) (.product (.bool flag) (.bool flag)))
-    check program "sharedCapture" [.bool flag] (.word (w 3))
+    check program "repeatedCapture" [.bool flag] (.word (w 0))
     check program "intermediate" [.bool flag] (.product (.word (w 17)) (.bool flag))
   check program "unused" [] (.word (w 9))
   let seeds ← ["qualifiedMaker", "useFunction"].mapM fun name => do
@@ -72,9 +74,9 @@ def run : IO Unit := do
           unless first.value == .word (w 11) do throw (IO.userError "qualified closure lost its capture or globals")
           match ← first.session.run consumer [made.value, .word (w 2)] {executionFuel := 300000} with
           | .ok (.succeeded second) =>
-              unless second.value == .word (w 12) do throw (IO.userError "qualified closure lost mutation across calls")
+              unless second.value == .word (w 11) do throw (IO.userError "qualified closure call did not restart from its captured seed")
           | _ => throw (IO.userError "qualified closure second invocation failed")
       | _ => throw (IO.userError "qualified closure invocation failed")
   | _ => throw (IO.userError "qualified closure export failed")
-  IO.println "actual Core local polymorphism and qualified shared captures GREEN"
+  IO.println "actual Core local polymorphism and qualified by-value captures GREEN"
 end Tests.SourceCoreLocalPolymorphicExecution

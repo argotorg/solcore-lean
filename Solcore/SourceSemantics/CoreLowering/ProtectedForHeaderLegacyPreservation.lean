@@ -159,7 +159,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return_reachable
               (.cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2))) tailReturn⟩, tailReady, ?_⟩
           rw [sequence_rename]
           exact (ContinuationAgreement.bind initialEval).trans ((ContinuationAgreement.letE allocationEval).trans agreement)
-      | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+      | letInitializedGeneralized _ captures poly other allocated => exact False.elim (poly mono)
   | @discard context scope expression expressionNode rest lowered body found child remaining _remainingErrors ih =>
     have itemFact := sites.head itemsFacts
     cases trace with | cons first rest =>

@@ -224,7 +224,7 @@ structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgra
     (RecursiveStageRegistry.scope wordStages.sidecar [] support.wordHeader.header.function)
   secondReadMeaning : CallMeaning thirdMeaning.after support.useBoolHeader.header (.bool false) sequence.secondRead [secondMeaning.entry.source]
     (RecursiveStageRegistry.scope useBoolStages.sidecar [] support.useBoolHeader.header.function)
-  repeatedReadMeaning : CallMeaning secondReadMeaning.after support.useWordHeader.header (.word (Core.Word.ofNatModulo 33)) sequence.repeatedRead [firstEntry.source]
+  repeatedReadMeaning : CallMeaning secondReadMeaning.after support.useWordHeader.header (.word seed) sequence.repeatedRead [firstEntry.source]
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
   thirdReadMeaning : CallMeaning repeatedReadMeaning.after support.useWordHeader.header (.word (Core.Word.ofNatModulo 55)) sequence.thirdRead [thirdMeaning.entry.source]
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
@@ -270,7 +270,7 @@ theorem sequence_meaning {fixture : CompiledFixture} {observed : ObservedProgram
     (by simp) second.entryType second.handleEq false sequence.secondRead sequence.secondValue useBoolStages
     (RecursiveStageRegistry.scope useBoolStages.sidecar [] support.useBoolHeader.header.function)
   obtain ⟨repeatedRead⟩ := RetainedState.useWord_meaning support sources bodies methods secondRead.after firstEntry
-    (by simp) firstType firstHandle (Core.Word.ofNatModulo 33) sequence.repeatedRead sequence.repeatedValue useWordStages
+    (by simp) firstType firstHandle seed sequence.repeatedRead sequence.repeatedValue useWordStages
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
   obtain ⟨thirdRead⟩ := RetainedState.useWord_meaning support sources bodies methods repeatedRead.after third.entry
     (by simp) third.entryType third.handleEq (Core.Word.ofNatModulo 55) sequence.thirdRead sequence.thirdValue useWordStages

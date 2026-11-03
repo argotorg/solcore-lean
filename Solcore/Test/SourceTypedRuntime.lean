@@ -569,10 +569,14 @@ private def testAssignmentsMappingsAndControl
 
 private def testClosuresOrderProxyAndFuel
     (program : CheckedProgram) : IO Unit := do
+  /- Closures capture by value: `read` keeps the 1 it captured, and the later
+  assignment of 9 does not reach it. -/
   let capture ← prepareNamed program "sharedCapture"
-  expectWord "shared-cell closure capture" 9 (← runPrepared capture)
+  expectWord "creation-time closure capture" 1 (← runPrepared capture)
+  /- Each closure call writes only its own copy of `order`, which stays 0, so
+  this result no longer tells the index call from the RHS call. -/
   let order ← prepareNamed program "assignmentOrder"
-  expectWord "assignment target-before-RHS order" 1207
+  expectWord "assignment through index and RHS closure calls" 7
     (← runPrepared order [] 300000)
   let proxy ← prepareNamed program "proxyValue"
   expectProxyWord "proxy value" (← runPrepared proxy)

@@ -80,32 +80,34 @@ def CaptureShape.value {source : TypedSource} (shape : CaptureShape source)
 theorem MakeShape.body_trace {source : TypedSource} (shape : MakeShape source)
     {program : SourceSemantics.Program} {context next : SourceSemantics.Context}
     (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    {captured : Dynamic.Environment} {middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (extended : BinderExtends source.owner context shape.principal.binder next)
     (fields : Dynamic.RuntimeContextFields context next)
     (wellformed : SchemeWellFormed next shape.principal.binder.scheme)
     (word : TypeWellFormed next .word) (boolean : TypeWellFormed next .bool) :
     Dynamic.FunctionStatementsExecute program context evidence source environment before
       [shape.principal.initialized.id,shape.returned.id] next
-      (.returned (shape.value context environment evidence))
-      (shape.principal.allocatedHeap context environment before) := by
-  let heap := shape.principal.allocatedHeap context environment before
-  let locals := (shape.principal.binder.id,⟨before.cells.length⟩) :: environment
-  have allocated : Dynamic.Heap.AllocatesGeneralized before (shape.principal.descriptor context environment)
-      ⟨before.cells.length⟩ heap := .append
-  have first := shape.principal.materializes (program := program) shape.wordRead environment locals
+      (.returned (shape.value context captured evidence))
+      (shape.principal.allocatedHeap context captured middle) := by
+  let heap := shape.principal.allocatedHeap context captured middle
+  let locals := (shape.principal.binder.id,⟨middle.cells.length⟩) :: environment
+  have allocated : Dynamic.Heap.AllocatesGeneralized middle (shape.principal.descriptor context captured)
+      ⟨middle.cells.length⟩ heap := .append
+  have first := shape.principal.materializes (program := program) shape.wordRead captured locals
     [(shape.principal.typeVariable,.word)] evidence [] Dynamic.Environment.LooksUp.head
     allocated.reads_new rfl fields (shape.instance evidence wellformed word)
-  have second := shape.principal.materializes (program := program) shape.boolRead environment locals
+  have second := shape.principal.materializes (program := program) shape.boolRead captured locals
     [(shape.principal.typeVariable,.bool)] evidence [] Dynamic.Environment.LooksUp.head
     allocated.reads_new rfl fields (shape.instance evidence wellformed boolean)
   have tuple : Dynamic.ExpressionEvaluates program next evidence source locals heap shape.tuple.id
-      (shape.value context environment evidence) heap := by
+      (shape.value context captured evidence) heap := by
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.tupleFound)
     · rw [shape.tupleForm]
       exact .tuple (by rw [shape.tupleRequirements,shape.tupleCoercions]; rfl)
         (.cons first (.cons second .nil)) (.cons (.singleton _))
     · rw [shape.tupleCoercions]; exact .nil
-  apply Dynamic.FunctionStatementsExecute.cons (shape.principal.initializes evidence environment before extended)
+  apply Dynamic.FunctionStatementsExecute.cons (shape.principal.initializes evidence snapshot extended)
   apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound shape.returnedFound)
   · intro expression impossible; rw [shape.returnedForm] at impossible; cases impossible
   · exact .returnValue (lookupStatement?_sound shape.returnedFound) shape.returnedForm tuple
@@ -113,22 +115,24 @@ theorem MakeShape.body_trace {source : TypedSource} (shape : MakeShape source)
 theorem CaptureShape.body_trace {source : TypedSource} (shape : CaptureShape source)
     {program : SourceSemantics.Program} {context next : SourceSemantics.Context}
     (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    {captured : Dynamic.Environment} {middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (extended : BinderExtends source.owner context shape.principal.binder next)
     (fields : Dynamic.RuntimeContextFields context next)
     (wellformed : SchemeWellFormed next shape.principal.binder.scheme)
     (boolean : TypeWellFormed next .bool) :
     Dynamic.FunctionStatementsExecute program context evidence source environment before
       [shape.principal.initialized.id,shape.returned.id] next
-      (.returned (shape.value context environment evidence))
-      (shape.principal.allocatedHeap context environment before) := by
-  let heap := shape.principal.allocatedHeap context environment before
-  let locals := (shape.principal.binder.id,⟨before.cells.length⟩) :: environment
-  have allocated : Dynamic.Heap.AllocatesGeneralized before (shape.principal.descriptor context environment)
-      ⟨before.cells.length⟩ heap := .append
-  have materialized := shape.principal.materializes (program := program) shape.read environment locals
+      (.returned (shape.value context captured evidence))
+      (shape.principal.allocatedHeap context captured middle) := by
+  let heap := shape.principal.allocatedHeap context captured middle
+  let locals := (shape.principal.binder.id,⟨middle.cells.length⟩) :: environment
+  have allocated : Dynamic.Heap.AllocatesGeneralized middle (shape.principal.descriptor context captured)
+      ⟨middle.cells.length⟩ heap := .append
+  have materialized := shape.principal.materializes (program := program) shape.read captured locals
     [(shape.principal.typeVariable,.bool)] evidence [] Dynamic.Environment.LooksUp.head
     allocated.reads_new rfl fields (shape.instance evidence wellformed boolean)
-  apply Dynamic.FunctionStatementsExecute.cons (shape.principal.initializes evidence environment before extended)
+  apply Dynamic.FunctionStatementsExecute.cons (shape.principal.initializes evidence snapshot extended)
   apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound shape.returnedFound)
   · intro expression impossible; rw [shape.returnedForm] at impossible; cases impossible
   · exact .returnValue (lookupStatement?_sound shape.returnedFound) shape.returnedForm materialized

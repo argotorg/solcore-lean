@@ -73,7 +73,8 @@ def native_admitted_entry
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq inputs.extended] using argumentsTyped
-  have allocated := entry.allocation.preservesHeapTyping beforeTyped rawArguments
+  have allocated := entry.allocation.preservesHeapTyping (beforeTyped.copy entry.copy)
+    (rawArguments.mono entry.copy.metadata_extends)
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   have heapTyped : Dynamic.HeapWellTyped inputs.context entry.heap :=
     allocated.transportClosed fields.signatures body.frame.code.closed (fields.targetClosed body.frame.code.closed)
@@ -126,7 +127,8 @@ theorem source_continuation (budget : Nat)
         captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
       (added : Environment) (_length : added.length = code.receipt.loweredParameters.length)
-      (_spine : entry.entry.canonical = added ++ captured.canonical)
+      (copied : Environment) (_spine : entry.entry.canonical = added ++ copied)
+      (_kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
       (reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩),
@@ -139,8 +141,8 @@ theorem source_continuation (budget : Nat)
         functions program (origins i) child)) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached
-  let selected := selection entry added length spine reached
+  intro entry added length copied spine kept reached
+  let selected := selection entry added length copied spine kept reached
   exact CallableIndexedOwnedParameterReadyContinuations.source_at
     (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable entry reached)
     wellFormed syntaxTree origins selected.val selected.property budget below

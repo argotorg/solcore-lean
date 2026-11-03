@@ -19,6 +19,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole program)}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
+  (bindings : ProtectedStateTransition.Bindings protocol)
   {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
     (CompatibleHeap.projects whole.compatible.checked.catalog) whole.indexed.layouts.definitions}
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
@@ -34,7 +35,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {faults : RecursiveStageMeaning.FaultRep}
 
 
-include record registered in
+include bindings record registered in
 theorem lifts
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
@@ -58,13 +59,13 @@ theorem lifts
   induction tree with
   | existing old =>
     cases modeEq
-    exact CellAwareLexicalSourceTreeLifting.lifts bridge compiled record producer registered children preservation sourceEq old issuer
+    exact CellAwareLexicalSourceTreeLifting.lifts bridge bindings compiled record producer registered children preservation sourceEq old issuer
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
-      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same remaining ih =>
+      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same captured copied remaining ih =>
     cases modeEq
-    exact CellAwareSourceGeneralizedPrefixLifting.generalized bridge compiled record producer registered
+    exact CellAwareSourceGeneralizedPrefixLifting.generalized bridge bindings compiled record producer registered
       (type := type) (body := body) found form declaration polymorphic extended ordinary initializerFound initializerForm
-      valueType requirements coercions site initial nativeTyped allocation annotation same sourceEq issuer (ih rfl)
+      valueType requirements coercions site initial nativeTyped allocation annotation same copied sourceEq issuer (ih rfl)
   | @initialized context nextContext scope mode id node binder initializer initializerNode rest expected type lowered body
       found form member mono extended ordinary initializerFound valueType typed certified allocation annotation same remaining ih =>
     cases modeEq

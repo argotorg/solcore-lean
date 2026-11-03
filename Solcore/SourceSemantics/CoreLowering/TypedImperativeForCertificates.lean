@@ -149,6 +149,7 @@ theorem tree_of_typed_position
       have sameType := ensure_same checkedType
       subst payload
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted
@@ -389,6 +390,7 @@ theorem tree_of_typed_position
       cases checked
       have sameType := ensure_same checkedType
       subst payload
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted

@@ -3,9 +3,10 @@ import Solcore.Frontend.SourceCoreCalls
 import Solcore.Frontend.SourceCoreInteger
 import Solcore.Frontend.SourceCoreSourceCells
 
-/-! Monomorphic function values over shared optional cells. Named references
-carry a deterministic plan-local identity; lambdas retain anonymous identity
-and capture the existing cell references. A supplied statement compiler owns
+/-! Monomorphic function values over optional cells. Named references carry a
+deterministic plan-local identity; lambdas retain anonymous identity and
+capture by value: creation copies the captured cells, and each call copies
+them again before binding its parameters. A supplied statement compiler owns
 control flow, so this module adds no source evaluator or duplicate loop logic.
 Ordinary let initializers are still evaluated before their binding is allocated. -/
 
@@ -87,6 +88,9 @@ structure Policy where
   before ordinary traversal. The supplied child compiler shares this policy. -/
   lowerSpecial? : Option (Context → ExpressionLowerer → Nat → TypedSource → Scope →
     ExpressionId → (ExpressionId → Core.Word) → Except Error (Option LoweredExpr)) := none
+  /-- Whether a lambda occurrence copies its captures when it is created. An
+  instance of a generalized local shares the copies of its declaration. -/
+  snapshotLambda : ExpressionId → Bool := fun _ => true
   leafLowerer : ExpressionLowerer → Nat → TypedSource → Scope → ExpressionId →
       (ExpressionId → Core.Word) → Except Error LoweredExpr :=
     fun _ fuel source scope id reasonAt => SourceCoreBasic.lowerExpression fuel source scope id (reasonAt id)
@@ -294,13 +298,16 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 | some allocate =>
                     SourceCoreSourceCells.bindParameters allocate source scope parameters resultCore
                       argumentProjection (body.weakenAt parameters.length)
+              let rawBody ← SourceCoreSourceCells.copyScope policy.sourceCells source scope (· + 1) rawBody
               let rawBody ← policy.rawLambdaBody context source scope node parameterCore resultCore rawBody
               SourceCoreBasic.ensureType site type (policy.callables.functionType parameterCore resultCore)
               let rawLambda ← policy.rawLambdaExpression context source scope node parameterCore resultCore
                 (.lambda parameterCore (Core.LanguageResult.resultType resultCore) rawBody)
               let expression ← policy.callables.decorateCallable context source node (.lambda id) parameterCore resultCore
                 (Core.LanguageResult.success (Core.TaggedFunction.anonymous rawLambda))
-              pure ⟨type, expression⟩
+              if policy.snapshotLambda id then
+                pure ⟨type, ← SourceCoreSourceCells.copyScope policy.sourceCells source scope (fun index => index) expression⟩
+              else pure ⟨type, expression⟩
           | .unary operator operand =>
               let operand ← lowerExpressionWithPolicy policy lowerBody fuel context source scope operand reasonAt
               let coreOperator := if operator = .bitNot && operand.type = .integer then

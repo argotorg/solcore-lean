@@ -66,7 +66,8 @@ theorem heap_typed_at_parameters (frame : Dynamic.ClosureFrame program function)
   have actualArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [rawTypes] using argumentsTyped
-  have reached := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped actualArguments entry.entry.allocation
+  have reached := Dynamic.BindersAllocate.preservesHeapTyping (beforeTyped.copy entry.entry.copy)
+    (actualArguments.mono entry.entry.copy.metadata_extends) entry.entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   exact reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
     frame.code.variables_closed (fields.targetResidualVariablesOpen frame.code.residual_variables_open)

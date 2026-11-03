@@ -59,6 +59,7 @@ def Fixture.shapeAt (fixture : Fixture) {header : Header fixture.recipe.compiled
   outer := fixture.shape.statement
   inputs := by rw [facts.source]; exact fixture.shape.inputs
   binderType := fixture.makeBinder
+  binderCopied := by rw [facts.source]; exact fixture.makeCopied
   roots := by rw [facts.source]; exact fixture.shape.roots
   readFound := by rw [facts.source]; exact fixture.shape.read.found
   readForm := fixture.shape.read.form
@@ -87,10 +88,11 @@ theorem Fixture.method_certificate (fixture : Fixture) (issued : Profiled fixtur
 
 def converted (flag : Bool) : Word := if flag then Word.ofNatModulo 41 else Word.ofNatModulo 7
 
-def convertedHeap (flag : Bool) : Dynamic.Heap := appendBool (appendBool (capturedHeap flag) flag) flag
+def convertedHeap (flag : Bool) : Dynamic.Heap := appendBool (appendBool (calledHeap flag) flag) flag
 
-/-- Independently execute the original captured read, generic named call and
-complete conversion suffix. No staged or completed native trace is used. -/
+/-- Independently execute the call's copy of the snapshot, the original captured
+read, generic named call and complete conversion suffix. No staged or completed
+native trace is used. -/
 theorem Fixture.closure_plain (fixture : Fixture) (issued : Profiled fixture.recipe)
     {makeHeader keepHeader : Header fixture.recipe.compiled (Program.ofChecked fixture.recipe.compiled.sourceProgram)}
     (makeFacts : HeaderFacts fixture.make.named.specialized fixture.available makeHeader)
@@ -145,27 +147,26 @@ theorem Fixture.closure_plain (fixture : Fixture) (issued : Profiled fixture.rec
       (CallableCoercionMethodInstantiation.bodyInstance fixture.recipe.compiled.sourceProgram fixture.method).context := by
     cases chosen with | intro _ _ _ _ _ _ _ _ _ _ _ _ _ covered => exact covered
   have invoked := method_plain (program := Program.ofChecked fixture.recipe.compiled.sourceProgram) fixture.methodShape rfl methodCertificate.typing.inputs_extend fixture.methodBinder
-    ledger methodRuntime.requirements methodCovers (appendBool (capturedHeap flag) flag) flag
+    ledger methodRuntime.requirements methodCovers (appendBool (calledHeap flag) flag) flag
   have invoked : Dynamic.BodyInvokes (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       (CallableCoercionMethodInstantiation.bodyInstance fixture.recipe.compiled.sourceProgram fixture.method)
-      (CallableNamedMetadata.environment fixture.methodDictionary) (appendBool (capturedHeap flag) flag) [.bool flag]
+      (CallableNamedMetadata.environment fixture.methodDictionary) (appendBool (calledHeap flag) flag) [.bool flag]
       (.word (converted flag)) (convertedHeap flag) := by
     simpa only [fixture.firstValue, fixture.secondValue, converted, convertedHeap] using invoked
   have read : Dynamic.ExpressionEvaluates (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       makeHeader.context makeHeader.function.evidence makeHeader.function.source
-      [(fixture.shape.binder.id, ⟨0⟩)] (capturedHeap flag) fixture.shape.read.node.id (.bool flag) (capturedHeap flag) := by
+      [(fixture.shape.binder.id, ⟨2⟩)] (calledHeap flag) fixture.shape.read.node.id (.bool flag) (calledHeap flag) := by
     rw [makeFacts.source]
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound fixture.shape.read.found)
     · rw [fixture.shape.read.form]
       exact .local (by rw [fixture.shape.read.requirements, fixture.shape.read.coercions]; rfl) .head
-        (Dynamic.Heap.Allocates.reads_new (Dynamic.Heap.Allocates.append (heap := ⟨[]⟩)
-          (type := .bool) (value := some (.bool flag)))) rfl rfl
+        (.intro (.tail (.tail .head))) rfl rfl
     · rw [fixture.shape.read.coercions]; exact .nil
   have called := identity_plain keepHeader fixture.identity keepFacts.source fixture.keepBinder
-    (context := makeHeader.context) (evidence := makeHeader.function.evidence) (capturedHeap flag) flag
+    (context := makeHeader.context) (evidence := makeHeader.function.evidence) (calledHeap flag) flag
   have expression : Dynamic.ExpressionEvaluates (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       makeHeader.context makeHeader.function.evidence makeHeader.function.source
-      [(fixture.shape.binder.id, ⟨0⟩)] (capturedHeap flag) fixture.shape.call.node.id
+      [(fixture.shape.binder.id, ⟨2⟩)] (calledHeap flag) fixture.shape.call.node.id
       (.word (converted flag)) (convertedHeap flag) := by
     apply Dynamic.ExpressionEvaluates.intro (by rw [makeFacts.source]; exact lookupExpression?_sound fixture.shape.call.found)
     · rw [fixture.shape.call.form]
@@ -178,12 +179,15 @@ theorem Fixture.closure_plain (fixture : Fixture) (issued : Profiled fixture.rec
       exact .cons (.method chosen invoked) .nil
   have executed : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       makeHeader.context makeHeader.function.evidence makeHeader.function.source
-      [(fixture.shape.binder.id, ⟨0⟩)] (capturedHeap flag) [fixture.shape.innerReturn.id] makeHeader.context
+      [(fixture.shape.binder.id, ⟨2⟩)] (calledHeap flag) [fixture.shape.innerReturn.id] makeHeader.context
       (.returned (.word (converted flag))) (convertedHeap flag) := by
     exact .singleton (by rw [makeFacts.source]; exact lookupStatement?_sound fixture.shape.innerReturnFound)
       (by rw [fixture.shape.innerReturnForm]; intro id impossible; cases impossible)
       (.returnValue (by rw [makeFacts.source]; exact lookupStatement?_sound fixture.shape.innerReturnFound)
         fixture.shape.innerReturnForm expression)
-  exact .closure rfl frame (.nil _) (.nil _ _) executed rfl
+  have copy : Dynamic.EnvironmentCopies makeHeader.function.source [(fixture.shape.binder.id, ⟨1⟩)]
+      (capturedHeap flag) [(fixture.shape.binder.id, ⟨2⟩)] (calledHeap flag) :=
+    .copied (fixture.shapeAt makeFacts).binderCopied (.intro (.tail .head)) .append (.nil _)
+  exact .closure rfl frame (.nil _) copy (.nil _ _) executed rfl
 
 end Tests.SourceCoreSelectedCoercedDirect

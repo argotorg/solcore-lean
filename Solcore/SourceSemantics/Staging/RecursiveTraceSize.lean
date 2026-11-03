@@ -343,11 +343,12 @@ mutual
         (body : StatementsIn program registry true bodySize child bodyContext environment bound roots finalContext outcome after)
         (resultRule : BodyResult bodyInstance.resultType outcome result) :
         Applies program registry (stepSize [bodySize]) scope context before (.global function) arguments result after
-    | closure {bodySize : Nat} {scope context before bound after function arguments environment parameterTypes bodyContext finalContext child outcome result}
+    | closure {bodySize : Nat} {scope context before copied bound after function arguments entry environment parameterTypes bodyContext finalContext child outcome result}
         (selected : registry.Closure function child)
         (valid : ClosureFrame program function)
         (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes bodyContext)
-        (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters arguments environment bound)
         (body : StatementsIn program registry true bodySize child bodyContext environment bound function.body finalContext outcome after)
         (resultRule : BodyResult function.resultType outcome result) :
         Applies program registry (stepSize [bodySize]) scope context before (.closure function) arguments result after
@@ -674,14 +675,15 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : StatementsIn program registry mode nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | letGeneralized {nextSize : Nat} {mode scope context middleContext finalContext environment before bound after
-          id rest node binder initializer function location outcome}
+    | letGeneralized {nextSize : Nat} {mode scope context middleContext finalContext environment before snapshotHeap
+          bound after id rest node binder initializer captured function location outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .letDecl binder (some initializer))
-        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+        (snapshot : EnvironmentCopies scope.source environment before captured snapshotHeap)
+        (captures : GeneralizedClosureCaptures context scope.source captured binder initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
-        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (allocate : Heap.AllocatesGeneralized snapshotHeap function location bound)
         (next : StatementsIn program registry mode nextSize scope middleContext
           ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
@@ -781,12 +783,13 @@ mutual
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
         (next : ForItems program registry nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry (stepSize [childSize, nextSize]) scope context environment before (.letDecl binder (some initializer) :: rest) finalContext outcome after
-    | initializedGeneralized {nextSize : Nat} {scope context middleContext finalContext environment before bound after
-          binder initializer rest function location outcome}
-        (captures : GeneralizedClosureCaptures context scope.source environment binder initializer function)
+    | initializedGeneralized {nextSize : Nat} {scope context middleContext finalContext environment before snapshotHeap bound after
+          binder initializer rest captured function location outcome}
+        (snapshot : EnvironmentCopies scope.source environment before captured snapshotHeap)
+        (captures : GeneralizedClosureCaptures context scope.source captured binder initializer function)
         (polymorphic : binder.scheme.quantified ≠ [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
-        (allocate : Heap.AllocatesGeneralized before function location bound)
+        (allocate : Heap.AllocatesGeneralized snapshotHeap function location bound)
         (next : ForItems program registry nextSize scope middleContext
           ((binder.id, location) :: environment) bound rest finalContext outcome after) :
         ForItems program registry (stepSize [nextSize]) scope context environment before
@@ -1308,12 +1311,12 @@ local macro "construct_stage_grade" : tactic =>
       exact ⟨_, .generalizedLocal contains form layout lookup read descriptor contextFields instantiation graded⟩
     case generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault =>
       exact ⟨_, .generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault⟩
-    case letGeneralized contains form captures polymorphic extension allocated next nextIH =>
+    case letGeneralized contains form snapshot captures polymorphic extension allocated next nextIH =>
       obtain ⟨size, graded⟩ := nextIH
-      exact ⟨_, .letGeneralized contains form captures polymorphic extension allocated graded⟩
-    case initializedGeneralized captures polymorphic extension allocated next nextIH =>
+      exact ⟨_, .letGeneralized contains form snapshot captures polymorphic extension allocated graded⟩
+    case initializedGeneralized snapshot captures polymorphic extension allocated next nextIH =>
       obtain ⟨size, graded⟩ := nextIH
-      exact ⟨_, .initializedGeneralized captures polymorphic extension allocated graded⟩
+      exact ⟨_, .initializedGeneralized snapshot captures polymorphic extension allocated graded⟩
     case atomicValue contains atomic uncoerced valueRule =>
       exact ⟨_, .atomicValue contains atomic uncoerced valueRule⟩
     case atomicFault contains atomic uncoerced faultRule =>
@@ -1463,9 +1466,9 @@ local macro "construct_stage_grade" : tactic =>
     case global instantiates covers rootsEq selected parameters allocate body resultRule ih_body =>
       obtain ⟨bodySize, graded_body⟩ := ih_body
       exact ⟨_, .global instantiates covers rootsEq selected parameters allocate graded_body resultRule⟩
-    case closure selected valid parameters allocate body resultRule ih_body =>
+    case closure selected valid parameters copy allocate body resultRule ih_body =>
       obtain ⟨bodySize, graded_body⟩ := ih_body
-      exact ⟨_, .closure selected valid parameters allocate graded_body resultRule⟩
+      exact ⟨_, .closure selected valid parameters copy allocate graded_body resultRule⟩
     case nil =>
       exact ⟨_, .nil⟩
     case returnUnit contains form =>

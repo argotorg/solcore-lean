@@ -138,7 +138,7 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [13,31,49,122,140,213,286,340] do
+  unless stores == [13,40,67,149,176,258,340,403] do
     throw (IO.userError s!"method scoped stores changed: {reprStr stores}")
   IO.println "METHOD_DIRECT_EVIDENCE_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar33/true/33/55; constrained named relay and implementation method direct calls with actual Mark evidence"
 

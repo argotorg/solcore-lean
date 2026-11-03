@@ -103,7 +103,8 @@ theorem of_certificate
       sourceNode, actualNode, sameCertificate⟩ :=
     CallableIndexedLambdaGeneration.of_certificate compiled.indexed sourceContext evidence [] certificate accepted
       profile (LambdaMetadataViews.MetadataView.refl _) found form found rfl
-      root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType native
+      root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType
+      (by rw [root.compilerPolicy.snapshotLambda]) native
   have facts := CallableIndexedOwnedOrdinaryLambdaSourceFacts.of_typed
     (function := closure named parameters result statements sourceContext evidence [])
     runtime.graph.nodeOccurrencesUnique found form sourceTyped coercions

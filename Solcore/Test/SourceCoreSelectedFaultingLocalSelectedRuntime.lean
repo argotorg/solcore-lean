@@ -29,7 +29,7 @@ def selectedRuntime : IO Unit := do
       heaps := heaps ++ [started.session.heapSize, returned.heapSize]
       IO.println s!"FAULTING_SELECTED_SOURCE_PUBLIC: flag={flag}, token={token.toNat}, heap={returned.heapSize}"
     | _ => throw (IO.userError "selected Source-first call did not fail")
-  unless heaps == [2,17,2,17] do
+  unless heaps == [2,23,2,23] do
     throw (IO.userError "selected Source-first exact public heaps changed")
   IO.println s!"FAULTING_SELECTED_SOURCE_HEAPS: {heaps}"
   IO.println "FAULTING_SELECTED_SOURCE_PUBLIC_PASS: originals1/cache1/selected-body1/checked-registry; Source-before-resume; semantic fault/reflection/reached heap/first history"

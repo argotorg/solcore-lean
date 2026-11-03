@@ -1,9 +1,11 @@
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedOuterBodyBounds
 
-/-! Finite Source constructors compose the same selected initializer, actual
-allocation and parent outcome. Their genuine Source sizes are independent of
-native completion sizes. Admission transports only the context of the same
-reached state, retaining its heap, pool and every ordered row. -/
+/-! Finite Source constructors compose the same selected initializer, which
+copies the captured cells and forms the closure over the copies, the actual
+allocation at the copied heap and the parent outcome. Their genuine Source
+sizes are independent of native completion sizes. Admission transports only
+the context of the same reached state, retaining its heap, pool and every
+ordered row. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -22,18 +24,20 @@ variable (fixture : AcceptedFixture) {caller : ActualHeader fixture}
     fixture.packet.namedCode compilation (runtimeContext fixture.packet) [] (initialScope fixture.packet)
     (expressionId fixture.packet 1) lowered)
   (typing : SourceCoreChosenOrdinaryAcceptedOuterTyping.Metadata fixture)
-  {environment : Dynamic.Environment} {before allocated after : Dynamic.Heap}
+  {environment captured : Dynamic.Environment} {before copied allocated after : Dynamic.Heap}
   {location : Dynamic.Location}
 
 include atHeader in
-/-- The selected receipt supplies its actual pure initializer and a real
-Source grade, without using a native execution or a body law. -/
-theorem initializer_sized :
+/-- The selected receipt supplies its actual initializer over the copies of
+the captured cells and a real Source grade, without using a native execution
+or a body law. -/
+theorem initializer_sized
+    (snapshot : Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied) :
     ∃ size, SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
       size (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
-      (expressionId fixture.packet 1) (.closure (receipt.formation.function environment)) before := by
+      (expressionId fixture.packet 1) (.closure (receipt.formation.function captured)) copied := by
   have trace := SourceCoreChosenOrdinaryAcceptedInitializerAdmission.receipt_evaluates
-    fixture environment atHeader receipt before
+    fixture environment atHeader receipt (by rw [atHeader.named]; exact snapshot)
   rw [atHeader.named] at trace
   exact SourceExecutionSize.ExpressionEvaluates.has_size trace
 
@@ -51,9 +55,9 @@ include typing in
 private theorem initialized_head {initializerSize : Nat}
     (initializer : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
       initializerSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
-      (expressionId fixture.packet 1) (.closure (receipt.formation.function environment)) before)
-    (allocation : Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-      (some (.closure (receipt.formation.function environment))) location allocated) :
+      (expressionId fixture.packet 1) (.closure (receipt.formation.function captured)) copied)
+    (allocation : Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+      (some (.closure (receipt.formation.function captured))) location allocated) :
     SourceExecutionSize.StatementExecutes (Program.ofChecked fixture.packet.compiled.sourceProgram)
       (SourceExecutionSize.stepSize [initializerSize]) (runtimeContext fixture.packet) []
       (source fixture.packet.named) environment before (statementId fixture.packet 0)
@@ -65,10 +69,12 @@ private theorem initialized_head {initializerSize : Nat}
 
 include atHeader typing in
 /-- Actual successful parent execution returns through the two original
-statements, retaining the allocated heap and exact selected Source closure. -/
+statements, retaining the allocated heap and exact selected Source closure over
+the copies. -/
 theorem body_from_parent_value {parentSize : Nat} {value : Dynamic.Value}
-    (allocation : Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-      (some (.closure (receipt.formation.function environment))) location allocated)
+    (snapshot : Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied)
+    (allocation : Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+      (some (.closure (receipt.formation.function captured))) location allocated)
     (parent : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
       parentSize (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) []
       (source fixture.packet.named) ((fixture.graph.binder.id, location) :: environment) allocated
@@ -76,13 +82,13 @@ theorem body_from_parent_value {parentSize : Nat} {value : Dynamic.Value}
     ∃ initializerSize wholeSize,
       SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
         initializerSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
-        (expressionId fixture.packet 1) (.closure (receipt.formation.function environment)) before ∧
+        (expressionId fixture.packet 1) (.closure (receipt.formation.function captured)) copied ∧
       SourceExecutionSize.FunctionStatementsExecute (Program.ofChecked fixture.packet.compiled.sourceProgram)
         wholeSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
         [statementId fixture.packet 0, statementId fixture.packet 4]
         (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) (.returned value) after ∧
       initializerSize < wholeSize ∧ parentSize < wholeSize := by
-  obtain ⟨initializerSize, initializer⟩ := initializer_sized fixture atHeader receipt (environment := environment) (before := before)
+  obtain ⟨initializerSize, initializer⟩ := initializer_sized fixture atHeader receipt snapshot
   have head := initialized_head fixture receipt typing initializer allocation
   have returned := SourceExecutionSize.StatementExecutes.returnValue
     (lookupStatement?_sound fixture.graph.outerReturnFound) fixture.graph.outerReturnForm parent
@@ -97,11 +103,13 @@ theorem body_from_parent_value {parentSize : Nat} {value : Dynamic.Value}
     .cons head tail, bodySize_children initializerSize parentSize⟩
 
 include atHeader typing in
-/-- A genuine parent fault follows the same successful initializer and
-allocation. The original fault token and final Source heap are unchanged. -/
+/-- A genuine parent fault follows the same successful initializer over the
+copies and allocation. The original fault token and final Source heap are
+unchanged. -/
 theorem body_from_parent_fault {parentSize : Nat} {reason : Dynamic.SemanticFault}
-    (allocation : Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-      (some (.closure (receipt.formation.function environment))) location allocated)
+    (snapshot : Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied)
+    (allocation : Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+      (some (.closure (receipt.formation.function captured))) location allocated)
     (parent : SourceExecutionSize.ExpressionFaults (Program.ofChecked fixture.packet.compiled.sourceProgram)
       parentSize (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) []
       (source fixture.packet.named) ((fixture.graph.binder.id, location) :: environment) allocated
@@ -109,13 +117,13 @@ theorem body_from_parent_fault {parentSize : Nat} {reason : Dynamic.SemanticFaul
     ∃ initializerSize wholeSize,
       SourceExecutionSize.ExpressionEvaluates (Program.ofChecked fixture.packet.compiled.sourceProgram)
         initializerSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
-        (expressionId fixture.packet 1) (.closure (receipt.formation.function environment)) before ∧
+        (expressionId fixture.packet 1) (.closure (receipt.formation.function captured)) copied ∧
       SourceExecutionSize.FunctionStatementsFault (Program.ofChecked fixture.packet.compiled.sourceProgram)
         wholeSize (runtimeContext fixture.packet) [] (source fixture.packet.named) environment before
         [statementId fixture.packet 0, statementId fixture.packet 4]
         (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) reason after ∧
       initializerSize < wholeSize ∧ parentSize < wholeSize := by
-  obtain ⟨initializerSize, initializer⟩ := initializer_sized fixture atHeader receipt (environment := environment) (before := before)
+  obtain ⟨initializerSize, initializer⟩ := initializer_sized fixture atHeader receipt snapshot
   have head := initialized_head fixture receipt typing initializer allocation
   have returned := SourceExecutionSize.StatementFaults.returnValue
     (lookupStatement?_sound fixture.graph.outerReturnFound) fixture.graph.outerReturnForm parent
@@ -127,8 +135,9 @@ include atHeader typing in
 /-- The actual parent outcome selects one finite construction, preserving
 both measured child grades and the literal returned context. -/
 theorem body_from_parent {parentSize : Nat} {outcome : Dynamic.ExpressionOutcome}
-    (allocation : Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-      (some (.closure (receipt.formation.function environment))) location allocated)
+    (snapshot : Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied)
+    (allocation : Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+      (some (.closure (receipt.formation.function captured))) location allocated)
     (parent : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked fixture.packet.compiled.sourceProgram)
       parentSize (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) []
       (source fixture.packet.named) ((fixture.graph.binder.id, location) :: environment) allocated
@@ -142,11 +151,11 @@ theorem body_from_parent {parentSize : Nat} {outcome : Dynamic.ExpressionOutcome
   cases parent with
   | value parent =>
     obtain ⟨_initializerSize, size, _initializer, constructed, _smaller, parentSmall⟩ :=
-      body_from_parent_value fixture atHeader receipt typing allocation parent
+      body_from_parent_value fixture atHeader receipt typing snapshot allocation parent
     exact ⟨size, .control constructed, parentSmall⟩
   | fault parent =>
     obtain ⟨_initializerSize, size, _initializer, constructed, _smaller, parentSmall⟩ :=
-      body_from_parent_fault fixture atHeader receipt typing allocation parent
+      body_from_parent_fault fixture atHeader receipt typing snapshot allocation parent
     exact ⟨size, .fault constructed, parentSmall⟩
 
 include atHeader typing in
@@ -154,8 +163,9 @@ include atHeader typing in
 empty evidence is explicit rather than inferred from emitted native code. -/
 theorem body_trace_at_header {parentSize : Nat} {outcome : Dynamic.ExpressionOutcome}
     (evidence : caller.function.evidence = [])
-    (allocation : Dynamic.Heap.Allocates before fixture.graph.binder.scheme.body
-      (some (.closure (receipt.formation.function environment))) location allocated)
+    (snapshot : Dynamic.EnvironmentCopies (source fixture.packet.named) environment before captured copied)
+    (allocation : Dynamic.Heap.Allocates copied fixture.graph.binder.scheme.body
+      (some (.closure (receipt.formation.function captured))) location allocated)
     (parent : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked fixture.packet.compiled.sourceProgram)
       parentSize (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) []
       (source fixture.packet.named) ((fixture.graph.binder.id, location) :: environment) allocated
@@ -165,12 +175,12 @@ theorem body_trace_at_header {parentSize : Nat} {outcome : Dynamic.ExpressionOut
   cases parent with
   | value parent =>
     obtain ⟨_initializerSize, size, _initializer, constructed, _smaller, parentSmall⟩ :=
-      body_from_parent_value fixture atHeader receipt typing allocation parent
+      body_from_parent_value fixture atHeader receipt typing snapshot allocation parent
     refine ⟨size, .returned (finalContext := SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) ?_, parentSmall⟩
     simpa only [atHeader.context, atHeader.source, atHeader.statements, evidence] using constructed
   | fault parent =>
     obtain ⟨_initializerSize, size, _initializer, constructed, _smaller, parentSmall⟩ :=
-      body_from_parent_fault fixture atHeader receipt typing allocation parent
+      body_from_parent_fault fixture atHeader receipt typing snapshot allocation parent
     refine ⟨size, .fault (finalContext := SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) ?_, parentSmall⟩
     simpa only [atHeader.context, atHeader.source, atHeader.statements, evidence] using constructed
 

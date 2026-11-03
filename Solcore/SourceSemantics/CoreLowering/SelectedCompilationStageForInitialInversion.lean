@@ -89,7 +89,7 @@ theorem initialized {binder : TypedBinder} {expression : ExpressionId} (mono : b
       exact .inr ⟨_, _, _, _, _, _, _,
         Nat.lt_trans (SourceExecutionSize.child_lt_stepSize (by simp)) childStrict, tailStrict, same,
         .value evaluated, allocated, tail⟩
-    | letInitializedGeneralized _ poly => exact (poly mono).elim
+    | letInitializedGeneralized _ _ poly => exact (poly mono).elim
 
 theorem discard {expression : ExpressionId}
     (trace : PlainInitial program invocation context environment before

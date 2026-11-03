@@ -80,8 +80,10 @@ variable {nativeArguments : List Value}
 
 
 include body profile extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
-/-- Empty arity keeps the original strict native witness. The same source
-allocation and caller restoration follow from the concrete runtime body. -/
+/-- Empty arity keeps the original strict native witness. The scope slots hold
+the copies of the captures and every administrative slot past the scope keeps
+its index and value. The same source copies, allocation and caller restoration
+follow from the concrete runtime body. -/
 theorem empty_arguments {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store} (empty : nativeArguments = [])
     (completed : EvaluationSize size
@@ -91,7 +93,7 @@ theorem empty_arguments {callerContext : SourceSemantics.Context} {callerEvidenc
       ∃ child bodyStore outcome after finalMap finalWorld,
       child < size ∧ EvaluationSize child reached.actual reached.store
         (code.receipt.body.rename reached.embedding) result bodyStore ∧
-      reached.canonical = captured.canonical ∧
+      (∀ slot, scope.length ≤ slot → reached.canonical[slot]? = captured.canonical[slot]?) ∧
       FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after ∧
       CompatibleAmbientHeap.HeapRepresents values.checked registry (model prepared profile) finalMap finalWorld after finalStore ∧
       Nonempty (RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix scope finalMap finalWorld after finalStore captured.canonical) ∧
@@ -100,11 +102,12 @@ theorem empty_arguments {callerContext : SourceSemantics.Context} {callerEvidenc
     _, _, _, _, callerEntry, caller⟩ :=
     CallableIndexedLambdaRuntimeEntry.reflects_original captured code history body profile extension uninitialized missing escaped initial sameFrame
       represented heaps locals reference read currentCarried allowed completed
-  obtain ⟨added, length, spine⟩ := reached.spine
+  obtain ⟨added, copied, length, spine, slots⟩ := reached.spine
   have zero : code.receipt.loweredParameters.length = 0 := by simpa [empty] using represented.length.2
   have nil : added = [] := List.eq_nil_of_length_eq_zero (length.trans zero)
+  rw [nil, List.nil_append] at spine
   exact ⟨reached, child, bodyStore, outcome, after, finalMap, finalWorld, smaller, evaluated,
-    by simpa only [nil, List.nil_append] using spine, source, heaps, callerEntry, caller⟩
+    fun slot outside => spine ▸ slots slot outside, source, heaps, callerEntry, caller⟩
 
 end Actual
 

@@ -1,10 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterNativeInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaScalarNativeTyping
+import Solcore.SourceSemantics.CoreLowering.CaptureCopyIndexedTyping
 
 /-! The actual typed contracted lambda already contains its original body's
-native typing. Snapshot, frame, manifest and parameter wrappers are inverted
-through their literal accepted compiler receipts. Only unused syntax binders
+native typing. Creation copies, snapshot, frame, manifest, per-call copies and
+parameter wrappers are inverted through their literal accepted compiler
+receipts. Only unused syntax binders
 are removed. Source typing, body syntax, selected authority and execution are
 independent; no expected body typing premise is supplied. -/
 set_option autoImplicit false
@@ -53,17 +55,36 @@ theorem manifest_body {checked : SourceCoreCompatibleCatalog.Checked}
   | letE metadataTyped bodyTyped =>
     exact TypedLexicalWhile.Native.remove_front bodyTyped
 
-/-- The contracted carrier fixes the literal anonymous snapshot lambda.
-The saved lexical frame and two frame temporaries do not alter its original
-raw body code, so its typing follows without a separately typed body input. -/
+/-- A scope slot holds a cell of its payload type in the scope's own context. -/
+private theorem scope_slot {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {index : Nat} {id : Resolved.LocalId} {payload : Ty} (found : scope[index]? = some (id, payload)) :
+    (SourceCoreLocalCell.coreContext scope ++ administrative)[index]? = some (.cell (OptionalCell.cellType payload)) := by
+  rw [List.getElem?_append_left (by simpa [SourceCoreLocalCell.coreContext] using (List.getElem?_eq_some_iff.mp found).1)]
+  simp [SourceCoreLocalCell.coreContext, found]
+
+/-- The contracted carrier fixes the literal anonymous snapshot lambda inside
+its creation copies. The copies, the saved lexical frame and two frame
+temporaries do not alter its original raw body code, so its typing follows
+without a separately typed body input. -/
 theorem raw_body {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     (code : Code prepared function scope administrative) :
     HasType (code.receipt.parameterCore :: SourceCoreLocalCell.coreContext scope ++ administrative)
       code.receipt.rawBody (LanguageResult.resultType code.receipt.resultCore) prepared.layouts.definitions := by
-  have typed := code.typed
-  rw [code.emitted] at typed
+  have snapshotted := code.typed
+  rw [code.emitted] at snapshotted
+  have typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code.expression
+      (LanguageResult.resultType (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore))
+      prepared.layouts.definitions := by
+    have snapshot := code.receipt.snapshot
+    rw [code.decorated] at snapshot
+    split at snapshot
+    · rw [code.allocationProfile] at snapshot
+      exact CaptureCopyTyping.copyScopeIndexed_body_hasType snapshot
+        (fun _ _ _ found => scope_slot found) snapshotted
+    · rw [Except.ok.inj snapshot]
+      exact snapshotted
   cases typed with
   | inRight _ wrapped =>
     cases wrapped with
@@ -87,7 +108,12 @@ theorem body_native {checked : SourceCoreCompatibleCatalog.Checked}
     HasType (SourceCoreLocalCell.coreContext
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) ++ administrative)
       code.receipt.body (LanguageResult.resultType code.receipt.resultCore) prepared.layouts.definitions := by
-  have allocated := manifest_body (code.manifest ▸ code.receipt.bodyHook) (raw_body code)
+  have copied := manifest_body (code.manifest ▸ code.receipt.bodyHook) (raw_body code)
+  have allocated := CaptureCopyTyping.copyScopeIndexed_body_hasType
+    (CallableIndexedLambdaEntryPrefix.copies_accepted (values := .initial checked) code)
+    (fun _ _ _ found => by
+      simp only [List.cons_append, List.getElem?_cons_succ]
+      exact scope_slot found) copied
   have body := CallableIndexedParameterNativeInversion.accepted_body code.allocationError
     (CallableIndexedLambdaEntryPrefix.prefix_accepted (values := .initial checked) code) allocated
   rw [CallableIndexedParameterNativeInversion.final_context] at body

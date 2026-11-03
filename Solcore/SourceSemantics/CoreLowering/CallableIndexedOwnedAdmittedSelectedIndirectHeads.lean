@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedIndirectSequence
 
-/-! The actual literal formation receipt feeds admitted ordered arguments at its
-same caller state. The original whole Source trace authenticates successful
+/-! The actual literal formation receipt feeds admitted ordered arguments at the
+caller state transported to the formed copies. The original whole Source trace authenticates successful
 value and heap typing at the exact returned witness. Faults retain their real
 post and all-row stability. No uniform admission or execution law is supplied. -/
 set_option autoImplicit false
@@ -44,14 +44,18 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (agrees : EnvironmentsAgree ξ canonical actual)
   (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
-  (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+    (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store)
 
-include prefixZero complete globals slots related agrees typed stored in
-/-- Admitted arguments consume the actual literal callee post. The original
-whole Source derivation supplies successful value and heap typing at the exact
-returned caller witness, with stable rows retained for either outcome. -/
+local notation "Record" => CalleeRecord owner caller prefixZero profile complete globals head bridge initial packet related
+  agrees typed
+
+include prefixZero complete globals slots related agrees typed heaps in
+/-- Admitted arguments consume the actual literal callee post, at the formed
+state that holds the copies of its captured cells. The original whole Source
+derivation supplies successful value and heap typing at the exact returned
+caller witness, with stable rows retained for either outcome. -/
 theorem preserves_bounded
-    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
     (admitted : Admission bridge context initial)
     (parentTyped : ExpressionHasType source context id head.compiler.original.type)
@@ -61,8 +65,13 @@ theorem preserves_bounded
     (arguments : Below budget (CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       context evidence source certificate faults))
-    (bodies : SourceContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored) (head.selected environment).escaped bridge initial budget)
+    (bodies : ∀ formedRecord : Record,
+      ∀ reached : callerProtocol.State ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap,
+        formedRecord.finalStore, canonical⟩,
+      callerProtocol.Relates initial reached →
+      SourceContinuations (source := source) (context := context) (evidence := evidence)
+        (environment := environment) (ids := head.ids) profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
+        (head.selected environment).escaped bridge reached budget)
     {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment heap id outcome after)
     (within : size ≤ budget) :
@@ -76,36 +85,49 @@ theorem preserves_bounded
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧
         PostAdmission bridge context head.compiler.original.type outcome reached := by
-  obtain ⟨calleeSize, argumentsSize, callSize, calleeTrace, suffix, calleeSmall, argumentsSmall, callWithin⟩ :=
+  obtain ⟨calleeSize, argumentsSize, callSize, calleeCaptured, calleeHeap, calleeTrace, calleeCopy, suffix,
+      calleeSmall, argumentsSmall, callWithin⟩ :=
     suffix_of_source head.compiler.found head.compiler.originalForm head.parent.coercions
       head.compiler.argumentCoercions head.parent.arity head.lambda unique wellFormed runtime covers locals admitted.heap
       head.sourceArguments head.sourceCount trace
+  obtain ⟨formedRecord⟩ := CallableIndexedOwnedLambdaFormationReceipts.formation_exists head.formation complete globals slots (bridge.pool initial) owner prefixZero
+    packet.observed packet.carried packet.bundle related agrees typed heaps
+  obtain ⟨_sourceCallee, sourceCopy, nativeCallee⟩ := formed_receipts owner caller prefixZero profile complete globals
+    slots head bridge initial packet related agrees typed heaps formedRecord
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional calleeCopy sourceCopy
   rw [head.function_eq] at calleeTrace suffix
-  obtain ⟨sourceCallee, nativeCallee⟩ := formed_receipts owner caller prefixZero profile complete globals slots head
-    bridge initial packet related agrees typed stored
-  have captures : FunctionValues.SourceCapturesValid heap (.closure (formed head.formation environment)) := locals
+  obtain ⟨formedState, formedRelated⟩ :=
+    caller_transition bridge initial formedRecord.maps formedRecord.worlds formedRecord.frame formedRecord.copy.metadata_extends
+  have formedAdmitted : Admission bridge context formedState :=
+    ⟨admitted.heap.copy formedRecord.copy,
+      CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative (bridge.pool initial)
+        (bridge.pool formedState) admitted.rows formedRecord.frame⟩
+  have captures : FunctionValues.SourceCapturesValid formedRecord.finalHeap (.closure (formed head.formation formedRecord.captured)) :=
+    formedRecord.copy.agrees locals
   let selected := head.selected environment
   obtain ⟨sourceSize, value, finalStore, finalMap, finalWorld, sourceParent, evaluated, represented, finalHeaps,
       maps, worlds, frame, metadata, reached, relatedPost⟩ :=
-    preserves_bounded_with_sequence profile head.compiler head.prepared head.parent (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored)
+    preserves_bounded_with_sequence profile head.compiler head.prepared head.parent (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
       selected.nativeTypes selected.escaped selected.rawResult selected.nativeResult
-      locals captures wellFormed runtime covers admitted.heap head.sourceArguments head.sourceCount
-      bridge initial admitted.rows budget
-      (CallableIndexedOwnedAdmittedIndirectSequence.preserves profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored)
-        selected.children unique head.sourceArguments related heaps locals agrees typed bridge initial admitted budget arguments)
-      bodies initial (ProtectedStateTransition.Protocol.refl callerProtocol initial) (.refl _) (.refl _) (.refl _ _) (.refl _)
+      (locals.mono formedRecord.copy.metadata_extends) captures wellFormed runtime covers formedAdmitted.heap
+      head.sourceArguments head.sourceCount
+      bridge formedState formedAdmitted.rows budget
+      (CallableIndexedOwnedAdmittedIndirectSequence.preserves profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
+        selected.children unique head.sourceArguments (related.extend formedRecord.maps formedRecord.worlds) formedRecord.heaps
+        (locals.mono formedRecord.copy.metadata_extends) agrees (typed.weaken formedRecord.worlds) bridge formedState formedAdmitted budget
+        arguments)
+      (bodies formedRecord formedState formedRelated) initial formedRelated formedRecord.maps formedRecord.worlds formedRecord.frame formedRecord.copy.metadata_extends
       calleeTrace nativeCallee selected.stageAccepted selected.arityAccepted suffix
       (Nat.le_trans (Nat.le_of_lt argumentsSmall) within) (Nat.le_trans callWithin within)
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
     maps, worlds, frame, metadata, reached, relatedPost,
     after_expression_sized initial reached admitted wellFormed runtime covers locals parentTyped trace frame⟩
 
-include prefixZero complete globals slots related agrees typed stored in
+include prefixZero complete globals slots related agrees typed heaps in
 /-- Native reflection uses the authentic emitted literal and admitted argument
 sequence. Its independently graded whole Source trace authenticates successful
 admission at the exact returned caller witness. -/
 theorem reflects_bounded
-    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
     (admitted : Admission bridge context initial)
     (parentTyped : ExpressionHasType source context id head.compiler.original.type)
@@ -115,8 +137,13 @@ theorem reflects_bounded
     (arguments : Below budget (CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       context evidence source certificate faults))
-    (bodies : NativeContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored) (head.selected environment).escaped bridge initial budget)
+    (bodies : ∀ formedRecord : Record,
+      ∀ reached : callerProtocol.State ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap,
+        formedRecord.finalStore, canonical⟩,
+      callerProtocol.Relates initial reached →
+      NativeContinuations (source := source) (context := context) (evidence := evidence)
+        (environment := environment) (ids := head.ids) profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
+        (head.selected environment).escaped bridge reached budget)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
@@ -130,20 +157,32 @@ theorem reflects_bounded
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧
         PostAdmission bridge context head.compiler.original.type outcome reached := by
-  obtain ⟨sourceCallee, nativeCallee⟩ := formed_receipts owner caller prefixZero profile complete globals slots head
-    bridge initial packet related agrees typed stored
+  obtain ⟨formedRecord⟩ := CallableIndexedOwnedLambdaFormationReceipts.formation_exists head.formation complete globals slots (bridge.pool initial) owner prefixZero
+    packet.observed packet.carried packet.bundle related agrees typed heaps
+  obtain ⟨sourceCallee, _sourceCopy, nativeCallee⟩ := formed_receipts owner caller prefixZero profile complete globals
+    slots head bridge initial packet related agrees typed heaps formedRecord
   obtain ⟨calleeSize, calleeTrace⟩ := SourceExecutionSize.ExpressionEvaluates.has_size sourceCallee
-  have captures : FunctionValues.SourceCapturesValid heap (.closure (formed head.formation environment)) := locals
+  obtain ⟨formedState, formedRelated⟩ :=
+    caller_transition bridge initial formedRecord.maps formedRecord.worlds formedRecord.frame formedRecord.copy.metadata_extends
+  have formedAdmitted : Admission bridge context formedState :=
+    ⟨admitted.heap.copy formedRecord.copy,
+      CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative (bridge.pool initial)
+        (bridge.pool formedState) admitted.rows formedRecord.frame⟩
+  have captures : FunctionValues.SourceCapturesValid formedRecord.finalHeap (.closure (formed head.formation formedRecord.captured)) :=
+    formedRecord.copy.agrees locals
   let selected := head.selected environment
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
       maps, worlds, frame, metadata, reached, relatedPost⟩ :=
-    reflects_bounded_with_sequence profile head.compiler head.prepared head.parent (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored)
+    reflects_bounded_with_sequence profile head.compiler head.prepared head.parent (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
       selected.nativeTypes selected.escaped selected.rawResult selected.nativeResult
-      locals captures wellFormed runtime covers admitted.heap head.sourceArguments head.sourceCount
-      bridge initial admitted.rows budget
-      (CallableIndexedOwnedAdmittedIndirectSequence.reflects profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed stored)
-        selected.children unique head.sourceArguments related heaps locals agrees typed bridge initial admitted budget arguments)
-      bodies initial (ProtectedStateTransition.Protocol.refl callerProtocol initial) (.refl _) (.refl _) (.refl _ _) (.refl _)
+      (locals.mono formedRecord.copy.metadata_extends) captures wellFormed runtime covers formedAdmitted.heap
+      head.sourceArguments head.sourceCount
+      bridge formedState formedAdmitted.rows budget
+      (CallableIndexedOwnedAdmittedIndirectSequence.reflects profile (formedReceipt owner caller prefixZero profile complete globals slots head bridge initial packet related agrees typed heaps formedRecord)
+        selected.children unique head.sourceArguments (related.extend formedRecord.maps formedRecord.worlds) formedRecord.heaps
+        (locals.mono formedRecord.copy.metadata_extends) agrees (typed.weaken formedRecord.worlds) bridge formedState formedAdmitted budget
+        arguments)
+      (bodies formedRecord formedState formedRelated) initial formedRelated formedRecord.maps formedRecord.worlds formedRecord.frame formedRecord.copy.metadata_extends
       calleeTrace nativeCallee selected.stageAccepted selected.arityAccepted completed within
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
     maps, worlds, frame, metadata, reached, relatedPost,
@@ -174,11 +213,17 @@ def SourceBodiesAt (budget : Nat) : Prop :=
     (initial : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
       ⟨childScope, mapping, world, heap, store, canonical⟩),
     Admission (nestedBridge (headers := headers) owner caller) context initial →
+    ∀ formedRecord : CalleeRecord owner caller prefixZero profile complete globals head
+      (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed,
+    ∀ reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
+      ⟨childScope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore,
+        canonical⟩,
+    (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).Relates initial reached →
     SourceContinuations (source := source) (context := context) (evidence := evidence)
       (environment := environment) (ids := head.ids) profile
       (formedReceipt owner caller prefixZero profile complete globals slots head
-        (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed heaps.runtime_hasTypes)
-      (head.selected environment).escaped (nestedBridge (headers := headers) owner caller) initial budget
+        (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed heaps formedRecord)
+      (head.selected environment).escaped (nestedBridge (headers := headers) owner caller) reached budget
 
 /-- Native continuation obligations retain the same actual producer/input and
 its original parameter prefix. Their Source grade remains independent. -/
@@ -197,11 +242,17 @@ def NativeBodiesAt (budget : Nat) : Prop :=
     (initial : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
       ⟨childScope, mapping, world, heap, store, canonical⟩),
     Admission (nestedBridge (headers := headers) owner caller) context initial →
+    ∀ formedRecord : CalleeRecord owner caller prefixZero profile complete globals head
+      (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed,
+    ∀ reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
+      ⟨childScope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore,
+        canonical⟩,
+    (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).Relates initial reached →
     NativeContinuations (source := source) (context := context) (evidence := evidence)
       (environment := environment) (ids := head.ids) profile
       (formedReceipt owner caller prefixZero profile complete globals slots head
-        (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed heaps.runtime_hasTypes)
-      (head.selected environment).escaped (nestedBridge (headers := headers) owner caller) initial budget
+        (nestedBridge (headers := headers) owner caller) initial initial.property related agrees typed heaps formedRecord)
+      (head.selected environment).escaped (nestedBridge (headers := headers) owner caller) reached budget
 
 /-- The existing admitted Tree head callback consumes its actual input
 admission. The literal receipt selects one authentic formed producer, and all
@@ -227,7 +278,7 @@ theorem head_preserves_at
   have same := Option.some.inj (head.compiler.found.symm.trans found)
   subst node
   exact preserves_bounded owner caller prefixZero profile complete globals slots head
-    (nestedBridge (headers := headers) owner caller) initial initial.property environments agrees typed heaps.runtime_hasTypes
+    (nestedBridge (headers := headers) owner caller) initial initial.property environments agrees typed
     heaps locals admitted parentTyped wellFormed runtime covers unique size arguments
     (bodies head environments heaps locals agrees typed initial admitted) trace (Nat.le_refl size)
 
@@ -254,7 +305,7 @@ theorem head_reflects_at
   have same := Option.some.inj (head.compiler.found.symm.trans found)
   subst node
   exact reflects_bounded owner caller prefixZero profile complete globals slots head
-    (nestedBridge (headers := headers) owner caller) initial initial.property environments agrees typed heaps.runtime_hasTypes
+    (nestedBridge (headers := headers) owner caller) initial initial.property environments agrees typed
     heaps locals admitted parentTyped wellFormed runtime covers unique size arguments
     (bodies head environments heaps locals agrees typed initial admitted) completed (Nat.le_refl size)
 

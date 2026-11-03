@@ -104,7 +104,7 @@ theorem fault_initializers_prepend
     have extension : ForHeaders.ContextExtends source.owner context tail.context := by
       rw [contextEq]
       cases head with
-      | letUninitialized _ extension _ | letInitialized _ _ extension _ | letInitializedGeneralized _ _ extension _ =>
+      | letUninitialized _ extension _ | letInitialized _ _ extension _ | letInitializedGeneralized _ _ _ extension _ =>
           exact .binder extension
       | expression | assignValue | assignBitNot => exact .refl _ _
     rw [← contextEq, ← environmentEq, ← heapEq] at remaining

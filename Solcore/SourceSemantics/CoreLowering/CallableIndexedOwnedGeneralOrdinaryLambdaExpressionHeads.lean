@@ -136,7 +136,7 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
       selection := ⟨head.selection.children, head.selection.nativeTypes, head.selection.escaped,
         head.selection.rawResult, head.selection.nativeResult, head.selection.stageAccepted, head.selection.arityAccepted⟩,
       sameCallee := head.sameCallee, ordinary := head.formation.ordinary, coercions := head.formation.coercions,
-      sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
+      copied := head.formation.site.snapshots, sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
       syntaxTree := head.syntaxTree, parentTyped := by
         change ExpressionHasType (CallableIndexedNamedGeneration.source caller.named) context id head.compiler.original.type
         simpa only [sameSource] using typed }
@@ -216,7 +216,7 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
       selection := ⟨head.selection.children, head.selection.nativeTypes, head.selection.escaped,
         head.selection.rawResult, head.selection.nativeResult, head.selection.stageAccepted, head.selection.arityAccepted⟩,
       sameCallee := head.sameCallee, ordinary := head.formation.ordinary, coercions := head.formation.coercions,
-      sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
+      copied := head.formation.site.snapshots, sourceArguments := head.sourceArguments, sourceCount := head.sourceCount,
       syntaxTree := head.syntaxTree, parentTyped := by
         change ExpressionHasType (CallableIndexedNamedGeneration.source caller.named) context id head.compiler.original.type
         simpa only [sameSource] using typed }

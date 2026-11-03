@@ -47,8 +47,9 @@ theorem preserves
     exact represented.length.1
   cases execution with
   | closureArity mismatch => exact False.elim (mismatch arity)
-  | closure selected _ extension allocated executed returned =>
+  | closure selected _ extension copy allocated executed returned =>
     obtain ⟨entry⟩ := ContractedFunctionCalls.entry_exists layout code extension represented heaps locals
+    obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy entry.copy
     obtain ⟨rfl, rfl⟩ := allocations_same allocated entry.allocation
     obtain ⟨_, _, typed, _⟩ := frame_body_at code.frame extension
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps, maps, worlds, frame, metadata⟩ :=
@@ -86,7 +87,7 @@ theorem reflects
       (entry.agreement.unwrap evaluated)
   obtain ⟨finalContext, control, executed, returned⟩ := trace
   exact ⟨outcome, after, finalMap, finalWorld,
-    .closure selected code.frame extension entry.allocation executed returned,
+    .closure selected code.frame extension entry.copy entry.allocation executed returned,
     result, finalHeaps, entry.maps.trans maps, entry.worlds.trans worlds,
     entry.frame.trans frame, entry.metadata.trans metadata⟩
 

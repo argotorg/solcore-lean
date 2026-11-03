@@ -11,7 +11,10 @@ import Solcore.Frontend.ProgramChecking
 /-! Effectful key/RHS composition under real indexed definitions. The semantic
 consumer keeps the universal expression IH explicit; its source resolution and
 RHS traces construct native runs, snapshot preservation and latest-root facts.
-The IO fixture separately exercises actual compiler hooks and source effects. -/
+The IO fixture separately exercises actual compiler hooks and source effects.
+Its closures capture `root` by value: each closure's writes stay in its call's
+copy of `root`, recorded in the ledger, and only the compound write reaches the
+root itself. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCompatibleAmbientPlaceEffects
 open Solcore Solcore.Core Solcore.Frontend Solcore.Frontend.SourceInference
@@ -124,9 +127,12 @@ private def workspace : Workspace.RawWorkspace := {
     " root[key(1)] += rhs(3); root[3] = 50; return 0; }"
   ]}] }
 
+/-- `roots` gives the entries of every ledger row of the root binder in
+allocation order: the root's own row, the snapshots `key` and `rhs` take when
+they are created, and the copy each call of `key` or `rhs` makes. -/
 private def exercise {checked : Checked} (artifact : SourceCoreCallableIndexedPrograms.Prepared checked)
     (program : CheckedProgram) (name : String) (expected : Option Word)
-    (entries : List (SourceCoreDataValues.Value × SourceCoreDataValues.Value)) : IO Unit := do
+    (roots : List (List (SourceCoreDataValues.Value × SourceCoreDataValues.Value))) : IO Unit := do
   let signature ← match program.signatures.functions.find? (·.name == name) with
     | some signature => pure signature | none => throw (IO.userError "effectful function absent")
   let key : SourceSpecialization.SpecializationKey := ⟨signature.id, []⟩
@@ -141,16 +147,17 @@ private def exercise {checked : Checked} (artifact : SourceCoreCallableIndexedPr
   let direct ← get "effectful direct" (artifact.runSource key [initial] 300000 500)
   require (completed.result.native.observation == direct.result.native.observation) "effectful resume changed final observation"
   match expected, completed.result.native.observation with
-  | some expected, .succeeded (.word value) _ => require (value == expected) "snapshot used RHS-mutated root value"
+  | some expected, .succeeded (.word value) _ => require (value == expected) "compound key/RHS assignment result changed"
   | none, .failed token _ => require ((completed.result.diagnostics.diagnostic? token).isSome) "effectful fault lost source diagnostic"
   | _, other => throw (IO.userError s!"effectful outcome: {reprStr other}")
   let ledger ← get "effectful source ledger" (SourceCoreCallableIndexedLedger.scan completed)
-  let row ← match ledger.ledger.rows.filter (·.entry.key.binder.id == sourceCell.id) with
-    | [row] => pure row | _ => throw (IO.userError "effectful root ledger is not unique")
-  let native ← match row.payload with
-    | some native => pure native | none => throw (IO.userError "effectful root became uninitialized")
-  let actual ← get "effectful raw root" (SourceCoreCompatibleValues.decode 500 completed.result.context sourceCell.scheme.body native)
-  require (actual == .mapping (.comptime .word) (.comptime .word) entries) "effect order, write suppression or raw mapping metadata changed"
+  let rows := ledger.ledger.rows.filter (·.entry.key.binder.id == sourceCell.id)
+  require (rows.length == roots.length) "effectful root ledger changed its own row or its copies"
+  for (row, entries) in rows.zip roots do
+    let native ← match row.payload with
+      | some native => pure native | none => throw (IO.userError "effectful root became uninitialized")
+    let actual ← get "effectful raw root" (SourceCoreCompatibleValues.decode 500 completed.result.context sourceCell.scheme.body native)
+    require (actual == .mapping (.comptime .word) (.comptime .word) entries) "effect order, write suppression or raw mapping metadata changed"
   require (artifact.layouts.definitions.length > checked.catalog.definitions.length) "effectful fixture lacks actual ambient definitions"
 
 def run : IO Unit := do
@@ -160,9 +167,13 @@ def run : IO Unit := do
     | .ok (.complete plan) => pure plan | other => throw (IO.userError s!"effectful plan: {reprStr other}")
   let automatic ← get "effectful base compiler" (SourceCoreCompatibleFunctions.prepare program plan 500)
   let artifact ← get "effectful indexed compiler" (SourceCoreCallableIndexedPrograms.prepare automatic.prepared 500)
-  exercise artifact program "effects" (some (w 63)) [(.word (w 1), .word (w 23)), (.word (w 2), .word (w 40))]
-  exercise artifact program "keyFault" none [(.word (w 1), .word (w 20))]
-  exercise artifact program "rhsFault" none [(.word (w 1), .word (w 20)), (.word (w 2), .word (w 40))]
+  let entry := fun (key value : Nat) => ((.word (w key), .word (w value)) : SourceCoreDataValues.Value × SourceCoreDataValues.Value)
+  -- The key's and the RHS's writes stay in their call copies, so the compound
+  -- assignment adds `rhs(3)` to the root's default 0.
+  exercise artifact program "effects" (some (w 3))
+    [[entry 1 3], [], [], [entry 1 20], [entry 1 30, entry 2 40]]
+  exercise artifact program "keyFault" none [[], [], [], [entry 1 20]]
+  exercise artifact program "rhsFault" none [[], [], [], [entry 1 20], [entry 2 40]]
   IO.println "compatible ambient place key/RHS effects GREEN"
 
 end Tests.SourceCoreCompatibleAmbientPlaceEffects

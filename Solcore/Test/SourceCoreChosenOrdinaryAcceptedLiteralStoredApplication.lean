@@ -146,8 +146,9 @@ private theorem return_outcome {environment : Dynamic.Environment} {before after
     cases impossible
 
 include atHeader shape in
-/-- Real call inversion exposes the original parameter allocation. Its heap
-preservation and the literal return prove the final deep Source heap locally. -/
+/-- Real call inversion exposes the copies of the captured cells and the
+original parameter allocation. Their heap preservation and the literal return
+prove the final deep Source heap locally. -/
 theorem call_heap {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {before after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome} {size : Nat}
     (heapTyped : Dynamic.HeapWellTyped (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) before)
@@ -161,7 +162,8 @@ theorem call_heap {context : SourceSemantics.Context} {evidence : Dynamic.Eviden
       [SourceCoreChosenOrdinaryAcceptedArgumentAdmission.argumentValue].length := by
     rw [parameters, shape.parameters]
     rfl
-  obtain ⟨types, bodyContext, environment, bound, extended, allocated, body⟩ := FunctionCallBody.Outcome.trace arity trace.sound
+  obtain ⟨types, bodyContext, entry, copied, environment, bound, extended, copy, allocated, body⟩ :=
+    FunctionCallBody.Outcome.trace arity trace.sound
   have entryContext : bodyContext = shape.bodyContext := by
     have original : MonoBindersExtend (receipt.formation.function []).source.owner
         (receipt.formation.function []).context (receipt.formation.function []).parameters [parameterType]
@@ -172,13 +174,13 @@ theorem call_heap {context : SourceSemantics.Context} {evidence : Dynamic.Eviden
     subst types
     exact extended.functional original
   have valuesTyped : Dynamic.ValuesHaveTypes (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture)
-      before [SourceCoreChosenOrdinaryAcceptedArgumentAdmission.argumentValue]
+      copied [SourceCoreChosenOrdinaryAcceptedArgumentAdmission.argumentValue]
       ((receipt.formation.function []).parameters.map (fun binder => binder.scheme.body)) := by
     rw [parameters, shape.parameters]
     simpa only [List.map_cons, List.map_nil, shape.scheme, TypeSystem.Scheme.mono] using
       SourceCoreChosenOrdinaryAcceptedArgumentAdmission.arguments_typed
-        (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) before
-  have boundTyped := Dynamic.BindersAllocate.preservesHeapTyping heapTyped valuesTyped allocated
+        (SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture) copied
+  have boundTyped := Dynamic.BindersAllocate.preservesHeapTyping (heapTyped.copy copy) valuesTyped allocated
   have bodyShape := (SourceCoreChosenOrdinaryAcceptedLiteralInvocation.support_shape fixture atHeader receipt []).2
   have expected : outcome = .value (.word (Word.ofNatModulo 7)) ∧ after = bound := by
     cases body with

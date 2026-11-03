@@ -129,8 +129,11 @@ def run : IO Unit := do
   assertTrue (match first.result.native.observation with | .outOfFuel _ => true | _ => false)
     "ambient fixture did not exercise a checkpoint"
   let completion := first.resume 100000
+  -- Closures capture by value: both calls of `f` start again from `seed = 2`,
+  -- so the second returns 2 + 4.
   match completion.result.native.observation with
-  | .succeeded (.word result) _ => assertTrue (result == Word.ofNatModulo 9) "ambient closure lost shared captured cell"
+  | .succeeded (.word result) _ =>
+    assertTrue (result == Word.ofNatModulo 6) "ambient closure did not restart its call from the captured creation-time value"
   | other => throw (IO.userError s!"ambient invocation: {reprStr other}")
   let initialStore := SourceCoreCallableIndexedLedger.store completion
   let comparator ← get "ambient real comparator" (SourceCoreCompatibleDataEquality.prepare 500 automatic.checked .word)

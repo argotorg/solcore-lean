@@ -268,6 +268,8 @@ private def gapBinder (compiled : SourceCoreUnifiedCompilation.Compiled) (name :
   | [binder] => pure binder.id
   | _ => throw (IO.userError "fixed-budget guarded for exact fault binder missing")
 
+/-- Cells after the inert prefix: `raw`, `seed`, the snapshot of `seed` and
+`raw` that `saved` takes when it is created, `saved` and `index`. -/
 private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : String)
     (updated counter : Nat) : IO Unit := do
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr (final.heap.take initial.heap.length) == reprStr initial.heap)
@@ -276,16 +278,19 @@ private def observe (initial final : SourceTypedRuntime.RuntimeState) (name : St
     | some cell => pure cell | none => throw (IO.userError "fixed-budget guarded for missing root mapping")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr raw.value == reprStr (some (table updated)))
     s!"fixed-budget guarded for raw mapping/default/duplicate order changed {name}"
-  let index ← match final.heap[initial.heap.length + 3]? with
+  let index ← match final.heap[initial.heap.length + 5]? with
     | some cell => pure cell | none => throw (IO.userError "fixed-budget guarded for missing index")
   SourceCoreUnifiedCorpusSupport.assertTrue (reprStr index.value == reprStr (some (wordValue counter)))
     s!"fixed-budget guarded for writes changed {name}"
-  match final.heap[initial.heap.length + 2]? with
+  let snapshot := ((final.heap.drop (initial.heap.length + 2)).take 2).map (·.value)
+  SourceCoreUnifiedCorpusSupport.assertTrue (reprStr snapshot == reprStr [some (wordValue 7), some (table 10)])
+    s!"fixed-budget guarded for captured snapshot values changed {name}"
+  match final.heap[initial.heap.length + 4]? with
   | some ⟨_, some (.closure parameters result body source owner captures _)⟩ =>
     SourceCoreUnifiedCorpusSupport.assertTrue (parameters.length == 1 && result == .word && !body.isEmpty && source.owner == owner.declaration)
       s!"fixed-budget guarded for captured closure metadata changed {name}"
-    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 1, initial.heap.length])
-      s!"fixed-budget guarded for captured source aliases changed {name}"
+    SourceCoreUnifiedCorpusSupport.assertTrue ((captures.map (fun capture => capture.2.index)) == [initial.heap.length + 2, initial.heap.length + 3])
+      s!"fixed-budget guarded for captured snapshot locations changed {name}"
   | other => throw (IO.userError s!"fixed-budget guarded for lost stored captured closure {name}: {reprStr other}")
 
 def run : IO Unit := do
@@ -316,6 +321,6 @@ def run : IO Unit := do
       | other => throw (IO.userError s!"fixed-budget guarded for failure {name}: {reprStr other}")
     if fuel == 400000 then baseline := current
     else SourceCoreUnifiedCorpusSupport.assertTrue (current == baseline) "fixed-budget guarded for resume changed observations"
-  IO.println "fixed-budget guarded for: original source/native size, fixed-budget condition/body/post, shared finite for proof, nested for/while, break skips post, continue runs post, initializer/condition/body/post first faults, raw duplicate/capture aliases and resume GREEN"
+  IO.println "fixed-budget guarded for: original source/native size, fixed-budget condition/body/post, shared finite for proof, nested for/while, break skips post, continue runs post, initializer/condition/body/post first faults, raw duplicate/capture snapshots and resume GREEN"
 
 end Tests.SourceCoreRecursiveNamedForBounds

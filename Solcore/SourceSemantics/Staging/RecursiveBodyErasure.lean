@@ -128,9 +128,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case letUninitialized contains form mono extension allocate _next ih =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.letUninitialized contains form mono extension allocate) ih
-  case letGeneralized contains form captures polymorphic extension allocated _next nextIH =>
+  case letGeneralized contains form snapshot captures polymorphic extension allocated _next nextIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
-      (.letInitializedGeneralized contains form captures polymorphic extension allocated) nextIH
+      (.letInitializedGeneralized contains form snapshot captures polymorphic extension allocated) nextIH
   case letInitialized contains form child mono extension allocate _next _childIH tailIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.letInitialized contains form child.value_plain mono extension allocate) tailIH
@@ -226,8 +226,8 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case empty => exact .nil
   case absent mono extended allocated next nextIH =>
     exact ForItemsPlain.prepend (.letUninitialized mono extended allocated) nextIH
-  case initializedGeneralized captures polymorphic extension allocated _next nextIH =>
-    exact ForItemsPlain.prepend (.letInitializedGeneralized captures polymorphic extension allocated) nextIH
+  case initializedGeneralized snapshot captures polymorphic extension allocated _next nextIH =>
+    exact ForItemsPlain.prepend (.letInitializedGeneralized snapshot captures polymorphic extension allocated) nextIH
   case initialized mono extended child allocated next _childIH nextIH =>
     exact ForItemsPlain.prepend (.letInitialized child.value_plain mono extended allocated) nextIH
   case initializerFault mono child _childIH =>
@@ -394,8 +394,8 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
   case empty => exact .nil
   case absent mono extended allocated next nextIH =>
     exact ForItemsPlain.prepend (.letUninitialized mono extended allocated) nextIH
-  case initializedGeneralized captures polymorphic extension allocated _next nextIH =>
-    exact ForItemsPlain.prepend (.letInitializedGeneralized captures polymorphic extension allocated) nextIH
+  case initializedGeneralized snapshot captures polymorphic extension allocated _next nextIH =>
+    exact ForItemsPlain.prepend (.letInitializedGeneralized snapshot captures polymorphic extension allocated) nextIH
   case initialized mono extended child allocated next _childIH nextIH =>
     exact ForItemsPlain.prepend (.letInitialized child.value_plain mono extended allocated) nextIH
   case initializerFault mono child _childIH =>

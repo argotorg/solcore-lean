@@ -217,7 +217,7 @@ def run : IO Unit := do
     let .succeeded next ← nextCheckpoint.resume 100000 1000
       | throw (IO.userError "completion captured reuse failed")
     require (next.value == .unit) "completion captured reuse result changed"
-    require ([initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize] == [2, 5, 8, 11])
+    require ([initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize] == [2, 8, 14, 20])
       "completion captured Unit fallthrough stores changed"
     IO.println s!"COMPLETION_CAPTURE_HEAPS: {[initial.heapSize, made.session.heapSize, first.session.heapSize, next.session.heapSize]}"
   IO.println "COMPLETION_COMPILER_PROFILE_FORWARD_PASS"

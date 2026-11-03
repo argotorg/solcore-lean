@@ -107,19 +107,20 @@ theorem BodyLift.global {program : Program} {registry : Registry} {caller child 
 
 theorem BodyLift.closure {program : Program} {registry : Registry} {caller child : Scope}
     {context bodyContext plainFinal : SourceSemantics.Context}
-    {before bound after : Dynamic.Heap} {function : Dynamic.Closure} {types : List TypeSystem.Ty}
-    {environment : Dynamic.Environment} {arguments : List Dynamic.Value}
+    {before copied bound after : Dynamic.Heap} {function : Dynamic.Closure} {types : List TypeSystem.Ty}
+    {entry environment : Dynamic.Environment} {arguments : List Dynamic.Value}
     {plain : Dynamic.ControlOutcome} {outcome : Dynamic.ExpressionOutcome}
     (selected : registry.Closure function child)
     (valid : Dynamic.ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters types bodyContext)
-    (allocate : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocate : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
     (lifted : BodyLift program registry true child bodyContext environment bound function.body plainFinal plain after)
     (exit : CompatibleNamedBody.Exit function.resultType plain outcome) :
     Lifting.ApplicationLift program registry caller context before (.closure function) arguments outcome after := by
   obtain ⟨finalContext, staged, reached, trace, adapted⟩ := lifted
   obtain ⟨result, converted, resultAdapted⟩ := adapted.exit exit
-  exact ⟨result, reached, .closure selected valid parameters allocate trace converted, resultAdapted⟩
+  exact ⟨result, reached, .closure selected valid parameters copy allocate trace converted, resultAdapted⟩
 
 /-- The body port starts at the same actual physical parameter entry as the
 existing preservation port. Its recursive premise is internal to the root proof. -/

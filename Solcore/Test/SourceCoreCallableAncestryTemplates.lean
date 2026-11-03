@@ -185,7 +185,7 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
     (stored : Core.RuntimeStoreHasTypes world store definitions) (left right : Core.Value)
     (leftTyped : Core.RuntimeValueHasType world left (Core.CallableContract.functionType .word .word) definitions)
     (rightTyped : Core.RuntimeValueHasType world right (Core.CallableContract.functionType .word .word) definitions)
-    (frame : SourceCoreCallableContextFrames.Layout) (shared : Nat) : IO Unit := do
+    (frame : SourceCoreCallableContextFrames.Layout) (snapshots : List Nat) : IO Unit := do
   let callLeft := Core.Expr.apply (.second (.first (.var 1))) (.word (w 1))
   let callRight := Core.Expr.apply (.second (.first (.var 0))) (.word (w 2))
   let body := Core.LocalSequence.pair .word .word callLeft callRight
@@ -204,10 +204,14 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
       | none => first | some checkpoint => checkpoint.resume 250000
     match completed.observation with
     | .succeeded (.pair (.word first) (.word second)) final =>
-      assertTrue (first == w 4 && second == w 6) "authenticated snapshots split the shared mutable source capture"
-      assertTrue (final[shared]? == some (.inRight .unit (.word (w 6)))) "capture location changed on reentry"
+      -- Each call starts again from its closure's creation-time `seed = 3`.
+      assertTrue (first == w 4 && second == w 5) "authenticated snapshots did not restart each call from the creation-time capture"
+      assertTrue (snapshots.all (fun location => final[location]? == some (.inRight .unit (.word (w 3)))))
+        "reentry wrote a closure's snapshot cell"
       assertTrue (final[0]? == some (SourceCoreCallableContextFrames.encode frame .empty)) "reentry did not restore callable context"
-      assertTrue (final.length == store.length + 6) "snapshot wrapper changed the parameter allocation and ancestry metadata suffix"
+      -- Each call makes three marked allocations of three cells: the copies of
+      -- the two captured cells and the parameter.
+      assertTrue (final.length == store.length + 18) "snapshot wrapper changed the capture copies, parameter allocation and ancestry metadata suffix"
     | observation => throw (IO.userError s!"authenticated lambda reuse failed: {reprStr observation}")
 
 private def escaped {checked : Checked} (prepared : Prepared checked) (cache : Cache prepared) (owner : Key) : IO Unit := do
@@ -235,16 +239,22 @@ private def escaped {checked : Checked} (prepared : Prepared checked) (cache : C
           (first.template.source.lambda.context.bindingAt? capture.binder).map (·.binding.binder.name) == some "seed")
         let rightSeed := second.sourceCaptures.find? (fun capture =>
           (second.template.source.lambda.context.bindingAt? capture.binder).map (·.binding.binder.name) == some "seed")
-        assertTrue (leftSeed.map (·.location) == rightSeed.map (·.location) && leftSeed.isSome)
-          "dynamic snapshot changed shared lexical source location"
+        -- Closures capture by value: each closure's `seed` capture is its own
+        -- snapshot cell, holding the creation-time value.
+        let leftLocation := leftSeed.map (·.location)
+        let rightLocation := rightSeed.map (·.location)
+        let created := fun (location : Option Nat) =>
+          (location.bind fun location => store[location]?) == some (.inRight .unit (.word (w 3)))
+        assertTrue (leftLocation != rightLocation && created leftLocation && created rightLocation)
+          "dynamic snapshots shared one lexical source location instead of each keeping its own copy"
         let ledger ← match SourceCoreAllocationLedger.scanTyped prepared.layouts [] (store.map Core.Value.type) store typed.1 with
           | .ok ledger => pure ledger | .error error => throw (IO.userError s!"nested lambda ledger failed: {reprStr error}")
         checkCaptures first ledger
         checkCaptures second ledger
         if spent == 250000 then
-          let capture ← match leftSeed with
-            | some capture => pure capture | none => throw (IO.userError "shared seed disappeared")
-          reuse typed.1 left right typed.2.1 typed.2.2 prepared.ancestry.layout.frame capture.location
+          let (some leftCapture, some rightCapture) := (leftLocation, rightLocation)
+            | throw (IO.userError "snapshot seed disappeared")
+          reuse typed.1 left right typed.2.1 typed.2.2 prepared.ancestry.layout.frame [leftCapture, rightCapture]
       | observation => throw (IO.userError s!"nested lambda did not succeed: {reprStr observation}")
     else throw (IO.userError "nested lambda product result projection changed")
 

@@ -16,6 +16,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole program)}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
+  (bindings : ProtectedStateTransition.Bindings protocol)
   {projects : GenericHeap.Projection}
   {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
     projects whole.indexed.layouts.definitions}
@@ -32,7 +33,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {faults : RecursiveStageMeaning.FaultRep}
 
 
-include record registered in
+include bindings record registered in
 theorem lifts
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
@@ -61,10 +62,10 @@ theorem lifts
       (by simpa only [sourceEq] using expressionFound) (by simpa only [sourceEq] using typed)
       certified (children _)
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
-      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same remaining ih =>
+      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same captured copied remaining ih =>
     cases modeEq
-    exact CellAwareSourceGeneralizedPrefixLifting.generalized bridge compiled record producer registered
+    exact CellAwareSourceGeneralizedPrefixLifting.generalized bridge bindings compiled record producer registered
       (type := type) (body := body) found form declaration polymorphic extended ordinary initializerFound initializerForm
-      valueType requirements coercions site initial nativeTyped allocation annotation same sourceEq issuer (ih rfl)
+      valueType requirements coercions site initial nativeTyped allocation annotation same copied sourceEq issuer (ih rfl)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNamedSourceTreeLifting

@@ -37,11 +37,11 @@ theorem capture_plan_selected
     (call : StartedCall session row.original.key [.word seed] runOptions) :
     Nonempty (NextSourcePlan first retained next [.word seed] [.word seed] call
       ((next.capture_shape shape).value next.packet.header.context
-        (inputEnvironment (next.capture_shape shape).principal.input retained.state.heap)
+        (snapshotEnvironment (next.capture_shape shape).principal.input retained.state.heap .word (.word seed))
         next.packet.header.function.evidence)
       ((next.capture_shape shape).principal.allocatedHeap next.packet.header.context
-        (inputEnvironment (next.capture_shape shape).principal.input retained.state.heap)
-        (inputHeap retained.state.heap .word (.word seed)))) := by
+        (snapshotEnvironment (next.capture_shape shape).principal.input retained.state.heap .word (.word seed))
+        (snapshotHeap retained.state.heap .word (.word seed)))) := by
   obtain ⟨start⟩ := selected_start first retained next call
   let actualShape := next.capture_shape shape
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes

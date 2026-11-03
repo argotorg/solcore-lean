@@ -744,6 +744,12 @@ theorem of_generalized_allocation
     HeapTypesExtend before after :=
   HeapMetadataExtend.of_generalized_allocation allocation
 
+theorem of_copy
+    {before after : Heap} {copied : Cell} {location : Location}
+    (allocation : Heap.AllocatesCopy before copied location after) :
+    HeapTypesExtend before after :=
+  HeapMetadataExtend.of_copy allocation
+
 theorem of_write
     {before after : Heap} {writtenLocation : Location}
     {value : Option Value}
@@ -1412,6 +1418,64 @@ theorem bind
               have extension := HeapTypesExtend.of_allocation allocation
               exact induction middle_typed (remaining_typed.mono extension)
 
+/-- Allocating a copy of a typed cell preserves deep heap typing. -/
+theorem allocateCopy
+    {context : Context} {before after : Heap}
+    {location copy : Location} {cell : Cell}
+    (heap_typed : HeapWellTyped context before)
+    (read : Heap.Reads before location cell)
+    (allocation : Heap.AllocatesCopy before cell copy after) :
+    HeapWellTyped context after := by
+  have extension := HeapTypesExtend.of_copy allocation
+  have cell_typed := heap_typed cell (read_mem read)
+  cases allocation
+  intro other member
+  simp only [List.mem_append, List.mem_singleton] at member
+  rcases member with old | fresh
+  · exact (heap_typed other old).mono extension
+  · subst other
+    exact cell_typed.mono extension
+
+/-- Copying a captured environment keeps the heap deeply typed: each fresh
+cell repeats a typed cell. -/
+theorem copy
+    {context : Context} {source : TypedSource} {environment copies : Environment}
+    {before after : Heap}
+    (heap_typed : HeapWellTyped context before)
+    (copy : EnvironmentCopies source environment before copies after) :
+    HeapWellTyped context after := by
+  induction copy with
+  | nil => exact heap_typed
+  | shared _ _ ih => exact ih heap_typed
+  | copied _ read allocate _ ih => exact ih (heap_typed.allocateCopy read allocate)
+
 end HeapWellTyped
+
+namespace EnvironmentCopies
+
+/-- A copied environment agrees with the lexical scope of its original. -/
+theorem agrees
+    {scope : Resolved.LocalScope Scheme} {source : TypedSource}
+    {environment copies : Environment} {before after : Heap}
+    (agrees : EnvironmentAgrees before scope environment)
+    (copy : EnvironmentCopies source environment before copies after) :
+    EnvironmentAgrees after scope copies := by
+  induction copy generalizing scope with
+  | nil =>
+      cases agrees
+      exact .nil
+  | shared _ tail ih =>
+      cases agrees with
+      | cons headRead cell_type storage rest =>
+          exact .cons (tail.preserves_read headRead) cell_type storage (ih rest)
+  | copied _ read allocate tail ih =>
+      cases agrees with
+      | cons headRead cell_type storage rest =>
+          have same := read.functional headRead
+          subst same
+          exact .cons (tail.preserves_read allocate.reads_new) cell_type storage
+            (ih (rest.mono (HeapTypesExtend.of_copy allocate)))
+
+end EnvironmentCopies
 
 end Solcore.SourceSemantics.Dynamic

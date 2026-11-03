@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectFo
 
 /-! Formation uses an explicit receiving function model and a positive
 closure constructor. The original functions-independent elementary producer
-runs once, and the same incoming heap is retained under that receiving model.
+runs once, copying the captured cells, and the formed heap is represented
+under that receiving model.
 No weaker heap model is inverted into stronger global provenance. Reflection
 retains its independent Source grade and exact dictionary-bearing packet. -/
 set_option autoImplicit false
@@ -51,7 +52,7 @@ structure Post
 namespace Ordinary
 variable {canonical : Environment}
   (support : CallableIndexedOwnedPreparedOrdinaryLambdaSupport.Support code)
-  (qualified : qualification.ordinary code support)
+  (qualified : ∀ environment, qualification.ordinary (code.recapture environment) (support.recapture environment))
   (prepared : CallableIndexedOwnedPreparedOrdinaryLambdaSupport.PreparedAt code support)
   (initial : State headers keys ⟨scope, mapping, world, heap, store, canonical⟩)
   (packet : CallableIndexedOwnedNestedCanonicalState.Packet owner support.caller _ initial)
@@ -70,37 +71,45 @@ inside the original existential at the same reached packet. -/
 def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap)
     (result : Core.Value) (finalStore : Store) : Prop :=
   Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore ∧
-  GenericExpressionMeaning.ResultRepresents
-    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      models)
-    mapping world code.sourceNode.type code.lowered.type faults outcome result ∧
-  CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models mapping world after finalStore ∧
-  LocationMap.Extends mapping mapping ∧ WorldExtends world world ∧
-  AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
-  ∃ reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner support.caller).State
-      ⟨scope, mapping, world, after, finalStore, canonical⟩,
-    (CallableIndexedOwnedNestedCanonicalState.protocol owner support.caller).Relates ⟨initial, packet⟩ reached ∧
-    Post (models := models) (registry := registry) (faults := faults)
-      (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
-      function.context code.sourceNode.type code.lowered.type outcome result reached ∧
-    StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore
+  ∃ finalMap finalWorld,
+    GenericExpressionMeaning.ResultRepresents
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        models)
+      finalMap finalWorld code.sourceNode.type code.lowered.type faults outcome result ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models finalMap finalWorld after finalStore ∧
+    LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+    AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+    ∃ reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner support.caller).State
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+      (CallableIndexedOwnedNestedCanonicalState.protocol owner support.caller).Relates ⟨initial, packet⟩ reached ∧
+      Post (models := models) (registry := registry) (faults := faults)
+        (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
+        function.context code.sourceNode.type code.lowered.type outcome result reached ∧
+      ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation,
+        StaticMember qualification headers keys bodyRegistry faults finalMap finalWorld formed.closure
+          (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
+          code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore
 
 /-- The proved strong post is attached without selecting another state or
 running formation again. Source admission belongs to that post's actual trace. -/
 private theorem result_at_formation
+    (formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation)
     (nativeTrace : Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word carrier) store)
-    (member : StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
+      (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) formed.finalStore)
+    (member : StaticMember qualification headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+      (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
       code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore)
+    {reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner support.caller).State
+      ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, canonical⟩}
+    (related : (CallableIndexedOwnedNestedCanonicalState.protocol owner support.caller).Relates ⟨initial, packet⟩ reached)
     (post : Post (models := models) (registry := registry) (faults := faults)
       (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
       function.context code.sourceNode.type code.lowered.type
-      (.value (.closure function)) (.inRight .word carrier) ⟨initial, packet⟩) :
+      (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) reached) :
     ResultAt (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (models := models) (support := support) (initial := initial) (packet := packet)
-      (.value (.closure function)) heap (.inRight .word carrier) store :=
-  ⟨nativeTrace, post.result, post.cells, .refl _, .refl _, .refl _ _, .refl _,
-    ⟨initial, packet⟩, Relates.refl initial, post, member⟩
+      (.value (.closure formed.closure)) formed.finalHeap (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) formed.finalStore :=
+  ⟨nativeTrace, formed.finalMap, formed.finalWorld, post.result, post.cells, formed.maps, formed.worlds, formed.frame,
+    formed.copy.metadata_extends, reached, related, post, formed, member⟩
 
 variable
   (cells : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models mapping world heap store)
@@ -119,32 +128,41 @@ include lift cells wellFormed runtime covers locals typed sourceType admitted pr
 private theorem formation_post
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word carrier) store ∧
-    StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
-    Post (models := models) (registry := registry) (faults := faults)
-      (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller) function.context code.sourceNode.type code.lowered.type
-      (.value (.closure function)) (.inRight .word carrier) ⟨initial, packet⟩ ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
-  obtain ⟨sourceTrace, nativeTrace, member, determined⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual))
+        formed.finalStore ∧
+      StaticMember qualification headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
+      (∃ reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner support.caller).State
+          ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, canonical⟩,
+        (CallableIndexedOwnedNestedCanonicalState.protocol owner support.caller).Relates ⟨initial, packet⟩ reached ∧
+        Post (models := models) (registry := registry) (faults := faults)
+          (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller) function.context code.sourceNode.type code.lowered.type
+          (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) reached) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual) ∧ finalStore = formed.finalStore) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, member, determined⟩ :=
     CallableIndexedOwnedPreparedDirectFormationReceipts.Ordinary.formation_member
       captured code owner qualification profile support qualified prepared initial packet prefixContext observed
-      cells.runtime_hasTypes ordinary coercions
+      cells ordinary coercions
   have represented : GenericExpressionMeaning.ResultRepresents
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models)
-      mapping world code.sourceNode.type code.lowered.type faults
-      (.value (.closure function)) (.inRight .word carrier) := by
+      formed.finalMap formed.finalWorld code.sourceNode.type code.lowered.type faults
+      (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) := by
     apply FunctionCalls.ResultRepresents.value
     rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
     exact .function (lift member)
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner support.caller) (CallableIndexedOwnedNestedCanonicalState.administrativeTransport (headers := headers) owner support.caller)
+    ⟨initial, packet⟩ formed.maps formed.worlds formed.frame formed.copy.metadata_extends
   have post := after_expression (bridge := CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
     (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
-    ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
-    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
-  exact ⟨sourceTrace, nativeTrace, member, ⟨post, cells, represented⟩, determined⟩
+    ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals typed
+    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) formed.frame
+  exact ⟨formed, sourceTrace, nativeTrace, member, ⟨reached, related, ⟨post, formed.heaps, represented⟩⟩, determined⟩
 
 include profile lift qualified prefixContext observed prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
 /-- The actual Source value/fault head selects the authentic lambda. Exactly
@@ -157,18 +175,19 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
         outcome after result finalStore := by
   cases trace.sound with
   | value evaluated =>
-      obtain ⟨rfl, rfl⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
+      obtain ⟨sourceCaptured, rfl, copy⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
         (program := Program.ofChecked compiled.sourceProgram) code support.body.unique coercions evaluated
-      obtain ⟨_sourceTrace, nativeTrace, member, post, _determined⟩ :=
+      obtain ⟨formed, _sourceTrace, nativeTrace, member, ⟨reached, related, post⟩, _determined⟩ :=
         formation_post
           (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
           (support := support) (qualified := qualified) (prepared := prepared)
           (initial := initial) (packet := packet) (prefixContext := prefixContext) (observed := observed)
           (models := models) (lift := lift) (cells := cells) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
           (typed := typed) (sourceType := sourceType) (admitted := admitted) ordinary coercions
-      exact ⟨_, store, result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
-        (models := models) captured code owner qualification support initial packet nativeTrace member post⟩
+      obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formed.copy
+      exact ⟨_, formed.finalStore, result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
+        (models := models) captured code owner qualification support initial packet formed nativeTrace member related post⟩
   | fault failed =>
       exact False.elim (RecursiveNamedLambdaFormationHeads.excludes_fault_of_code
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
@@ -184,7 +203,7 @@ theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
         function.context function.evidence function.source function.captured heap code.id outcome after ∧
       ResultAt (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (models := models) (support := support) (initial := initial) (packet := packet)
         outcome after result finalStore := by
-  obtain ⟨sourceTrace, nativeTrace, member, post, determined⟩ :=
+  obtain ⟨formed, sourceTrace, nativeTrace, member, ⟨reached, related, post⟩, determined⟩ :=
     formation_post
       (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
       (support := support) (qualified := qualified) (prepared := prepared)
@@ -194,16 +213,16 @@ theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
   obtain ⟨rfl, rfl⟩ := determined result finalStore completed.sound
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
     (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
-  exact ⟨sourceSize, .value (.closure function), heap, sized,
+  exact ⟨sourceSize, .value (.closure formed.closure), formed.finalHeap, sized,
     result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
-      (models := models) captured code owner qualification support initial packet nativeTrace member post⟩
+      (models := models) captured code owner qualification support initial packet formed nativeTrace member related post⟩
 
 end Ordinary
 
 namespace Principal
 variable
   (support : CallableIndexedOwnedPreparedPrincipalLambdaSupport.Support code)
-  (qualified : qualification.principal code support)
+  (qualified : ∀ environment, qualification.principal (code.recapture environment) (support.recapture environment))
   (prepared : CallableIndexedOwnedPreparedPrincipalLambdaSupport.PreparedAt code support)
   (initial : State headers keys ⟨scope, mapping, world, heap, store, captured.canonical⟩)
   (packet : CallableIndexedOwnedOriginCanonicalState.Packet owner support.principal.named _ initial)
@@ -217,35 +236,43 @@ The outer payload registry is independent of the retained body registry. -/
 def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap)
     (result : Core.Value) (finalStore : Store) : Prop :=
   Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore ∧
-  GenericExpressionMeaning.ResultRepresents
-    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      models)
-    mapping world code.sourceNode.type code.lowered.type faults outcome result ∧
-  CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models mapping world after finalStore ∧
-  LocationMap.Extends mapping mapping ∧ WorldExtends world world ∧
-  AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
-  ∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
-      ⟨scope, mapping, world, after, finalStore, captured.canonical⟩,
-    (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached ∧
-    Post (models := models) (registry := registry) (faults := faults)
-      (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-      function.context code.sourceNode.type code.lowered.type outcome result reached ∧
-    StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore
+  ∃ finalMap finalWorld,
+    GenericExpressionMeaning.ResultRepresents
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        models)
+      finalMap finalWorld code.sourceNode.type code.lowered.type faults outcome result ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models finalMap finalWorld after finalStore ∧
+    LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+    AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+    ∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
+        ⟨scope, finalMap, finalWorld, after, finalStore, captured.canonical⟩,
+      (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached ∧
+      Post (models := models) (registry := registry) (faults := faults)
+        (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
+        function.context code.sourceNode.type code.lowered.type outcome result reached ∧
+      ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation,
+        StaticMember qualification headers keys bodyRegistry faults finalMap finalWorld formed.closure
+          (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
+          code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore
 
 private theorem result_at_formation
+    (formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation)
     (nativeTrace : Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word carrier) store)
-    (member : StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
+      (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) formed.finalStore)
+    (member : StaticMember qualification headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+      (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
       code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore)
+    {reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
+      ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, captured.canonical⟩}
+    (related : (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached)
     (post : Post (models := models) (registry := registry) (faults := faults)
       (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
       function.context code.sourceNode.type code.lowered.type
-      (.value (.closure function)) (.inRight .word carrier) ⟨initial, packet⟩) :
+      (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) reached) :
     ResultAt (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (models := models) (support := support) (initial := initial) (packet := packet)
-      (.value (.closure function)) heap (.inRight .word carrier) store :=
-  ⟨nativeTrace, post.result, post.cells, .refl _, .refl _, .refl _ _, .refl _,
-    ⟨initial, packet⟩, Relates.refl initial, post, member⟩
+      (.value (.closure formed.closure)) formed.finalHeap (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) formed.finalStore :=
+  ⟨nativeTrace, formed.finalMap, formed.finalWorld, post.result, post.cells, formed.maps, formed.worlds, formed.frame,
+    formed.copy.metadata_extends, reached, related, post, formed, member⟩
 
 variable
   (cells : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry models mapping world heap store)
@@ -264,32 +291,41 @@ include lift cells wellFormed runtime covers locals typed sourceType admitted pr
 private theorem formation_post
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word carrier) store ∧
-    StaticMember qualification headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
-    Post (models := models) (registry := registry) (faults := faults)
-      (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) function.context code.sourceNode.type code.lowered.type
-      (.value (.closure function)) (.inRight .word carrier) ⟨initial, packet⟩ ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
-  obtain ⟨sourceTrace, nativeTrace, member, determined⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models) captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual))
+        formed.finalStore ∧
+      StaticMember qualification headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore ∧
+      (∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
+          ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, captured.canonical⟩,
+        (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached ∧
+        Post (models := models) (registry := registry) (faults := faults)
+          (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) function.context code.sourceNode.type code.lowered.type
+          (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) reached) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual) ∧ finalStore = formed.finalStore) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, member, determined⟩ :=
     CallableIndexedOwnedPreparedDirectFormationReceipts.Principal.formation_member
       captured code owner qualification profile support qualified prepared initial packet
-      cells.runtime_hasTypes ordinary coercions
+      cells ordinary coercions
   have represented : GenericExpressionMeaning.ResultRepresents
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry models)
-      mapping world code.sourceNode.type code.lowered.type faults
-      (.value (.closure function)) (.inRight .word carrier) := by
+      formed.finalMap formed.finalWorld code.sourceNode.type code.lowered.type faults
+      (.value (.closure formed.closure)) (.inRight .word (value code formed.embedding (CallableIndexedLambdaValues.History.native history) formed.closureActual)) := by
     apply FunctionCalls.ResultRepresents.value
     rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
     exact .function (lift member)
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named) (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner support.principal.named)
+    ⟨initial, packet⟩ formed.maps formed.worlds formed.frame formed.copy.metadata_extends
   have post := after_expression (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
     (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
-    ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
-    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
-  exact ⟨sourceTrace, nativeTrace, member, ⟨post, cells, represented⟩, determined⟩
+    ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals typed
+    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) formed.frame
+  exact ⟨formed, sourceTrace, nativeTrace, member, ⟨reached, related, ⟨post, formed.heaps, represented⟩⟩, determined⟩
 
 include profile lift qualified prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
 /-- Source inversion keeps the actual selected principal, then invokes one
@@ -302,18 +338,19 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
         outcome after result finalStore := by
   cases trace.sound with
   | value evaluated =>
-      obtain ⟨rfl, rfl⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
+      obtain ⟨sourceCaptured, rfl, copy⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
         (program := Program.ofChecked compiled.sourceProgram) code support.body.unique coercions evaluated
-      obtain ⟨_sourceTrace, nativeTrace, member, post, _determined⟩ :=
+      obtain ⟨formed, _sourceTrace, nativeTrace, member, ⟨reached, related, post⟩, _determined⟩ :=
         formation_post
           (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
           (support := support) (qualified := qualified) (prepared := prepared)
           (initial := initial) (packet := packet)
           (models := models) (lift := lift) (cells := cells) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
           (typed := typed) (sourceType := sourceType) (admitted := admitted) ordinary coercions
-      exact ⟨_, store, result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
-        (models := models) captured code owner qualification support initial packet nativeTrace member post⟩
+      obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formed.copy
+      exact ⟨_, formed.finalStore, result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
+        (models := models) captured code owner qualification support initial packet formed nativeTrace member related post⟩
   | fault failed =>
       exact False.elim (RecursiveNamedLambdaFormationHeads.excludes_fault_of_code
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
@@ -329,7 +366,7 @@ theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
         function.context function.evidence function.source function.captured heap code.id outcome after ∧
       ResultAt (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (models := models) (support := support) (initial := initial) (packet := packet)
         outcome after result finalStore := by
-  obtain ⟨sourceTrace, nativeTrace, member, post, determined⟩ :=
+  obtain ⟨formed, sourceTrace, nativeTrace, member, ⟨reached, related, post⟩, determined⟩ :=
     formation_post
       (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
       (support := support) (qualified := qualified) (prepared := prepared)
@@ -339,9 +376,9 @@ theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
   obtain ⟨rfl, rfl⟩ := determined result finalStore completed.sound
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
     (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
-  exact ⟨sourceSize, .value (.closure function), heap, sized,
+  exact ⟨sourceSize, .value (.closure formed.closure), formed.finalHeap, sized,
     result_at_formation (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
-      (models := models) captured code owner qualification support initial packet nativeTrace member post⟩
+      (models := models) captured code owner qualification support initial packet formed nativeTrace member related post⟩
 
 end Principal
 

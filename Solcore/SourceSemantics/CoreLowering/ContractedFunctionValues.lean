@@ -46,18 +46,49 @@ variable {catalog : SourceCoreDataCatalog.Catalog} {program : Program}
   {active : TypeSystem.Substitution} {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {administrativeContext : Core.Context}
 
+/-- The decorated callable created at the lambda, before its creation-time copies. -/
+def Code.callable
+    (code : Code catalog program bodyCertificate policy compilation table active function scope administrativeContext) :
+    Core.Expr :=
+  Core.LanguageResult.success (code.descriptor.wrap
+    (Core.TaggedFunction.anonymous (.lambda code.artifact.raw.parameterCore
+      (Core.LanguageResult.resultType code.artifact.raw.resultCore) code.artifact.raw.rawBody)))
+
 theorem Code.emitted
     (code : Code catalog program bodyCertificate policy compilation table active function scope administrativeContext) :
-    code.lowered.expression = Core.LanguageResult.success (code.descriptor.wrap
-      (Core.TaggedFunction.anonymous (.lambda code.artifact.raw.parameterCore
-        (Core.LanguageResult.resultType code.artifact.raw.resultCore) code.artifact.raw.rawBody))) := by
-  have raw := congrArg SourceCoreBasic.LoweredExpr.expression code.artifact.raw.emitted
+    code.lowered.expression =
+      SourceCoreSourceCells.copyScopePlain function.source scope (fun index => index) code.callable := by
   have accepted := code.artifact.decoration
-  rw [raw] at accepted
   have expected := code.decoration (Core.TaggedFunction.anonymous (.lambda code.artifact.raw.parameterCore
     (Core.LanguageResult.resultType code.artifact.raw.resultCore) code.artifact.raw.rawBody))
   have same := Except.ok.inj (accepted.symm.trans expected)
-  exact (congrArg SourceCoreBasic.LoweredExpr.expression code.artifact.emitted).trans same
+  rw [congrArg SourceCoreBasic.LoweredExpr.expression code.artifact.emitted]
+  dsimp only
+  rw [same]
+  rfl
+
+/-- Code validity does not depend on the captured environment, so the same
+code describes the closure over any copy of its captures. -/
+def Code.recapture
+    (code : Code catalog program bodyCertificate policy compilation table active function scope administrativeContext)
+    (captured : Dynamic.Environment) :
+    Code catalog program bodyCertificate policy compilation table active { function with captured := captured }
+      scope administrativeContext where
+  id := code.id
+  node := code.node
+  reportedType := code.reportedType
+  lowered := code.lowered
+  artifact := code.artifact
+  owner := code.owner
+  descriptor := code.descriptor
+  decoration := code.decoration
+  frame := ⟨code.frame.signatures, code.frame.owner,
+    ⟨code.frame.code.owner, code.frame.code.closed, code.frame.code.variables_closed,
+      code.frame.code.residual_variables_open, code.frame.code.graph, code.frame.code.requirement_ledger,
+      code.frame.code.occurrence⟩,
+    code.frame.requirements, code.frame.evidence_covers⟩
+  projection := code.projection
+  outputTyped := code.outputTyped
 
 theorem Code.rawBody_hasType
     (code : Code catalog program bodyCertificate policy compilation table active function scope administrativeContext) :
@@ -65,6 +96,7 @@ theorem Code.rawBody_hasType
       code.artifact.raw.rawBody (Core.LanguageResult.resultType code.artifact.raw.resultCore) catalog.definitions := by
   have typed := code.outputTyped
   rw [code.emitted] at typed
+  replace typed := CaptureCopyTyping.copyScopePlain_body_hasType (fun _ _ same => same) typed
   cases typed with
   | inRight _ wrapped =>
     cases wrapped with
@@ -155,45 +187,89 @@ theorem Represents.source_hasType
   | closure layout code =>
     exact .closure (code.frame.signatures.trans signatures.symm) code.frame.code code.frame.evidence_covers captures
 
-/-- The actual emitted wrapper preserves the renamed code and the real capture
-layout while retaining the exact artifact descriptor. -/
-theorem formation {actual : Core.Environment}
-    (layout : FunctionCaptures.Layout catalog mapping world scope function.captured actual)
+/-- The actual emitted wrapper copies the captured cells of its creation
+environment, then preserves the renamed code and the closure's capture layout
+while retaining the exact artifact descriptor. -/
+theorem formation {model : GenericHeap.PayloadModel catalog}
+    {environment : Dynamic.Environment} {actual : Core.Environment} {heap : Dynamic.Heap} {store : Core.Store}
+    (layout : FunctionCaptures.Layout catalog mapping world scope environment actual)
     (code : Code catalog program bodyCertificate policy compilation table active function scope layout.administrativeContext)
-    (store : Core.Store) :
-    Core.Evaluates actual store (code.lowered.expression.rename layout.embedding)
-      (.inRight .word (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
-        layout.embedding actual code.descriptor.id)) store ∧
-    Represents catalog program bodyCertificate table mapping world
-      (FunctionValues.sourceType function) (.closure function)
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store) :
+    ∃ captured finalHeap finalStore finalMap finalWorld closureActual embedding,
+      Dynamic.EnvironmentCopies function.source environment heap captured finalHeap ∧
+      Core.Evaluates actual store (code.lowered.expression.rename layout.embedding)
+        (.inRight .word (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
+          embedding closureActual code.descriptor.id)) finalStore ∧
+      Represents catalog program bodyCertificate table finalMap finalWorld
+        (FunctionValues.sourceType function) (.closure { function with captured := captured })
+        (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
+          embedding closureActual code.descriptor.id)
+        (Core.CallableContract.functionType code.artifact.raw.parameterCore code.artifact.raw.resultCore) ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ Core.WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore := by
+  obtain ⟨captured, finalHeap, finalCanonical, finalActual, finalActualContext, finalStore, finalMap,
+      finalWorld, finalEmbedding, copy, environments, finalHeaps, maps, worlds, frame, lookups, types,
+      actualTyped, agreement⟩ :=
+    CaptureCopies.copies_prefix_typed (pre := []) (preContext := [])
+      (body := code.callable) layout.represented heaps
+      layout.lookups rfl layout.types layout.actualTyped
+  let closureLayout : FunctionCaptures.Layout catalog finalMap finalWorld scope captured finalActual := {
+    administrativeContext := layout.administrativeContext
+    canonical := finalCanonical
+    actualContext := finalActualContext
+    embedding := finalEmbedding
+    represented := environments
+    lookups := lookups
+    types := types
+    actualTyped := actualTyped }
+  have represented : Represents catalog program bodyCertificate table finalMap finalWorld
+      (FunctionValues.sourceType { function with captured := captured }) (.closure { function with captured := captured })
       (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
-        layout.embedding actual code.descriptor.id)
+        finalEmbedding finalActual code.descriptor.id)
       (Core.CallableContract.functionType code.artifact.raw.parameterCore code.artifact.raw.resultCore) := by
-  refine ⟨?_, .closure layout code⟩
+    exact @Represents.closure catalog program bodyCertificate table finalMap finalWorld policy compilation active
+      { function with captured := captured } scope finalActual closureLayout (code.recapture captured)
+  refine ⟨captured, finalHeap, finalStore, finalMap, finalWorld, finalActual, finalEmbedding, copy, ?_,
+    represented, finalHeaps, maps, worlds, frame⟩
   rw [code.emitted]
+  have base : (fun index : Nat => index) = (· + ([] : Core.Environment).length) := by
+    funext index
+    simp
+  rw [base]
+  apply agreement.wrap
   exact .inRight (.pair (.pair (.inLeft .unit) .lambda) .word)
 
-/-- Ordinary source lambda formation corresponds to the authenticated wrapper.
-This does not add the separate runtime stage-call guard to source evaluation. -/
-theorem formation_corresponds {actual : Core.Environment}
-    (layout : FunctionCaptures.Layout catalog mapping world scope function.captured actual)
+/-- Ordinary source lambda formation over copies of its creation environment
+corresponds to the authenticated wrapper. This does not add the separate
+runtime stage-call guard to source evaluation. -/
+theorem formation_corresponds {model : GenericHeap.PayloadModel catalog}
+    {environment : Dynamic.Environment} {actual : Core.Environment} {heap : Dynamic.Heap} {store : Core.Store}
+    (layout : FunctionCaptures.Layout catalog mapping world scope environment actual)
     (code : Code catalog program bodyCertificate policy compilation table active function scope layout.administrativeContext)
-    (heap : Dynamic.Heap) (store : Core.Store) (requirements : code.node.requirements = [])
-    (coercions : code.node.coercions = []) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured
-      heap code.id (.closure function) heap ∧
-    Core.Evaluates actual store (code.lowered.expression.rename layout.embedding)
-      (.inRight .word (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
-        layout.embedding actual code.descriptor.id)) store ∧
-    Represents catalog program bodyCertificate table mapping world
-      (FunctionValues.sourceType function) (.closure function)
-      (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
-        layout.embedding actual code.descriptor.id)
-      (Core.CallableContract.functionType code.artifact.raw.parameterCore code.artifact.raw.resultCore) := by
-  refine ⟨?_, formation layout code store⟩
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (requirements : code.node.requirements = []) (coercions : code.node.coercions = []) :
+    ∃ captured finalHeap finalStore finalMap finalWorld closureActual embedding,
+      Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment
+        heap code.id (.closure { function with captured := captured }) finalHeap ∧
+      Core.Evaluates actual store (code.lowered.expression.rename layout.embedding)
+        (.inRight .word (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
+          embedding closureActual code.descriptor.id)) finalStore ∧
+      Represents catalog program bodyCertificate table finalMap finalWorld
+        (FunctionValues.sourceType function) (.closure { function with captured := captured })
+        (value code.artifact.raw.parameterCore code.artifact.raw.resultCore code.artifact.raw.rawBody
+          embedding closureActual code.descriptor.id)
+        (Core.CallableContract.functionType code.artifact.raw.parameterCore code.artifact.raw.resultCore) ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ Core.WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore := by
+  obtain ⟨captured, finalHeap, finalStore, finalMap, finalWorld, closureActual, embedding, copy, evaluated,
+      represented, heaps, maps, worlds, frame⟩ := formation layout code heaps
+  refine ⟨captured, finalHeap, finalStore, finalMap, finalWorld, closureActual, embedding, ?_, evaluated,
+    represented, heaps, maps, worlds, frame⟩
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound code.artifact.raw.found)
   · rw [code.artifact.raw.form, requirements, coercions]
-    exact .lambda rfl
+    exact .lambda rfl copy
   · rw [coercions]
     exact .nil
 

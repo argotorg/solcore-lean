@@ -91,36 +91,58 @@ private def success (entry : Entry) (arguments : List Core.Value) (expected : Co
       pure store
   | result => throw (IO.userError s!"function-entry did not succeed: {reprStr result}")
 
+/-- Closures capture by value: every call starts from the closure's
+creation-time copies, and assignments in a body write only that call's copies. -/
 private def testCapturesAndCalls (program : CheckedProgram) : IO Unit := do
   let named ← firstEntry (← prepared program ["named"])
   discard <| success named [scalar 4] (scalar 5)
   discard <| success named [scalar 9] (scalar 10)
   let returnedProgram ← prepared program ["useReturned"]
   let returnedEntry ← firstEntry returnedProgram
-  let store ← success returnedEntry [scalar 4] (.pair (scalar 6) (scalar 9))
+  let store ← success returnedEntry [scalar 4] (.pair (scalar 6) (scalar 7))
   let firstSourceCell := returnedEntry.inputs.length + returnedProgram.plan.specializations.length
   assertTrue (store[firstSourceCell]? == some (present (scalar 4))) "returned closure mutated its caller's value copy"
-  assertTrue (store[firstSourceCell + 1]? == some (present (scalar 9))) "returned closure did not share its own captured parameter"
+  assertTrue (store[firstSourceCell + 1]? == some (present (scalar 4)))
+    "returned closure call wrote its captured parameter instead of a per-call copy"
   let sharedProgram ← prepared program ["shared"]
   let sharedEntry ← firstEntry sharedProgram
-  let store ← success sharedEntry [scalar 4] (.pair (scalar 6) (scalar 9))
-  assertTrue (store[sharedEntry.inputs.length + sharedProgram.plan.specializations.length]? == some (present (scalar 9)))
-    "two closures copied a mutable capture instead of sharing its cell"
+  let store ← success sharedEntry [scalar 4] (.pair (scalar 6) (scalar 7))
+  assertTrue (store[sharedEntry.inputs.length + sharedProgram.plan.specializations.length]? == some (present (scalar 4)))
+    "a closure call wrote the enclosing parameter instead of its own copy"
   let nested ← firstEntry (← prepared program ["nestedCapture"])
-  discard <| success nested [scalar 4] (scalar 13)
+  discard <| success nested [scalar 4] (scalar 8)
   let loop ← firstEntry (← prepared program ["closureLoop"])
   discard <| success loop [scalar 8] (scalar 11)
 
+/-- `loop` is assigned after the closure is created, so the closure's copy of
+`loop` is uninitialized and its first recursive read fails. -/
 private def testRecursionAndResume (program : CheckedProgram) : IO Unit := do
   let compiled ← prepared program ["selfCell", "useBounce", "selfCell"]
   assertTrue (compiled.entries.length == 3) "function-entry duplicate seed order changed"
+  let selfCell := (← request program "selfCell").declaration
+  let function ← match program.functions.find? (·.declaration == selfCell) with
+    | some function => pure function
+    | none => throw (IO.userError "self-cell source missing")
+  let (read, binder) ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference "loop" (.local binder), .. } => some (node, binder)
+      | _ => none with
+    | some read => pure read
+    | none => throw (IO.userError "self-cell read in the closure body missing")
   for entry in compiled.entries do
-    discard <| success entry [scalar 7] (scalar 7)
+    if entry.key.declaration == selfCell then
+      match (← execute entry [scalar 7]).observation with
+      | .failed reason _ =>
+          assertTrue (decide (entry.failureDiagnostic? reason = some {
+            error := .uninitializedLocal binder, site := .occurrence read.id.occurrence, span := some read.span }))
+            "self-cell closure failure lost its uninitialized copy's binder, occurrence or span"
+      | result => throw (IO.userError s!"self-cell closure read of its uninitialized copy did not fail: {reprStr result}")
+    else
+      discard <| success entry [scalar 7] (scalar 7)
   let entry ← firstEntry compiled
   let suspended ← execute entry [scalar 7] 15
   let checkpoint ← match suspended.checkpoint? with
     | some checkpoint => pure checkpoint
-    | none => throw (IO.userError "closure recursion did not produce a typed checkpoint")
+    | none => throw (IO.userError "self-cell closure call did not produce a typed checkpoint")
   let resumed := checkpoint.resume 30000
   let uninterrupted ← execute entry [scalar 7] 30015
   assertTrue (resumed.observation == uninterrupted.observation)
@@ -132,7 +154,9 @@ private def testFailures (program : CheckedProgram) : IO Unit := do
   match (← execute entry []).observation with
   | .failed reason store =>
       let marker := entry.inputs.length + compiled.plan.specializations.length + 1
-      assertTrue (store[marker]? == some (present (scalar 0))) "failed callee evaluated argument side effects"
+      /- The argument closure would write only its own copy of `marker`, so
+      this cell no longer shows whether the argument was evaluated. -/
+      assertTrue (store[marker]? == some (present (scalar 0))) "failed callee changed the enclosing marker"
       assertTrue (decide (entry.failureDiagnostic? reason ≠ none)) "failed function cell lost its diagnostic"
   | result => throw (IO.userError s!"uninitialized function cell did not fail: {reprStr result}")
   let compiled ← prepared program ["useFailure"]

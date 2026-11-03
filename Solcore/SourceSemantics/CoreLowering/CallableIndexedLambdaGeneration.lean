@@ -100,7 +100,7 @@ theorem contextual_certificate_with_policy_recipe {checked : SourceCoreCompatibl
       simpa [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure] using read
   · change SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext [] = _
     rw [prepared.ancestry.graph.inputs.callableSelected]
-  · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, by funext lambda; simp⟩
 
 /-- The original interface forgets only the additional literal policy fields. -/
 theorem contextual_certificate_with_body_recipe {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)
@@ -224,6 +224,8 @@ structure Site {checked : SourceCoreCompatibleCatalog.Checked}
   compilation : code.compilation = context prepared named
   active : code.active = []
   allocationError : code.allocationError = fun error => .sourceAllocation (reprStr error)
+  /-- The site's lambda copies its captures at creation. -/
+  snapshots : code.policy.snapshotLambda code.id = true
 
 private theorem descriptor_exists (table : SourceCoreStageCodebook.Table)
     {origin : SourceCoreStageCodebook.Origin} {id : Word} (selected : table.idAt? origin = some id) :
@@ -262,6 +264,7 @@ theorem of_certificate {checked : SourceCoreCompatibleCatalog.Checked}
     (expressionProfile : policy.rawLambdaExpression = SourceCoreCallableIndexedAncestry.expressionHook prepared.ancestry named.signature.key [])
     (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some prepared.ancestry.graph.inputs.callable) [])
     (projector : policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked)
+    (snapshots : policy.snapshotLambda id = true)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
       (LanguageResult.resultType lowered.type) prepared.layouts.definitions) :
     ∃ site : Site prepared named parameters result body sourceContext evidence captured scope administrative,
@@ -302,7 +305,7 @@ theorem of_certificate {checked : SourceCoreCompatibleCatalog.Checked}
     id, sourceNode, sourceFound, sourceForm, node, found, form, reported, reasonAt, lowered, receipt, accepted,
     allocationError := fun error => .sourceAllocation (reprStr error), allocationProfile, manifest, expressionProfile,
     callables, descriptor, projection, typed }
-  exact ⟨⟨code, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl receipt⟩
+  exact ⟨⟨code, rfl, rfl, rfl, snapshots⟩, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl receipt⟩
 
 /-- Build every static code field from the actual named callback's accepted
 ordinary lambda branch. Canonical metadata and native checking remain explicit,
@@ -348,7 +351,8 @@ theorem of_contextual_with_policy_recipe {checked : SourceCoreCompatibleCatalog.
     contextual_certificate_with_policy_recipe prepared compiled record found (form.trans sourceForm) owner requirements coercions ordinary read accepted
   obtain ⟨site, identifier, emitted, samePolicy, sameBody, sameFuel, _view, _reasonAt, _sourceNode, _node, _receipt⟩ :=
     of_certificate prepared sourceContext evidence captured receipt accepted profile viewOfSource
-      sourceFound sourceForm found form allocationProfile manifest expressionProfile callables projector typed
+      sourceFound sourceForm found form allocationProfile manifest expressionProfile callables projector
+      (by rw [policyRecipe.snapshotLambda]) typed
   have actualBody : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compiled site.code :=
     sameBody.trans bodyRecipe
   have actualPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe
@@ -550,19 +554,30 @@ theorem Site.formation_after_prefix
     (preserved : AdministrativePreserved entryMap
       (entryStore.set location (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame
         (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin))) mapping store)
-    (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog checked.catalog) projects prepared.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : site.code.policy.snapshotLambda site.code.id = true)
+    (referenceIndex : site.code.referenceIndex = scope.length + 1 + prepared.base.globals.length)
     (reference : captured.canonical[site.code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location)) :
-    Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
-      (.closure (closure named parameters result body sourceContext evidence capturedSource)) heap ∧
-    Evaluates actual store (site.code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value site.code captured.embedding
-        (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)) store ∧
-    Represents prepared mapping world (FunctionValues.sourceType (closure named parameters result body sourceContext evidence capturedSource))
-      (.closure (closure named parameters result body sourceContext evidence capturedSource))
-      (value site.code captured.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)
-      (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
+    ∃ formed : Formed model captured site.code (site.historyAt selected record) heap store location,
+      Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
+        (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (site.code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value site.code formed.embedding
+          (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) formed.closureActual))
+        formed.finalStore ∧
+      Represents prepared formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType (closure named parameters result body sourceContext evidence capturedSource))
+        (.closure formed.closure)
+        (value site.code formed.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin)
+          formed.closureActual)
+        (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
   obtain ⟨_, cell⟩ := installed_after_prefix selected record entryRead unmapped preserved
-  exact formation (function := closure named parameters result body sourceContext evidence capturedSource) captured site.code (site.historyAt selected record) program heap ordinary coercions stored reference cell.read
+  obtain ⟨formed⟩ := formation captured site.code (site.historyAt selected record) copied referenceIndex heaps
+    reference cell.read
+  exact ⟨formed, formed.source program ordinary coercions, formed.evaluated,
+    formed.represents heaps.runtime_hasTypes⟩
 
 theorem Site.reflects_after_prefix
     {mapping world actual}
@@ -579,18 +594,30 @@ theorem Site.reflects_after_prefix
     (preserved : AdministrativePreserved entryMap
       (entryStore.set location (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame
         (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin))) mapping store)
-    (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog checked.catalog) projects prepared.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : site.code.policy.snapshotLambda site.code.id = true)
+    (referenceIndex : site.code.referenceIndex = scope.length + 1 + prepared.base.globals.length)
     (reference : captured.canonical[site.code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
     (completed : Evaluates actual store (site.code.lowered.expression.rename captured.embedding) output after) :
-    output = .inRight .word (value site.code captured.embedding
-      (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
-      (.closure (closure named parameters result body sourceContext evidence capturedSource)) heap ∧
-    Represents prepared mapping world (FunctionValues.sourceType (closure named parameters result body sourceContext evidence capturedSource))
-      (.closure (closure named parameters result body sourceContext evidence capturedSource))
-      (value site.code captured.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)
-      (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
+    ∃ formed : Formed model captured site.code (site.historyAt selected record) heap store location,
+      output = .inRight .word (value site.code formed.embedding
+        (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) formed.closureActual) ∧
+      after = formed.finalStore ∧
+      Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
+        (.closure formed.closure) formed.finalHeap ∧
+      Represents prepared formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType (closure named parameters result body sourceContext evidence capturedSource))
+        (.closure formed.closure)
+        (value site.code formed.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin)
+          formed.closureActual)
+        (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
   obtain ⟨_, cell⟩ := installed_after_prefix selected record entryRead unmapped preserved
-  exact reflects (function := closure named parameters result body sourceContext evidence capturedSource) captured site.code (site.historyAt selected record) program heap ordinary coercions stored reference cell.read completed
+  obtain ⟨formed⟩ := formation captured site.code (site.historyAt selected record) copied referenceIndex heaps
+    reference cell.read
+  obtain ⟨sameOutput, sameStore⟩ := formed.reflects completed
+  exact ⟨formed, sameOutput, sameStore, formed.source program ordinary coercions,
+    formed.represents heaps.runtime_hasTypes⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration

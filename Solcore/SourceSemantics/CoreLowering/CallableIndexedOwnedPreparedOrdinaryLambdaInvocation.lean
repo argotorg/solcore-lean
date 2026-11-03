@@ -90,7 +90,7 @@ theorem preserves_head_at (size : Nat) :
       code.id code.sourceNode.type := by
     simpa only [sameSource, code, Formation.code, Formation.function,
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.produced.identifier] using typed
-  obtain ⟨result, finalStore, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨result, finalStore, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedPreparedOrdinaryLambdaFormation.preserves_at
       (function := head.function environment) (actual := actual)
@@ -100,9 +100,9 @@ theorem preserves_head_at (size : Nat) :
   have native : Evaluates actual store (lowered.expression.rename ξ) result finalStore := by
     simpa only [code, Formation.code, recaptureCode, head.produced.emitted, captured, captures_for] using native
   have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-      mapping world code.sourceNode.type lowered.type faults outcome result := by
+      finalMap finalWorld code.sourceNode.type lowered.type faults outcome result := by
     simpa only [model, code, Formation.code, recaptureCode, head.produced.emitted] using represented
-  exact ⟨result, finalStore, mapping, world, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨result, finalStore, finalMap, finalWorld, native, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 include inclusion complete globals slots prefixZero wellFormed runtime covers sameSource in
@@ -141,7 +141,7 @@ theorem reflects_head_at (size : Nat) :
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.produced.identifier] using typed
   have actualCompleted : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) value finalStore := by
     simpa only [code, Formation.code, recaptureCode, head.produced.emitted, captured, captures_for] using completed
-  obtain ⟨sourceSize, outcome, after, trace, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨sourceSize, outcome, after, trace, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reflects_at
       (function := head.function environment) (actual := actual)
@@ -153,9 +153,9 @@ theorem reflects_head_at (size : Nat) :
     simpa only [sameSource, code, Formation.code, Formation.function,
       CallableIndexedLambdaGeneration.closure, recaptureCode, head.produced.identifier] using trace
   have represented : GenericExpressionMeaning.ResultRepresents (model (registry := registry) functions)
-      mapping world code.sourceNode.type lowered.type faults outcome value := by
+      finalMap finalWorld code.sourceNode.type lowered.type faults outcome value := by
     simpa only [model, code, Formation.code, recaptureCode, head.produced.emitted] using represented
-  exact ⟨sourceSize, outcome, after, mapping, world, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 end FormationHeads

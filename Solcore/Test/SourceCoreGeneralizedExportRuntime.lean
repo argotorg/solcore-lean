@@ -186,7 +186,7 @@ def run : IO Unit := do
   let heaps := [firstStart.session.heapSize,firstResult.val.session.heapSize,captureResult.val.session.heapSize,
     tickResult.val.session.heapSize,wordResult.val.session.heapSize,boolResult.val.session.heapSize,
     savedResult.val.session.heapSize,repeatResult.val.session.heapSize]
-  require (heaps == [4,10,16,19,22,25,28,31]) "Source-certified exported handle heaps changed"
+  require (heaps == [4,13,22,25,31,37,43,49]) "Source-certified exported handle heaps changed"
   IO.println "GENERALIZED_EXPORTED_SOURCE_PUBLIC: originals3/cache3/typed3/profile3; make/capture/tick/Word/Bool/captured/reuse"
   IO.println s!"GENERALIZED_EXPORTED_SOURCE_HEAPS: {heaps}"
   IO.println "GENERALIZED_EXPORTED_SOURCE_PUBLIC_PASS"

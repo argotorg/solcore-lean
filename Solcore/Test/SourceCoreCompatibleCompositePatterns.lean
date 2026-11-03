@@ -111,11 +111,13 @@ def run : IO Unit := do
   let w := Word.ofNatModulo
   let mapping : SourceCoreExecution.Value := .mapping .word .word
     [(.word (w 7), .word (w 13)), (.word (w 7), .word (w 900)), (.word (w 9), .word (w 29))]
-  for (name, expected) in [("nested", 52), ("constructed", 52), ("miss", 10)] do
+  -- The bound closure captures `marker = 10` by value and each call starts
+  -- again from it, so `f(bound[9])` returns 10 + 29.
+  for (name, expected) in [("nested", 39), ("constructed", 39), ("miss", 10)] do
     let entry ← SourceCompilerFeatureSupport.compileNamed program name
     let inputs : List SourceCoreExecution.Value := [.word (w 10), mapping]
     SourceCompilerFeatureSupport.require ((← entry.run inputs) == .word (w expected))
-      "nested function/mapping matcher changed ordered bindings or shared captures"
+      "nested function/mapping matcher changed ordered bindings or by-value captures"
     for budget in [0, 7, 43] do entry.checkResume inputs (.word (w expected)) budget
   IO.println "compatible composite patterns: recursive typed receipts, general payloads, raw guards and finite source/Core correspondence GREEN"
 end Tests.SourceCoreCompatibleCompositePatterns

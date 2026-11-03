@@ -199,7 +199,7 @@ theorem reflects_original_for {callerContext : SourceSemantics.Context} {callerE
     reached_reflects_for captured code history body functions functionObservations functionViews extension uninitialized missing escaped initial sameFrame reached evaluated
   obtain ⟨restoredHeaps, restoredEntry, restoredFrame, caller⟩ :=
     restore_catalog_for reached initial sameFrame read currentCarried finalHeaps maps worlds frame metadata
-  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.frame body.extended reached.allocation
+  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.frame body.extended reached.copy reached.allocation
   subst finalStore
   exact ⟨reached, child, bodyStore, sourceSize, outcome, after, finalMap, finalWorld,
     smaller, evaluated, rfl, trace, source, related, restoredHeaps, reached.maps.trans maps, reached.worlds.trans worlds,
@@ -319,7 +319,7 @@ theorem reflects_original_named_for {callerContext : SourceSemantics.Context} {c
     reached_reflects_named_for captured code history body functions functionObservations functionViews family extension uninitialized missing escaped initial sameFrame reached evaluated
   obtain ⟨restoredHeaps, restoredEntry, restoredFrame, caller⟩ :=
     restore_catalog_for reached initial sameFrame read currentCarried finalHeaps maps worlds frame metadata
-  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.frame body.extended reached.allocation
+  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.frame body.extended reached.copy reached.allocation
   subst finalStore
   exact ⟨reached, child, bodyStore, sourceSize, outcome, after, finalMap, finalWorld,
     smaller, evaluated, rfl, trace, source, related, restoredHeaps, reached.maps.trans maps, reached.worlds.trans worlds,
@@ -443,7 +443,7 @@ theorem reflects_original_nested_for {callerContext : SourceSemantics.Context} {
     reached_reflects_nested_for captured code history body profile complete globals slots metadataSource family extension uninitialized missing escaped initial sameFrame reached evaluated
   obtain ⟨restoredHeaps, restoredEntry, restoredFrame, caller⟩ :=
     restore_catalog_for reached initial sameFrame read currentCarried finalHeaps maps worlds frame metadata
-  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.body.frame body.body.extended reached.allocation
+  have source := trace.sound.call (context := callerContext) (caller := callerEvidence) body.body.frame body.body.extended reached.copy reached.allocation
   subst finalStore
   exact ⟨reached, child, bodyStore, sourceSize, outcome, after, finalMap, finalWorld,
     smaller, evaluated, rfl, trace, source, related, restoredHeaps, reached.maps.trans maps, reached.worlds.trans worlds,

@@ -101,7 +101,7 @@ def run : IO Unit := do
             | throw (IO.userError "builtin returned value shape")
           let heaps := [firstStart.session.heapSize, firstReturned.session.heapSize,
             secondReturned.session.heapSize, thirdReturned.session.heapSize]
-          require (heaps == [2,11,20,29]) "mixed conditional Source-certified repeated native heaps changed"
+          require (heaps == [2,17,32,47]) "mixed conditional Source-certified repeated native heaps changed"
           IO.println "MIXED_CONDITIONAL_SOURCE_PUBLIC: originals1/cache1/typing1/profile1; proof before every resume"
           IO.println s!"MIXED_CONDITIONAL_SOURCE_HEAPS: {heaps}"
           IO.println "MIXED_CONDITIONAL_SOURCE_PUBLIC_PASS"

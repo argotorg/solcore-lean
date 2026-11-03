@@ -159,7 +159,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
               (.cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2))) tailReturn⟩, tailReady, ?_⟩
           rw [sequence_rename]
           exact (ContinuationAgreement.bind initialEval).trans ((ContinuationAgreement.letE allocationEval).trans agreement)
-      | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+      | letInitializedGeneralized _ captures poly other allocated => exact False.elim (poly mono)
   | discard found child remaining ih =>
     have itemFact := sites.head itemsFacts
     cases trace with | cons first rest =>
@@ -661,7 +661,7 @@ theorem Tree.preserves_fault_reachable_bounded_for_with_eliminator
               worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
               preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata),
               ⟨reached, protocol.trans expressionRelated (protocol.trans allocationRelated (protocol.trans tailRelated restoredRelated)), restoredPost⟩⟩
-        | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+        | letInitializedGeneralized _ captures poly other allocated => exact False.elim (poly mono)
     · intro context scope expression expressionNode rest lowered body found child ih
       intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
       have itemFact := sites.head itemsFacts

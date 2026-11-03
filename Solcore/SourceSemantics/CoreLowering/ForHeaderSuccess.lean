@@ -124,7 +124,7 @@ theorem Tree.source_success
         simp only [Core.LoopRenaming.letInitialized]
         exact (ContinuationAgreement.bind coreEval).trans
           (ContinuationAgreement.letE (Core.OptionalCell.allocateInitialized_evaluates (.var rfl)))
-      | letInitializedGeneralized _ polymorphic _ _ => exact False.elim (polymorphic binding.monomorphic)
+      | letInitializedGeneralized _ _ polymorphic _ _ => exact False.elim (polymorphic binding.monomorphic)
   | @discard scope context expression expressionType expressionCode rest body depth valueTree tail ih =>
     cases executed with
     | cons head remaining =>

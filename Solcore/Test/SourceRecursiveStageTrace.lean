@@ -65,7 +65,7 @@ private theorem targetValue (heap : Dynamic.Heap) :
   · exact ⟨by simp [child, source], rfl⟩
   · exact .lambda _ _ _
   · rfl
-  · exact .lambda rfl
+  · exact .lambda rfl (.nil heap)
 
 private theorem ordinaryValue (heap : Dynamic.Heap) :
     Recursive.Expression program registry child context [] heap (id 4) (.value (.closure (callable false))) heap := by
@@ -73,7 +73,7 @@ private theorem ordinaryValue (heap : Dynamic.Heap) :
   · exact ⟨by simp [child, source], rfl⟩
   · exact .lambda _ _ _
   · rfl
-  · exact .lambda rfl
+  · exact .lambda rfl (.nil heap)
 
 private theorem bound (marked : Bool) : child.guards.Binds (.closure (callable marked)) ⟨[parameter marked], false⟩ := by
   apply CallableLedger.Binds.closure rfl
@@ -132,6 +132,7 @@ example (heap : Dynamic.Heap) (valid : Dynamic.ClosureFrame program wrapper) :
   · exact ⟨rfl, rfl⟩
   · exact valid
   · exact .nil _
+  · exact .nil heap
   · exact .nil [] heap
   · apply Recursive.Statements.returnFault (node := returnNode) (expression := id 2)
     · exact ⟨by simp [child, source], rfl⟩

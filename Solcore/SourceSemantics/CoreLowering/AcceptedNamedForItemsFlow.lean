@@ -117,8 +117,12 @@ inductive Items (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (generated : policy.lowerExpression fuel source scope expression reasonAt = .ok child)
       (childType : SourceCoreBasic.ensureType (.binder binder.id) payload child.type = .ok ())
       (remaining : Items policy source site result reasonAt next finalScope finish fuel ((binder.id, payload) :: scope) rest tail)
-      (allocated : SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id binder
-        (LocalLoop.controlType result) payload child.expression tail = .ok code) :
+      (allocated : (if binder.scheme.quantified.isEmpty then
+          SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id binder
+            (LocalLoop.controlType result) payload child.expression tail
+        else
+          SourceCoreSourceCells.letInitializedSnapshot policy.sourceCells source scope binder
+            (LocalLoop.controlType result) payload child.expression tail) = .ok code) :
       Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.letDecl binder (some expression) :: rest) code
   | discard {fuel scope expression rest tail}
       (child : SourceCoreBasic.LoweredExpr)

@@ -102,7 +102,7 @@ theorem application_preserves {budget : Nat}
   exact CallableIndexedOwnedPreparedStagedClosureInvocationSpineBounds.application_preserves
     captured code history inputs functions represented owner caller heaps locals reference currentCarried
     allowed callerRuntime stable budget
-    (fun entry added length spine reached childSize strict =>
+    (fun entry added length copied spine kept reached childSize strict =>
       CallableIndexedOwnedPreparedStagedNestedBranchingLambdaBodyBounds.source_body_at (semantic := semantic)
         (assignmentInterpretation := assignmentInterpretation)
         (faithful := CallableIndexedLambdaValues.identity_faithful compiled.indexed)
@@ -111,7 +111,7 @@ theorem application_preserves {budget : Nat}
         (ordinary := ordinary) (origin := origin) (prefixContext := prefixContext)
         (packet := packet) (support := support) (owner := owner) (caller := caller)
         (observed := observed) (stable := stable) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped)
-        entry added length spine reached recursiveChildren children (Nat.le_of_lt strict))
+        entry added length copied spine kept reached recursiveChildren children (Nat.le_of_lt strict))
     trace within
 
 include support observed origin prefixContext stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in

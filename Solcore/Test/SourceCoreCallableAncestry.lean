@@ -7,10 +7,12 @@ import Solcore.Frontend.ProgramChecking
 #check_failure Solcore.Frontend.SourceCoreCallableAncestry.Compiled.mk
 
 /-! The actual common compiler transports distinct read occurrences into
-escaping nested closures. Their source cell remains shared. Named boundaries
-reset lexical ancestry; failures restore it. Every run uses actual native
-checking, typed checkpoints and the Core machine. No source evaluator is
-imported or used. Source closure reconstruction remains a separate boundary.
+escaping nested closures. Closures capture by value: each escaping closure
+keeps its own snapshot of the source cells it captures, and each call starts
+again from that snapshot. Named boundaries reset lexical ancestry; failures
+restore it. Every run uses actual native checking, typed checkpoints and the
+Core machine. No source evaluator is imported or used. Source closure
+reconstruction remains a separate boundary.
 -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCallableAncestry
@@ -84,7 +86,7 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
     (stored : Core.RuntimeStoreHasTypes world store definitions) (left right : Core.Value)
     (leftTyped : Core.RuntimeValueHasType world left (Core.CallableContract.functionType .word .word) definitions)
     (rightTyped : Core.RuntimeValueHasType world right (Core.CallableContract.functionType .word .word) definitions)
-    (layout : SourceCoreCallableContextFrames.Layout) (shared : Nat) : IO Unit := do
+    (layout : SourceCoreCallableContextFrames.Layout) (unchanged : List Nat) : IO Unit := do
   let applyLeft : Core.Expr := .apply (.second (.first (.var 1))) (.word (w 1))
   let applyRight : Core.Expr := .apply (.second (.first (.var 0))) (.word (w 2))
   let body := Core.LocalSequence.pair .word .word applyLeft applyRight
@@ -103,10 +105,13 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
       | none => first | some suspended => suspended.resume 250000
     match final.observation with
     | .succeeded (.pair (.word leftResult) (.word rightResult)) finalStore =>
-      assertTrue (leftResult == w 4 && rightResult == w 6) "read-view ancestry split a shared mutable capture"
-      assertTrue (finalStore[shared]? == some (.inRight .unit (.word (w 6)))) "source capture location changed"
+      -- Each call starts again from its closure's creation-time `seed = 3`.
+      assertTrue (leftResult == w 4 && rightResult == w 5) "read-view ancestry did not restart each call from its creation snapshot"
+      assertTrue (unchanged.all (fun location => finalStore[location]? == some (.inRight .unit (.word (w 3)))))
+        "a call wrote a snapshot or the outer principal's source capture"
       assertTrue (finalStore[0]? == some (SourceCoreCallableContextFrames.encode layout .empty)) "lambda application retained its lexical frame"
-      assertTrue (finalStore.length == store.length + 2) "snapshot/context wrapper allocated extra per-call heap cells"
+      -- Each call copies the two captured cells and binds its parameter: three plain cells.
+      assertTrue (finalStore.length == store.length + 6) "snapshot/context wrapper allocated extra per-call heap cells"
     | other => throw (IO.userError s!"escaped ancestry reuse failed: {reprStr other}")
 
 example {definitions : Core.DataEnvironment} {layout : SourceCoreCallableContextFrames.Layout} {context : Core.Context}
@@ -162,8 +167,25 @@ def run : IO Unit := do
         assertTrue (rightSnapshot == SourceCoreCallableContextFrames.encode prepared.layout.frame (.lambda outerId (.view secondView.id outerId (.named rootId))))
           "escaping lambda lost second dynamic read-view ancestry"
         assertTrue (store[0]? == some (SourceCoreCallableContextFrames.encode prepared.layout.frame .empty)) "named call did not restore its caller frame"
-        let shared := (wordReferences left).filter (fun location => (wordReferences right).contains location)
-        let [location] := shared.eraseDups | throw (IO.userError "escaping nested closures do not share exactly one source Word capture")
+        -- Each escaping closure's environment begins with its creation snapshot.
+        -- The copies are made most recent binding first (`value`, then `seed`),
+        -- each bound at the head of the environment, so the copy of `seed` comes first.
+        let leftReferences := wordReferences left
+        let rightReferences := wordReferences right
+        let [leftSeed, leftValue] := leftReferences.take 2
+          | throw (IO.userError "first escaping closure lost its creation snapshot")
+        let [rightSeed, rightValue] := rightReferences.take 2
+          | throw (IO.userError "second escaping closure lost its creation snapshot")
+        let word := fun n => some (Core.Value.inRight .unit (.word (w n)))
+        assertTrue (store[leftSeed]? == word 3 && store[leftValue]? == word 1 &&
+            store[rightSeed]? == word 3 && store[rightValue]? == word 2)
+          "escaping closures lost their creation-time seed and argument copies"
+        -- They share only the outer principal's cells: the original `seed` and
+        -- the copy the generalized `outer` took of it.
+        let shared := (leftReferences.filter (fun location => rightReferences.contains location)).eraseDups
+        assertTrue (shared.length == 2 && shared.all (fun location => store[location]? == word 3) &&
+            ![leftSeed, leftValue, rightSeed, rightValue].any shared.contains)
+          "escaping nested closures shared a snapshot cell or more than the outer principal's two Word cells"
         have stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store prepared.layout.definitions := by
           obtain ⟨world, stored, _, _⟩ := values
           have equal := stored.world_eq
@@ -177,7 +199,7 @@ def run : IO Unit := do
           obtain ⟨world, otherStored, _, rightTyped⟩ := values
           rw [otherStored.world_eq] at rightTyped
           exact rightTyped
-        reuse stored left right leftTyped rightTyped prepared.layout.frame location
+        reuse stored left right leftTyped rightTyped prepared.layout.frame (leftSeed :: rightSeed :: shared)
       | other => throw (IO.userError s!"dynamic ancestry root failed: {reprStr other}")
   else throw (IO.userError "ancestry tuple result projection changed")
   let boundary ← key program "namedBoundary"
@@ -209,5 +231,5 @@ def run : IO Unit := do
     assertTrue ((← snapshot value) == SourceCoreCallableContextFrames.encode prepared.layout.frame (.named emptyId))
       "zero-argument/scopeless lambda lost lexical snapshot"
   | other => throw (IO.userError s!"empty lexical scope failed: {reprStr other}")
-  IO.println "ordinary Core dynamic ancestry, exact read occurrences, shared captures/named reset/failure/resume GREEN"
+  IO.println "ordinary Core dynamic ancestry, exact read occurrences, by-value captures/named reset/failure/resume GREEN"
 end Tests.SourceCoreCallableAncestry

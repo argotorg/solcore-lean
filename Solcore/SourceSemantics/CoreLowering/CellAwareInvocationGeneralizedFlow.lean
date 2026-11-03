@@ -4,9 +4,11 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! The actual generalized allocation composes with its remaining statement
-flow. Both directions retain the same descriptor attachment, physical frame
-and strict continuation grade. Lambda shape observations used for reflection
-are explicit until supplied by the actual initializer's source receipt. -/
+flow. The declaration first copies its scope; the principal captures the
+copies and the continuation keeps the original cells. Both directions retain
+the same descriptor attachment, physical frame and strict continuation grade.
+Lambda shape observations used for reflection are explicit until supplied by
+the actual initializer's source receipt. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -15,7 +17,9 @@ namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationGeneralizedFlo
 open Core Frontend SourceInference GeneralHeap ReadOnly CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post restore_post)
-open TypedLexicalWhile (initializedRequest sequence)
+open TypedLexicalWhile (initializedRequest)
+open CellAwareGeneralizedSnapshotCode (snapshotInner snapshotSequence)
+open SourceSemantics.CaptureBinders (copiedBinder?)
 
 private theorem head_typed {source : TypedSource} {context : SourceSemantics.Context}
     {id : StatementId} {rest : List StatementId}
@@ -76,11 +80,19 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     (whole.indexed.layouts.allocatorAt index.owner index.active (fun error => .sourceAllocation (reprStr error)))
     (initializedRequest allocationSource scope binder lowered.type))
   (same : annotation.original = allocation.expression)
+  {captured : Expr}
+  (copied : SourceCoreSourceCells.copyScope
+    (some (SourceCoreCallableIndexedAllocationFrames.allocator whole.indexed.ancestry.layout.frame
+      whole.indexed.base.globals.length
+      (whole.indexed.layouts.allocatorAt index.owner index.active (fun error => .sourceAllocation (reprStr error)))))
+    allocationSource scope (fun index => index) (snapshotInner lowered.type lowered.expression annotation.expression) =
+      .ok captured)
+  (copiedIds : ∀ id, (copiedBinder? allocationSource id).isSome = (copiedBinder? index.source id).isSome)
   (sourceEq : invocation.source = index.source)
 
 
 include artifact checked entry site read form projected generated issuer declaration polymorphic
-  extended ordinary nativeTyped allocation annotation same sourceEq registered bindings in
+  extended ordinary nativeTyped allocation annotation same copied copiedIds sourceEq registered bindings in
 theorem preserves_at_source (budget : Nat)
     (tail : CellAwareInvocationFlowBounds.PreservesAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge nextContext model index producer registry invocation faults
@@ -88,29 +100,33 @@ theorem preserves_at_source (budget : Nat)
     CellAwareInvocationFlowBounds.PreservesAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge context model index producer registry invocation faults
       administrative scope mode (id :: rest) expected type
-      (sequence type lowered.expression annotation.expression body) budget := by
+      (snapshotSequence type captured body) budget := by
   intro size within mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped initial admitted authority physical owner sameLocation ready
     finalContext outcome after trace
   have unique := runtime.graph.nodeOccurrencesUnique
   have found := index.statement_read_reached site.reached read
-  obtain ⟨tailSize, function, location, bound, sameSize, captures, allocated, remainingTrace⟩ :=
+  obtain ⟨tailSize, copies, snapshotHeap, function, location, bound, sameSize, snapshot, captures, allocated,
+      remainingTrace⟩ :=
     CellAwareGeneralizedSourceInversion.generalized (by simpa only [sourceEq] using unique)
       (by simpa only [sourceEq] using found) form polymorphic
       (by simpa only [sourceEq] using extended) trace
-  have capturesNamed : Dynamic.GeneralizedClosureCaptures context index.source environment binder initializer function := by
+  have snapshotIndexed : Dynamic.EnvironmentCopies index.source environment before copies snapshotHeap := by
+    simpa only [sourceEq] using snapshot
+  have capturesIndexed : Dynamic.GeneralizedClosureCaptures context index.source copies binder initializer function := by
     simpa only [sourceEq] using captures
   obtain ⟨control, next, facts, headTyped⟩ := head_typed sourceTyped
-  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime locals headTyped
-    found form polymorphic capturesNamed
+  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime (snapshotIndexed.agrees locals)
+    headTyped found form polymorphic capturesIndexed
   have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
     rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
-  obtain ⟨values, marker, agreement, _smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
-      preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical, locationEq, nativeEq⟩ :=
+  obtain ⟨values, marker, copiedStore, copiedMap, copiedWorld, agreement, _smaller, nextEnvironments, nextHeaps,
+      nextLocals, nextAgrees, nextTyped, preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical,
+      locationEq, nativeEq⟩ :=
     CellAwareInvocationGeneralizedPrefix.complete_at_source bridge artifact checked entry unique site read form
-      projected generated issuer declaration polymorphic extended
-      ordinary nativeTyped allocation annotation same producer registered environments heaps locals agrees actualTyped
-      initial admitted authority physical (ready initial physical.read) capturesNamed functionTyped allocated type body
+      projected generated issuer declaration polymorphic extended ordinary nativeTyped allocation annotation same
+      copied copiedIds producer bindings registered environments heaps locals agrees actualTyped initial admitted
+      authority physical ready snapshotIndexed capturesIndexed functionTyped allocated type body
   have nextReady : ProtectedStateTransition.CellAllocation.ReadyAt producer nextPhysical.location nextPhysical.native := by
     intro index current stored
     have previous := ready current (by simpa only [locationEq, nativeEq] using stored)
@@ -125,16 +141,17 @@ theorem preserves_at_source (budget : Nat)
       reached nextAdmitted nextAuthority nextPhysical owner (sameLocation.trans locationEq.symm) nextReady remainingTrace
   let finalState := bindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (id := binder.id) (type := lowered.type)
-    (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState
+    (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState
   refine ⟨value, finalStore, finalMap, finalWorld, agreement.wrap evaluated, represented, finalHeaps,
     effect.maps.trans maps, effect.worlds.trans worlds, preserved.trans finalFrame,
     effect.metadata.trans metadata, effect.trans finalEffect, finalState,
     protocol.trans related (protocol.trans tailRelated (bindings.restore_related
       (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
       (id := binder.id) (type := lowered.type)
-      (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState)), ?_⟩
+      (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState)), ?_⟩
   exact restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState post
+    (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2))
+    tailState post
 
 variable {initializerNode : ExpressionNode} {parameters : List TypedBinder}
   {result : TypeSystem.Ty} {lambdaBody : List StatementId}
@@ -144,7 +161,7 @@ variable {initializerNode : ExpressionNode} {parameters : List TypedBinder}
   (requirements : initializerNode.requirements = []) (coercions : initializerNode.coercions = [])
 
 include artifact checked entry site read form projected generated issuer declaration polymorphic
-  extended ordinary nativeTyped allocation annotation same sourceEq registered bindings
+  extended ordinary nativeTyped allocation annotation same copied copiedIds sourceEq registered bindings
   initializerFound initializerForm valueType requirements coercions in
 theorem reflects_at_source (budget : Nat)
     (tail : CellAwareInvocationFlowBounds.ReflectsAtMost
@@ -153,29 +170,31 @@ theorem reflects_at_source (budget : Nat)
     CellAwareInvocationFlowBounds.ReflectsAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge context model index producer registry invocation faults
       administrative scope mode (id :: rest) expected type
-      (sequence type lowered.expression annotation.expression body) budget := by
+      (snapshotSequence type captured body) budget := by
   intro size within mapping world actualContext environment canonical actual before store embedding value finalStore
     environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped initial admitted authority physical owner sameLocation ready
     completed
-  let function := Dynamic.GeneralizedClosure.ofDirectLambda context index.source environment binder initializer
+  obtain ⟨copies, snapshotHeap, snapshot⟩ := CellAwareGeneralizedSourceInversion.copies_exist index.source locals
+  let function := Dynamic.GeneralizedClosure.ofDirectLambda context index.source copies binder initializer
     parameters result lambdaBody
-  have captures : Dynamic.GeneralizedClosureCaptures context index.source environment binder initializer function :=
+  have captures : Dynamic.GeneralizedClosureCaptures context index.source copies binder initializer function :=
     .directLambda (lookupExpression?_sound initializerFound) initializerForm
       (by simpa only [ExpressionNode.rawType, coercions] using valueType) valueType requirements coercions
-  let location : Dynamic.Location := ⟨before.cells.length⟩
-  let bound : Dynamic.Heap := ⟨before.cells ++ [⟨function.binder.scheme.body, none, some function⟩]⟩
-  have allocated : Dynamic.Heap.AllocatesGeneralized before function location bound := .append
+  let location : Dynamic.Location := ⟨snapshotHeap.cells.length⟩
+  let bound : Dynamic.Heap := ⟨snapshotHeap.cells ++ [⟨function.binder.scheme.body, none, some function⟩]⟩
+  have allocated : Dynamic.Heap.AllocatesGeneralized snapshotHeap function location bound := .append
   have unique := runtime.graph.nodeOccurrencesUnique
   have found := index.statement_read_reached site.reached read
   obtain ⟨control, next, facts, headTyped⟩ := head_typed sourceTyped
-  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime locals headTyped
-    found form polymorphic captures
-  obtain ⟨values, marker, _agreement, smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
-      preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical, locationEq, nativeEq⟩ :=
+  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime (snapshot.agrees locals)
+    headTyped found form polymorphic captures
+  obtain ⟨values, marker, copiedStore, copiedMap, copiedWorld, _agreement, smaller, nextEnvironments, nextHeaps,
+      nextLocals, nextAgrees, nextTyped, preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical,
+      locationEq, nativeEq⟩ :=
     CellAwareInvocationGeneralizedPrefix.complete_at_source bridge artifact checked entry unique site read form
-      projected generated issuer declaration polymorphic extended
-      ordinary nativeTyped allocation annotation same producer registered environments heaps locals agrees actualTyped
-      initial admitted authority physical (ready initial physical.read) captures functionTyped allocated type body
+      projected generated issuer declaration polymorphic extended ordinary nativeTyped allocation annotation same
+      copied copiedIds producer bindings registered environments heaps locals agrees actualTyped initial admitted
+      authority physical ready snapshot captures functionTyped allocated type body
   obtain ⟨tailSize, strict, tailCompleted⟩ := smaller completed
   have nextReady : ProtectedStateTransition.CellAllocation.ReadyAt producer nextPhysical.location nextPhysical.native := by
     intro index current stored
@@ -191,18 +210,20 @@ theorem reflects_at_source (budget : Nat)
       reached nextAdmitted nextAuthority nextPhysical owner (sameLocation.trans locationEq.symm) nextReady tailCompleted
   let finalState := bindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (id := binder.id) (type := lowered.type)
-    (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState
+    (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState
   refine ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
     .letGeneralized (by simpa only [sourceEq] using lookupStatement?_sound found) form
-      (by simpa only [sourceEq] using captures) polymorphic (by simpa only [sourceEq] using extended) allocated trace,
+      (by simpa only [sourceEq] using snapshot) (by simpa only [sourceEq] using captures) polymorphic
+      (by simpa only [sourceEq] using extended) allocated trace,
     represented, finalHeaps, effect.maps.trans maps, effect.worlds.trans worlds, preserved.trans finalFrame,
     effect.metadata.trans metadata, effect.trans finalEffect, finalState,
     protocol.trans related (protocol.trans tailRelated (bindings.restore_related
       (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
       (id := binder.id) (type := lowered.type)
-      (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState)), ?_⟩
+      (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState)), ?_⟩
   exact restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState post
+    (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2))
+    tailState post
 
 end RequestSource
 
@@ -254,11 +275,18 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     (whole.indexed.layouts.allocatorAt index.owner index.active (fun error => .sourceAllocation (reprStr error)))
     (initializedRequest index.source scope binder lowered.type))
   (same : annotation.original = allocation.expression)
+  {captured : Expr}
+  (copied : SourceCoreSourceCells.copyScope
+    (some (SourceCoreCallableIndexedAllocationFrames.allocator whole.indexed.ancestry.layout.frame
+      whole.indexed.base.globals.length
+      (whole.indexed.layouts.allocatorAt index.owner index.active (fun error => .sourceAllocation (reprStr error)))))
+    index.source scope (fun index => index) (snapshotInner lowered.type lowered.expression annotation.expression) =
+      .ok captured)
   (sourceEq : invocation.source = index.source)
 
 
 include artifact checked entry site read form projected generated issuer declaration polymorphic
-  extended ordinary nativeTyped allocation annotation same sourceEq registered bindings in
+  extended ordinary nativeTyped allocation annotation same copied sourceEq registered bindings in
 theorem preserves (budget : Nat)
     (tail : CellAwareInvocationFlowBounds.PreservesAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge nextContext model index producer registry invocation faults
@@ -266,8 +294,9 @@ theorem preserves (budget : Nat)
     CellAwareInvocationFlowBounds.PreservesAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge context model index producer registry invocation faults
       administrative scope mode (id :: rest) expected type
-      (sequence type lowered.expression annotation.expression body) budget := by
-  apply preserves_at_source (allocationSource := index.source) <;> first | assumption | rfl
+      (snapshotSequence type captured body) budget := by
+  apply preserves_at_source (allocationSource := index.source) (copiedIds := fun _ => rfl) <;>
+    first | assumption | rfl
 
 variable {initializerNode : ExpressionNode} {parameters : List TypedBinder}
   {result : TypeSystem.Ty} {lambdaBody : List StatementId}
@@ -277,7 +306,7 @@ variable {initializerNode : ExpressionNode} {parameters : List TypedBinder}
   (requirements : initializerNode.requirements = []) (coercions : initializerNode.coercions = [])
 
 include artifact checked entry site read form projected generated issuer declaration polymorphic
-  extended ordinary nativeTyped allocation annotation same sourceEq registered bindings
+  extended ordinary nativeTyped allocation annotation same copied sourceEq registered bindings
   initializerFound initializerForm valueType requirements coercions in
 theorem reflects (budget : Nat)
     (tail : CellAwareInvocationFlowBounds.ReflectsAtMost
@@ -286,8 +315,9 @@ theorem reflects (budget : Nat)
     CellAwareInvocationFlowBounds.ReflectsAtMost
       (attachment := GeneralizedLocalCapturedScopes.Attachment) bridge context model index producer registry invocation faults
       administrative scope mode (id :: rest) expected type
-      (sequence type lowered.expression annotation.expression body) budget := by
-  apply reflects_at_source (allocationSource := index.source) <;> first | assumption | rfl
+      (snapshotSequence type captured body) budget := by
+  apply reflects_at_source (allocationSource := index.source) (copiedIds := fun _ => rfl) <;>
+    first | assumption | rfl
 
 
 end Legacy

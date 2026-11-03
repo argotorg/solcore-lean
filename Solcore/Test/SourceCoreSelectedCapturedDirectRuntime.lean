@@ -32,8 +32,8 @@ def run : IO Unit := do
     | throw (IO.userError "retained captured call did not complete")
   require (repeated.value == .word seed) "retained captured Source read changed"
   require ([started.session.heapSize, factory.session.heapSize, first.session.heapSize, repeated.session.heapSize]
-    == [2, 5, 5, 5]) "captured direct heap sizes changed"
+    == [2, 8, 11, 14]) "captured direct heap sizes changed"
   require (fixture.recipe.compiled.indexed.base.functions.length == 1) "captured cache changed"
-  IO.println s!"SOURCE_FIRST_DIRECT_CAPTURED_PASS: actual checked factory captures parameter37 at Source location0; independently constructed factory and direct closure traces before execution; closed initial function/full-output and retained direct scalar alternatives; zero-fuel factory/direct resume; old closure handle repeated; heaps{[started.session.heapSize, factory.session.heapSize, first.session.heapSize, repeated.session.heapSize]}"
+  IO.println s!"SOURCE_FIRST_DIRECT_CAPTURED_PASS: actual checked factory copies parameter37 into its snapshot at Source location1 and each call reads its own copy; independently constructed factory and direct closure traces before execution; closed initial function/full-output and retained direct scalar alternatives; zero-fuel factory/direct resume; old closure handle repeated; heaps{[started.session.heapSize, factory.session.heapSize, first.session.heapSize, repeated.session.heapSize]}"
 
 end Tests.SourceCoreSelectedCapturedDirect

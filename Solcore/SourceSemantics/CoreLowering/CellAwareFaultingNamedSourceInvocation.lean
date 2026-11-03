@@ -126,7 +126,7 @@ theorem lift_selected
     intro index state read
     rw [sameLocation, sameNative] at read ⊢
     exact ready state read
-  have meaning := CellAwareFaultingSourceBodyLifting.lifts_selected bridge generation record profile receiver extension authority
+  have meaning := CellAwareFaultingSourceBodyLifting.lifts_selected bridge (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys) generation record profile receiver extension authority
     support.registryBodies producer (CallableIndexedAmbient.frame_registered whole.indexed) sourceEq body issuer
     (size := size) (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
     (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)

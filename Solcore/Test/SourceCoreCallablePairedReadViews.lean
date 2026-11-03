@@ -10,9 +10,11 @@ import Solcore.Frontend.SourceCoreCallableAncestryPairedPreparation
 
 /-! Actual compiler output supplies the transparent read wrapper and its saved
 original callable. Result and stored-payload provenance are kept separately.
-The tests check native code/descriptor authenticity and source capture sharing;
-dynamic requirement rewriting is deliberately left to the prepared ancestry
-metadata layer, rather than inferred from canonical read rows.
+The tests check native code/descriptor authenticity and by-value captures: two
+reads of one generalized local share its principal's snapshot cells, and each
+call starts again from them. Dynamic requirement rewriting is deliberately left
+to the prepared ancestry metadata layer, rather than inferred from canonical
+read rows.
 -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCallablePairedReadViews
@@ -116,7 +118,7 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
     (stored : Core.RuntimeStoreHasTypes world store definitions) (left right : Core.Value)
     (leftTyped : Core.RuntimeValueHasType world left (Core.CallableContract.functionType .word .word) definitions)
     (rightTyped : Core.RuntimeValueHasType world right (Core.CallableContract.functionType .word .word) definitions)
-    (frame : SourceCoreCallablePairedFrames.Layout) (shared allocated : Nat) : IO Unit := do
+    (frame : SourceCoreCallablePairedFrames.Layout) (snapshot allocated : Nat) : IO Unit := do
   let body := Core.LocalSequence.pair .word .word
     (.apply (.second (.first (.var 1))) (.word (w 10)))
     (.apply (.second (.first (.var 0))) (.word (w 20)))
@@ -133,10 +135,11 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
     let completed := match first.checkpoint? with | none => first | some checkpoint => checkpoint.resume 100000
     match completed.observation with
     | .succeeded (.pair (.word first) (.word second)) final =>
-      assertTrue (first == w 4 && second == w 5) "read wrapper changed shared mutation order"
-      assertTrue (final[shared]? == some (.inRight .unit (.word (w 5)))) "read wrapper split the underlying shared cell"
+      -- Each call starts again from the principal's snapshot `seed = 3`.
+      assertTrue (first == w 4 && second == w 4) "read wrapper did not restart each call from the principal's snapshot"
+      assertTrue (final[snapshot]? == some (.inRight .unit (.word (w 3)))) "read wrapper call wrote the principal's snapshot cell"
       assertTrue (final[0]? == some (SourceCoreCallablePairedFrames.encode frame .empty)) "view/lambda frames were not restored"
-      assertTrue (final.length == store.length + allocated) "view reentry changed actual source parameter allocations"
+      assertTrue (final.length == store.length + allocated) "view reentry changed actual capture copies or source parameter allocations"
     | observation => throw (IO.userError s!"read wrapper reentry failed: {reprStr observation}")
 
 private def pair {checked : Checked} {prepared : Prepared checked} {templates : Templates prepared}
@@ -199,7 +202,7 @@ private def pair {checked : Checked} {prepared : Prepared checked} {templates : 
           | .ok joined => pure joined | .error error => throw (IO.userError s!"left read captures failed: {reprStr error}")
         let rightJoined ← match joinProduced rightProduced ledger with
           | .ok joined => pure joined | .error error => throw (IO.userError s!"right read captures failed: {reprStr error}")
-        assertTrue (leftJoined.captures.environment == rightJoined.captures.environment) "read wrappers lost shared source environments"
+        assertTrue (leftJoined.captures.environment == rightJoined.captures.environment) "read wrappers lost the principal's shared snapshot environment"
         assertTrue (leftJoined.captures.environment.map Prod.fst == leftAuth.underlying.template.source.scope.map Prod.fst)
           "read wrapper added saved carrier/context slots to source captures"
         assertTrue (leftJoined.captures.environment.all (fun binding => initial.length ≤ binding.2.index))
@@ -216,8 +219,11 @@ private def pair {checked : Checked} {prepared : Prepared checked} {templates : 
           let seed ← match leftAuth.underlying.sourceCaptures.find? (fun capture =>
               (leftAuth.underlying.template.source.lambda.context.bindingAt? capture.binder).map (·.binding.binder.name) == some "seed") with
             | some capture => pure capture | none => throw (IO.userError "read wrapper source seed capture missing")
+          -- Each call makes marked allocations of three cells: the copies of the
+          -- principal's captures (`seed`, and in `nested` also `value`), the
+          -- lambda's parameter and, except for `shared`, `keep`'s parameter.
           reuse typed.1 left right typed.2.1 typed.2.2 prepared.ancestry.layout.frame seed.location
-            (if sharedPrincipal then 6 else 12)
+            (if sharedPrincipal then 12 else if nested then 24 else 18)
       | observation => throw (IO.userError s!"read views pair did not succeed: {reprStr observation}")
     else throw (IO.userError "read views pair result projection changed")
 
@@ -295,7 +301,7 @@ def run : IO Unit := do
   monomorphic cache (← key program "mono")
   stored cache (← key program "failure") false
   stored cache (← key program "suspended") true
-  IO.println "exact emitted read wrappers, saved original auth, ordered shared captures, stored failure/suspension and resume GREEN"
+  IO.println "exact emitted read wrappers, saved original auth, ordered snapshot captures, stored failure/suspension and resume GREEN"
 
 
 end Tests.SourceCoreCallablePairedReadViews

@@ -40,8 +40,12 @@ function main() returns (Word) {
 Source files are supplied as a `Workspace.RawWorkspace`. The
 [execution tests](Solcore/Test/SourceCoreExecution.lean) show how to compile a
 workspace, open a session, call an entry point, and resume after the fuel runs
-out. They also cover recursive functions, closures with mutable captures, and
-mappings. See the [runtime API overview](docs/design/core-runtime-unification.md#public-runtime-api)
+out. They also cover recursive functions, closures, and mappings. A closure
+captures by value, as in solcore-rs: it keeps the values its captured
+variables had when it was created, an assignment in its body changes only that
+call's copy, and each call starts again from the creation-time values
+([closure captures](docs/design/closure-capture-by-value.md)). See the
+[runtime API overview](docs/design/core-runtime-unification.md#public-runtime-api)
 for values, handles, snapshots, and execution options.
 
 ## Running solcore-rs output

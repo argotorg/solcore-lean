@@ -1,12 +1,14 @@
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyCalls
 
-/-! Allocate the original generalized closure, evaluate both distinct instances
-from Source typing, and retain the actual captured flag across the first call. -/
+/-! Allocate the original generalized closure over the copies of its
+environment, evaluate both distinct instances from Source typing, and retain the
+copied captured flag across the first call, whose own copies leave it intact. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreGeneralizedLexicalBody
 open Solcore Core Frontend SourceInference SourceSemantics
 open Tests.SourceCoreMixedImperative
+open Tests.SourceSemanticsCaptureCopies
 
  def StoredLambda {source : TypedSource} (shape : LambdaShape source)
     (context : SourceSemantics.Context) (environment : Dynamic.Environment) (heap : Dynamic.Heap) (flag : Bool) : Prop :=
@@ -55,13 +57,25 @@ theorem StoredLambda.invoke {program : SourceSemantics.Program} {source : TypedS
     · rw [same]; exact ⟨callee.type_admissible.binders,.builtin .word⟩
     · rw [same]; exact ⟨callee.type_admissible.binders,.builtin .bool⟩
   obtain ⟨definitionContext,captured,location,cell,lookup,read,descriptor,fields,capture⟩ := stored
+  have descriptorTyped := ((state.heapTyped cell read.member).generalized_inv descriptor).2
+  have readable : Readable before captured := Readable.of_agrees descriptorTyped.captures
   exact shape.invoke_from_typed call captured environment evidence flag state.runtime
     (by simpa only [state.runtime.signatures] using wellFormed.signatures)
     state.covers state.locals state.heapTyped (sameType.symm ▸ callee) ground capture lookup read descriptor fields argumentTrace
+    (copies_spec_applySubstitution [(shape.typeVariable, type)] source readable)
 
+/-- The generalized `let` copies the environment, then stores the principal
+descriptor over the copies. -/
 def closureHeap {source : TypedSource} (shape : LambdaShape source) (context : SourceSemantics.Context)
     (environment : Dynamic.Environment) (before : Dynamic.Heap) : Dynamic.Heap :=
-  ⟨before.cells ++ [{type := shape.binder.scheme.body, value := none, generalized := some (shape.descriptor context environment)}]⟩
+  ⟨(copies source environment before).2.cells ++
+    [{type := shape.binder.scheme.body, value := none,
+      generalized := some (shape.descriptor context (copies source environment before).1)}]⟩
+
+theorem closureHeap_appends {source : TypedSource} (shape : LambdaShape source) (context : SourceSemantics.Context)
+    (environment : Dynamic.Environment) (before : Dynamic.Heap) :
+    HeapAppends before (closureHeap shape context environment before) :=
+  (HeapAppends.of_copies source environment before).trans ⟨_,rfl⟩
 
 theorem generalized_step {program : SourceSemantics.Program} {source : TypedSource}
     (shape : LambdaShape source) (site : StatementAt source (.letDecl shape.binder (some shape.lambda.id)))
@@ -72,22 +86,32 @@ theorem generalized_step {program : SourceSemantics.Program} {source : TypedSour
     {control : ControlContext} {facts : StatementFacts}
     (typed : StatementHasType source control context site.node.id final facts) :
     Dynamic.StatementExecutes program context evidence source environment before site.node.id final
-      (.fallthrough ((shape.binder.id,⟨before.cells.length⟩) :: environment)) (closureHeap shape context environment before) ∧
-    SourceState program source final evidence ((shape.binder.id,⟨before.cells.length⟩) :: environment)
+      (.fallthrough ((shape.binder.id,identityLocation source environment before) :: environment))
       (closureHeap shape context environment before) ∧
-    StoredLambda shape final ((shape.binder.id,⟨before.cells.length⟩) :: environment) (closureHeap shape context environment before) flag := by
+    SourceState program source final evidence ((shape.binder.id,identityLocation source environment before) :: environment)
+      (closureHeap shape context environment before) ∧
+    StoredLambda shape final ((shape.binder.id,identityLocation source environment before) :: environment)
+      (closureHeap shape context environment before) flag := by
   have form := form_at state.runtime.graph.nodeOccurrencesUnique site.found typed
   rw [site.formEq] at form
   cases form with
   | letInitialized _ mono _ => rw [shape.scheme] at mono; cases mono
   | letInitializedGeneralized polymorphic _ _ _ extended =>
-    have allocation : Dynamic.Heap.AllocatesGeneralized before (shape.descriptor context environment)
-        ⟨before.cells.length⟩ (closureHeap shape context environment before) := .append
+    have snapshot := copies_spec source (Readable.of_agrees state.locals)
+    have allocation : Dynamic.Heap.AllocatesGeneralized (copies source environment before).2
+        (shape.descriptor context (copies source environment before).1)
+        (identityLocation source environment before) (closureHeap shape context environment before) := .append
     have trace := Dynamic.StatementExecutes.letInitializedGeneralized (program := program)
-      (evidence := evidence) (lookupStatement?_sound site.found) site.formEq (shape.captures context environment)
-      polymorphic extended allocation
+      (evidence := evidence) (lookupStatement?_sound site.found) site.formEq snapshot
+      (shape.captures context (copies source environment before).1) polymorphic extended allocation
+    have capturedCopy : StoredValue shape.flag (copies source environment before).1
+        (closureHeap shape context environment before) (.bool flag) := by
+      rcases captured with ⟨location,cell,lookup,read,ordinary,contents⟩
+      obtain ⟨copyLocation,copyLookup,copyRead⟩ := copy_reads snapshot lookup read
+      exact ⟨copyLocation,cell,copyLookup,allocation.preserves_read copyRead,ordinary,contents⟩
     exact ⟨trace,state.after_statement wellFormed typed trace,
-      ⟨context,environment,_,_,.head,allocation.reads_new,rfl,.ofBinderExtends extended,captured.mono ⟨_,rfl⟩⟩⟩
+      ⟨context,(copies source environment before).1,_,_,.head,allocation.reads_new,rfl,.ofBinderExtends extended,
+        capturedCopy⟩⟩
 
 theorem Shape.body_from_source {program : SourceSemantics.Program} {source : TypedSource}
     (shape : Shape source) {context final : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -108,12 +132,14 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
   | returnValue tupleTyped =>
     obtain ⟨_,_,wordTyped,boolTyped⟩ := shape.tuple.children state.runtime.graph.nodeOccurrencesUnique tupleTyped
     obtain ⟨_,_,_,literalTyped⟩ := shape.wordCall.typed state.runtime.graph.nodeOccurrencesUnique wordTyped
-    have literalTrace := shape.literal.evaluates (program := program) evidence ((shape.f.binder.id,⟨before.cells.length⟩)::environment) (closureHeap shape.f context environment before) state.runtime.graph.nodeOccurrencesUnique literalTyped
+    have literalTrace := shape.literal.evaluates (program := program) evidence ((shape.f.binder.id,identityLocation source environment before)::environment) (closureHeap shape.f context environment before) state.runtime.graph.nodeOccurrencesUnique literalTyped
     rw [shape.literalValue] at literalTrace
     obtain ⟨firstHeap,firstTrace,firstAppend⟩ := stored.invoke stateNext wellFormed shape.wordCall (.inl rfl) wordTyped literalTrace
     have stateAfter := stateNext.after_expression wellFormed wordTyped firstTrace
-    have allocatedPrefix : HeapAppends before (closureHeap shape.f context environment before) := ⟨_,rfl⟩
-    have flagNext := ((flagStored.mono allocatedPrefix).under ⟨before.cells.length⟩ shape.fFlag).mono firstAppend
+    have allocatedPrefix : HeapAppends before (closureHeap shape.f context environment before) :=
+      closureHeap_appends shape.f context environment before
+    have flagNext := ((flagStored.mono allocatedPrefix).under (identityLocation source environment before) shape.fFlag).mono
+      firstAppend
     obtain ⟨after,secondTrace,secondAppend⟩ := (stored.mono firstAppend).invoke stateAfter wellFormed
       shape.boolCall (.inr rfl) boolTyped (read_value shape.flagRead flagNext)
     have tupleTrace := shape.tuple.evaluates firstTrace secondTrace

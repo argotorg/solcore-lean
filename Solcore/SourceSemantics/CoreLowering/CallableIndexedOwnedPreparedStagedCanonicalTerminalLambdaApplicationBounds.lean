@@ -91,10 +91,10 @@ theorem application_preserves (budget : Nat)
   exact CallableIndexedOwnedPreparedStagedClosureInvocationSpineBounds.application_preserves
     captured code history inputs functions represented owner caller heaps locals reference currentCarried
     allowed callerRuntime stable budget
-    (fun entry added length spine reached childSize strict =>
+    (fun entry added length copied spine kept reached childSize strict =>
       CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaBodyBounds.source_body_at
         captured code history inputs functions owner caller callerPrefix observed stable beforeTyped argumentsTyped terminal certifies
-        entry added length spine reached budget childSize (Nat.le_of_lt strict) children)
+        entry added length copied spine kept reached budget childSize (Nat.le_of_lt strict) children)
     trace within
 
 include observed stable beforeTyped argumentsTyped terminal certifies represented heaps locals reference currentCarried allowed callerRuntime in

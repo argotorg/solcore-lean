@@ -54,7 +54,8 @@ def source_admitted_entry
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -63,7 +64,7 @@ def source_admitted_entry
   let base := CallableIndexedOwnedLambdaReadyContinuations.source_admitted_entry
     captured code history inputs functions owner caller body beforeTyped argumentsTyped stable entry reached
   exact ⟨CallableIndexedOwnedLambdaNestedEntries.source_entry captured code history inputs functions owner principal
-    observed prefixContext sourceSeed caller body entry added length spine reached, base.source, base.rows⟩
+    observed prefixContext sourceSeed caller body entry added length copied spine kept reached, base.source, base.rows⟩
 
 include beforeTyped argumentsTyped stable observed prefixContext sourceSeed in
 /-- The measured native prefix exposes the same actual Source allocation and
@@ -88,13 +89,14 @@ theorem source_original
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
-    (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length spine reached).original =
+    (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length copied spine kept reached).original =
       CallableIndexedOwnedLambdaNestedEntries.source_entry captured code history inputs functions owner principal
-        observed prefixContext sourceSeed caller body entry added length spine reached := rfl
+        observed prefixContext sourceSeed caller body entry added length copied spine kept reached := rfl
 
 /-- Native packaging retains the actual Prefix entry and initial pool. -/
 theorem native_original
@@ -122,12 +124,13 @@ theorem source_continuation (budget : Nat)
         captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
       (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-      (spine : entry.entry.canonical = added ++ captured.canonical)
+      (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+      (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
       (reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩),
       { i : ι // origins i = source_origin body.origin
-        (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length spine reached).source.runtime })
+        (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length copied spine kept reached).source.runtime })
     (below : RecursiveNamedCatalogInvocationBounds.Below budget (fun child => ∀ i,
       CallableRuntimeBodyReadyOrigins.PreservesAt (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner principal)
         (readiness (bridge (headers := headers) owner principal)) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -135,17 +138,17 @@ theorem source_continuation (budget : Nat)
         functions program (origins i) child)) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached
-  let selected := selection entry added length spine reached
+  intro entry added length copied spine kept reached
+  let selected := selection entry added length copied spine kept reached
   intro child strict outcome after trace
   have ready := below child strict selected.val
   rw [selected.property] at ready
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds,
       frame, metadata, exit, returned, related, _post⟩ :=
     CallableIndexedOwnedSourceBodyReadyBounds.preserves_at (bridge (headers := headers) owner principal)
-      (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length spine reached).source.runtime
+      (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length copied spine kept reached).source.runtime
       wellFormed syntaxTree ready
-      (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length spine reached) trace
+      (source_admitted_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length copied spine kept reached) trace
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds,
     frame, metadata, exit, returned.val, related⟩
 

@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
 /-! Original source derivations at the indirect-call boundary. The retained
 children keep their own grades, caller and invocation dictionaries, ordered
 arguments and every intermediate heap. Closure application keeps the actual
-captured binder allocation. These inversions do not construct a callable's
+copies of the captures and the parameter allocation. These inversions do not construct a callable's
 catalog authority, compiler receipt or body execution meaning. -/
 
 set_option autoImplicit false
@@ -120,16 +120,18 @@ inductive ClosureCompletion (program : Program) (context : SourceSemantics.Conte
   | arity (mismatch : function.parameters.length ≠ arguments.length) :
       ClosureCompletion program context caller invocation before function arguments (SourceExecutionSize.stepSize [])
         (.fault (.argumentArityMismatch function.parameters.length arguments.length)) before
-  | reached {size bodySize parameterTypes callContext environment bound outcome after}
+  | reached {size bodySize parameterTypes callContext entry copied environment bound outcome after}
       (sameEvidence : invocation = function.evidence) (frame : Dynamic.ClosureFrame program function)
       (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes callContext)
-      (allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+      (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+      (allocation : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound)
       (body : BodyTrace program bodySize function callContext environment bound outcome after)
       (smaller : bodySize < size) (grade : size = SourceExecutionSize.stepSize [bodySize]) :
       ClosureCompletion program context caller invocation before function arguments size outcome after
 
-/-- Full captured allocation and the original body child are retained directly
-from each closure application constructor, including control escape. -/
+/-- The copies of the captures, the full parameter allocation and the original
+body child are retained directly from each closure application constructor,
+including control escape. -/
 theorem closure_completed_sized
     {program : Program} {size : Nat} {context : SourceSemantics.Context}
     {caller invocation : Dynamic.EvidenceEnvironment} {before after : Dynamic.Heap}
@@ -139,23 +141,23 @@ theorem closure_completed_sized
   cases original with
   | value applied =>
     cases applied with
-    | closure same frame parameters allocation executed returned =>
+    | closure same frame parameters copy allocation executed returned =>
       cases returned
-      exact .reached same frame parameters allocation (.returned executed)
+      exact .reached same frame parameters copy allocation (.returned executed)
         (SourceExecutionSize.child_lt_stepSize (by simp)) rfl
-    | closureUnit same frame unit parameters allocation executed fellThrough =>
+    | closureUnit same frame unit parameters copy allocation executed fellThrough =>
       obtain ⟨_, rfl⟩ := fellThrough
-      exact .reached same frame parameters allocation (.unit unit executed)
+      exact .reached same frame parameters copy allocation (.unit unit executed)
         (SourceExecutionSize.child_lt_stepSize (by simp)) rfl
   | fault failed =>
     cases failed with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity mismatch => exact .arity mismatch
-    | closureBody same frame parameters allocation failed =>
-      exact .reached same frame parameters allocation (.fault failed)
+    | closureBody same frame parameters copy allocation failed =>
+      exact .reached same frame parameters copy allocation (.fault failed)
         (SourceExecutionSize.child_lt_stepSize (by simp)) rfl
-    | closureControlEscape same frame parameters allocation executed escaped =>
-      exact .reached same frame parameters allocation (.escaped executed escaped)
+    | closureControlEscape same frame parameters copy allocation executed escaped =>
+      exact .reached same frame parameters copy allocation (.escaped executed escaped)
         (SourceExecutionSize.child_lt_stepSize (by simp)) rfl
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndirectCallSourceBounds

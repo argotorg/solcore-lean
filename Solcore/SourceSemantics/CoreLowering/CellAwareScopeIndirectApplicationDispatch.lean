@@ -158,7 +158,7 @@ theorem preserves_application_selected (budget : Nat)
       have valuesCount := CallableIndexedOwnedPreparedSecondCallGateRejection.values_count argumentsTrace
       have different : function.parameters.length ≠ ids.length := by simpa only [physicalCount] using count
       cases called with
-      | closure selectedChild valid parameters allocate bodyTrace bodyResult =>
+      | closure selectedChild valid parameters _copy allocate bodyTrace bodyResult =>
         exact False.elim (different (allocate.length_eq.trans valuesCount))
       | closureArity mismatch =>
         have actualAccepted : Staging.CallBoundary.GuardAccepts (CallableLedger.frame sidecar)

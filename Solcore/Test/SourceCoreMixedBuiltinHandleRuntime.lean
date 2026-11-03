@@ -108,7 +108,7 @@ def run : IO Unit := do
   require (reused.val.value == .integer 23) "Source-certified reused builtin integer23 changed"
   let heaps := [firstStart.session.heapSize,firstResult.val.session.heapSize,applied.val.session.heapSize,
     nextResult.val.session.heapSize,reused.val.session.heapSize]
-  require (heaps == [2,11,11,20,20]) "Source-certified builtin retained heaps changed"
+  require (heaps == [2,17,17,32,32]) "Source-certified builtin retained heaps changed"
   IO.println "MIXED_BUILTIN_HANDLE_SOURCE_PUBLIC: originals1/cache1/typing1/profile1; factory/Word17/factory/Word23; proof before every resume"
   IO.println s!"MIXED_BUILTIN_HANDLE_SOURCE_HEAPS: {heaps}"
   IO.println "MIXED_BUILTIN_HANDLE_SOURCE_PUBLIC_PASS"

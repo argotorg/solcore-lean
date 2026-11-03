@@ -136,6 +136,7 @@ theorem extraction_of_typed_position_with_residual (residualMode : Bool) (diagno
       have sameType := unary_ensure_same checkedType
       subst payload
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted
@@ -436,6 +437,7 @@ theorem extraction_of_typed_position_with_residual (residualMode : Bool) (diagno
       cases checked
       have sameType := unary_ensure_same checkedType
       subst payload
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted

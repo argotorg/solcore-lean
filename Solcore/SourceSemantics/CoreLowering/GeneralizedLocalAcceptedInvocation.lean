@@ -59,8 +59,9 @@ theorem enters
           function.body finalContext facts ∧ BodyCompletes function.resultType facts) ∧
       CellAwareScopeAuthority.Effect instances mapping world before store
         entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store ∧
-      (∃ added : Environment, added.length = material.code.receipt.loweredParameters.length ∧
-        entry.entry.canonical = added ++ material.captured.canonical ∧
+      (∃ added copied : Environment, added.length = material.code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ copied ∧
+        (∀ slot, material.inputs.scope.length ≤ slot → copied[slot]? = material.captured.canonical[slot]?) ∧
         ProtectedStateTransition.Transition (protocol headers keys) callerState
           ⟨material.code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ material.inputs.scope,
             entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) := by
@@ -70,7 +71,7 @@ theorem enters
     simpa only [sameLocation] using view.lexicalReference
   have ordinaryCells : GenericHeap.OrdinaryCells payload cells :=
     GeneralizedLocalDescriptorHeap.ordinary_cells
-  obtain ⟨entry, added, length, spine, transition⟩ :=
+  obtain ⟨entry, added, copied, length, spine, slots, transition⟩ :=
     GeneralizedLocalOwnedBodyEntry.parameters_with_state material.origin material.captured material.code inputs
       functions ordinaryCells represented owner callerState view.carried view.recipe heaps locals reference read
   have argumentsTyped : Dynamic.ValuesHaveTypes function.context before arguments inputs.types := by
@@ -81,6 +82,6 @@ theorem enters
   exact ⟨inputs, entry, runtime, covers, heapTyped, environmentTyped, bodyTyped,
     GeneralizedLocalBodyEntry.Entry.scope_effect (values := .initial compiled.compatible.checked) material.origin material.captured material.code inputs functions registry cells
       arguments nativeArguments before store owner.key.frameLocation view.callerNative view.callerGhost
-      view.caller view.id view.recipe entry instances, added, length, spine, transition⟩
+      view.caller view.id view.recipe entry instances, added, copied, length, spine, slots, transition⟩
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedInvocation

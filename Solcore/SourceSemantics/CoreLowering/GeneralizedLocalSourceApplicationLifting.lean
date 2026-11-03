@@ -21,20 +21,23 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {mapping : LocationM
   (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) material.code)
 
 include inputs in
-/-- Parameter allocation supplies the complete Source state at the body boundary. -/
+/-- The call's copies of the captured cells and the parameter allocation supply
+the complete Source state at the body boundary. -/
 theorem parameter_state {registry : Registry} {child : Scope}
     (selected : registry.Closure function child)
     (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
-    {arguments : List Dynamic.Value} {before bound : Dynamic.Heap} {environment : Dynamic.Environment}
+    {arguments : List Dynamic.Value} {before copied bound : Dynamic.Heap} {entry environment : Dynamic.Environment}
     (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments function before arguments)
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound) :
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before entry copied)
+    (allocated : Dynamic.BindersAllocate entry copied function.parameters arguments environment bound) :
     CellAwareOrdinaryBodySourceState.State (program := Program.ofChecked compiled.sourceProgram)
       (invocation := child) inputs.context environment bound := by
   have runtime := CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters frame inputs.extended
   have mono := FunctionCallBody.mono_binders inputs.extended
-  have reached := Dynamic.BindersAllocate.preservesHeapTyping raw.heaps raw.arguments allocated
+  have reached := Dynamic.BindersAllocate.preservesHeapTyping (raw.heaps.copy copy)
+    (raw.arguments.mono copy.metadata_extends) allocated
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
-  refine ⟨?_,?_,allocated.preservesEnvironmentAgreement mono.1 mono.2 raw.captures,?_⟩
+  refine ⟨?_,?_,allocated.preservesEnvironmentAgreement mono.1 mono.2 (copy.agrees raw.captures),?_⟩
   · simpa only [registry.source selected] using runtime.1
   · simpa only [registry.evidence selected] using runtime.2
   · exact reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
@@ -55,7 +58,7 @@ theorem application_exact {registry : Registry} {child caller : Scope}
       callContext callerEvidence invocationEvidence before (.closure function) arguments outcome after) :
     Applies (Program.ofChecked compiled.sourceProgram) registry caller callContext before
       (.closure function) arguments (Lifting.embed outcome) after := by
-  obtain ⟨childSize, environment, bound, valid, allocated, sourceTrace, _smaller⟩ :=
+  obtain ⟨childSize, entry, copied, environment, bound, valid, copy, allocated, sourceTrace, _smaller⟩ :=
     SelectedCompilationStageClosureSourceTrace.source_prefix inputs.extended arity trace
   obtain ⟨finalContext, bodyOutcome, bodyTrace, converted⟩ :=
     SelectedCompilationStageNamedInvocationLifting.body_control sourceTrace
@@ -67,7 +70,7 @@ theorem application_exact {registry : Registry} {child caller : Scope}
       function.body finalContext bodyOutcome after := by
     simpa only [SelectedCompilationStageScopedLiftBounds.PlainStatements, Bool.true_eq, ↓reduceIte, source,registry.evidence selected] using bodyTrace
   obtain ⟨lifted,_post⟩ := CellAwareOrdinaryBodySourceLifting.lifts selectedBodies tree
-    (parameter_state material inputs selected valid raw allocated) plain
+    (parameter_state material inputs selected valid raw copy allocated) plain
   have matched : BodyResult function.resultType (CellAwareOrdinaryBodySourceState.embed bodyOutcome)
       (Lifting.embed outcome) := by
     cases converted with
@@ -76,7 +79,7 @@ theorem application_exact {registry : Registry} {child caller : Scope}
     | fault => exact .fault
     | breaking => exact .breaking
     | continuing => exact .continuing
-  exact .closure selected valid inputs.extended allocated lifted matched
+  exact .closure selected valid inputs.extended copy allocated lifted matched
 
 include inputs in
 theorem application {registry : Registry} {child caller : Scope}

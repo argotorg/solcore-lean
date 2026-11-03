@@ -65,7 +65,7 @@ theorem initialized (mono : binder.scheme.quantified = [])
         cases Dynamic.BinderExtends.functional extended extension
         refine .inr ⟨_, _, _, _, _, _, ?_, SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, allocated, .done tail⟩
         simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
-      | letInitializedGeneralized _ poly => exact (poly mono).elim
+      | letInitializedGeneralized _ _ poly => exact (poly mono).elim
   | fault trace =>
     cases trace with
     | head failed =>
@@ -80,7 +80,7 @@ theorem initialized (mono : binder.scheme.quantified = [])
         cases Dynamic.BinderExtends.functional extended extension
         refine .inr ⟨_, _, _, _, _, _, ?_, SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, allocated, .fault failed⟩
         simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
-      | letInitializedGeneralized _ poly => exact (poly mono).elim
+      | letInitializedGeneralized _ _ poly => exact (poly mono).elim
 
 theorem discard (trace : PlainItems program size invocation context environment before
       (.expression expression :: items) finalContext outcome after) :

@@ -40,6 +40,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open AcceptedNamedBodyFlow (Tree)
 open CellAwareInvocationAcceptedTerminals (children)
 open CellAwareInvocationAcceptedSourceFacts (head_form expression_node)
+open CellAwareGeneralizedSnapshotCode (snapshotInner snapshotSequence)
 
 section Coverage
 variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {result : Ty}
@@ -109,6 +110,53 @@ private theorem ensure_eq {site : SourceCoreElaboration.ErrorSite} {expected act
   by_cases same : expected = actual
   · exact same
   · simp [SourceCoreBasic.ensureType, same] at accepted
+
+/-- At a Word failure component, the bundle initializer of a snapshot
+declaration is typed at the language result of the declared payload. -/
+private theorem snapshot_initializer {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {binder : TypedBinder} {payload : Ty}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active
+      (CompatibleStatementInitialized.request source scope binder payload))
+    (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+      (layouts.allocatorAt owner active onError) (CompatibleStatementInitialized.request source scope binder payload))
+    (same : annotation.original = allocation.expression)
+    {copySource : TypedSource} {definitions : DataEnvironment} {context : Core.Context} {type success : Ty}
+    {initializer captured body : Expr}
+    (copied : SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)))
+      copySource scope (fun index => index) (snapshotInner payload initializer annotation.expression) = .ok captured)
+    (slots : ∀ (index : Nat) (id : Resolved.LocalId) (cellPayload : Ty), scope[index]? = some (id, cellPayload) →
+      context[index]? = some (.cell (OptionalCell.cellType cellPayload)))
+    (typed : HasType context (snapshotSequence type captured body) (LanguageResult.resultType success) definitions) :
+    HasType context initializer (LanguageResult.resultType payload) definitions := by
+  unfold snapshotSequence LanguageResult.bind at typed
+  cases typed with
+  | caseE capturedTyped failure _ =>
+    cases failure with
+    | inLeft _ reason =>
+      cases reason with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        subst found
+        have inner := CaptureCopyTyping.copyScopeIndexed_body_hasType copied slots capturedTyped
+        unfold snapshotInner LanguageResult.bind LanguageResult.success at inner
+        cases inner with
+        | caseE initializerTyped innerFailure allocated =>
+          cases innerFailure with
+          | inLeft _ innerReason =>
+            cases innerReason with
+            | var innerFound =>
+              simp only [List.getElem?_cons_zero, Option.some.injEq] at innerFound
+              subst innerFound
+              cases allocated with
+              | inRight _ allocationTyped =>
+                have bound := CellAwareInvocationAcceptedNative.allocation_payload allocation annotation same
+                  allocationTyped
+                subst bound
+                exact initializerTyped
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {attachment : optParam
@@ -254,11 +302,13 @@ theorem correct (budget : Nat)
     rw [form] at formTyped
     have payloadEq : payload = child.type := ensure_eq childType
     subst payloadEq
-    obtain ⟨allocation, annotation, same, emitted⟩ := index.let_initialized_receipt allocated
     obtain ⟨nativeType, native⟩ := native
-    have tailNative := TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ native)
     by_cases mono : binder.scheme.quantified = []
-    · have typedInitializer : ExpressionHasType index.source context initializer binder.scheme.body ∧
+    · have monomorphic : binder.scheme.quantified.isEmpty = true := by rw [mono]; rfl
+      rw [if_pos monomorphic] at allocated
+      obtain ⟨allocation, annotation, same, emitted⟩ := index.let_initialized_receipt allocated
+      have tailNative := TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ native)
+      have typedInitializer : ExpressionHasType index.source context initializer binder.scheme.body ∧
           BinderExtends index.source.owner context binder middle := by
         cases formTyped with
         | letInitialized initializerTyped _ extension => exact ⟨initializerTyped, extension⟩
@@ -284,7 +334,21 @@ theorem correct (budget : Nat)
         by
           intro _ typed
           exact tailBounds.2.2 (TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ typed))⟩
-    · obtain ⟨generalized, lambdaShape⟩ := shape.resolve_left mono
+    · have generalizedBinder : binder.scheme.quantified.isEmpty = false := by
+        cases quantified : binder.scheme.quantified with
+        | nil => exact absurd quantified mono
+        | cons _ _ => rfl
+      simp only [generalizedBinder, Bool.false_eq_true, ↓reduceIte] at allocated
+      obtain ⟨allocation, annotation, same, captured, copied, emitted⟩ :=
+        index.let_initialized_snapshot_receipt allocated
+      have slots : ∀ (slot : Nat) (slotId : Resolved.LocalId) (cellPayload : Ty),
+          scope[slot]? = some (slotId, cellPayload) →
+          (SourceCoreLocalCell.coreContext scope ++ administrative)[slot]? =
+            some (.cell (OptionalCell.cellType cellPayload)) :=
+        fun _ _ _ found => CellAwareGeneralizedSnapshotTyping.scope_cell found
+      have tailNative := (CellAwareGeneralizedSnapshotTyping.snapshot_children allocation annotation same copied slots
+        (emitted ▸ native)).2
+      obtain ⟨generalized, lambdaShape⟩ := shape.resolve_left mono
       have typedInitializer : ExpressionHasType index.source (localSchemeInitializerContext context binder)
             initializer binder.scheme.body ∧ BinderExtends index.source.owner context binder middle := by
         cases formTyped with
@@ -302,11 +366,12 @@ theorem correct (budget : Nat)
       have word : CellAwareInvocationAcceptedNative.WordFailure (SourceCoreLocalCell.coreContext scope ++ administrative)
           code whole.indexed.layouts.definitions := by
         intro _ typed
-        exact tailBounds.2.2 (TypedLexicalWhile.Native.initialized_child allocation annotation same (emitted ▸ typed))
+        exact tailBounds.2.2 (CellAwareGeneralizedSnapshotTyping.snapshot_children allocation annotation same copied
+          slots (emitted ▸ typed)).2
       obtain ⟨success, nativeEq⟩ := word native
       subst nativeEq
       rw [emitted] at native
-      have nativeTyped := CellAwareInvocationAcceptedNative.initialized_initializer allocation annotation same native
+      have nativeTyped := snapshot_initializer allocation annotation same copied slots native
       obtain ⟨attachmentEq, entry, issuer⟩ := generalized
       subst attachmentEq
       refine ⟨?_, ?_, word⟩

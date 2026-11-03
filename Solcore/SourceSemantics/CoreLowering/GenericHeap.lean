@@ -112,6 +112,44 @@ theorem HeapRepresents.allocate
       exact ⟨_, value, payload, Dynamic.Heap.Allocates.reads_new .append, freshType,
         Core.Store.allocate_fresh_lookup store value, cell.extend ⟨[store.length], rfl⟩ extension⟩
 
+/-- A copy of any source cell, generalized principal included, is a mapped
+allocation like `HeapRepresents.allocate`. -/
+theorem HeapRepresents.allocate_copy
+    {mapping : LocationMap} {world : Core.StoreTyping} {heap after : Dynamic.Heap} {store : Core.Store}
+    {copied : Dynamic.Cell} {location : Dynamic.Location}
+    {value : Core.Value} {payload : Core.Ty}
+    (related : HeapRepresents model mapping world heap store)
+    (cell : CellRepresents model mapping world copied value payload)
+    (allocated : Dynamic.Heap.AllocatesCopy heap copied location after) :
+    HeapRepresents model (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
+      after (store.allocate value).1 ∧
+    ReferenceRepresents (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
+      location store.length payload := by
+  cases allocated
+  have extension : Core.WorldExtends world (world ++ [Core.OptionalCell.cellType payload]) := ⟨_, rfl⟩
+  have freshType : (world ++ [Core.OptionalCell.cellType payload])[store.length]? =
+      some (Core.OptionalCell.cellType payload) := by rw [← related.runtime_hasTypes.length_eq]; simp
+  have freshMap : (mapping ++ [store.length])[heap.cells.length]? = some store.length := by
+    rw [← related.length_eq]; simp
+  refine ⟨⟨?_, LocationMap.Injective.append related.injective store.length ?_,
+    related.runtime_hasTypes.allocate (cell.runtime_hasType), ?_⟩, ⟨freshMap, freshType⟩⟩
+  · simp [related.length_eq]
+  · intro index impossible
+    have bound := related.target_lt impossible
+    omega
+  · intro source target mapped
+    rcases append_lookup mapped with old | ⟨sourceEq, targetEq⟩
+    · obtain ⟨oldCell, oldValue, oldPayload, sourceRead, found, coreRead, represents⟩ := related.cells old
+      exact ⟨oldCell, oldValue, oldPayload, Dynamic.Heap.AllocatesCopy.preserves_read .append sourceRead,
+        extension.lookup found,
+        (Core.Store.allocate_old_lookup store value (related.target_lt old)).trans coreRead,
+        represents.extend ⟨[store.length], rfl⟩ extension⟩
+    · subst target
+      rw [related.length_eq] at sourceEq
+      subst source
+      exact ⟨_, value, payload, Dynamic.Heap.AllocatesCopy.reads_new .append, freshType,
+        Core.Store.allocate_fresh_lookup store value, cell.extend ⟨[store.length], rfl⟩ extension⟩
+
 /-- A well-typed write to an unmapped administrative cell preserves the source
 heap and every source-visible cell. This permits installing recursive closures
 after allocating their optional administrative function cells. -/
@@ -286,7 +324,7 @@ theorem bind_internal {mapping : LocationMap} {world : Core.StoreTyping}
     HeapRepresents model (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       after (store.allocate value).1 := by
   obtain ⟨heapRelated, reference⟩ := heaps.allocate cell allocated
-  exact ⟨.internal reference (environments.fresh_absent fresh)
+  exact ⟨.internal reference.typed (environments.fresh_absent fresh)
     (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩), heapRelated⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericHeap

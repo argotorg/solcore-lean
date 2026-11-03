@@ -75,7 +75,9 @@ of source termination or a successful result. Core fuel and EVM gas are not the
 same quantity.
 
 Runtime support includes closures, recursive functions, mapping values,
-mutable locals, compound values and function handles nested in data. Source
+mutable locals, compound values and function handles nested in data. Closures
+capture by value: a closure copies its captured locals when it is created and
+again at each call ([closure captures](closure-capture-by-value.md)). Source
 mapping values here are local language data; they are not an assertion that
 native contract storage is connected to the account-world runtime.
 

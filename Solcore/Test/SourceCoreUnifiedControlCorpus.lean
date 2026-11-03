@@ -44,10 +44,16 @@ def run : IO Unit := do
   assertTrue (mappings.heap.length == 3 && hasWord mappings 0) "nested/default mapping source allocations changed"
   for spent in [0, 43, 300000] do
     discard <| expect compiled "loops" [] (.word (word 6)) spent
-  let ordered ← expect compiled "assignmentOrder" [] (.word (word 1207))
-  assertTrue (hasWord ordered 12) "index/RHS source writes were lost"
+  /- Closures capture by value. Each closure call writes only its own copy of
+  `order`, which stays 0, so this result no longer tells the index call from
+  the RHS call; the calls' copies hold 1 and 2. -/
+  let ordered ← expect compiled "assignmentOrder" [] (.word (word 7))
+  assertTrue (hasWord ordered 1 && hasWord ordered 2) "index/RHS closure calls lost the writes to their copies"
+  /- `rhs` writes 20 only to its own copy of `value`, so the target still holds
+  5 when it is read and this result no longer shows whether that read precedes
+  the RHS. -/
   let snapshot ← expect compiled "compoundSnapshot" [] (.word (word 8))
-  assertTrue (hasWord snapshot 8 && !hasWord snapshot 20) "compound assignment did not use the pre-RHS snapshot"
+  assertTrue (hasWord snapshot 8 && hasWord snapshot 20) "compound assignment or the RHS call's copy changed"
   for (name, expected) in [("integerBitNot", -6), ("integerBitAndNegative", 3),
       ("integerBitOrNegative", -5), ("integerBitXorNegative", -7)] do
     let state ← expect compiled name [] (.integer expected)

@@ -84,8 +84,11 @@ def run : IO Unit := do
       (tupleType, some (.product (w value) (.product (w 11) (w 13)))),
       (.word, some (w first)), (.word, some (w 13))]
     for budget in [0, 7, 43] do ordered.checkResume inputs (w expected) budget
+  -- The lambda copies `marker = 10` when the scrutinee creates it, and `f(x)`
+  -- assigns 12 only to its call's copy, so the arm still reads 10 from `marker`.
   let captured ← SourceCompilerFeatureSupport.compileNamed program "captured"
-  SourceCompilerFeatureSupport.require ((← captured.run [w 10]) == w 12) "marked arm captures included an administrative temporary"
-  for budget in [0, 7, 43] do captured.checkResume [w 10] (w 12) budget
+  SourceCompilerFeatureSupport.require ((← captured.run [w 10]) == w 10)
+    "closure call reached the enclosing marker or the arm read an administrative temporary"
+  for budget in [0, 7, 43] do captured.checkResume [w 10] (w 10) budget
   IO.println "compatible marked match arms: actual allocation receipts, skipped temporary captures, exact source cells and finite continuation agreement GREEN"
 end Tests.SourceCoreCompatibleMatchArmAllocations

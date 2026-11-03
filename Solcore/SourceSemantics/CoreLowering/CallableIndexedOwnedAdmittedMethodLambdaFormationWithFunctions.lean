@@ -33,40 +33,48 @@ include packet inclusion in
 /-- The original actual formation supplies the closure. Only its function
 representation is transferred forward to the caller's model. -/
 theorem formation
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functions mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
-    functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
-      finalStore = store) := by
-  obtain ⟨sourceTrace, native, represented, determined⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      functions.Represents registry formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) := by
+  obtain ⟨formed, sourceTrace, native, represented, determined⟩ :=
     CallableIndexedOwnedMethodLambdaFormationReceipts.formation captured code support owner initial packet
-      profile stored ordinary coercions
-  exact ⟨sourceTrace, native, inclusion represented, determined⟩
+      profile heaps copied ordinary coercions
+  exact ⟨formed, sourceTrace, native, inclusion represented, determined⟩
 
-/-- The output retains all ordinary leaf effects and the exact packet state. -/
+/-- The output retains all ordinary leaf effects and the exact packet state,
+in the formed state that holds the copies. -/
 def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap) (result : Value) (finalStore : Store) : Prop :=
   Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore ∧
-  GenericExpressionMeaning.ResultRepresents
-    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      functions)
-    mapping world code.sourceNode.type code.lowered.type faults outcome result ∧
-  CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-    functions mapping world after finalStore ∧
-  LocationMap.Extends mapping mapping ∧ WorldExtends world world ∧
-  AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
-  ∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
-      ⟨scope, mapping, world, after, finalStore, captured.canonical⟩,
-    (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached ∧
-    PostAdmission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-      function.context code.sourceNode.type outcome reached
+  ∃ finalMap finalWorld,
+    GenericExpressionMeaning.ResultRepresents
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        functions)
+      finalMap finalWorld code.sourceNode.type code.lowered.type faults outcome result ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functions finalMap finalWorld after finalStore ∧
+    LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+    AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+    ∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named).State
+        ⟨scope, finalMap, finalWorld, after, finalStore, captured.canonical⟩,
+      (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates ⟨initial, packet⟩ reached ∧
+      PostAdmission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
+        function.context code.sourceNode.type outcome reached
 
 variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) function.context function.source)
@@ -74,6 +82,7 @@ variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgr
   (locals : Dynamic.EnvironmentAgrees heap function.context.locals function.captured)
   (typed : ExpressionHasType function.source function.context code.id code.sourceNode.type)
   (sourceType : code.sourceNode.type = FunctionValues.sourceType function)
+  (copied : code.policy.snapshotLambda code.id = true)
   (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
   (coercions : code.sourceNode.coercions = [])
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
@@ -81,7 +90,7 @@ variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgr
   (admitted : Admission (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
     function.context ⟨initial, packet⟩)
 
-include inclusion sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
+include inclusion sourceType copied ordinary coercions heaps admitted wellFormed runtime covers locals typed in
 /-- Original Source value and fault inversion select the authentic lambda
 leaf. Its proved formation supplies the actual native and admitted post. -/
 theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -90,30 +99,36 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
     ∃ result finalStore, ResultAt captured code support owner initial packet functions outcome after result finalStore := by
   cases trace.sound with
   | value evaluated =>
-    obtain ⟨rfl, rfl⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
+    obtain ⟨sourceCaptured, rfl, copy⟩ := RecursiveNamedLambdaFormationHeads.source_value_of_code
       (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
       (program := Program.ofChecked compiled.sourceProgram) code support.unique coercions evaluated
-    obtain ⟨sourceTrace, native, represented, _determined⟩ :=
-      formation captured code support owner initial packet profile functions inclusion heaps.runtime_hasTypes ordinary coercions
+    obtain ⟨formed, sourceTrace, native, represented, _determined⟩ :=
+      formation captured code support owner initial packet profile functions inclusion heaps copied ordinary coercions
+    obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formed.copy
     have valueRep : ValueRep compiled.compatible.checked registry
-        functions mapping world
-        code.sourceNode.type (.closure function)
-        (value code captured.embedding (history_at captured code support owner initial packet).native actual) code.lowered.type := by
+        functions formed.finalMap formed.finalWorld
+        code.sourceNode.type (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        code.lowered.type := by
       rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
       exact .function represented
+    obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+      (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
+      (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner support.principal.named)
+      ⟨initial, packet⟩ formed.maps formed.worlds formed.frame formed.copy.metadata_extends
     have post := after_expression
       (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
       (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
-      ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
-      (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
-    exact ⟨_, store, native, .value valueRep, heaps, .refl _, .refl _, .refl _ _, .refl _,
-      ⟨initial, packet⟩, Relates.refl initial, post⟩
+      ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals typed
+      (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) formed.frame
+    exact ⟨_, formed.finalStore, native, formed.finalMap, formed.finalWorld, .value valueRep, formed.heaps,
+      formed.maps, formed.worlds, formed.frame, formed.copy.metadata_extends, reached, related, post⟩
   | fault failed =>
     exact False.elim (RecursiveNamedLambdaFormationHeads.excludes_fault_of_code
       (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
       (program := Program.ofChecked compiled.sourceProgram) code support.unique coercions failed)
 
-include inclusion sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
+include inclusion sourceType copied ordinary coercions heaps admitted wellFormed runtime covers locals typed in
 /-- The original native completion is deterministic against authentic
 formation; its independently sized Source trace supplies the same admission. -/
 theorem reflects_at {size : Nat} {result : Value} {finalStore : Store}
@@ -122,14 +137,14 @@ theorem reflects_at {size : Nat} {result : Value} {finalStore : Store}
       RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         function.context function.evidence function.source function.captured heap code.id outcome after ∧
       ResultAt captured code support owner initial packet functions outcome after result finalStore := by
-  obtain ⟨sourceTrace, _native, _represented, determined⟩ :=
-    formation captured code support owner initial packet profile functions inclusion heaps.runtime_hasTypes ordinary coercions
+  obtain ⟨formed, sourceTrace, _native, _represented, determined⟩ :=
+    formation captured code support owner initial packet profile functions inclusion heaps copied ordinary coercions
   obtain ⟨rfl, rfl⟩ := determined result finalStore completed.sound
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
     (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
   obtain ⟨nativeResult, reachedStore, resultAt⟩ := preserves_at captured code support owner initial packet profile functions inclusion
-    wellFormed runtime covers locals typed sourceType ordinary coercions heaps admitted sized
+    wellFormed runtime covers locals typed sourceType copied ordinary coercions heaps admitted sized
   obtain ⟨rfl, rfl⟩ := determined nativeResult reachedStore resultAt.1
-  exact ⟨sourceSize, _, heap, sized, resultAt⟩
+  exact ⟨sourceSize, _, formed.finalHeap, sized, resultAt⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMethodLambdaFormationWithFunctions

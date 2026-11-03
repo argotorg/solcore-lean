@@ -190,29 +190,36 @@ open CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation (history_at sour
 include profile prefixContext observed provenance inclusion selected in
 /-- One original contextual formation retains its complete traces and
 represented value, plus the same positive member for later initialized reads.
-The escaped row is supplied by the actual accepted compiler selection. -/
+The escaped row is supplied by the actual accepted compiler selection. The
+member is the formed closure over the copies of its captured cells. -/
 theorem formation_member_from_selection
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functions mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
-    functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
-      finalStore = store) ∧
-    Member headers keys registry faults mapping world function
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore := by
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      functions.Represents registry formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) ∧
+      Member headers keys registry faults formed.finalMap formed.finalWorld formed.closure
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore := by
   exact CallableIndexedOwnedContextualStoredClosureAssociationReceipts.formation_member
     (captured := captured) (code := code) (support := support) (owner := owner)
     (initial := initial) (packet := packet) (profile := profile) (prefixContext := prefixContext)
     (observed := observed) (provenance := provenance) (functions := functions)
-    (inclusion := inclusion) (escaped := selected.escaped) stored ordinary coercions
+    (inclusion := inclusion) (escaped := selected.escaped) heaps copied ordinary coercions
 
 end FormationMember
 

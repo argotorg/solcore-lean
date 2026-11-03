@@ -2,9 +2,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrincipa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
 
 /-! One original principal formation produces the genuine Source/native trace.
-The retained prepared principal support constructs its prospective positive
-receipt at that exact carrier. The same trace adds Source admission and the
-existing positive post at the unchanged reached packet. No old StaticMember
+The formation copies the captured cells, so the retained prepared principal
+support constructs its prospective positive receipt for the formed closure over
+the copies. The same trace adds Source admission and the existing positive post
+at the reached packet transported to the formed state. No old StaticMember
 is inverted and no body callback is supplied. The current payload model still
 stores the forward plain leaf; migration to prepared leaves remains separate. -/
 set_option autoImplicit false
@@ -16,6 +17,34 @@ open CallableIndexedOwnedFunctionValues (Header Key)
 open CallableIndexedOwnedPreparedPrincipalLambdaSupport (Support PreparedAt Receipt)
 open CallableIndexedOwnedContextualCellOrigins (CellOrigins PostWithOrigins)
 open CallableIndexedOwnedSourceAdmission
+
+section Prepared
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+
+/-- The prepared principal seed of a code is the seed of the same code over
+other captures. -/
+theorem prepared_recapture {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {support : Support code} (prepared : PreparedAt code support) (environment : Dynamic.Environment) :
+    PreparedAt (code.recapture environment) (support.recapture environment) := by
+  cases prepared with
+  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView _ =>
+    exact .recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView environment
+
+/-- A prepared principal code is the lambda of a selected method Site, which
+copies its captures. -/
+theorem prepared_snapshots {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {support : Support code} (prepared : PreparedAt code support) :
+    code.policy.snapshotLambda code.id = true := by
+  cases prepared with
+  | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy
+      compilerPolicy issuedRecipe bodyView environment =>
+    exact site.snapshots
+
+end Prepared
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -38,33 +67,45 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 local notation "plain" => support.plain actualSites sites
 local notation "history" => CallableIndexedOwnedMethodLambdaFormationReceipts.history_at
   captured code plain owner initial packet
-local notation "carrier" => value code captured.embedding (CallableIndexedLambdaValues.History.native history) actual
+local notation "carrier " formed:max => value code (Formed.embedding formed)
+  (CallableIndexedLambdaValues.History.native history) (Formed.closureActual formed)
 
 include actualSites sites packet prepared profile in
-/-- The authentic method factory runs once. Preparation is retained from its
-own support, and runtime typing comes from that actual formed value. -/
+/-- The authentic method factory runs once and copies the captured cells.
+Preparation is retained from its own support, recaptured at the copies, and
+runtime typing comes from that actual formed value. -/
 theorem formation_member
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word carrier) store ∧
-    Nonempty (Receipt headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
-  obtain ⟨sourceTrace, nativeTrace, represented, determined⟩ :=
+    ∃ formed : Formed model captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (carrier formed)) formed.finalStore ∧
+      Nonempty (Receipt headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (carrier formed)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (carrier formed) ∧
+          finalStore = formed.finalStore) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, represented, determined⟩ :=
     CallableIndexedOwnedMethodLambdaFormationReceipts.formation
-      captured code plain owner initial packet profile stored ordinary coercions
-  have typed : RuntimeValueHasType world carrier
+      captured code plain owner initial packet profile heaps (prepared_snapshots prepared) ordinary coercions
+  have typed : RuntimeValueHasType formed.finalWorld (carrier formed)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
       compiled.indexed.layouts.definitions :=
     (CallableIndexedOwnedMethodLambdaValues.model headers keys bodyRegistry faults profile).runtime_hasType
       (registry := bodyRegistry) represented
-  exact ⟨sourceTrace, nativeTrace,
-    ⟨.principal owner captured code history support actualSites sites ⟨rfl⟩ prepared packet.observed
-      (CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code plain owner initial packet)
+  have leading : formed.captures.administrative[0]? = some support.principal.named.signature.parameterType :=
+    CallableIndexedOwnedMethodLambdaFormationReceipts.leading captured code plain owner initial packet
+  exact ⟨formed, sourceTrace, nativeTrace,
+    ⟨.principal (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (support.recapture formed.captured) actualSites sites ⟨rfl⟩ (prepared_recapture prepared formed.captured)
+      (packet.observed.of_slots formed.slots) leading
       (CallableIndexedOwnedMethodLambdaFormationReceipts.reference_index captured code plain) typed⟩,
     determined⟩
 
@@ -81,43 +122,61 @@ variable
 
 include actualSites sites cells wellFormed runtime covers locals typed sourceType admitted prepared packet profile in
 /-- The prepared receipt and current positive post accompany the same actual
-Source/native formation and unchanged reached packet. The factory is invoked
-once; only the new value erases forward into the current plain positive model. -/
+Source/native formation over the copies, at the reached packet transported to
+the formed state. The factory is invoked once; only the new value erases
+forward into the current plain positive model. -/
 theorem formation_post
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding) (.inRight .word carrier) store ∧
-    Nonempty (Receipt headers keys bodyRegistry faults mapping world function carrier
-      code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore) ∧
-    PostWithOrigins (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
-      (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-      function.context profile code.sourceNode.type code.lowered.type
-      (.value (.closure function)) (.inRight .word carrier) ⟨initial, packet⟩ ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
-  obtain ⟨sourceTrace, nativeTrace, member, determined⟩ := formation_member
-    captured code support actualSites sites prepared owner initial packet profile
-    cells.runtime_hasTypes ordinary coercions
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
+        captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (carrier formed)) formed.finalStore ∧
+      Nonempty (Receipt headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure
+        (carrier formed)
+        code.receipt.loweredParameters code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∃ reached : (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner
+          support.principal.named).State
+          ⟨scope, formed.finalMap, formed.finalWorld, formed.finalHeap, formed.finalStore, captured.canonical⟩,
+        (CallableIndexedOwnedOriginCanonicalState.protocol owner support.principal.named).Relates
+          ⟨initial, packet⟩ reached ∧
+        PostWithOrigins (bodyRegistry := bodyRegistry) (registry := registry) (faults := faults)
+          (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
+          function.context profile code.sourceNode.type code.lowered.type
+          (.value (.closure formed.closure))
+          (.inRight .word (carrier formed)) reached) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (carrier formed) ∧
+          finalStore = formed.finalStore) := by
+  obtain ⟨formed, sourceTrace, nativeTrace, member, determined⟩ := formation_member
+    captured code support actualSites sites prepared owner initial packet profile cells ordinary coercions
   have represented : GenericExpressionMeaning.ResultRepresents
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
-      mapping world code.sourceNode.type code.lowered.type faults
-      (.value (.closure function)) (.inRight .word carrier) := by
+      formed.finalMap formed.finalWorld code.sourceNode.type code.lowered.type faults
+      (.value (.closure formed.closure))
+      (.inRight .word (carrier formed)) := by
     apply FunctionCalls.ResultRepresents.value
     rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
     obtain ⟨receipt⟩ := member
     exact CallableIndexedOwnedContextualCellOrigins.payload_static_member (registry := registry) profile ⟨receipt.forget⟩
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner support.principal.named)
+    (CallableIndexedOwnedOriginCanonicalState.administrativeTransport (headers := headers) owner support.principal.named)
+    ⟨initial, packet⟩ formed.maps formed.worlds formed.frame formed.copy.metadata_extends
   have post := CallableIndexedOwnedSourceAdmission.after_expression
     (bridge := CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
     (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
-    ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
-    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
-  exact ⟨sourceTrace, nativeTrace, member,
-    CallableIndexedOwnedContextualCellOrigins.post_at_same_state
-      (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
-      profile ⟨initial, packet⟩ post cells represented,
+    ⟨initial, packet⟩ reached admitted wellFormed runtime covers locals typed
+    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) formed.frame
+  exact ⟨formed, sourceTrace, nativeTrace, member,
+    ⟨reached, related,
+      CallableIndexedOwnedContextualCellOrigins.post_at_same_state
+        (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named)
+        profile reached post formed.heaps represented⟩,
     determined⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrincipalFormationReceipts

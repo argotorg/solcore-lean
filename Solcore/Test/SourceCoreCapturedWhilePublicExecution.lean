@@ -3,9 +3,11 @@ import Solcore.Test.SourceCoreCapturedWhileMakeStep
 import Solcore.Test.SourceCoreCapturedWhileSeed
 import Solcore.Test.SourceCoreCapturedWhileClosureShape
 
-/-! The first captured cell is written and read again after a separate closure
-and a fresh factory allocation. Every transition uses the actual returned
-public session and the same Source heap retained by the previous call. -/
+/-! The first closure is called again after a separate closure and a fresh
+factory allocation. Captures are by value: each call's loop writes its own copy
+of the captured seed before the call returns it. Every transition uses the
+actual returned public session and the same Source heap retained by the
+previous call. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedWhile

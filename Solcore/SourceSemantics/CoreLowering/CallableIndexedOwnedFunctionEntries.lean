@@ -538,8 +538,9 @@ variable {callerPrefix : Nat}
   (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
     (values := .initial compiled.compatible.checked) (program := program)
     headers owner.key.locations callerPrefix scope captured.canonical owner.key.frameLocation)
-  {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
-  (spine : entry.entry.canonical = added ++ captured.canonical)
+  {added copied : Environment} (length : added.length = code.receipt.loweredParameters.length)
+  (spine : entry.entry.canonical = added ++ copied)
+  (slots : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
 
 /-- The source entry comes from the same unsized prefix and its retained
 ordered spine. The lambda ghost and full carried metadata are unchanged. -/
@@ -549,29 +550,29 @@ def ordinary_source_entry :
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
       entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store entry.entry.canonical :=
   CallableIndexedLambdaCatalogEntries.source_entry entry (initial_catalog pool owner globals)
-    (initial_catalog_frame_eq pool owner globals) length spine
+    (initial_catalog_frame_eq pool owner globals) length spine slots
 
 theorem ordinary_source_entry_frame_eq :
-    (ordinary_source_entry pool owner entry globals length spine).catalog.authority.frameLocation =
+    (ordinary_source_entry pool owner entry globals length spine slots).catalog.authority.frameLocation =
       owner.key.frameLocation :=
   initial_catalog_frame_eq pool owner globals
 
 /-- The selected source-entry row and the transported pool retain the exact
 same record list. This comparison concerns authority data, not proof terms. -/
 theorem ordinary_source_entry_records :
-    (ordinary_source_entry pool owner entry globals length spine).catalog.authority.records =
+    (ordinary_source_entry pool owner entry globals length spine slots).catalog.authority.records =
       ((ordinary_pool pool owner entry).rows owner.position).authority.records :=
   (ordinary_pool_records pool owner entry owner.position).symm
 
 theorem ordinary_source_entry_current :
-    (ordinary_source_entry pool owner entry globals length spine).catalog.authority.current =
+    (ordinary_source_entry pool owner entry globals length spine slots).catalog.authority.current =
       ((ordinary_pool pool owner entry).rows owner.position).authority.current := by
   change entry.next = ((ordinary_pool pool owner entry).rows owner.position).authority.current
   have same := ordinary_pool_current pool owner entry owner.position
   simpa [CallableIndexedOwnedFunctionValues.OwnedKey.key] using same.symm
 
 theorem ordinary_source_entry_ghost :
-    (ordinary_source_entry pool owner entry globals length spine).catalog.authority.ghost =
+    (ordinary_source_entry pool owner entry globals length spine slots).catalog.authority.ghost =
       ((ordinary_pool pool owner entry).rows owner.position).authority.ghost := by
   change (SourceCoreCallablePairedFrames.Frame.lambda code.descriptor.id history.ghost) =
     ((ordinary_pool pool owner entry).rows owner.position).authority.ghost

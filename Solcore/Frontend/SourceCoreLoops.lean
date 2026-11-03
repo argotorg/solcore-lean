@@ -93,8 +93,12 @@ def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.ErrorSit
           | some initializer =>
               let initializer ← policy.lowerExpression fuel source scope initializer reasonAt
               SourceCoreBasic.ensureType (.binder binder.id) payloadType initializer.type
-              SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
-                controlType payloadType initializer.expression body
+              if binder.scheme.quantified.isEmpty then
+                SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
+                  controlType payloadType initializer.expression body
+              else
+                SourceCoreSourceCells.letInitializedSnapshot policy.sourceCells source scope binder
+                  controlType payloadType initializer.expression body
       | .expression expression =>
           let expression ← policy.lowerExpression fuel source scope expression reasonAt
           let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
@@ -136,8 +140,12 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
               SourceCoreBasic.ensureType (.binder binder.id) payloadType initializer.type
               let body ← lowerFlowStatementsWithPolicy policy fuel source ((binder.id, payloadType) :: scope)
                 rest resultType reasonAt tailReturns selfReason
-              SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
-                controlType payloadType initializer.expression body
+              if binder.scheme.quantified.isEmpty then
+                SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
+                  controlType payloadType initializer.expression body
+              else
+                SourceCoreSourceCells.letInitializedSnapshot policy.sourceCells source scope binder
+                  controlType payloadType initializer.expression body
       | .assignValue assignment operator value =>
           SourceCoreBasic.ensureType site .unit type
           let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason

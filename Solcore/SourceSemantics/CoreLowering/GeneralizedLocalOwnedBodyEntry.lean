@@ -52,8 +52,9 @@ theorem parameters_with_state
     ∃ entry : GeneralizedLocalBodyEntry.Entry (values := .initial compiled.compatible.checked)
       origin captured code inputs functions registry cells arguments nativeArguments before store
       owner.key.frameLocation callerNative callerGhost caller id recipe,
-    ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-      entry.entry.canonical = added ++ captured.canonical ∧
+    ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+      entry.entry.canonical = added ++ copied ∧
+      (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?) ∧
       ProtectedStateTransition.Transition (protocol headers keys) callerState
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
@@ -72,12 +73,13 @@ theorem parameters_with_state
   have readyAt : ProtectedStateTransition.CellAllocation.ReadyAt producer owner.key.frameLocation next := by
     intro index reached read
     exact CallableIndexedOwnedAllocationProducer.ready_of_stable_read reached owner.position read nextHistory
-  obtain ⟨entry, added, length, spine, reached, parameterRelated⟩ :=
+  obtain ⟨entry, added, copied, length, spine, slots, reached, parameterRelated⟩ :=
     GeneralizedLocalBodyEntry.Stateful.entry_exists_with_spine (values := .initial compiled.compatible.checked)
-      origin captured code inputs functions ordinaryCells (protocol headers keys) producer represented callerCarried recipe
+      origin captured code inputs functions ordinaryCells (protocol headers keys) producer
+      (administrativeTransport headers keys) (rebinds headers keys) represented callerCarried recipe
       heaps locals reference read unmapped initial readyAt
   have installedRelated : Relates callerState initial := install_related callerState owner.position (.stable nextHistory)
-  exact ⟨entry, added, length, spine, reached, installedRelated.trans parameterRelated⟩
+  exact ⟨entry, added, copied, length, spine, slots, reached, installedRelated.trans parameterRelated⟩
 
 /-- Original Source typing and the actual allocation produce body admission.
 No source type is recovered from an erased native payload type. -/
@@ -100,7 +102,8 @@ theorem source_admission
   have actualArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [rawTypes] using argumentsTyped
-  have reached := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped actualArguments entry.entry.allocation
+  have reached := Dynamic.BindersAllocate.preservesHeapTyping (beforeTyped.copy entry.entry.copy)
+    (actualArguments.mono entry.entry.copy.metadata_extends) entry.entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   have typed := reached.transportClosed fields.signatures frame.code.closed (fields.targetClosed frame.code.closed)
     frame.code.variables_closed (fields.targetResidualVariablesOpen frame.code.residual_variables_open)

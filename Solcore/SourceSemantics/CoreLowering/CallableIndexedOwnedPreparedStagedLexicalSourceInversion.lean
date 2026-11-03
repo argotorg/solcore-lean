@@ -110,7 +110,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
-  | letGeneralized actual same _ polymorphic _ _ _ =>
+  | letGeneralized actual same _ _ polymorphic _ _ _ =>
       have equal := (shape actual).symm.trans same
       cases equal
       exact False.elim (polymorphic monomorphic)

@@ -52,9 +52,9 @@ structure InitialForward (selected : SelectedInventory whole row)
     (payloads := start.native) (nativeCheckpoint := start.checkpoint)
     (publicCheckpoint := started.call.checkpoint)
     ((selected.make_shape shape).value selected.packet.header.context
-      (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) selected.packet.header.function.evidence)
+      (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) selected.packet.header.function.evidence)
     ((selected.make_shape shape).principal.allocatedHeap selected.packet.header.context
-      (inputEnvironment (selected.make_shape shape).principal.input ⟨[]⟩) (inputHeap ⟨[]⟩ .bool (.bool flag)))
+      (snapshotEnvironment (selected.make_shape shape).principal.input ⟨[]⟩ .bool (.bool flag)) (snapshotHeap ⟨[]⟩ .bool (.bool flag)))
 
 /-- Every premise is an original checked/static observation or an actual public
 start. Source execution is constructed inside, before the target is resumed. -/

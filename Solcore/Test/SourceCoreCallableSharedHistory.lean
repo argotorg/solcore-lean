@@ -31,8 +31,10 @@ private def artifact (program : CheckedProgram) : IO SourceCoreCompatibleFunctio
 private def initial : SourceCoreAllocationLedger.SourceHeap := [⟨.word, none⟩, ⟨.function .word .word, none⟩, ⟨.mapping .word .word, none⟩]
 
 /-- Ground instances discovered under a read-parent are compiled at the
-original lexical bundle-creation scope. This is a positive compiler regression;
-it does not claim the scoped single-parent ancestry table covers this case. -/
+original lexical bundle-creation scope. Closures capture by value, so that scope
+is the snapshot taken around the bundle's declaration. This is a positive
+compiler regression; it does not claim the scoped single-parent ancestry table
+covers this case. -/
 def run : IO Unit := do
   let program ← match checkProgram workspace with
     | .ok program => pure program | .error error => throw (IO.userError s!"shared source rejected: {reprStr error}")
@@ -57,10 +59,14 @@ def run : IO Unit := do
     assertTrue (shared.environment.length == 1) "shared bundle captured a read-parent parameter"
     let capturedSeed ← match shared.environment.head? with
       | some binding => pure binding | none => throw (IO.userError "shared bundle dropped lexical seed capture")
-    let seed ← match ledger.ledger.rows.find? (·.entry.key.binder.name == "seed") with
-      | some seed => pure seed | none => throw (IO.userError "shared seed allocation missing")
-    assertTrue (capturedSeed.1 == seed.entry.key.binder.id && capturedSeed.2 == seed.sourceLocation)
-      "shared bundle selected the read parent's environment instead of its creation environment"
+    -- The snapshot around the declaration copies `seed` after the input and
+    -- right before the bundle's own allocation.
+    let [input, seed] := (ledger.ledger.rows.takeWhile (·.entry.key.binder.name != "shared")).filter
+        (·.entry.key.binder.name == "seed")
+      | throw (IO.userError "shared seed allocation or its snapshot missing")
+    assertTrue (capturedSeed.1 == seed.entry.key.binder.id && capturedSeed.2 == seed.sourceLocation &&
+        seed.payload == input.payload)
+      "shared bundle selected the read parent's environment instead of its creation snapshot"
     assertTrue (SourceCoreCallableAncestryLedger.frame? completion == some .empty)
       "shared bundle left an active callable frame"
   IO.println "root-created generic bundle: authenticated read-parent recipe, lexical captures and typed Core resume GREEN"

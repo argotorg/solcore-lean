@@ -123,18 +123,21 @@ theorem Shape.captures {source : TypedSource} (shape : Shape source)
   .directLambda (lookupExpression?_sound shape.lambdaFound) shape.lambdaForm
     shape.lambdaRaw shape.lambdaType shape.lambdaRequirements shape.lambdaCoercions
 
-/-- The original let stores one principal descriptor. It performs no lambda
-body call and selects neither the Word nor Bool instance at allocation. -/
+/-- The original let copies its environment once and stores one principal
+descriptor over the copies. It performs no lambda body call and selects
+neither the Word nor Bool instance at allocation. -/
 theorem Shape.initializes {source : TypedSource} (shape : Shape source)
     {program : SourceSemantics.Program} {context nextContext : SourceSemantics.Context}
-    (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    (evidence : Dynamic.EvidenceEnvironment) {environment captured : Dynamic.Environment}
+    {before middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (extended : BinderExtends source.owner context shape.binder nextContext) :
     Dynamic.StatementExecutes program context evidence source environment before shape.initialized.id
-      nextContext (.fallthrough ((shape.binder.id, ⟨before.cells.length⟩) :: environment))
-      (shape.allocatedHeap context environment before) := by
+      nextContext (.fallthrough ((shape.binder.id, ⟨middle.cells.length⟩) :: environment))
+      (shape.allocatedHeap context captured middle) := by
   apply Dynamic.StatementExecutes.letInitializedGeneralized
-    (lookupStatement?_sound shape.initializedFound) shape.initializedForm
-    (shape.captures context environment) (by rw [shape.scheme]; simp) extended
+    (lookupStatement?_sound shape.initializedFound) shape.initializedForm snapshot
+    (shape.captures context captured) (by rw [shape.scheme]; simp) extended
   exact .append
 
 end Tests.SourceCoreSelectedGeneralizedLocal

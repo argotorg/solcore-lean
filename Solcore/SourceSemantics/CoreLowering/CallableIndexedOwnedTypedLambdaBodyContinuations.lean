@@ -92,7 +92,8 @@ theorem native_receipt
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq body.extended] using argumentsTyped
-  have allocated := entry.allocation.preservesHeapTyping beforeTyped rawArguments
+  have allocated := entry.allocation.preservesHeapTyping (beforeTyped.copy entry.copy)
+    (rawArguments.mono entry.copy.metadata_extends)
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields body.extended
   have heapTyped : Dynamic.HeapWellTyped body.context entry.heap :=
     allocated.transportClosed fields.signatures body.frame.code.closed (fields.targetClosed body.frame.code.closed)
@@ -129,7 +130,7 @@ theorem source_continuation (budget : Nat)
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
       (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history body.toContext functions owner caller budget := by
-  intro entry _added _length _spine reached child strict outcome after trace
+  intro entry _added _length _copied _spine _kept reached child strict outcome after trace
   have source := source_receipt captured code history body functions owner caller beforeTyped argumentsTyped entry
   have admitted : Admission (bridge (headers := headers) (keys := keys)) body.context reached :=
     ⟨source.heapTyped, parameter_rows owner caller stable reached entry.nextHistory entry.entry.frame⟩

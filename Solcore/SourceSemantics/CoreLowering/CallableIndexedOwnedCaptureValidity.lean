@@ -10,8 +10,9 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCaptureValidi
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedFunctionValues CallableIndexedLambdaValues
 
-/-- The actual Source lambda captures precisely its caller's lexical environment
-and leaves the heap unchanged. No child or body execution premise is needed. -/
+/-- The actual Source lambda captures copies of its caller's lexical
+environment; the heap only grows. No child or body execution premise is
+needed. -/
 theorem captures_of_formation
     {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource}
@@ -22,9 +23,9 @@ theorem captures_of_formation
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (evaluated : Dynamic.ExpressionFormEvaluates program context evidence source environment before
       (.lambda parameters result statements) requirements coercions (.closure function) after) :
-    after = before ∧ FunctionValues.SourceCapturesValid after (.closure function) := by
+    Dynamic.HeapMetadataExtend before after ∧ FunctionValues.SourceCapturesValid after (.closure function) := by
   cases evaluated with
-  | lambda _ => exact ⟨rfl, locals⟩
+  | lambda _ snapshot => exact ⟨snapshot.metadata_extends, snapshot.agrees locals⟩
 
 /-- Source typing at the actual callee heap exposes the complete raw capture
 scope, including generalized descriptors, independently of the native carrier. -/

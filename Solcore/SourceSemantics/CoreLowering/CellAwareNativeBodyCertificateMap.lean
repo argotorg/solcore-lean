@@ -27,9 +27,9 @@ theorem map_tree
   | tail found form expressionFound valueType typed value =>
     exact .tail found form expressionFound valueType typed (included _ _ _ _ value)
   | generalizedInitialized found form declaration polymorphic extended ordinary initializerFound initializerForm
-      valueType requirements coercions site initial nativeTyped allocation annotation same _remaining ih =>
+      valueType requirements coercions site initial nativeTyped allocation annotation same copied _remaining ih =>
     exact .generalizedInitialized found form declaration polymorphic extended ordinary initializerFound initializerForm
-      valueType requirements coercions site initial nativeTyped allocation annotation same ih
+      valueType requirements coercions site initial nativeTyped allocation annotation same copied ih
 
 def map_body
     (included : ∀ context scope id lowered, first context scope id lowered → second context scope id lowered)

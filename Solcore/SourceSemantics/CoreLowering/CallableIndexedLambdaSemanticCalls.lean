@@ -42,8 +42,10 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
 include extension uninitialized missing in
 theorem Entry.preserves
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
-    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies environment : Dynamic.Environment} {copied bound after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -54,6 +56,7 @@ theorem Entry.preserves
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy entry.entry.copy
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at trace
   have registered := CallableIndexedAmbient.frame_registered prepared
@@ -81,8 +84,9 @@ theorem Entry.reflects
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
       store applyPayload result finalStore) :
-    ∃ environment bound outcome after finalMap finalWorld,
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+    ∃ copies copied environment bound outcome after finalMap finalWorld,
+      Dynamic.EnvironmentCopies function.source function.captured before copies copied ∧
+      Dynamic.BindersAllocate copies copied function.parameters arguments environment bound ∧
       FunctionCallBody.Trace program function body.context environment bound outcome after ∧
       FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
         finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
@@ -119,7 +123,8 @@ theorem Entry.reflects
       (show CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost store from
         ⟨entry.currentRead, entry.currentHistory⟩) finalHeaps worlds frame
     subst finalStore
-    exact ⟨entry.entry.environment, entry.entry.heap, outcome, after, finalMap, finalWorld, entry.entry.allocation, trace,
+    exact ⟨entry.entry.copies, entry.entry.copiedHeap, entry.entry.environment, entry.entry.heap, outcome, after,
+      finalMap, finalWorld, entry.entry.copy, entry.entry.allocation, trace,
       related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
@@ -136,9 +141,9 @@ theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dyn
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
   obtain ⟨entry⟩ := entry_exists captured code history body profile represented heaps locals reference read currentCarried unmapped allowed
-  obtain ⟨environment, bound, outcome, after, finalMap, finalWorld, allocated, trace, rest⟩ :=
+  obtain ⟨copies, copied, environment, bound, outcome, after, finalMap, finalWorld, copy, allocated, trace, rest⟩ :=
     Entry.reflects captured code history body profile extension uninitialized missing entry evaluated
-  exact ⟨outcome, after, finalMap, finalWorld, trace.call body.frame body.extended allocated, rest⟩
+  exact ⟨outcome, after, finalMap, finalWorld, trace.call body.frame body.extended copy allocated, rest⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
 theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
@@ -154,12 +159,13 @@ theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dy
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
   have arity : function.parameters.length = arguments.length := by rw [parameters code]; simpa using represented.length.1
-  obtain ⟨types, context, environment, bound, extended, allocated, trace⟩ := FunctionCallBody.Outcome.trace arity executed
+  obtain ⟨types, context, copies, copied, environment, bound, extended, copy, allocated, trace⟩ :=
+    FunctionCallBody.Outcome.trace arity executed
   have sameTypes : types = body.types := extended.bodyTypes_eq.symm.trans body.extended.bodyTypes_eq
   subst types
   have sameContext := extended.functional body.extended
   subst context
   obtain ⟨entry⟩ := entry_exists captured code history body profile represented heaps locals reference read currentCarried unmapped allowed
-  exact Entry.preserves captured code history body profile extension uninitialized missing entry allocated trace
+  exact Entry.preserves captured code history body profile extension uninitialized missing entry copy allocated trace
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticCalls

@@ -77,7 +77,9 @@ theorem closure_inputs (named : Named) (parameters : List TypedBinder) (result :
     (closure named parameters result body context evidence captured).captured = captured := ⟨rfl, rfl, rfl, rfl⟩
 
 /-- A concrete administrative allocation is a genuine preserving prefix. The
-completion consumer needs no separately supplied source/owner/active history. -/
+completion consumer needs no separately supplied source/owner/active history.
+The site's lambda copies its captures when it is created, so the completed
+store is the formed one and the source closure captures the same copies. -/
 theorem completed_after_administrative_allocation
     {checked : SourceCoreCompatibleCatalog.Checked} {prepared : CallableIndexedNamedGeneration.Prepared checked}
     {named : Named} {parameters : List TypedBinder} {result : TypeSystem.Ty} {body : List StatementId}
@@ -95,20 +97,25 @@ theorem completed_after_administrative_allocation
     (allocated : store = (Store.allocate (entryStore.set location (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame
       (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin))) temporary).1)
     (entryRead : entryStore.read? location = some saved) (unmapped : location ∉ mapping)
-    (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog checked.catalog) projects
+      prepared.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (referenceIndex : site.code.referenceIndex = scope.length + 1 + prepared.base.globals.length)
     (reference : captured.canonical[site.code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
     (completed : Evaluates actual store (site.code.lowered.expression.rename captured.embedding) output after) :
-    after = store ∧
-    Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
-      (.closure (closure named parameters result body sourceContext evidence capturedSource)) heap := by
+    ∃ formed : Formed model captured site.code (site.historyAt selected record) heap store location,
+      after = formed.finalStore ∧
+      Dynamic.ExpressionEvaluates program sourceContext evidence (source named) capturedSource heap site.code.id
+        (.closure (closure named parameters result body sourceContext evidence formed.captured)) formed.finalHeap := by
   have preserved : GeneralHeap.AdministrativePreserved mapping
       (entryStore.set location (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame
         (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin))) mapping store := by
     rw [allocated]
     exact GeneralHeap.AdministrativePreserved.allocate_administrative _ _ _
-  have reflected := site.reflects_after_prefix captured selected record program heap ordinary coercions
-    entryRead unmapped preserved stored reference completed
-  exact ⟨reflected.2.1, reflected.2.2.1⟩
+  obtain ⟨formed, _, sameStore, formedSource, _⟩ := site.reflects_after_prefix captured selected record program heap
+    ordinary coercions entryRead unmapped preserved heaps site.snapshots referenceIndex reference completed
+  exact ⟨formed, sameStore, formedSource⟩
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
@@ -160,9 +167,16 @@ private def audit {checked : SourceCoreCompatibleCatalog.Checked}
   SourceCompilerFeatureSupport.require (authenticated.current.frame == .empty)
     "generation named entry failed to restore the caller"
 
+/-- The snapshot cell of `stopped`'s lambda: after the input `seed` and the
+copy of `seed` made when the lambda was created. -/
+private def storedLambda : Nat := 2
+
+/-- The stored lambda was created with `seed = 3` and already called with `4`.
+Its call copies its creation-time copy of `seed` again, so with `2` it returns
+`3 + 2`, not the value the earlier call left in that call's own copy. -/
 private def callSnapshot {artifact : SourceCoreExecution.Artifact}
     (snapshot : SourceCoreExecution.Snapshot artifact) : IO SourceCoreExecution.Handle := do
-  let handle ← match (snapshot.cells[1]?).bind (fun (cell : SourceCoreHeapSnapshot.Cell) => cell.value) with
+  let handle ← match (snapshot.cells[storedLambda]?).bind (fun (cell : SourceCoreHeapSnapshot.Cell) => cell.value) with
     | some (.data (.function handle)) => pure handle
     | _ => throw (IO.userError "generation snapshot lost its stored lambda")
   let session ← match snapshot.restore with
@@ -172,8 +186,8 @@ private def callSnapshot {artifact : SourceCoreExecution.Artifact}
     (← session.invokePacked handle (SourceCompilerFeatureSupport.scalar 2) SourceCompilerFeatureSupport.executionOptions)
   match called with
   | .succeeded done =>
-    SourceCompilerFeatureSupport.require (done.value == SourceCompilerFeatureSupport.scalar 9)
-      "stored generation lost the mutated shared capture"
+    SourceCompilerFeatureSupport.require (done.value == SourceCompilerFeatureSupport.scalar 5)
+      "stored generation did not restart from its creation-time capture"
   | _ => throw (IO.userError "stored generation invocation failed")
   pure handle
 
@@ -231,7 +245,7 @@ def run : IO Unit := do
       let final ← SourceCompilerFeatureSupport.get "generation resumed snapshot" (← session.snapshot 2048)
       let resumedHandle ← callSnapshot final
       SourceCompilerFeatureSupport.require (actual == token && resumedHandle.sourceType == baselineHandle.sourceType &&
-          reprStr (final.cells.eraseIdx 1) == reprStr (snapshot.cells.eraseIdx 1))
+          reprStr (final.cells.eraseIdx storedLambda) == reprStr (snapshot.cells.eraseIdx storedLambda))
         "generation resume changed captures, writes or first fault"
     | _ => throw (IO.userError "generation resume changed its stopping point")
   IO.println "indexed named-to-lambda generation: real callbacks, full source seed, lexical evidence/captures and resume GREEN"

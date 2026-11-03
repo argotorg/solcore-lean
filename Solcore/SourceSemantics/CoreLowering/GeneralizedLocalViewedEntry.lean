@@ -91,7 +91,7 @@ theorem prepare
   have installedHeaps := heaps.write_administrative
     (fun found => unmapped (List.mem_of_getElem? found)) referenceTyped
     (encode_runtime_typed world (CallableIndexedAmbient.frame_registered compiled.indexed) view.transient) written
-  obtain ⟨entry, _added, _length, _spine, reached, related⟩ :=
+  obtain ⟨entry, _added, _copied, _length, _spine, _slots, reached, related⟩ :=
     GeneralizedLocalOwnedBodyEntry.parameters_with_state material.origin material.captured material.code inputs functions
       GeneralizedLocalDescriptorHeap.ordinary_cells represented owner temporary view.carried view.recipe
       installedHeaps locals reference (Store.write?_reads_written written)

@@ -261,15 +261,20 @@ private def complete (state : Core.State) : IO Core.StatefulRunResult := do
     SourceCompilerFeatureSupport.require (actual == expected) s!"nested lambda full resume {fuel}"
   pure expected
 
+/-- Closures capture by value: each call first copies its captures, and
+creating an inner lambda copies the bindings in scope, most recent first. The
+outer call copies `seed`; an inner lambda copies its scope when it is created
+and again when it is called. -/
 private def expectedNames (name : String) : List String :=
   match name with
-  | "nested" | "direct" => ["item", "value", "prior", "last", "value"]
-  | "recursive" => ["item", "value", "value", "value", "value", "value", "prior", "last", "value"]
-  | "emptyouter" => ["last", "value"]
-  | "emptyinner" => ["item", "value"]
-  | "firstfault" => ["item", "gap"]
-  | "laterfault" => ["item", "value", "written", "gap"]
-  | "parallel" => ["item", "first", "last", "value"]
+  | "nested" | "direct" => ["seed", "item", "value", "prior", "prior", "item", "seed", "prior", "item", "seed", "last", "value"]
+  | "recursive" => ["seed", "item", "value", "value", "value", "value", "value", "prior", "prior", "item", "seed",
+      "prior", "item", "seed", "last", "value"]
+  | "emptyouter" => ["seed", "seed", "seed", "last", "value"]
+  | "emptyinner" => ["seed", "item", "item", "seed", "item", "seed", "value"]
+  | "firstfault" => ["seed", "item", "gap"]
+  | "laterfault" => ["seed", "item", "value", "written", "gap"]
+  | "parallel" => ["seed", "item", "item", "seed", "first", "first", "item", "seed", "first", "item", "seed", "last", "value"]
   | _ => []
 
 private def native_bodies : IO Unit := do

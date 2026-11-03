@@ -97,7 +97,7 @@ theorem FormedAt.map_keys {futureKeys : List (Key compiled (Program.ofChecked co
     exact .ordinary i (embedding.map owner) history origin prefixContext actualGlobals referenceIndex typed
 
 section Formation
-open CallableIndexedOwnedPreparedOrdinaryLambdaFormation (history_at source_origin reference_index)
+open CallableIndexedOwnedPreparedOrdinaryLambdaFormation (history_at source_origin reference_index prepared_recapture)
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {heap : Dynamic.Heap} {store : Store} {actual canonical : Environment}
   (captured : Captures compiled.indexed mapping world scope function.captured actual)
@@ -115,40 +115,49 @@ variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
 
 include packet prepared prefixContext observed in
 /-- One actual formation call at identity inclusion retains its complete
-original tuple and constructs the known prepared member from the same inputs.
+original tuple and constructs the known prepared member of the formed closure
+over the copies from the same inputs, at the recaptured index.
 Typing comes from the returned relation; its branch is never inverted. -/
 theorem formation_member
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)
+      mapping world heap store)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
-      function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
-      registry mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
-      finalStore = store) ∧
-    FormedAt headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  obtain ⟨sourceTrace, evaluated, related, determined⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)) captured code
+        (history_at captured code support owner initial packet) heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+        function.source function.captured heap code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual)) formed.finalStore ∧
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
+        registry formed.finalMap formed.finalWorld (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (history_at captured code support owner initial packet).native
+          formed.closureActual) ∧ finalStore = formed.finalStore) ∧
+      FormedAt headers keys registry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure)
+        (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
+  obtain ⟨formed, sourceTrace, evaluated, related, determined⟩ :=
     CallableIndexedOwnedPreparedOrdinaryLambdaFormation.formation captured code support prepared owner initial packet
       profile prefixContext observed (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)
-      (fun related => related) stored ordinary coercions
+      (fun related => related) heaps ordinary coercions
   have typed := (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).runtime_hasType
     (registry := registry) related
-  let i : OrdinaryIndex compiled := ⟨function, mapping, world, scope, actual, captured, code, support, prepared⟩
-  have member : FormedAt headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+  let i : OrdinaryIndex compiled := ⟨formed.closure, formed.finalMap, formed.finalWorld, scope, formed.closureActual,
+    formed.captures, formed.closureCode, support.recapture formed.captured, prepared_recapture prepared formed.captured⟩
+  have member : FormedAt headers keys registry faults formed.finalMap formed.finalWorld
+      (FunctionValues.sourceType function) (.closure formed.closure)
+      (value code formed.embedding (history_at captured code support owner initial packet).native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-    .ordinary i owner (history_at captured code support owner initial packet)
-      (source_origin captured code support owner initial packet) prefixContext observed
-      (reference_index captured code support) typed
-  exact ⟨sourceTrace, evaluated, related, determined, member⟩
+    .ordinary i owner formed.closureHistory ⟨(source_origin captured code support owner initial packet).metadata⟩
+      prefixContext (observed.of_slots formed.slots) (reference_index captured code support) typed
+  exact ⟨formed, sourceTrace, evaluated, related, determined, member⟩
 end Formation
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryFormedMembers

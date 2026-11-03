@@ -1,7 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
 
-/-! The actual ordinary closure call supplies its full frame and allocation.
-The retained mono parameter row identifies the original body context. -/
+/-! The actual ordinary closure call supplies its full frame, the copies of its
+captures and its parameter allocation. The retained mono parameter row
+identifies the original body context. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureSourceTrace
@@ -24,35 +25,36 @@ theorem source_prefix {program : Program} {function : Dynamic.Closure}
     (arity : function.parameters.length = arguments.length)
     (trace : RecursiveNamedCallBounds.CallOutcome program size callContext caller invocation before
       (.closure function) arguments outcome after) :
-    ∃ childSize environment bound,
+    ∃ childSize entry copied environment bound,
       Dynamic.ClosureFrame program function ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+      Dynamic.EnvironmentCopies function.source function.captured before entry copied ∧
+      Dynamic.BindersAllocate entry copied function.parameters arguments environment bound ∧
       RecursiveNamedCallBounds.BodyTrace program childSize function bodyContext environment bound outcome after ∧
       childSize < size := by
   cases trace with
   | value applied =>
     cases applied with
-    | closure _ valid extended allocated body returned =>
+    | closure _ valid extended copy allocated body returned =>
       have same := binders_context_eq extended parameters
       subst same
       subst_vars
-      exact ⟨_, _, _, valid, allocated, .returned body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | closureUnit _ valid unit extended allocated body fellThrough =>
+      exact ⟨_, _, _, _, _, valid, copy, allocated, .returned body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | closureUnit _ valid unit extended copy allocated body fellThrough =>
       have same := binders_context_eq extended parameters
       subst same
       obtain ⟨environment, rfl⟩ := fellThrough
-      exact ⟨_, _, _, valid, allocated, .unit unit body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+      exact ⟨_, _, _, _, _, valid, copy, allocated, .unit unit body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
   | fault failed =>
     cases failed with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity mismatch => exact False.elim (mismatch arity)
-    | closureBody _ valid extended allocated body =>
+    | closureBody _ valid extended copy allocated body =>
       have same := binders_context_eq extended parameters
       subst same
-      exact ⟨_, _, _, valid, allocated, .fault body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | closureControlEscape _ valid extended allocated body escaped =>
+      exact ⟨_, _, _, _, _, valid, copy, allocated, .fault body, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | closureControlEscape _ valid extended copy allocated body escaped =>
       have same := binders_context_eq extended parameters
       subst same
-      exact ⟨_, _, _, valid, allocated, .escaped body escaped, SourceExecutionSize.child_lt_stepSize (by simp)⟩
+      exact ⟨_, _, _, _, _, valid, copy, allocated, .escaped body escaped, SourceExecutionSize.child_lt_stepSize (by simp)⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureSourceTrace

@@ -1,11 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.DataHeap
 
 /-! Lexical environments for catalog-indexed cells, with explicit internal Core
-slots. A match scrutinee gets a mapped source heap cell but no source lexical
-binding. Internal slots therefore extend the compiler scope and Core environment
-while preserving the source environment. Freshness prevents an internal name
-from hiding a source binding. This relation does not make internal IDs readable
-source locals merely because the low-level compiler can look them up. -/
+slots. An internal slot is a typed Core cell with no source lexical binding: a
+match scrutinee, whose cell the source heap also holds, or a closure's copy of
+one, which the source heap does not hold. Internal slots therefore extend the
+compiler scope and Core environment while preserving the source environment.
+Freshness prevents an internal name from hiding a source binding. This
+relation does not make internal IDs readable source locals merely because the
+low-level compiler can look them up. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.DataHeap
@@ -27,8 +29,8 @@ inductive EnvRepresentsIn (catalog : SourceCoreDataCatalog.Catalog) (definitions
         (.cellRef (Core.OptionalCell.cellType payload) target :: coreEnvironment)
   | internal {scope : SourceCoreLocalCell.Scope} {environment : Dynamic.Environment}
       {coreEnvironment : Core.Environment} {id : Resolved.LocalId}
-      {source : Dynamic.Location} {target : Core.Location} {payload : Core.Ty}
-      (reference : ReferenceRepresents mapping world source target payload)
+      {target : Core.Location} {payload : Core.Ty}
+      (typed : world[target]? = some (Core.OptionalCell.cellType payload))
       (absent : ∀ location, ¬ Dynamic.Environment.LooksUp environment id location)
       (tail : EnvRepresentsIn catalog definitions mapping world administrativeContext scope environment coreEnvironment) :
       EnvRepresentsIn catalog definitions mapping world administrativeContext ((id, payload) :: scope) environment
@@ -60,7 +62,7 @@ theorem EnvRepresents.extend {mapping futureMapping : LocationMap} {world future
   induction related with
   | nil typed => exact .nil (typed.weaken worlds)
   | cons reference _ ih => exact .cons (reference.extend maps worlds) ih
-  | internal reference absent _ ih => exact .internal (reference.extend maps worlds) absent ih
+  | internal typed absent _ ih => exact .internal (Core.WorldExtends.lookup worlds typed) absent ih
 
 theorem EnvRepresents.runtime_hasTypes {mapping : LocationMap} {world : Core.StoreTyping}
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
@@ -71,7 +73,7 @@ theorem EnvRepresents.runtime_hasTypes {mapping : LocationMap} {world : Core.Sto
   induction related with
   | nil typed => exact typed
   | cons reference _ ih => exact .cons (.cellRef reference.typed) ih
-  | internal reference _ _ ih => exact .cons (.cellRef reference.typed) ih
+  | internal typed _ _ ih => exact .cons (.cellRef typed) ih
 
 /-- Every actual source lexical binding is present at the compiler's first
 matching slot, even with internal slots interspersed between lexical scopes. -/
@@ -93,7 +95,7 @@ theorem EnvRepresents.lookup_source {mapping : LocationMap} {world : Core.StoreT
     | tail different sourceLookup =>
       obtain ⟨index, type, found, slot, coreLookup, reference⟩ := ih sourceLookup
       exact ⟨index + 1, type, found, by simp [SourceCoreLocalCell.lookup?, different, slot], coreLookup, reference⟩
-  | @internal scope environment coreEnvironment other source target payload reference absent tail ih =>
+  | @internal scope environment coreEnvironment other target payload typed absent tail ih =>
     have different : other ≠ id := by intro same; subst other; exact absent location sourceLookup
     obtain ⟨index, type, found, slot, coreLookup, reference⟩ := ih sourceLookup
     exact ⟨index + 1, type, found, by simp [SourceCoreLocalCell.lookup?, different, slot], coreLookup, reference⟩
@@ -181,7 +183,7 @@ theorem EnvRepresents.bind_internal {mapping : LocationMap} {world : Core.StoreT
     HeapRepresents catalog signatures (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       after (store.allocate value).1 := by
   obtain ⟨heapRelated, reference⟩ := heaps.allocate cell allocated
-  exact ⟨.internal reference (environments.fresh_absent fresh)
+  exact ⟨.internal reference.typed (environments.fresh_absent fresh)
     (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩), heapRelated⟩
 
 namespace EnvRepresentsIn

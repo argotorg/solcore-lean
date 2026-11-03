@@ -256,54 +256,57 @@ section FormationWith
 variable {support : SupportFamily prepared} {P : SupportCondition prepared support}
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {mapping : LocationMap} {world : StoreTyping} {actual : Core.Environment}
-  (captured : Captures prepared mapping world scope function.captured actual)
-  (code : Code prepared function scope captured.administrative) (history : History code)
-  (body : support code) (supported : P captured code history body)
+  {environment : Dynamic.Environment} {projects : GenericHeap.Projection}
+  {model : GenericHeap.PayloadModel (storageCatalog values.checked.catalog) projects prepared.layouts.definitions}
+  {current : Captures prepared mapping world scope environment actual}
+  {code : Code prepared function scope current.administrative} {history : History code}
+  {heap : Dynamic.Heap} {store : Store} {location : Location}
+  (formed : Formed model current code history heap store location)
+  (body : support formed.closureCode)
+  (supported : P (function := formed.closure) formed.captures formed.closureCode formed.closureHistory body)
   (profile : values.checked.catalog.callableContracts = true)
-  {store : Store} {location : Location}
   (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
-  (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
-  (read : store.read? location = some (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame history.native))
 
-include body supported profile stored reference read in
+include body supported profile stored in
+/-- The formed closure keeps the support receipt and condition of its code. -/
 theorem formation_represents_with :
-    RepresentsWith prepared support P mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    RepresentsWith prepared support P formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  have prior := CallableIndexedLambdaValues.formation_represents captured code history stored reference read
+  have prior := formed.represents stored
   have typed := (CallableIndexedLambdaValues.model prepared profile).runtime_hasType (registry := values.registry) prior
-  exact .lambda captured code history body supported typed
+  exact RepresentsWith.lambda (function := formed.closure) formed.captures formed.closureCode formed.closureHistory
+    body supported typed
 
-include body supported profile stored reference read in
-theorem formation_with (heap : Dynamic.Heap)
+include body supported profile stored in
+theorem formation_with
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    RepresentsWith prepared support P mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    Evaluates actual store (code.lowered.expression.rename current.embedding)
+      (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+    RepresentsWith prepared support P formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-  ⟨CallableIndexedLambdaValues.source_formation code program heap ordinary coercions,
-    CallableIndexedLambdaValues.formation_evaluates captured code history reference read,
-    formation_represents_with prepared captured code history body supported profile stored reference read⟩
+  ⟨formed.source program ordinary coercions, formed.evaluated,
+    formation_represents_with prepared formed body supported profile stored⟩
 
-include body supported profile stored reference read in
-theorem reflects_with (heap : Dynamic.Heap)
+include body supported profile stored in
+theorem reflects_with
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) {result : Core.Value} {after : Store}
-    (completed : Evaluates actual store (code.lowered.expression.rename captured.embedding) result after) :
-    result = .inRight .word (value code captured.embedding history.native actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    RepresentsWith prepared support P mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    (completed : Evaluates actual store (code.lowered.expression.rename current.embedding) result after) :
+    result = .inRight .word (value code formed.embedding history.native formed.closureActual) ∧
+    after = formed.finalStore ∧
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    RepresentsWith prepared support P formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  obtain ⟨sameResult, sameStore, source, _⟩ := CallableIndexedLambdaValues.reflects captured code history program heap
-    ordinary coercions stored reference read completed
-  exact ⟨sameResult, sameStore, source,
-    formation_represents_with prepared captured code history body supported profile stored reference read⟩
+  obtain ⟨sameResult, sameStore⟩ := formed.reflects completed
+  exact ⟨sameResult, sameStore, formed.source program ordinary coercions,
+    formation_represents_with prepared formed body supported profile stored⟩
 end FormationWith
 
 /-- The same emitted code supplies the body receipt, rather than a body chosen
@@ -333,61 +336,58 @@ theorem Represents.closure_frame {mapping : LocationMap} {world : StoreTyping}
 section Formation
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {mapping : LocationMap} {world : StoreTyping} {actual : Core.Environment}
-  (captured : Captures prepared mapping world scope function.captured actual)
-  (code : Code prepared function scope captured.administrative) (history : History code)
-  (body : CallableIndexedLambdaRuntimeBody.Body code program bodyRegistry faults)
+  {environment : Dynamic.Environment} {projects : GenericHeap.Projection}
+  {model : GenericHeap.PayloadModel (storageCatalog values.checked.catalog) projects prepared.layouts.definitions}
+  {current : Captures prepared mapping world scope environment actual}
+  {code : Code prepared function scope current.administrative} {history : History code}
+  {heap : Dynamic.Heap} {store : Store} {location : Location}
+  (formed : Formed model current code history heap store location)
+  (body : CallableIndexedLambdaRuntimeBody.Body formed.closureCode program bodyRegistry faults)
   (profile : values.checked.catalog.callableContracts = true)
-  {store : Store} {location : Location}
   (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
-  (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
-  (read : store.read? location = some (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame history.native))
 
-include body profile stored reference read in
+include body profile stored in
 /-- The original formation proof supplies the exact native result typing. The
 new representation stores the independently constructed same-code body. -/
 theorem formation_represents :
-    Represents prepared program bodyRegistry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    Represents prepared program bodyRegistry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
   Represents.fromWith prepared program bodyRegistry faults
-    (formation_represents_with prepared captured code history body True.intro profile stored reference read)
+    (formation_represents_with prepared (support := legacySupport prepared program bodyRegistry faults)
+      (P := legacyCondition prepared program bodyRegistry faults) formed body True.intro profile stored)
 
-include body profile stored reference read in
-theorem formation (heap : Dynamic.Heap)
+include body profile stored in
+theorem formation
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    Represents prepared program bodyRegistry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    Evaluates actual store (code.lowered.expression.rename current.embedding)
+      (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+    Represents prepared program bodyRegistry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-  by
-    obtain ⟨source, evaluated, related⟩ := formation_with prepared program
-      (support := legacySupport prepared program bodyRegistry faults)
-      (P := legacyCondition prepared program bodyRegistry faults) captured code history body
-      True.intro profile stored reference read heap ordinary coercions
-    exact ⟨source, evaluated, Represents.fromWith prepared program bodyRegistry faults related⟩
+  ⟨formed.source program ordinary coercions, formed.evaluated,
+    formation_represents prepared program bodyRegistry faults formed body profile stored⟩
 
-include body profile stored reference read in
+include body profile stored in
 /-- Reflection consumes the original native completion. Determinism identifies
 the actual formed closure; no body computation is run during formation. -/
-theorem reflects (heap : Dynamic.Heap)
+theorem reflects
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) {result : Core.Value} {after : Store}
-    (completed : Evaluates actual store (code.lowered.expression.rename captured.embedding) result after) :
-    result = .inRight .word (value code captured.embedding history.native actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    Represents prepared program bodyRegistry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    (completed : Evaluates actual store (code.lowered.expression.rename current.embedding) result after) :
+    result = .inRight .word (value code formed.embedding history.native formed.closureActual) ∧
+    after = formed.finalStore ∧
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    Represents prepared program bodyRegistry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  obtain ⟨sameResult, sameStore, source, related⟩ := reflects_with prepared program
-    (support := legacySupport prepared program bodyRegistry faults)
-    (P := legacyCondition prepared program bodyRegistry faults) captured code history body
-    True.intro profile stored reference read heap ordinary coercions completed
-  exact ⟨sameResult, sameStore, source, Represents.fromWith prepared program bodyRegistry faults related⟩
+  obtain ⟨sameResult, sameStore⟩ := formed.reflects completed
+  exact ⟨sameResult, sameStore, formed.source program ordinary coercions,
+    formation_represents prepared program bodyRegistry faults formed body profile stored⟩
 
 end Formation
 
@@ -419,41 +419,59 @@ variable {named : CallableIndexedNamedGeneration.Named} {parameters : List Typed
 
 include body profile selected record ordinary coercions entryRead unmapped preserved stored reference in
 /-- The accepted named callback fixes the actual lambda Code and its history.
-The same-code static body is stored at formation after the original prefix. -/
-theorem accepted_site_formation :
-    Dynamic.ExpressionEvaluates program sourceContext evidence (CallableIndexedNamedGeneration.source named) capturedSource heap site.code.id
-      (.closure (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource)) heap ∧
-    Evaluates actual store (site.code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value site.code captured.embedding
-        (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)) store ∧
-    Represents prepared program bodyRegistry faults mapping world
-      (FunctionValues.sourceType (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource))
-      (.closure (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource))
-      (value site.code captured.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)
-      (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
+Formation copies the captured environment after the original prefix; the
+same-code static body is stored with the closure over the copies. -/
+theorem accepted_site_formation {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (storageCatalog values.checked.catalog) projects prepared.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : site.code.policy.snapshotLambda site.code.id = true)
+    (referenceIndex : site.code.referenceIndex = scope.length + 1 + prepared.base.globals.length) :
+    ∃ formed : Formed model captured site.code (site.historyAt selected record) heap store location,
+      Dynamic.ExpressionEvaluates program sourceContext evidence (CallableIndexedNamedGeneration.source named)
+        capturedSource heap site.code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (site.code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value site.code formed.embedding
+          (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) formed.closureActual))
+        formed.finalStore ∧
+      Represents prepared program bodyRegistry faults formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType (CallableIndexedLambdaGeneration.closure named parameters resultType statements
+          sourceContext evidence capturedSource))
+        (.closure formed.closure)
+        (value site.code formed.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin)
+          formed.closureActual)
+        (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
   obtain ⟨_, cell⟩ := CallableIndexedLambdaGeneration.installed_after_prefix selected record entryRead unmapped preserved
-  exact formation (values := values)
-    (function := CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource)
-    prepared program bodyRegistry faults captured site.code (site.historyAt selected record) body profile
-    stored reference cell.read heap ordinary coercions
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation captured site.code (site.historyAt selected record)
+    copied referenceIndex heaps reference cell.read
+  exact ⟨formed, formation (values := values) prepared program bodyRegistry faults formed
+    (body.recapture formed.captured) profile stored ordinary coercions⟩
 
 include body profile selected record ordinary coercions entryRead unmapped preserved stored reference in
 /-- Completed formation reflection keeps the same accepted site and body. -/
-theorem accepted_site_reflection {output : Core.Value} {after : Store}
+theorem accepted_site_reflection {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (storageCatalog values.checked.catalog) projects prepared.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : site.code.policy.snapshotLambda site.code.id = true)
+    (referenceIndex : site.code.referenceIndex = scope.length + 1 + prepared.base.globals.length)
+    {output : Core.Value} {after : Store}
     (completed : Evaluates actual store (site.code.lowered.expression.rename captured.embedding) output after) :
-    output = .inRight .word (value site.code captured.embedding
-      (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program sourceContext evidence (CallableIndexedNamedGeneration.source named) capturedSource heap site.code.id
-      (.closure (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource)) heap ∧
-    Represents prepared program bodyRegistry faults mapping world
-      (FunctionValues.sourceType (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource))
-      (.closure (CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource))
-      (value site.code captured.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) actual)
-      (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
+    ∃ formed : Formed model captured site.code (site.historyAt selected record) heap store location,
+      output = .inRight .word (value site.code formed.embedding
+        (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin) formed.closureActual) ∧
+      after = formed.finalStore ∧
+      Dynamic.ExpressionEvaluates program sourceContext evidence (CallableIndexedNamedGeneration.source named)
+        capturedSource heap site.code.id (.closure formed.closure) formed.finalHeap ∧
+      Represents prepared program bodyRegistry faults formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType (CallableIndexedLambdaGeneration.closure named parameters resultType statements
+          sourceContext evidence capturedSource))
+        (.closure formed.closure)
+        (value site.code formed.embedding (SourceCoreCallableIndexedDispatch.namedFrame prepared.ancestry.graph.table origin)
+          formed.closureActual)
+        (CallableContract.functionType site.code.receipt.parameterCore site.code.receipt.resultCore) := by
   obtain ⟨_, cell⟩ := CallableIndexedLambdaGeneration.installed_after_prefix selected record entryRead unmapped preserved
-  exact reflects (values := values)
-    (function := CallableIndexedLambdaGeneration.closure named parameters resultType statements sourceContext evidence capturedSource)
-    prepared program bodyRegistry faults captured site.code (site.historyAt selected record) body profile
-    stored reference cell.read heap ordinary coercions completed
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation captured site.code (site.historyAt selected record)
+    copied referenceIndex heaps reference cell.read
+  exact ⟨formed, reflects (values := values) prepared program bodyRegistry faults formed
+    (body.recapture formed.captured) profile stored ordinary coercions completed⟩
 end ActualSite
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeValues

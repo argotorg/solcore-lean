@@ -91,6 +91,14 @@ structure AdministrativeTransport where
     (metadata : Dynamic.HeapMetadataExtend initial.heap heap),
     protocol.records (extend state maps worlds frame metadata) = protocol.records state
 
+/-- A protocol whose witnesses survive replacing the canonical values of the
+lexical slots, keeping every slot past the scope. A closure entry needs it after
+copying the captured cells, which rebinds the scope's slots to the copies. -/
+def Rebinds : Prop :=
+  ∀ {index : Index} (state : protocol.State index) (canonical : Environment),
+    (∀ slot, index.scope.length ≤ slot → canonical[slot]? = index.canonical[slot]?) →
+    Transition protocol state { index with canonical := canonical }
+
 theorem AdministrativeTransport.transition (transport : AdministrativeTransport protocol)
     {initial : Index} (state : protocol.State initial) {mapping world heap store}
     (maps : LocationMap.Extends initial.mapping mapping) (worlds : WorldExtends initial.world world)

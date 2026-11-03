@@ -95,28 +95,45 @@ A is chosen. Its changes are local to closure formation and closure
 application, on both sides and in lockstep, while B changes the carrier of
 every source value.
 
+## Which bindings are copied
+
+Both sides decide with one function of the closure's source,
+`SourceSemantics.CaptureBinders.copiedBinder? source id`
+(`Solcore/SourceSemantics/CaptureBinders.lean`): a binding is copied when its
+identifier has exactly one declaration among the source's inputs, lambda
+parameters and `let`, `for` and `match` binders, and that declaration is
+monomorphic. Every other binding is shared:
+
+- a generalized local has a polymorphic declaration, and its cell holds an
+  immutable principal (no rule writes such a cell: place resolution's
+  `RootInitialValue` and the empty-mapping read both require an ordinary
+  cell), so sharing it is the same as copying it;
+- a hidden match scrutinee slot has no declaration; it exists only in Core and
+  the source environment has no binding for it.
+
+Because the source semantics and the lowering use the same function of the same
+source, no invariant relating a scope to its environment is needed: a source
+binding and its Core slot are copied together or shared together. A compiler
+view of the source (`LambdaMetadataViews.MetadataView`) declares the same
+binders, so it makes the same decision.
+
 ## Source semantics
 
 `Dynamic/Heap.lean` gains:
 
 - `Heap.AllocatesCopy`, which appends an exact copy of a cell;
-- `EnvironmentCopies environment before copies after`, which walks the
-  environment from its most recent binding. A binding whose cell carries a
-  generalized principal keeps its location; any other binding gets a fresh
-  cell with the same type and optional value, and `copies` binds the same
-  identifier to it.
-
-No rule writes a cell that carries a generalized principal: place resolution's
-`RootInitialValue` and the empty-mapping read both require an ordinary cell.
-Sharing such a cell is therefore the same as copying it.
+- `EnvironmentCopies source environment before copies after`, which walks the
+  environment from its most recent binding. A binding that `copiedBinder?`
+  selects gets a fresh cell holding an exact copy of its cell, and `copies`
+  binds the same identifier to it; any other binding keeps its location.
 
 `Dynamic/Evaluation.lean` and `Dynamic/Fault.lean`:
 
-- `ExpressionFormEvaluates.lambda` takes `EnvironmentCopies environment before
-  captured after`, stores `captured`, and ends in `after`.
+- `ExpressionFormEvaluates.lambda` takes `EnvironmentCopies source environment
+  before captured after`, stores `captured`, and ends in `after`.
 - `CallableApplies.closure` and `closureUnit` take `EnvironmentCopies
-  function.captured before entry copied` and allocate the parameters on top of
-  `entry` from `copied`. `CallableFaults.closureBody` and
+  function.source function.captured before entry copied` and allocate the
+  parameters on top of `entry` from `copied`. `CallableFaults.closureBody` and
   `closureControlEscape` do the same.
 - `StatementExecutes.letInitializedGeneralized` and
   `ForItemExecutes.letInitializedGeneralized` copy the environment first; the
@@ -128,7 +145,9 @@ and an assignment in the body initializes only that call's copy. A copied
 closure value keeps its own snapshot locations, and nothing writes them, so a
 closure that captures another closure needs no deeper copy. Retained closures
 in public sessions, session snapshots and checkpoints hold the snapshot cells
-like any other cells.
+like any other cells. Copying a cell exactly keeps the heap typing and the
+lexical agreement of the copies without any further fact about the closure's
+context.
 
 ## Lowering
 
@@ -137,7 +156,9 @@ The Core lowering mirrors the source rules allocation by allocation.
 - Copies are marked source allocations made through the profile's allocator
   (`SourceCoreSourceCells`), so the allocation ledger knows them. A copy loads
   the slot's optional payload and allocates an uninitialized or an initialized
-  marked cell in the two branches of a `caseE`. Without an allocator, the copy
+  marked cell in the two branches of a `caseE`; its marker captures the
+  scope's original slots, and its frame-reference index follows the
+  convention of named inputs (`copyReferences`). Without an allocator, the copy
   is a plain `newCell` of the loaded payload.
 - At creation, the lowered lambda is preceded by one copy for each copied
   scope slot, and the lambda expression is renamed so that those slots refer
@@ -149,10 +170,8 @@ The Core lowering mirrors the source rules allocation by allocation.
 - A generalized declaration copies the scope around its bundle and its binder
   allocation, so the bundle's instance closures and the binder's marker
   capture the snapshot cells, which is what the ledger restores the principal
-  from. Instances of a generalized local take no snapshot of their own.
-- Hidden match scrutinee slots and generalized local slots are not copied:
-  the source environment has no binding for the first, and the second keeps
-  its location in the source rule.
+  from. Instances of a generalized local take no snapshot of their own
+  (`Policy.snapshotLambda` is false for the initializer).
 
 This changes neither Core's syntax nor its semantics, the Hull importer or the
 shared contract runtime.
@@ -167,12 +186,69 @@ Copies are therefore marked allocations.
 
 Theorem statements that mention the lambda rule's unchanged heap, or a closure
 whose captured environment is its creation environment, change to the snapshot
-environment and the extended heaps; other statements stay unchanged. The
-lowering proofs gain lemmas for one marked copy and for a copied scope, and
-reuse the existing formation and invocation lemmas under the snapshot and
-call renamings. The runtime tests expect the by-value results, including #120's
-programs, the repeated call, a loop-carried capture and the adapted
-`control-flow-capture-identity` fixture.
+environment and the extended heaps; other statements stay unchanged.
+
+- `CaptureCopies.copies_prefix` (plain copies) and
+  `CaptureCopies.marked_copies_prefix` (marked copies through the indexed
+  allocator) relate the copies of a represented scope to the source copies:
+  the heap relation extends, the scope's canonical slots point at the copies,
+  slots past the scope keep their values, the frame cell is only read, and the
+  copies agree with their continuation in both directions, with sizes.
+- `DataHeap.EnvRepresentsIn.internal` describes an internal slot by its typed
+  Core cell. A Core copy of an internal slot, which can occur only when a
+  hidden identifier also has a declaration, is then still an internal slot.
+- Formation: `CallableIndexedLambdaValues.formation` gives a `Formed` record
+  (the source copies, the closure's capture layout over them, the extended heap
+  relation and the Core evaluation); the families build their closure
+  relations from it. The non-indexed families (`FunctionValues`,
+  `ContractedFunctionValues`) state formation over the creation environment.
+- A formed closure lives in the formed state, so formation lemmas conclude
+  `∃ formed`, members and associations are stated for `formed.closure` at
+  `formed.finalMap` and `formed.finalWorld`, and a caller's protocol state is
+  carried to the formed state by its administrative transport (for example
+  `formedState` in the selected-call modules). A consumer that needs a record
+  takes one as an argument or obtains one from an existence lemma such as
+  `CallableIndexedOwnedLambdaFormationReceipts.formation_exists`; premises that
+  used to name the formed closure now quantify over every formed record. A
+  compiler-qualification premise stated for the creation code now holds for
+  the code recaptured at any environment (`qualified`), and the source
+  liftings of generalized declarations take the protocol's `Bindings` to
+  rebind the copied scope.
+- Calls: the indexed parameter entry (`CallableIndexedLambdaViewPrefix.Entry`
+  and its siblings) copies the captured cells and then binds the parameters,
+  recording the copy for the source call. The entry's canonical environment is
+  the parameters followed by the copied slots, which agree with the closure's
+  canonical environment past the scope. Protected-state protocols cross the
+  copies by administrative transport and are rebound to the copied slots
+  (`ProtectedStateTransition.Rebinds`).
+- Generalized `let`: `CellAwareGeneralizedSnapshotCode` gives the lowered
+  snapshot around the bundle and its binder allocation, and
+  `CellAwareNamedGeneralizedPrefix.complete` follows it over the source copies.
+  The protocol state is rebound over the whole copied scope by
+  `ProtectedStateTransition.Bindings.rebind`, using the protocol's
+  administrative transitions (`ProtectedStateRebinding`).
+
+The runtime tests expect the by-value results, including #120's programs, the
+repeated call, a loop-carried capture and the adapted
+`control-flow-capture-identity` fixture. The 109 runtime tests written for
+shared cells now expect the by-value results:
+
+- a retained closure that assigns a captured local returns the same value at
+  every call (the projected bit-not factory returns the complement twice
+  instead of restoring the entry), and closures created together or by
+  different calls no longer share a capture cell;
+- a closure that reaches itself through a local assigned after its creation
+  (`let f: F; f = lam(…) { … f(…) … };`) copies that local while it is still
+  uninitialized, so the recursive call faults with `uninitializedLocal`;
+- tests that observed evaluation order only through a closure assigning a
+  captured local keep their by-value results, and where an exact heap or a
+  call copy still shows the order, they check that instead.
+
+A copy is a marked allocation of three native store cells (the allocator's
+entry, the marker and the payload) and a ledger row of the copied binder, so
+every recorded native heap size grows by them at each closure creation and
+each call, and reconstructed source heaps hold the snapshot and the per-call
+copies before later cells.
 
 Closures in Hull (`Solcore/Frontend/RustHull/`) are Rust's lifted lambdas and
 are out of scope. The generated closure profiles already capture before the

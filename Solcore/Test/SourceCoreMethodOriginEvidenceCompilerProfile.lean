@@ -122,7 +122,7 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [13,31,49,122,140,213,286,340] do
+  unless stores == [13,40,67,149,176,258,340,403] do
     throw (IO.userError s!"compiler profile stores changed: {reprStr stores}")
   IO.println "COMPILER_PROFILE_FORWARD_PASS: one actual complete profile; original X7 at checker1024 and1000; all seven Source traces and sufficient public fuel bounds; one automatic catalog; retained closures; scalar33/true/33/55; original stores"
 

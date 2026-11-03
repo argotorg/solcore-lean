@@ -15,7 +15,8 @@ open TypedLexicalWhile (initializedRequest sequence)
 open GeneralizedLocalDescriptorHeap GeneralizedLocalLocatedRows
 open GeneralizedLocalInstanceCompilation (Inputs)
 
-private theorem framed_after_allocation {checked : SourceCoreCompatibleCatalog.Checked}
+/-- The marked allocation keeps the located rows and their creation frame. -/
+theorem framed_after_allocation {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
     {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
     {ordinary : GenericHeap.PayloadModel catalog projects prepared.layouts.definitions}

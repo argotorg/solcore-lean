@@ -107,22 +107,22 @@ theorem call_with_closure_evidence
   cases called with
   | value applied =>
     cases applied with
-    | closure same frame parameters allocation executed returned =>
+    | closure same frame parameters copy allocation executed returned =>
       cases same
-      exact .value (.closure rfl frame parameters allocation executed returned)
-    | closureUnit same frame unit parameters allocation executed fellThrough =>
+      exact .value (.closure rfl frame parameters copy allocation executed returned)
+    | closureUnit same frame unit parameters copy allocation executed fellThrough =>
       cases same
-      exact .value (.closureUnit rfl frame unit parameters allocation executed fellThrough)
+      exact .value (.closureUnit rfl frame unit parameters copy allocation executed fellThrough)
   | fault failed =>
     cases failed with
     | notCallable invalid => exact False.elim (invalid trivial)
     | closureArity mismatch => exact .fault (.closureArity mismatch)
-    | closureBody same frame parameters allocation failed =>
+    | closureBody same frame parameters copy allocation failed =>
       cases same
-      exact .fault (.closureBody rfl frame parameters allocation failed)
-    | closureControlEscape same frame parameters allocation executed escaped =>
+      exact .fault (.closureBody rfl frame parameters copy allocation failed)
+    | closureControlEscape same frame parameters copy allocation executed escaped =>
       cases same
-      exact .fault (.closureControlEscape rfl frame parameters allocation executed escaped)
+      exact .fault (.closureControlEscape rfl frame parameters copy allocation executed escaped)
 
 /-- This packet is made from the actual ordered arguments and application
 children of the selected Source call, preserving their separate grades. -/

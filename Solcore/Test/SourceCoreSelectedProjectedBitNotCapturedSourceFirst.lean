@@ -33,14 +33,14 @@ theorem direct_from_captured (member : entry ∈ entries)
     Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) anchor.function.context
       invocation.evidence (Staging.Recursive.callableEvidence entry.source)
       state.heap entry.source [.word key] (.word previous.bitNot)
-      (heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key])) ∧
+      (heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail)) ∧
     ((Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram)
         (SelectedCompilationPhysicalProgramSupport.stages recipe.compiled) invocation
         anchor.function.context state.heap entry.source [.word key] (.value (.word previous.bitNot))
-        (heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key])) ∧
+        (heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail)) ∧
       SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows anchor issued.initial
         issued.support.profile recipe entries (.word previous.bitNot) checkpoint
-        (heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key]))) ∨
+        (heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail))) ∨
       SelectedCompilationStageClosedDirectForward.StageStopped issued state entry checkpoint invocation [.word key]) := by
   have typed := (state.history.semantic.current.2.2.2.2 entry member).2.2
   rw [entryType, source, sameHeap] at typed
@@ -49,7 +49,7 @@ theorem direct_from_captured (member : entry ∈ entries)
   have ordinary : Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) anchor.function.context
       invocation.evidence (Staging.Recursive.callableEvidence entry.source)
       state.heap entry.source [.word key] (.word previous.bitNot)
-      (heap before ((.word key, .word previous.bitNot) :: tail) (suffix ++ [keyCell key])) := by
+      (heap before ((.word key, .word previous) :: tail) (suffix ++ callCells key previous tail)) := by
     simpa only [source, sameHeap, Staging.Recursive.callableEvidence] using plain
   have input : RecursiveNamedPublicFunctionHistoryInputs.Input entries anchor.function.context
       .word (.word key) (.word key) :=
@@ -59,9 +59,10 @@ theorem direct_from_captured (member : entry ∈ entries)
     entryType input started ready (.singleton _) (.word previous.bitNot) rfl handleType ordinary⟩
 
 /-- Every sufficiently fueled first completion retains the same handle and
-captured location. The second ordinary call restores the mapping's first entry
-and appends a second argument cell, before the second public call executes. -/
-def RestoreAfterFirst (key previous : Word) (tail : List (Dynamic.Value × Dynamic.Value))
+snapshot. The second ordinary call starts again from the snapshot, returns the
+same complement and appends its own copy and key, before the second public call
+executes. -/
+def RepeatAfterFirst (key previous : Word) (tail : List (Dynamic.Value × Dynamic.Value))
     (checkpoint : SourceCoreExecution.Checkpoint artifact) (invocation : Staging.Recursive.Scope) : Prop :=
   ∃ requiredExecution requiredOutput,
     ∀ executionFuel outputFuel (outcome : SourceCoreExecution.Outcome artifact),
@@ -70,24 +71,25 @@ def RestoreAfterFirst (key previous : Word) (tail : List (Dynamic.Value × Dynam
       ∃ completion : SourceCoreExecution.Completion artifact,
         outcome = .succeeded completion ∧ completion.value = .word previous.bitNot ∧
         ∃ next : issued.toIssued.State anchor completion.session entries,
-          next.heap = heap before ((.word key, .word previous.bitNot) :: tail) [keyCell key] ∧
+          next.heap = heap before ((.word key, .word previous) :: tail) (callCells key previous tail) ∧
           ∀ nextFuel (second : SourceCoreExecution.Checkpoint artifact),
             completion.session.startHandlePacked entry.handle (.word key) nextFuel = .ok second →
             Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) anchor.function.context
               invocation.evidence (Staging.Recursive.callableEvidence entry.source)
-              next.heap entry.source [.word key] (.word previous)
-              (heap before ((.word key, .word previous) :: tail) [keyCell key, keyCell key]) ∧
+              next.heap entry.source [.word key] (.word previous.bitNot)
+              (heap before ((.word key, .word previous) :: tail) (callCells key previous tail ++ callCells key previous tail)) ∧
             ((Staging.Recursive.Applies (Program.ofChecked recipe.compiled.sourceProgram)
                 (SelectedCompilationPhysicalProgramSupport.stages recipe.compiled) invocation
-                anchor.function.context next.heap entry.source [.word key] (.value (.word previous))
-                (heap before ((.word key, .word previous) :: tail) [keyCell key, keyCell key]) ∧
+                anchor.function.context next.heap entry.source [.word key] (.value (.word previous.bitNot))
+                (heap before ((.word key, .word previous) :: tail) (callCells key previous tail ++ callCells key previous tail)) ∧
               SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows anchor issued.initial
-                issued.support.profile recipe entries (.word previous) second
-                (heap before ((.word key, .word previous) :: tail) [keyCell key, keyCell key])) ∨
+                issued.support.profile recipe entries (.word previous.bitNot) second
+                (heap before ((.word key, .word previous) :: tail) (callCells key previous tail ++ callCells key previous tail))) ∨
               SelectedCompilationStageClosedDirectForward.StageStopped issued next entry second invocation [.word key])
 
-/-- The Source-first two-call law retains actual stage rejection alternatives;
-it never assumes either current public call has already completed. -/
+/-- The Source-first two-call law: both calls return the complement of the
+factory's entry. It retains actual stage rejection alternatives and never
+assumes either current public call has already completed. -/
 theorem twice_from_captured (member : entry ∈ entries)
     (key previous : Word) (tail : List (Dynamic.Value × Dynamic.Value))
     (sameHeap : state.heap = heap before ((.word key, .word previous) :: tail))
@@ -101,8 +103,8 @@ theorem twice_from_captured (member : entry ∈ entries)
     Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) anchor.function.context
       invocation.evidence (Staging.Recursive.callableEvidence entry.source)
       state.heap entry.source [.word key] (.word previous.bitNot)
-      (heap before ((.word key, .word previous.bitNot) :: tail) [keyCell key]) ∧
-    (RestoreAfterFirst (anchor := anchor) (entries := entries) issued before entry key previous tail checkpoint invocation ∨
+      (heap before ((.word key, .word previous) :: tail) (callCells key previous tail)) ∧
+    (RepeatAfterFirst (anchor := anchor) (entries := entries) issued before entry key previous tail checkpoint invocation ∨
       SelectedCompilationStageClosedDirectForward.StageStopped issued state entry checkpoint invocation [.word key]) := by
   obtain ⟨ordinary, forward⟩ := direct_from_captured issued shape before entry state member key previous tail []
     sameHeap source entryType handleType ready started invocation
@@ -115,9 +117,8 @@ theorem twice_from_captured (member : entry ∈ entries)
       complete executionFuel outputFuel outcome executionBound outputBound resumed
     refine ⟨completion, actual, value, next, nextHeap, ?_⟩
     intro nextFuel second accepted
-    have follows := direct_from_captured issued shape before entry next member key previous.bitNot tail [keyCell key]
+    exact direct_from_captured issued shape before entry next member key previous tail (callCells key previous tail)
       nextHeap source entryType handleType exports accepted invocation
-    simpa only [Word.bitNot_involutive, List.cons_append, List.nil_append] using follows
   · exact .inr stopped
 
 
@@ -171,8 +172,8 @@ def FactoryChain (shape : Shape initial.header.function.source) (invocation : St
             Dynamic.CallableApplies (Program.ofChecked recipe.compiled.sourceProgram) initial.header.function.context
               invocation.evidence (Staging.Recursive.callableEvidence entry.source)
               next.heap entry.source [.word keyValue] (.word previous.bitNot)
-              (heap ⟨[]⟩ ((.word keyValue, .word previous.bitNot) :: sourceEntries tail) [keyCell keyValue]) ∧
-            (RestoreAfterFirst (anchor := initial.header) (entries := [entry]) issued ⟨[]⟩ entry keyValue previous (sourceEntries tail) checkpoint invocation ∨
+              (heap ⟨[]⟩ (sourceEntries ((keyValue, previous) :: tail)) (callCells keyValue previous (sourceEntries tail))) ∧
+            (RepeatAfterFirst (anchor := initial.header) (entries := [entry]) issued ⟨[]⟩ entry keyValue previous (sourceEntries tail) checkpoint invocation ∨
               SelectedCompilationStageClosedDirectForward.StageStopped issued next entry checkpoint invocation [.word keyValue])
 
 /-- The original factory call is independent of Core. Initial mapping metadata

@@ -40,8 +40,8 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
   obtain ⟨returnContext,_,_,returnTyped,_⟩ := head_tail last
   obtain ⟨fTrace,fState,fStored,fExtended⟩ := generalized_step shape.f shape.fLet state wellFormed fTyped
   let firstHeap := identityHeap shape.f context environment before
-  have firstAppend : HeapAppends before firstHeap := ⟨_,rfl⟩
-  have flagAtF := (flagStored.mono firstAppend).under ⟨before.cells.length⟩ shape.fFlag
+  have firstAppend : HeapAppends before firstHeap := identityHeap_appends shape.f context environment before
+  have flagAtF := (flagStored.mono firstAppend).under (identityLocation source environment before) shape.fFlag
   obtain ⟨blockHeap,blockTrace,blockAppend⟩ := shape.block_trace fState wellFormed blockTyped fStored flag flagAtF
   have blockForm := form_at state.runtime.graph.nodeOccurrencesUnique shape.block.found blockTyped
   rw [shape.block.formEq] at blockForm
@@ -56,7 +56,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
     | returnValue tupleTyped =>
       obtain ⟨_,_,wordTyped,boolTyped⟩ := tuple_typed shape state.runtime.graph.nodeOccurrencesUnique tupleTyped
       obtain ⟨_,_,_,literalTyped⟩ := call_typed shape.finalWordCall state.runtime.graph.nodeOccurrencesUnique wordTyped
-      have literal := shape.seventeen.evaluates (program := program) evidence ((shape.f.binder.id,⟨before.cells.length⟩) :: environment) blockHeap
+      have literal := shape.seventeen.evaluates (program := program) evidence ((shape.f.binder.id,(identityLocation source environment before)) :: environment) blockHeap
         state.runtime.graph.nodeOccurrencesUnique literalTyped
       rw [shape.seventeenValue] at literal
       obtain ⟨wordHeap,wordTrace,wordAppend⟩ := fAtBlock.invoke blockState wellFormed shape.finalWordCall
@@ -67,7 +67,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
       obtain ⟨after,boolTrace,boolAppend⟩ := fAtWord.invoke wordState wellFormed shape.finalBoolCall
         (.inr rfl) boolTyped (read_value shape.flagRead flagAtWord)
       have tupleTrace : Dynamic.ExpressionEvaluates program fContext evidence source
-          ((shape.f.binder.id,⟨before.cells.length⟩) :: environment) blockHeap shape.tuple.id
+          ((shape.f.binder.id,(identityLocation source environment before)) :: environment) blockHeap shape.tuple.id
           (.product (.word (Word.ofNatModulo 17)) (.bool flag)) after := by
         apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.tupleFound)
         · rw [shape.tupleForm]

@@ -59,6 +59,11 @@ private def hasWordCell (heap : List SourceTypedRuntime.Cell) (index : Nat) (exp
   | some ⟨.word, some (.word actual)⟩ => actual == expected
   | _ => false
 
+private def isAbsentWordCell (heap : List SourceTypedRuntime.Cell) (index : Nat) : Bool :=
+  match heap[index]? with
+  | some ⟨.word, none⟩ => true
+  | _ => false
+
 private def testProfile (program : CheckedProgram) : IO Unit := do
   let operators ← compileNamed program "operators"
   discard <| success operators [scalar 2] (.word (word 8).bitNot)
@@ -80,15 +85,20 @@ private def testProfile (program : CheckedProgram) : IO Unit := do
       (.invalidAssignmentOperands operator none (some .word)))
     tokens := reason :: tokens
   require (tokens[0]? != tokens[1]?) "public callee assignment failures reused a token"
+  /- Closures capture by value: an RHS closure call writes only its own copy
+  of the target. The copies follow the target in the source heap: the
+  closure's snapshot copies, the closure, then the call's copies. -/
   let snapshot ← compileNamed program "snapshot"
   let store ← success snapshot [scalar 2] (scalar 5)
+  /- `rhs` cannot change `value`, so this cell no longer shows whether the
+  target was read before the RHS. -/
   require (hasWordCell store 0 (word 5))
-    "public compound assignment used the latest captured-cell value"
+    "public compound assignment changed its result or an RHS closure call reached its target"
   let absent ← compileNamed program "snapshotAbsent"
   let (_, store) ← failure absent [] (← expectedDiagnostic program "snapshotAbsent"
     (.invalidAssignmentOperands .add none (some .word)))
-  require (hasWordCell store 0 (word 100))
-    "public absent-operand failure discarded RHS mutation"
+  require (isAbsentWordCell store 0 && hasWordCell store 3 (word 100))
+    "public absent-operand failure discarded the RHS call's write to its copy, or the write reached the target"
   let priority ← compileNamed program "failurePriority"
   let function ← match program.functions.find? (·.declaration == priority.key.declaration) with
     | some function => pure function
@@ -102,9 +112,9 @@ private def testProfile (program : CheckedProgram) : IO Unit := do
     | _ => throw (IO.userError "public RHS failure occurrence missing")
   let (_, store) ← failure priority [] {
     error := .uninitializedLocal binder, site := .occurrence node.id.occurrence, span := some node.span }
-  require (hasWordCell store 0 (word 100))
-    "public RHS failure lost its preceding mutation"
-  discard <| success (← compileNamed program "captured") [scalar 4] (.product (scalar 6) (scalar 9))
+  require (isAbsentWordCell store 0 && hasWordCell store 6 (word 100))
+    "public RHS failure lost the call's preceding write to its copy, or the write reached the target"
+  discard <| success (← compileNamed program "captured") [scalar 4] (.product (scalar 6) (scalar 7))
   discard <| success (← compileNamed program "functionEqual") [] (scalar 2)
 
 def run : IO Unit := do

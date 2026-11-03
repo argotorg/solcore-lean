@@ -111,7 +111,9 @@ completes the application and restores every unmapped caller cell. -/
 theorem entry_preserves_for
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.toContext functions registry arguments nativeArguments before store location current currentGhost)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -122,6 +124,8 @@ theorem entry_preserves_for
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at trace
   obtain ⟨size, sized⟩ := RecursiveNamedCallBounds.BodyTrace.has_size trace
@@ -176,7 +180,8 @@ theorem preserves_for {callerContext : SourceSemantics.Context} {callerEvidence 
   have arity : function.parameters.length = arguments.length := by
     rw [CallableIndexedLambdaEntryPrefix.parameters code]
     simpa using represented.length.1
-  obtain ⟨types, context, environment, bound, extended, allocated, trace⟩ := FunctionCallBody.Outcome.trace arity executed
+  obtain ⟨types, context, copies, copied, environment, bound, extended, copy, allocated, trace⟩ :=
+    FunctionCallBody.Outcome.trace arity executed
   have sameTypes : types = body.types := extended.bodyTypes_eq.symm.trans body.extended.bodyTypes_eq
   subst types
   have sameContext := extended.functional body.extended
@@ -185,7 +190,7 @@ theorem preserves_for {callerContext : SourceSemantics.Context} {callerEvidence 
   obtain ⟨entry⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for captured code history body.toContext functions
     represented heaps locals reference read currentCarried unmapped allowed
   obtain ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, caller⟩ :=
-    entry_preserves_for captured code history body functions functionLeaves functionTypes extension uninitialized missing escaped entry allocated trace
+    entry_preserves_for captured code history body functions functionLeaves functionTypes extension uninitialized missing escaped entry copy allocated trace
   exact ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata,
     ⟨initial.extend maps worlds frame metadata⟩, caller⟩
 
@@ -225,10 +230,13 @@ source child grade feeds the shared kernel, then the sole wrap/restore adapter
 returns the complete caller store. -/
 theorem entry_preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.toContext functions registry arguments nativeArguments before store location current currentGhost)
-    {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    {added copiedCanonical : Environment} (length : added.length = code.receipt.loweredParameters.length)
+    (spine : entry.entry.canonical = added ++ copiedCanonical)
+    (kept : ∀ slot, scope.length ≤ slot → copiedCanonical[slot]? = captured.canonical[slot]?)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -239,9 +247,11 @@ theorem entry_preserves_named_sized_for (budget size : Nat) (within : size ≤ b
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at trace
-  let installed := CallableIndexedLambdaCatalogEntries.source_entry entry initial sameFrame length spine
+  let installed := CallableIndexedLambdaCatalogEntries.source_entry entry initial sameFrame length spine kept
   obtain ⟨result, bodyStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
     CallableIndexedLambdaNamedRuntimeBodyMeaning.Body.preserves_sized code history body functions extension functionLeaves
       functionTypes owners family uninitialized missing escaped budget size within
@@ -268,7 +278,9 @@ full caller restoration without any unsized-to-sized conversion. -/
 theorem preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     {environment : Dynamic.Environment} {bound : Dynamic.Heap}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -281,11 +293,11 @@ theorem preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
       Nonempty (RecursiveNamedCatalog.Entry headers locations capturePrefix code.compilation.administrativePrefix scope finalMap finalWorld after finalStore captured.canonical) ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
   have unmapped : location ∉ mapping := sameFrame ▸ initial.authority.unmapped
-  obtain ⟨entry, added, length, spine⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
+  obtain ⟨entry, added, copiedCanonical, length, spine, kept⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
     captured code history body.toContext functions represented heaps locals reference read currentCarried unmapped allowed
   obtain ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, caller⟩ :=
     entry_preserves_named_sized_for captured code history body functions functionLeaves functionTypes family owners extension
-      uninitialized missing escaped initial sameFrame budget size within entry length spine allocated trace
+      uninitialized missing escaped initial sameFrame budget size within entry length spine kept copy allocated trace
   exact ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata,
     ⟨initial.extend maps worlds frame metadata⟩, caller⟩
 
@@ -327,10 +339,13 @@ source child grade feeds the shared kernel, then the sole wrap/restore adapter
 returns the complete caller store. -/
 theorem entry_preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) registry arguments nativeArguments before store location current currentGhost)
-    {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    {added copiedCanonical : Environment} (length : added.length = code.receipt.loweredParameters.length)
+    (spine : entry.entry.canonical = added ++ copiedCanonical)
+    (kept : ∀ slot, scope.length ≤ slot → copiedCanonical[slot]? = captured.canonical[slot]?)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function body.body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -341,9 +356,11 @@ theorem entry_preserves_nested_sized_for (budget size : Nat) (within : size ≤ 
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at trace
-  let original := CallableIndexedLambdaCatalogEntries.source_entry entry initial sameFrame length spine
+  let original := CallableIndexedLambdaCatalogEntries.source_entry entry initial sameFrame length spine kept
   let installed := CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.entry_of_source body original metadataSource globals entry.entry.environments
   obtain ⟨result, bodyStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
     CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.preserves_sized code body profile complete globals slots extension family owners
@@ -371,7 +388,9 @@ full caller restoration without any unsized-to-sized conversion. -/
 theorem preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     {environment : Dynamic.Environment} {bound : Dynamic.Heap}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : RecursiveNamedCallBounds.BodyTrace program size function body.body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -384,11 +403,11 @@ theorem preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget
       Nonempty (RecursiveNamedCatalog.Entry headers locations 0 code.compilation.administrativePrefix scope finalMap finalWorld after finalStore captured.canonical) ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
   have unmapped : location ∉ mapping := sameFrame ▸ initial.authority.unmapped
-  obtain ⟨entry, added, length, spine⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
+  obtain ⟨entry, added, copiedCanonical, length, spine, kept⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
     captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) represented heaps locals reference read currentCarried unmapped allowed
   obtain ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, caller⟩ :=
     entry_preserves_nested_sized_for captured code history body profile complete globals slots metadataSource family owners extension
-      uninitialized missing escaped initial sameFrame budget size within entry length spine allocated trace
+      uninitialized missing escaped initial sameFrame budget size within entry length spine kept copy allocated trace
   exact ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata,
     ⟨initial.extend maps worlds frame metadata⟩, caller⟩
 
@@ -417,7 +436,9 @@ completes the application and restores every unmapped caller cell. -/
 theorem entry_preserves
     (entry : CallableIndexedLambdaRuntimeBody.Entry captured code history body profile arguments nativeArguments before store location current currentGhost)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    {copies : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copied)
+    (allocated : Dynamic.BindersAllocate copies copied function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function body.context environment bound outcome after) :
     ∃ result finalStore finalMap finalWorld,
       Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -430,7 +451,7 @@ theorem entry_preserves
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
   exact entry_preserves_for captured code history body (model prepared profile)
     (observations prepared profile) (runtime_views prepared profile)
-    extension uninitialized missing escaped entry.toFor allocated trace
+    extension uninitialized missing escaped entry.toFor copy allocated trace
 
 variable {headers : RecursiveNamedCatalog.Inventory prepared.ancestry values prepared.layouts.definitions program}
   {locations : RecursiveNamedCatalog.Locations (prepared := prepared.ancestry) (values := values)

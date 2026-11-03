@@ -49,6 +49,13 @@ theorem of_write {before after : Heap} {written : Location} {value : Value}
 
 end HeapInitializationExtend
 
+theorem EnvironmentCopies.initialization_extends
+    {source : TypedSource} {environment copies : Environment} {before after : Heap}
+    (copy : EnvironmentCopies source environment before copies after) :
+    HeapInitializationExtend before after := by
+  intro location cell read initialized
+  exact ⟨cell, copy.preserves_read read, initialized⟩
+
 theorem BindersAllocate.initialization_extends
     {environment finalEnvironment : Environment} {before after : Heap}
     {binders : List TypedBinder} {values : List Value}
@@ -116,7 +123,7 @@ mutual
         (condition_evaluates.initialization_extends).trans branch_evaluates.initialization_extends
     | .conditionalFalse _ condition_evaluates branch_evaluates =>
         (condition_evaluates.initialization_extends).trans branch_evaluates.initialization_extends
-    | .lambda _ => .refl _
+    | .lambda _ snapshot => snapshot.initialization_extends
     | .directCall _ _ _ _ _ arguments_evaluate _ applies =>
         (arguments_evaluate.initialization_extends).trans applies.initialization_extends
     | .builtinCall _ arguments_evaluate applies =>
@@ -269,10 +276,12 @@ mutual
     match trace with
     | .builtin _ => .refl _
     | .global _ _ _ invokes => invokes.initialization_extends
-    | .closure _ _ _ allocate execute _ =>
-        (allocate.initialization_extends).trans execute.initialization_extends
-    | .closureUnit _ _ _ _ allocate execute _ =>
-        (allocate.initialization_extends).trans execute.initialization_extends
+    | .closure _ _ _ copy allocate execute _ =>
+        ((copy.initialization_extends).trans allocate.initialization_extends).trans
+          execute.initialization_extends
+    | .closureUnit _ _ _ _ copy allocate execute _ =>
+        ((copy.initialization_extends).trans allocate.initialization_extends).trans
+          execute.initialization_extends
 
   theorem BodyInvokes.initialization_extends {program : Program}
       {bodyInstance : BodyInstance} {evidence : EvidenceEnvironment} {arguments : List Value} {value : Value}
@@ -301,8 +310,9 @@ mutual
     | .letUninitialized _ _ _ _ allocate => (HeapInitializationExtend.of_allocation allocate)
     | .letInitialized _ _ evaluate _ _ allocate =>
         (evaluate.initialization_extends).trans (HeapInitializationExtend.of_allocation allocate)
-    | .letInitializedGeneralized _ _ _ _ _ allocate =>
-        (HeapInitializationExtend.of_generalized_allocation allocate)
+    | .letInitializedGeneralized _ _ snapshot _ _ _ allocate =>
+        (snapshot.initialization_extends).trans
+          (HeapInitializationExtend.of_generalized_allocation allocate)
     | .returnUnit _ _ => .refl _
     | .returnValue _ _ evaluate => evaluate.initialization_extends
     | .expression _ _ evaluate => evaluate.initialization_extends
@@ -374,8 +384,9 @@ mutual
     | .letUninitialized _ _ allocate => (HeapInitializationExtend.of_allocation allocate)
     | .letInitialized evaluate _ _ allocate =>
         (evaluate.initialization_extends).trans (HeapInitializationExtend.of_allocation allocate)
-    | .letInitializedGeneralized _ _ _ allocate =>
-        (HeapInitializationExtend.of_generalized_allocation allocate)
+    | .letInitializedGeneralized snapshot _ _ _ allocate =>
+        (snapshot.initialization_extends).trans
+          (HeapInitializationExtend.of_generalized_allocation allocate)
     | .expression evaluate => evaluate.initialization_extends
     | .assignValue execute => execute.initialization_extends
     | .assignBitNot execute => execute.initialization_extends

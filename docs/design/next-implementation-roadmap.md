@@ -11734,9 +11734,13 @@ The new emitters have no proof yet.
 
 **Closures capture by value.** After solcore-rs #120, a closure keeps the
 values its captured variables had at creation, and each call starts again
-from them. Every pinned Rust path agrees on this, and Lean's source semantics,
-lowering and proofs are to follow it. The probe, the design and its
-alternatives are in [Closures capture by value](closure-capture-by-value.md).
+from them. Every pinned Rust path agrees on this, and Lean now follows it: the
+lambda rule copies the captured cells, each call copies them again before
+binding its parameters, and the Core lowering makes the same copies as marked
+source allocations. Through the public API, #120's two programs and the
+repeated call give 42, 83 and 11, where they gave 101, 84 and 212. The probe,
+the design, its alternatives and the proof changes are in
+[Closures capture by value](closure-capture-by-value.md).
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).

@@ -135,6 +135,24 @@ theorem ActualSourceOrigin.of_support {function : Dynamic.Closure} {scope : Sour
   ⟨metadata, (CallableIndexedLambdaNestedStageOrigins.support_provenance compiled body).1,
     (CallableIndexedLambdaNestedStageOrigins.support_provenance compiled body).2⟩
 
+/-- Recapture keeps the static support of the same code. -/
+def StaticSupport.recapture {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {code : Code compiled.indexed function scope administrative}
+    (body : StaticSupport headers registry faults code) (environment : Dynamic.Environment) :
+    StaticSupport headers registry faults (code.recapture environment) :=
+  ⟨body.1, body.2.1, body.2.2.recapture environment⟩
+
+/-- Recapture keeps the origin: the same history metadata, preparation and
+source. -/
+theorem ActualSourceOrigin.recapture {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {code : Code compiled.indexed function scope administrative} {history : History code}
+    {body : StaticSupport headers registry faults code}
+    (origin : ActualSourceOrigin code history body) (environment : Dynamic.Environment) :
+    ActualSourceOrigin (code.recapture environment) (history.recapture environment) (body.recapture environment) :=
+  ⟨origin.historyMetadata, origin.source, origin.unique⟩
+
 inductive Represents (headers : List (Header compiled program)) (keys : List (Key compiled program))
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
     (mapping : LocationMap) (world : StoreTyping) : TypeSystem.Ty → Dynamic.Value → Value → Ty → Prop where
@@ -416,7 +434,8 @@ theorem named_of_read {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {so
     fun _ _ completed => Core.evaluation_deterministic completed evaluation⟩
 
 /-- Literal formation reuses its registered lexical key; no physical frame or
-new key is created by capturing the current value. -/
+new key is created. The value copies its captured cells, and the copies keep
+the catalog slots and the frame cell. -/
 theorem lambda_of_formation {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
     {actual : Environment} {callerPrefix : Nat}
     (pool : CallableIndexedAuthorityPool.Pool (prepared := compiled.indexed.ancestry)
@@ -429,33 +448,43 @@ theorem lambda_of_formation {function : Dynamic.Closure} {scope : SourceCoreLoca
       (values := .initial compiled.compatible.checked) (program := program) headers owner.key.locations callerPrefix scope captured.canonical owner.key.frameLocation)
     (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
     (current : (pool.rows owner.position).authority.current = history.native)
-    (ghost : (pool.rows owner.position).authority.ghost = history.ghost)
+    (_ghost : (pool.rows owner.position).authority.ghost = history.ghost)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    Represents headers keys bodyRegistry faults mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
-      result = .inRight .word (value code captured.embedding history.native actual) ∧ finalStore = store) := by
+    ∃ formed : Formed model captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
+        code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      Represents headers keys bodyRegistry faults formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+        (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding history.native formed.closureActual) ∧
+          finalStore = formed.finalStore) := by
   have reference : captured.canonical[code.referenceIndex]? = some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
     rw [referenceIndex]; exact globals.reference
   have read : store.read? owner.key.frameLocation = some (SourceCoreCallableIndexedFrames.encode compiled.indexed.ancestry.layout.frame history.native) := by
     have actualRead := (pool.rows owner.position).authority.frame.read
     rw [(pool.rows owner.position).frame_eq, current] at actualRead
     exact actualRead
-  have sameHistory : Current compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table history.native history.ghost := by
-    simpa only [current, ghost] using (pool.rows owner.position).authority.frame.history
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation captured code history copied referenceIndex heaps reference read
   obtain ⟨sourceTrace, nativeTrace, strong⟩ := CallableIndexedLambdaRuntimeValues.formation_with
     (values := .initial compiled.compatible.checked) (program := program) compiled.indexed
-    (P := fun _ _ _ _ => True) captured code history body True.intro profile stored reference read heap ordinary coercions
+    (P := fun _ _ _ _ => True) formed (body.recapture formed.captured) True.intro profile heaps.runtime_hasTypes
+    ordinary coercions
   have typed := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType (registry := bodyRegistry)
     (CallableIndexedLambdaRuntimeValues.RepresentsWith.forget (values := .initial compiled.compatible.checked) compiled.indexed strong)
-  exact ⟨sourceTrace, nativeTrace, .lambda owner captured code history body origin globals referenceIndex typed,
+  exact ⟨formed, sourceTrace, nativeTrace,
+    .lambda (function := formed.closure) owner formed.captures formed.closureCode formed.closureHistory
+      (body.recapture formed.captured) (origin.recapture formed.captured) (globals.of_slots formed.slots)
+      referenceIndex typed,
     fun _ _ completed => Core.evaluation_deterministic completed nativeTrace⟩
 
 /-- This accepted-policy branch is explicitly ordinary (empty source evidence).

@@ -59,40 +59,46 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   {support : SupportFamily prepared} {P : SupportCondition prepared support}
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {mapping : LocationMap} {world : StoreTyping} {actual : Environment}
-  (captured : Captures prepared mapping world scope function.captured actual)
-  (code : Code prepared function scope captured.administrative) (history : History code)
-  (body : support code) (supported : P captured code history body)
-  {store : Store} {location : Location}
+  {environment : Dynamic.Environment} {projects : GenericHeap.Projection}
+  {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog values.checked.catalog) projects
+    prepared.layouts.definitions}
+  {current : Captures prepared mapping world scope environment actual}
+  {code : Code prepared function scope current.administrative} {history : History code}
+  {heap : Dynamic.Heap} {store : Store} {location : Location}
+  (formed : Formed model current code history heap store location)
+  (body : support formed.closureCode)
+  (supported : P (function := formed.closure) formed.captures formed.closureCode formed.closureHistory body)
   (profile : values.checked.catalog.callableContracts = true)
   (stored : RuntimeStoreHasTypes world store prepared.layouts.definitions)
-  (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
-  (read : store.read? location = some (SourceCoreCallableIndexedFrames.encode prepared.ancestry.layout.frame history.native))
 
-include captured code history body supported profile stored reference read in
-theorem actual_formation {program : SourceSemantics.Program} (heap : Dynamic.Heap)
+include formed body supported profile stored in
+/-- The formed closure over the copies of the creation environment keeps the
+support receipt and condition of its code. -/
+theorem actual_formation {program : SourceSemantics.Program}
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    RepresentsWith prepared support P mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    Evaluates actual store (code.lowered.expression.rename current.embedding)
+      (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+    RepresentsWith prepared support P formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-  formation_with prepared program captured code history body supported profile stored reference read heap ordinary coercions
+  formation_with prepared program formed body supported profile stored ordinary coercions
 
-include captured code history body supported profile stored reference read in
-theorem actual_reflection {program : SourceSemantics.Program} (heap : Dynamic.Heap)
+include formed body supported profile stored in
+theorem actual_reflection {program : SourceSemantics.Program}
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) {result : Value} {after : Store}
-    (completed : Evaluates actual store (code.lowered.expression.rename captured.embedding) result after) :
-    result = .inRight .word (value code captured.embedding history.native actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    RepresentsWith prepared support P mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
+    (completed : Evaluates actual store (code.lowered.expression.rename current.embedding) result after) :
+    result = .inRight .word (value code formed.embedding history.native formed.closureActual) ∧
+    after = formed.finalStore ∧
+    Dynamic.ExpressionEvaluates program function.context function.evidence function.source environment heap
+      code.id (.closure formed.closure) formed.finalHeap ∧
+    RepresentsWith prepared support P formed.finalMap formed.finalWorld (FunctionValues.sourceType function)
+      (.closure formed.closure) (value code formed.embedding history.native formed.closureActual)
       (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-  reflects_with prepared program captured code history body supported profile stored reference read heap ordinary coercions completed
+  reflects_with prepared program formed body supported profile stored ordinary coercions completed
 
 theorem retained_code_history_and_condition
     {sourceType : TypeSystem.Ty} {native : Value} {type : Ty}

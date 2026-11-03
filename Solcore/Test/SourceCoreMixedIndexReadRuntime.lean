@@ -101,7 +101,7 @@ def run : IO Unit := do
             "third mixed index read retained Source value changed"
           let heaps := [firstStart.session.heapSize, firstReturned.session.heapSize,
             secondReturned.session.heapSize, thirdReturned.session.heapSize]
-          require (heaps == [2,44,80,122]) "mixed index read Source-certified repeated native heaps changed"
+          require (heaps == [2,56,104,158]) "mixed index read Source-certified repeated native heaps changed"
           IO.println "MIXED_INDEX_READ_SOURCE_PUBLIC: originals1/cache1/typing1/profile1; proof before every resume"
           IO.println s!"MIXED_INDEX_READ_SOURCE_HEAPS: {heaps}"
           IO.println "MIXED_INDEX_READ_SOURCE_PUBLIC_PASS"

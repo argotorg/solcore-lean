@@ -180,7 +180,7 @@ theorem body_result_with_exit_of_parent
     | value value =>
       obtain ⟨wholeSize, sourceBody, _parentSmall⟩ :=
         SourceCoreChosenOrdinaryAcceptedOuterSourceConstruction.body_from_parent fixture atHeader chosen.chosen typing
-          allocation parent
+          (.nil before) allocation parent
       refine ⟨SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture, .returned value, ?_, .returned value, ?_⟩
       · simpa only [TypedScopedStatements.Executes, ↓reduceIte,
           atHeader.context, atHeader.source, atHeader.statements, evidence] using sourceBody.sound
@@ -188,7 +188,7 @@ theorem body_result_with_exit_of_parent
     | fault reason =>
       obtain ⟨wholeSize, sourceBody, _parentSmall⟩ :=
         SourceCoreChosenOrdinaryAcceptedOuterSourceConstruction.body_from_parent fixture atHeader chosen.chosen typing
-          allocation parent
+          (.nil before) allocation parent
       refine ⟨SourceCoreChosenOrdinaryAcceptedOuterTyping.localContext fixture, .fault reason, ?_, .fault reason, ?_⟩
       · simpa only [TypedScopedStatements.Executes, ↓reduceIte,
           atHeader.context, atHeader.source, atHeader.statements, evidence] using sourceBody.sound
@@ -290,7 +290,7 @@ theorem reflects_body_with_exit (evidence : caller.function.evidence = []) (budg
   subst finalStore
   obtain ⟨sourceSize, sourceBody, _sourceParentSmall⟩ :=
     SourceCoreChosenOrdinaryAcceptedOuterSourceConstruction.body_trace_at_header fixture atHeader chosen.chosen typing
-      evidence allocatedSource parentTrace
+      evidence (.nil before) allocatedSource parentTrace
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceBody,
     body_result_with_exit_of_parent fixture atHeader typing inventory root chosen outer owner initial packet reached related maps worlds
       allocationFrame allocationMetadata parentEnvironments parentLocals evidence allocatedSource parentTrace post⟩

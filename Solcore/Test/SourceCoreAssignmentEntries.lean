@@ -174,20 +174,27 @@ private def testCallees (program : CheckedProgram) : IO Unit := do
     failureTokens := token :: failureTokens
   assertTrue (failureTokens[0]? != failureTokens[1]?) "callee assignment failures shared one token"
 
+/-- Closures capture by value: an RHS closure call writes only its own copy of
+the target, never the target itself. The copies follow the target in the
+store: the closure's snapshot copies, the closure, then the call's copies. -/
 private def testCapturedRhs (program : CheckedProgram) : IO Unit := do
   let prepared ← prepare .functions program "snapshot"
   let entry ← firstEntry prepared
   let store ← success entry [scalar 2] (scalar 5)
   let index := entry.inputs.length + prepared.plan.specializations.length
+  /- `rhs` cannot change `value`, so this result no longer shows whether the
+  target was read before the RHS. -/
   assertTrue (store[index]? == some (present (scalar 5)))
-    "compound assignment used the RHS-mutated value instead of its selected snapshot"
+    "compound assignment changed its result or an RHS closure call reached its target"
   let prepared ← prepare .functions program "snapshotAbsent"
   let entry ← firstEntry prepared
   let (site, span) ← diagnosticSite program "snapshotAbsent"
   let (_, store) ← expectFailure entry [] {
     error := .invalidAssignmentOperands .add none (some .word), site, span := some span }
-  assertTrue (store[prepared.plan.specializations.length]? == some (present (scalar 100)))
-    "absent compound operand discarded a successful RHS's captured-cell write"
+  let target := prepared.plan.specializations.length
+  assertTrue (store[target]? == some (.inLeft .word .unit) &&
+      store[target + 3]? == some (present (scalar 100)))
+    "absent compound operand discarded the RHS call's write to its copy, or the write reached the target"
   let prepared ← prepare .functions program "failurePriority"
   let entry ← firstEntry prepared
   let read ← match entry.faultSites.reads.find? (fun site =>
@@ -202,10 +209,12 @@ private def testCapturedRhs (program : CheckedProgram) : IO Unit := do
   let (_, store) ← expectFailure entry [] {
     error := .uninitializedLocal read.binder, site := .occurrence read.expression.occurrence,
     span := some read.span }
-  assertTrue (store[prepared.plan.specializations.length]? == some (present (scalar 100)))
-    "RHS failure priority discarded earlier shared mutation"
+  let target := prepared.plan.specializations.length
+  assertTrue (store[target]? == some (.inLeft .word .unit) &&
+      store[target + 6]? == some (present (scalar 100)))
+    "RHS failure priority discarded the call's earlier write to its copy, or the write reached the target"
   discard <| success (← firstEntry (← prepare .functions program "captured")) [scalar 4]
-    (.pair (scalar 6) (scalar 9))
+    (.pair (scalar 6) (scalar 7))
   discard <| success (← firstEntry (← prepare .functions program "functionEqual")) [] (scalar 2)
 
 def run : IO Unit := do

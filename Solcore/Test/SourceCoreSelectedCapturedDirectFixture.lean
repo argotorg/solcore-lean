@@ -27,6 +27,7 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
     | throw (IO.userError "captured source occurrence shape")
   let ⟨inputs⟩ ← observed (source.inputs = [binder]) "captured inputs"
   let ⟨binderType⟩ ← observed (binder.scheme = .mono .word) "captured parameter type"
+  let ⟨binderCopied⟩ ← observed (CaptureBinders.copiedBinder? source binder.id = some binder) "captured parameter copied"
   let ⟨roots⟩ ← observed (source.roots = [.statement outer.id]) "captured roots"
   let ⟨readFound⟩ ← observed (source.lookupExpression? read.id = some read) "captured read occurrence"
   let ⟨readForm⟩ ← observed (read.form = .reference binder.name (.local binder.id)) "captured read form"
@@ -48,6 +49,7 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
     outer := outer
     inputs := inputs
     binderType := binderType
+    binderCopied := binderCopied
     roots := roots
     readFound := readFound
     readForm := readForm

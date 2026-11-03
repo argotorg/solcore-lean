@@ -1,7 +1,8 @@
 import Solcore.Test.SourceCoreCapturedAssignmentFixture
 
 /-! Actual public calls retain each returned session and opaque handle.
-Interleaving a fresh allocation separates the two mutable captured cells. -/
+Captures are by value: every call starts again from the seed its closure
+captured, so a call's write reaches neither the next call nor another closure. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCapturedAssignment
@@ -120,7 +121,7 @@ structure ObservedSequence (fixture : CompiledFixture) (observed : ObservedFacto
   secondCall : ObservedInvocation third.completion.session second.handle (Core.Word.ofNatModulo 21)
   secondValue : secondCall.completion.value = .word (Core.Word.ofNatModulo 20)
   firstAgain : ObservedInvocation secondCall.completion.session first.handle (Core.Word.ofNatModulo 12)
-  finalValue : firstAgain.completion.value = .word (Core.Word.ofNatModulo 11)
+  finalValue : firstAgain.completion.value = .word (Core.Word.ofNatModulo 10)
 
 private def observeWord {artifact : SourceCoreExecution.Artifact}
     (completion : SourceCoreExecution.Completion artifact) (expected : Core.Word) :
@@ -138,7 +139,7 @@ def observeSequence (fixture : CompiledFixture) (observed : ObservedFactory fixt
   let secondCall ← observeInvocation third.completion.session second.handle (Core.Word.ofNatModulo 21)
   let ⟨secondValue⟩ ← observeWord secondCall.completion (Core.Word.ofNatModulo 20)
   let firstAgain ← observeInvocation secondCall.completion.session first.handle (Core.Word.ofNatModulo 12)
-  let ⟨finalValue⟩ ← observeWord firstAgain.completion (Core.Word.ofNatModulo 11)
+  let ⟨finalValue⟩ ← observeWord firstAgain.completion (Core.Word.ofNatModulo 10)
   return ⟨first, second, firstCall, firstValue, third, secondCall, secondValue, firstAgain, finalValue⟩
 
 end Tests.SourceCoreCapturedAssignment

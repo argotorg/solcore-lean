@@ -60,14 +60,15 @@ private theorem capturedSlots_after_prefix
     {callerPrefix : Nat} {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     (slots : CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix scope canonical)
     (added : Environment) (length : added.length = bindings.length)
-    {final : Environment} (spine : final = added ++ canonical) :
+    (copied : Environment) {final : Environment} (spine : final = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) :
     CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix
       (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) final := by
   subst final
   intro slot signature found
   have offset : (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + callerPrefix + slot =
       added.length + (scope.length + callerPrefix + slot) := by simp only [List.length_append, List.length_map, List.length_reverse]; omega
-  rw [offset, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left]
+  rw [offset, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left, kept _ (by omega)]
   exact slots slot signature found
 
 
@@ -86,18 +87,20 @@ theorem lifts_application {child invocation : Scope} (selected : stages.Closure 
     rw [CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) code,
       List.length_map]
     exact represented.length.1
-  obtain ⟨childSize, environment, bound, valid, allocated, sourceTrace, smaller⟩ :=
+  obtain ⟨childSize, copies, copiedHeap, environment, bound, valid, copy, allocated, sourceTrace, smaller⟩ :=
     SelectedCompilationStageClosureSourceTrace.source_prefix inputs.extended arity trace
   obtain ⟨finalContext, bodyOutcome, bodyTrace, converted⟩ :=
     SelectedCompilationStageNamedInvocationLifting.body_control sourceTrace
-  obtain ⟨entry, added, length, spine, parameterState, _parameterRelated⟩ :=
+  obtain ⟨entry, added, copied, length, spine, kept, parameterState, _parameterRelated⟩ :=
     CallableIndexedOwnedLambdaInvocationBounds.parameters_with_state captured code history inputs
       functions represented owner caller heaps locals reference currentCarried allowed
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry parameterState valid beforeTyped argumentsTyped savedRows
-  have slots := capturedSlots_after_prefix capturedSlots added length spine
+  have slots := capturedSlots_after_prefix capturedSlots added length copied spine kept
   let initial : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys code.compilation.administrativePrefix).State
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ :=
@@ -111,6 +114,6 @@ theorem lifts_application {child invocation : Scope} (selected : stages.Closure 
     initial canonicalAdmitted valid
     (by simpa only [stages.source selected, stages.evidence selected] using bodyTrace)
     (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller within))
-  exact BodyLift.closure selected valid inputs.extended entry.entry.allocation lifted converted
+  exact BodyLift.closure selected valid inputs.extended entry.entry.copy entry.entry.allocation lifted converted
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureEntryApplicationLifting

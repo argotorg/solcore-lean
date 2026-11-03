@@ -2220,7 +2220,7 @@ theorem preservesWith
   | @lambda _ lambdaContext finalContext parameters parameterTypes returnType
       body bodyFacts names_unique parameters_extend body_type body_completes =>
       cases evaluation with
-      | lambda layout =>
+      | @lambda _ _ _ _ _ after captured _ _ _ _ _ layout snapshot =>
           rcases occurrence with ⟨id, node, contains, node_form, node_raw⟩
           have body_types :=
             Solcore.SourceSemantics.Dynamic.MonoBindersExtend.bodyTypes_eq
@@ -2232,7 +2232,7 @@ theorem preservesWith
               resultType := returnType
               body := body
               source := source
-              captured := environment
+              captured := captured
               context := context
               evidence := evidence
             } := {
@@ -2249,17 +2249,17 @@ theorem preservesWith
           }
           exact ⟨by
               simpa [body_types] using
-                (ValueHasType.closure (context := context) (heap := before)
+                (ValueHasType.closure (context := context) (heap := after)
                   (function := {
                     parameters := parameters
                     resultType := returnType
                     body := body
                     source := source
-                    captured := environment
+                    captured := captured
                     context := context
                     evidence := evidence
-                  }) rfl code evidence_covers environment_agrees),
-            before_typed, .refl before⟩
+                  }) rfl code evidence_covers (snapshot.agrees environment_agrees)),
+            before_typed.copy snapshot, snapshot.metadata_extends⟩
   | @directCall _ callee arguments instantiation parameterTypes resultType
       predicates callee_valid application arguments_type =>
       cases evaluation with
@@ -3566,7 +3566,7 @@ theorem preservesWith
       | letInitializedGeneralized polymorphic _requirements_well_formed
           _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
-  | letInitializedGeneralized contains form_eq captures runtime_polymorphic
+  | letInitializedGeneralized contains form_eq snapshot captures runtime_polymorphic
       extension allocate =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         typed_contains contains
@@ -3579,16 +3579,17 @@ theorem preservesWith
           requirements_well_formed generalizes initializer_type
           static_extension =>
           have function_typed := captures.wellTyped runtime
-            environment_agrees static_polymorphic requirements_well_formed
-            generalizes initializer_type static_extension
+            (snapshot.agrees environment_agrees) static_polymorphic
+            requirements_well_formed generalizes initializer_type static_extension
+          have snapshot_extension := snapshot.metadata_extends
           have allocation_extension :=
             HeapTypesExtend.of_generalized_allocation allocate
-          have after_typed := before_typed.allocateGeneralized function_typed
-            allocate
+          have after_typed := (before_typed.copy snapshot).allocateGeneralized
+            function_typed allocate
           cases static_extension
           exact {
             heap_typed := after_typed
-            heap_extends := allocation_extension
+            heap_extends := snapshot_extension.trans allocation_extension
             outcome_typed := .fallthrough
               (.cons allocate.reads_new
                 (by simpa only using (congrArg
@@ -3599,7 +3600,8 @@ theorem preservesWith
                     captures.binder_eq))
                   (by simpa only using (congrArg TypedBinder.scheme
                     captures.binder_eq)))
-                (environment_agrees.mono allocation_extension))
+                ((environment_agrees.mono snapshot_extension).mono
+                  allocation_extension))
           }
   | returnUnit contains form_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique

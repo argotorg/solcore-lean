@@ -422,12 +422,13 @@ theorem StatementsPlain.if_fault {program : Program} {scope : Scope}
       | some statements => exact .ifFalseBody contains form test branch
 
 private theorem body_result {program : Program} {registry : Registry} {scope child : Scope}
-    {context bodyContext finalContext : Context} {before bound after : Heap} {function : Closure}
-    {arguments : List Value} {environment : Environment} {parameterTypes : List TypeSystem.Ty}
+    {context bodyContext finalContext : Context} {before copied bound after : Heap} {function : Closure}
+    {arguments : List Value} {entry environment : Environment} {parameterTypes : List TypeSystem.Ty}
     {outcome : BodyOutcome} {result : Outcome}
     (selected : registry.Closure function child) (valid : ClosureFrame program function)
     (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes bodyContext)
-    (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
+    (copy : EnvironmentCopies function.source function.captured before entry copied)
+    (allocate : BindersAllocate entry copied function.parameters arguments environment bound)
     (body : StatementsPlain program true child bodyContext environment bound function.body finalContext outcome after)
     (resultRule : BodyResult function.resultType outcome result) :
     AppliesPlain program scope context before (.closure function) arguments result after := by
@@ -436,18 +437,18 @@ private theorem body_result {program : Program} {registry : Registry} {scope chi
   generalize typeEq : function.resultType = type at resultRule
   cases resultRule with
   | returned =>
-    exact ⟨function.evidence, .closure rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) rfl⟩
+    exact ⟨function.evidence, .closure rfl valid parameters copy allocate (by simpa [StatementsPlain, source, evidence] using body) rfl⟩
   | unit =>
-    exact ⟨function.evidence, .closureUnit rfl valid typeEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩⟩
+    exact ⟨function.evidence, .closureUnit rfl valid typeEq parameters copy allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩⟩
   | breaking =>
-    exact ⟨function.evidence, .closureControlEscape rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inl ⟨_, rfl⟩)⟩
+    exact ⟨function.evidence, .closureControlEscape rfl valid parameters copy allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inl ⟨_, rfl⟩)⟩
   | continuing =>
-    exact ⟨function.evidence, .closureControlEscape rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inr ⟨_, rfl⟩)⟩
+    exact ⟨function.evidence, .closureControlEscape rfl valid parameters copy allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inr ⟨_, rfl⟩)⟩
   | @fault _ failure =>
     cases failure with
     | stage => trivial
     | semantic reason =>
-      exact ⟨function.evidence, .closureBody rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body)⟩
+      exact ⟨function.evidence, .closureBody rfl valid parameters copy allocate (by simpa [StatementsPlain, source, evidence] using body)⟩
 
 private theorem global_body_result {program : Program} {registry : Registry} {scope child : Scope}
     {context bodyContext finalContext : Context} {before bound after : Heap} {function : GlobalFunction}
@@ -579,11 +580,11 @@ local macro "erase_recursive_plain" : tactic =>
         | stage => trivial
     case generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault =>
       exact .generalizedLocalRequirement contains form layout lookup read descriptor contextFields selection fault
-    case letGeneralized contains form captures polymorphic extension allocated next nextIH =>
+    case letGeneralized contains form snapshot captures polymorphic extension allocated next nextIH =>
       exact StatementsPlain.prepend contains (by intro e; simp [form])
-        (.letInitializedGeneralized contains form captures polymorphic extension allocated) nextIH
-    case initializedGeneralized captures polymorphic extension allocated next nextIH =>
-      exact ForItemsPlain.prepend (.letInitializedGeneralized captures polymorphic extension allocated) nextIH
+        (.letInitializedGeneralized contains form snapshot captures polymorphic extension allocated) nextIH
+    case initializedGeneralized snapshot captures polymorphic extension allocated next nextIH =>
+      exact ForItemsPlain.prepend (.letInitializedGeneralized snapshot captures polymorphic extension allocated) nextIH
     case coercedValue contains _nonempty raw path rawIH pathIH =>
       rename_i outcome
       cases outcome with
@@ -837,7 +838,8 @@ local macro "erase_recursive_plain" : tactic =>
     case globalArity instantiates mismatch => exact ⟨[], .globalArity instantiates mismatch⟩
     case global instantiates covers roots selected parameters allocate body result ih =>
       exact global_body_result instantiates covers roots selected parameters allocate ih result
-    case closure selected valid parameters allocate body result ih => exact body_result selected valid parameters allocate ih result
+    case closure selected valid parameters copy allocate body result ih =>
+      exact body_result selected valid parameters copy allocate ih result
     case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
     case returnUnit contains form => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnUnit contains form)
     case continuing contains form => exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (.continueStmt contains form)

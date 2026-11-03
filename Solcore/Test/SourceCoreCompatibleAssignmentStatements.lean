@@ -5,7 +5,8 @@ import Solcore.Test.SourceCompilerFeatureSupport
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Assignment spines consume actual compatible flow receipts and retain all
 source effects before failure. Runtime fixtures combine projected and bare
-writes with lexical tails, early return, captured cells and suspension. -/
+writes with lexical tails, early return, a closure that keeps the value it
+captured before a later write, and suspension. -/
 set_option autoImplicit false
 set_option maxHeartbeats 5000000
 namespace Tests.SourceCoreCompatibleAssignmentStatements
@@ -199,7 +200,8 @@ private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit
 
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "assignment statement checker" (checkProgram workspace)
-  for (name, result) in [("bare", 13), ("mapping", 14), ("nested", 7), ("captured", 9), ("early", 11)] do
+  -- `read` captures `x = 1` by value, so the later `x += 8` does not reach it.
+  for (name, result) in [("bare", 13), ("mapping", 14), ("nested", 7), ("captured", 1), ("early", 11)] do
     let entry ← SourceCompilerFeatureSupport.compileNamed checked name
     let expected : SourceCompilerFeatureSupport.Value := .word (Word.ofNatModulo result)
     SourceCompilerFeatureSupport.require ((← entry.run []) == expected) s!"{name}: assignment statement value changed"

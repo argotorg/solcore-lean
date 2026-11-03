@@ -69,8 +69,12 @@ private def legacyNative : SourceTypedRuntime.Value → Option Core.Value
   | _ => none
 
 
+/-- `trace`, when given, lists the Word cells of a faulting run's store. In the
+tuple fixtures these are the `trace` local, the snapshots of it that `f` and
+`bump` take when they are created, and one copy for each `bump` call that ran
+before the fault. -/
 private def check (program : CheckedProgram) (name : String) (arguments : List Core.Value)
-    (expected : Option Core.Value) (trace : Option Core.Word := none) : IO Unit := do
+    (expected : Option Core.Value) (trace : Option (List Core.Word) := none) : IO Unit := do
   let key ← key program name
   let recipe ← prepare program [key]
   let entry ← match recipe.program.findEntry? key with
@@ -95,7 +99,7 @@ private def check (program : CheckedProgram) (name : String) (arguments : List C
           throw (IO.userError s!"{name} staged diagnostic differs: {reprStr diagnostic.error}; old: {reprStr oldError}")
         if let some trace := trace then
           let scalars := store.filterMap fun | .inRight .unit (.word value) => some value | _ => none
-          unless scalars == [trace] do throw (IO.userError s!"{name} changed argument/parameter effects: {reprStr scalars}")
+          unless scalars == trace do throw (IO.userError s!"{name} changed argument/parameter effects: {reprStr scalars}")
     | observation, _, _ => throw (IO.userError s!"{name} staged outcome changed: {reprStr observation}")
   for _ in [0, 1] do
     match entry.run arguments 65536 with
@@ -151,8 +155,10 @@ def run : IO Unit := do
   check program "markedGlobalRuntime" [.word (w 25)] none
   check program "markedResultIndirectBlocked" [] none
   check program "markedResultIndirectStaged" [] (some (.word (w 24)))
-  check program "tupleBefore" [] none (some (w 0))
-  check program "tupleAfter" [] none (some (w 2))
+  -- No argument runs before the fault, so no call copy of `trace` exists.
+  check program "tupleBefore" [] none (some [w 0, w 0, w 0])
+  -- Both `bump()` arguments run before the fault, each from the snapshot 0.
+  check program "tupleAfter" [] none (some [w 0, w 0, w 0, w 1, w 1])
   check program "tupleAccepted" [] (some (.word (w 7)))
   check program "identities" [] (some (.pair (.word (w 9)) (.word (w 0))))
   check program "builtinCall" [.integer 42] (some (.word (w 42)))
@@ -176,7 +182,7 @@ def run : IO Unit := do
           unless first.value == .word (w 11) do throw (IO.userError "staged handle lost its capture")
           match ← first.session.run consumer [made.value, .word (w 2)] 65536 256 with
           | .ok (.succeeded second) =>
-              unless second.value == .word (w 12) do throw (IO.userError "staged handle lost capture mutation")
+              unless second.value == .word (w 11) do throw (IO.userError "staged handle call did not restart from its captured seed")
           | _ => throw (IO.userError "staged handle second invocation failed")
       | _ => throw (IO.userError "staged handle invocation failed")
   | _ => throw (IO.userError "staged handle export failed")

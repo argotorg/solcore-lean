@@ -22,7 +22,7 @@ structure SequenceMeaning (issued : Issued fixture.recipe)
   secondRead : InvocationMeaning issued intervening.after second.entry secondNext true false
     sequence.secondRead secondSeed (RecursiveStageRegistry.scope stages.sidecar [] first.initial.header.function)
   repeatedRead : InvocationMeaning issued secondRead.after first.entry repeatedNext false false
-    sequence.repeatedRead firstNext (RecursiveStageRegistry.scope stages.sidecar [] first.initial.header.function)
+    sequence.repeatedRead seed (RecursiveStageRegistry.scope stages.sidecar [] first.initial.header.function)
 
 variable {issued : Issued fixture.recipe} {stages : ObservedStages fixture observed.makeRow}
   {sequence : ObservedSequence fixture observed}
@@ -44,7 +44,7 @@ theorem sequence_meaning (profile : Observed fixture)
   obtain ⟨secondRead⟩ := invocation_meaning intervening.after second.entry (by simp)
     second.entryType second.handleEq second.handleType secondNext true false sequence.secondRead secondSeed sequence.secondValue scope
   obtain ⟨repeatedRead⟩ := invocation_meaning secondRead.after first.entry (by simp)
-    first.entryType first.handleEq first.handleType repeatedNext false false sequence.repeatedRead firstNext sequence.repeatedValue scope
+    first.entryType first.handleEq first.handleType repeatedNext false false sequence.repeatedRead seed sequence.repeatedValue scope
   exact ⟨issued, ⟨⟨first, second, firstRead, intervening, secondRead, repeatedRead⟩⟩⟩
 
 structure ForwardMeaning (meaning : SequenceMeaning issued stages sequence) : Prop where
@@ -72,7 +72,7 @@ structure ForwardMeaning (meaning : SequenceMeaning issued stages sequence) : Pr
       (packed repeatedNext false false) runOptions.inputValidationFuel = .ok checkpoint ∧
     SelectedCompilationPublicSessionDirectScalarForward.ForwardAt issued.catalog.rows meaning.first.initial.header
       issued.initial issued.support.profile fixture.recipe (([meaning.first.entry] ++ [meaning.second.entry]) ++ [meaning.intervening.entry])
-      (.word firstNext) checkpoint meaning.repeatedRead.after.heap
+      (.word seed) checkpoint meaning.repeatedRead.after.heap
 
 theorem SequenceMeaning.forward (meaning : SequenceMeaning issued stages sequence) : ForwardMeaning meaning := by
   have initialReady : sequence.first.session.ExportsReady :=
@@ -107,8 +107,8 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.intervening.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize]
-  unless stores == [4,7,10,44,47,81,106] do
+  unless stores == [4,10,16,53,59,96,124] do
     throw (IO.userError s!"scoped closure profile stores changed: {reprStr stores}")
-  IO.println "SCOPED_CLOSURE_PROFILE_FORWARD_PASS: original C6 at checker1000; one complete profile and automatic catalog; make10/make20/A10/make30/B20/A11; retained captures and related Source heaps; all six sufficient public fuel bounds; original stores"
+  IO.println "SCOPED_CLOSURE_PROFILE_FORWARD_PASS: original C6 at checker1000; one complete profile and automatic catalog; make10/make20/A10/make30/B20/A10; retained captures and related Source heaps; all six sufficient public fuel bounds; original stores"
 
 end Tests.SourceCoreCanonicalScoped.CompilerProfile

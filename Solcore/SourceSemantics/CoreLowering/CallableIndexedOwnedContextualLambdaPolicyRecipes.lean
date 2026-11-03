@@ -85,6 +85,9 @@ structure PolicyRecipe
     (SourceCoreCompatibleValues.Context.initial checked)
   projectType : policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked
   sourceCells : policy.sourceCells = some (allocator prepared named)
+  /-- The outer choice compiles no generalized initializer, so every lambda it
+  forms copies its captures at creation. -/
+  snapshotLambda : policy.snapshotLambda = fun _ => true
 
 /-- The body and complete policy use one original compilation. The policy keeps
 its own root fuel when the same callback compiles a child at a smaller budget. -/

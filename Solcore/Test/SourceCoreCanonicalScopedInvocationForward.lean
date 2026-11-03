@@ -128,7 +128,7 @@ def InvocationForwardMeaning {fixture : CompiledFixture} {observed : ObservedPro
   ForwardWordAt meaning.support sequence.intervening.completion.session [meaning.first, meaning.second, meaning.intervening]
     sequence.second.handle (packed secondNext true false) secondSeed meaning.secondReadState.heap ∧
   ForwardWordAt meaning.support sequence.secondRead.completion.session [meaning.first, meaning.second, meaning.intervening]
-    sequence.first.handle (packed repeatedNext false false) firstNext meaning.finalState.heap
+    sequence.first.handle (packed repeatedNext false false) seed meaning.finalState.heap
 
 theorem SequenceWitness.invocations_forward {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {makeStages : ObservedStages fixture observed.makeRow}

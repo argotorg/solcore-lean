@@ -79,17 +79,21 @@ def run : IO Unit := do
       [treeType, .mapping .word .word, .mapping .word (.mapping .word .word), .mapping .word treeType] with
     | .ok checked => pure checked
     | .error error => throw (IO.userError s!"place catalog rejected: {reprStr error}")
-  expect (← entryFor program checked "order") [] (w 64)
+  -- Closures capture by value: the key and RHS closures assign only their
+  -- call's copies of `table` and `calls`, so only the compound write reaches
+  -- `table`, from its default 0.
+  expect (← entryFor program checked "order") [] (w 3)
   let nested ← entryFor program checked "nested"
-  expect nested [] (w 45)
+  expect nested [] (w 5)
   match nested.run [] 32 with
   | .ok result => match result.checkpoint? with
       | some checkpoint => match (checkpoint.resume 65536).observation with
-          | .succeeded actual _ => assertTrue (actual == w 45) "place resume repeated keys or lost latest root"
+          | .succeeded actual _ => assertTrue (actual == w 5) "place resume changed the compound result"
           | other => throw (IO.userError s!"place resume failed: {reprStr other}")
       | none => throw (IO.userError "place run did not suspend")
   | .error error => throw (IO.userError s!"place checkpoint rejected: {reprStr error}")
-  expect (← entryFor program checked "replaceLatest") [] (w 23)
+  -- The RHS replaces only its call's copy of `table`.
+  expect (← entryFor program checked "replaceLatest") [] (w 14)
   let mapId ← match checked.catalog.identity? (.mapping .word .word) with
     | some identity => pure identity
     | none => throw (IO.userError "place mapping identity missing")
@@ -112,7 +116,8 @@ def run : IO Unit := do
               (decide (diagnostic.error = .typeMismatch treeType none) && diagnostic.span.isSome)
               "place missing default lost its exact source diagnostic"
           | none => throw (IO.userError "place missing default lost diagnostic")
-          assertTrue (store.contains (.inRight .unit (w 17)) && !store.contains (.inRight .unit (w 128)))
+          -- The key's call copy of `count` holds 17; an RHS call would leave 111 in its own copy.
+          assertTrue (store.contains (.inRight .unit (w 17)) && !store.contains (.inRight .unit (w 111)))
             "place selected after RHS or skipped key effects"
           assertTrue (store.contains (.inLeft (.namedData treeMap) .unit) &&
             !store.contains (.inRight .unit (.constructed ⟨treeMap, 0⟩ .unit)))

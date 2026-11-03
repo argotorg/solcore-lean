@@ -7,9 +7,11 @@ import Solcore.Frontend.ProgramChecking
 #check_failure Solcore.Frontend.SourceCoreCallablePairedAncestry.Prepared.mk
 
 /-! Actual two-pass compiler execution retains a generalized read's caller
-snapshot separately from the principal's lexical creation snapshot. This test
-uses the owned native runner and allocation ledger; decoding a frame alone is
-not treated as evidence of its execution history or source closure identity.
+snapshot separately from the principal's lexical creation snapshot. Closures
+capture by value: a lambda keeps copies of its captured cells made when it is
+created, and each call starts again from them. This test uses the owned native
+runner and allocation ledger; decoding a frame alone is not treated as evidence
+of its execution history or source closure identity.
 -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCallablePairedPrograms
@@ -62,8 +64,10 @@ example {checked : Checked} {prepared : Prepared checked}
       (SourceCoreCallablePairedLedger.store completion) prepared.layouts.definitions :=
   SourceCoreCallablePairedLedger.store_typed completion
 
-private def successful {checked : Checked} (prepared : Prepared checked) (owner : Key)
-    (arguments : List SourceTypedRuntime.Value) (expected : Nat) (spent : Nat) :
+/-- Run `owner` after `spent` fuel to its end and check its ledgers and
+restored frame, whatever its outcome. -/
+private def completed {checked : Checked} (prepared : Prepared checked) (owner : Key)
+    (arguments : List SourceTypedRuntime.Value) (spent : Nat) :
     IO (SourceCoreCallablePairedPrograms.Completion prepared) := do
   let first ← get "paired native start" (prepared.runSource owner arguments spent 500)
   let early ← get "paired partial typed ledger" (SourceCoreCallablePairedLedger.scan first initial)
@@ -75,10 +79,24 @@ private def successful {checked : Checked} (prepared : Prepared checked) (owner 
     "paired administrative cell entered the source prefix"
   assertTrue (SourceCoreCallablePairedLedger.frame? completion == some .empty)
     "paired invocation failed to restore its empty current frame"
+  pure completion
+
+private def successful {checked : Checked} (prepared : Prepared checked) (owner : Key)
+    (arguments : List SourceTypedRuntime.Value) (expected : Nat) (spent : Nat) :
+    IO (SourceCoreCallablePairedPrograms.Completion prepared) := do
+  let completion ← completed prepared owner arguments spent
   match completion.result.native.observation with
   | .succeeded (.word value) _ => assertTrue (value == w expected) "paired execution changed the result"
   | other => throw (IO.userError s!"paired invocation did not succeed: {reprStr other}")
   pure completion
+
+/-- The binder `name` declared in `owner`'s checked body. -/
+private def binder {checked : Checked} (prepared : Prepared checked) (owner : Key) (name : String) :
+    IO Resolved.LocalId := do
+  let specialized ← get "paired specialization" (SourceCompilationPlan.exactSpecialization prepared.base.plan owner)
+  match (SourceCoreDataPlaces.declaredBinders specialized.function.typedBody).filter (·.name == name) with
+  | [binder] => pure binder.id
+  | _ => throw (IO.userError s!"paired fixture binder missing {name}")
 
 private def shared {checked : Checked} (prepared : Prepared checked)
     (graph : SourceCoreCallableAncestryPairedPreparation.Prepared prepared.base)
@@ -91,11 +109,14 @@ private def shared {checked : Checked} (prepared : Prepared checked)
   for spent in [0, 31, 150000] do
     let completion ← successful prepared owner [.word (w 3)] 6 spent
     let ledger ← get "shared paired ledger" (SourceCoreCallablePairedLedger.scan completion initial)
-    let seed ← match ledger.ledger.rows.find? (·.entry.key.binder.name == "seed") with
-      | some row => pure row | none => throw (IO.userError "paired shared seed missing")
     let shared ← match ledger.ledger.rows.find? (·.entry.key.binder.name == "shared") with
       | some row => pure row | none => throw (IO.userError "paired shared bundle missing")
-    assertTrue (shared.environment == [(seed.entry.key.binder.id, seed.sourceLocation)])
+    -- The principal captures the copy of `seed` taken around its declaration,
+    -- allocated after the input and right before the principal's own cell.
+    let [input, seed] := (ledger.ledger.rows.takeWhile (·.entry.key.binder.name != "shared")).filter
+        (·.entry.key.binder.name == "seed")
+      | throw (IO.userError "paired shared seed or its snapshot missing")
+    assertTrue (shared.environment == [(seed.entry.key.binder.id, seed.sourceLocation)] && seed.payload == input.payload)
       "read-parent compilation changed the principal's lexical environment"
     let mut callers : List Frame := []
     let mut sources : List TypedSource := []
@@ -149,10 +170,12 @@ private def escaped {checked : Checked} (prepared : Prepared checked)
           "escaped view lost its original lambda's creation snapshot"
       | _ => throw (IO.userError "escaped view did not retain its original native callable")
     | _ => throw (IO.userError "escaped read wrapper did not save its two values at creation")
-    let seed ← match ledger.ledger.rows.find? (fun row =>
-        row.entry.key.binder.name == "seed" && row.entry.key.owner == getOwner) with
-      | some row => pure row | none => throw (IO.userError "escaped shared seed missing")
-    assertTrue (seed.payload == some (.word (w 5))) "escaped applications split their shared mutable capture"
+    -- Closures capture by value: `getLocal`'s input and the returned closure's
+    -- snapshot keep 3, and each application increments its own copy once.
+    let seeds := (ledger.ledger.rows.filter (fun row =>
+        row.entry.key.binder.name == "seed" && row.entry.key.owner == getOwner)).map (·.payload)
+    assertTrue (seeds == [3, 3, 4, 4].map (fun n => some (.word (w n))))
+      "escaped applications did not each restart from the returned closure's snapshot"
     let items := ledger.ledger.rows.filter (·.entry.key.binder.name == "item")
     assertTrue (items.length == 2) "escaped applications lost their source parameter allocations"
     for row in items do
@@ -167,10 +190,10 @@ private def escaped {checked : Checked} (prepared : Prepared checked)
 private def otherFlows {checked : Checked} (prepared : Prepared checked)
     (graph : SourceCoreCallableAncestryPairedPreparation.Prepared prepared.base)
     (program : CheckedProgram) : IO Unit := do
+  -- Both calls of `mono`'s `f` start again from `seed = 10`; the second returns 10 + 4.
   for (name, arguments, expected) in [
-      ("mono", [SourceTypedRuntime.Value.word (w 10)], 17),
-      ("zero", [], 9), ("recursive", [.word (w 4)], 4),
-      ("unused", [], 7), ("looping", [.word (w 4)], 6)] do
+      ("mono", [SourceTypedRuntime.Value.word (w 10)], 14),
+      ("zero", [], 9), ("unused", [], 7), ("looping", [.word (w 4)], 6)] do
     let owner ← key program name
     for spent in [0, 37, 150000] do
       let completion ← successful prepared owner arguments expected spent
@@ -184,15 +207,33 @@ private def otherFlows {checked : Checked} (prepared : Prepared checked)
             "zero-parameter monomorphic lambda acquired a generalized view"
         if name == "unused" && row.entry.key.binder.name == "unused" then
           assertTrue (row.payload == some .unit) "unused principal unexpectedly required a native lambda"
+  -- `f` is still uninitialized when its lambda is created, so the lambda's copy
+  -- of `f` is too, and the first recursive read faults.
+  let recursive ← key program "recursive"
+  let missing ← binder prepared recursive "f"
+  for spent in [0, 37, 150000] do
+    let completion ← completed prepared recursive [.word (w 4)] spent
+    match completion.result.native.observation with
+    | .failed reason _ =>
+      assertTrue ((completion.result.diagnostics.diagnostic? reason).map (·.error) == some (.uninitializedLocal missing))
+        "read of the lambda's uninitialized copy of its own local did not fault"
+    | other => throw (IO.userError s!"paired recursive capture classification changed: {reprStr other}")
+    let ledger ← get "paired recursive ledger" (SourceCoreCallablePairedLedger.scan completion initial)
+    for row in ledger.ledger.rows do
+      let snapshot ← get "paired recursive snapshot"
+        (SourceCoreCallablePairedAllocationFrames.snapshot prepared.ancestry.layout.frame row)
+      assertTrue ((graph.table.lookup? snapshot.frame).isSome) "recursive lost an allocation metadata profile"
   let failed ← get "paired language failure" (prepared.runSource (← key program "absent") [.word (w 3)] 150000 500)
   match failed.result.native.observation with
   | .failed reason _ =>
     assertTrue ((failed.result.diagnostics.diagnostic? reason).isSome) "paired failure lost its source diagnostic"
     assertTrue (SourceCoreCallablePairedLedger.frame? failed == some .empty) "language failure did not restore context"
     let ledger ← get "paired failure ledger" (SourceCoreCallablePairedLedger.scan failed initial)
-    let seed ← match ledger.ledger.rows.find? (·.entry.key.binder.name == "seed") with
-      | some row => pure row | none => throw (IO.userError "paired failure lost prior effects")
-    assertTrue (seed.payload == some (.word (w 4))) "language failure erased an earlier shared mutation"
+    -- The input and the snapshot of `f` keep 3; the call's own copy keeps the
+    -- body's write made before the failure.
+    let seeds := (ledger.ledger.rows.filter (·.entry.key.binder.name == "seed")).map (·.payload)
+    assertTrue (seeds == [3, 3, 4].map (fun n => some (.word (w n))))
+      "language failure erased the call's earlier write to its copy"
   | other => throw (IO.userError s!"paired language failure classification changed: {reprStr other}")
   let pending ← get "paired nonterminating run" (prepared.runSource (← key program "spin") [] 5000 500)
   let resumed := pending.resume 5000

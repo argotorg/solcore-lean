@@ -96,6 +96,13 @@ def administrativeTransport (headers : List (CallableIndexedOwnedFunctionValues.
     Relates.of_records_eq rfl
   records_eq := fun {_initial} _state {_mapping _world _heap _store} _maps _worlds _frame _metadata => rfl
 
+/-- The pool does not observe the canonical environment, so rebinding the
+scope's slots to a closure's copies keeps it exactly. -/
+theorem rebinds (headers : List (CallableIndexedOwnedFunctionValues.Header compiled program))
+    (keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)) :
+    ProtectedStateTransition.Rebinds (protocol headers keys) :=
+  fun state _canonical _slots => ⟨state, Relates.refl state⟩
+
 theorem administrative_records {index : ProtectedStateTransition.Index} (state : State headers keys index)
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
     (maps : LocationMap.Extends index.mapping mapping) (worlds : WorldExtends index.world world)

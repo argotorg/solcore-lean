@@ -71,7 +71,7 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     have sourceTrace := trace
     rw [entrySource, outcomeValue] at sourceTrace
     cases sourceTrace with
-    | closure selected valid typed allocate body resultRule =>
+    | closure selected valid typed _copy allocate body resultRule =>
         rw [parameters] at allocate
         cases allocate
         rfl

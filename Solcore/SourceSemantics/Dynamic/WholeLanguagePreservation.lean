@@ -120,7 +120,7 @@ private theorem statementFinalContext_eq
       | letInitializedGeneralized polymorphic _requirements_well_formed
           _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
-  | letInitializedGeneralized contains form_eq captures runtime_polymorphic
+  | letInitializedGeneralized contains form_eq _snapshot captures runtime_polymorphic
       extension allocate =>
       have node_eq := containsStatement_unique
         graph.nodeOccurrencesUnique typed_contains contains
@@ -586,8 +586,8 @@ mutual
               ⟨value_typed, after_typed, branch_extension⟩
             exact ⟨value_typed, after_typed,
               condition_extension.trans branch_extension⟩
-    | @ExpressionFormEvaluates.lambda _ _ _ _ _ _ parameters returnType body _ _
-        layout => by
+    | @ExpressionFormEvaluates.lambda _ _ _ _ _ _ after captured parameters returnType body
+        _ _ layout snapshot => by
         cases typing with
         | @lambda _ lambdaContext finalContext parameters parameterTypes returnType
             body bodyFacts names_unique parameters_extend body_type body_completes =>
@@ -602,7 +602,7 @@ mutual
                 resultType := returnType
                 body := body
                 source := source
-                captured := environment
+                captured := captured
                 context := context
                 evidence := evidence
               } := {
@@ -619,17 +619,17 @@ mutual
             }
             exact ⟨by
                 simpa [body_types] using
-                  (ValueHasType.closure (context := context) (heap := before)
+                  (ValueHasType.closure (context := context) (heap := after)
                     (function := {
                       parameters := parameters
                       resultType := returnType
                       body := body
                       source := source
-                      captured := environment
+                      captured := captured
                       context := context
                       evidence := evidence
-                    }) rfl code evidence_covers environment_agrees),
-              before_typed, .refl before⟩
+                    }) rfl code evidence_covers (snapshot.agrees environment_agrees)),
+              before_typed.copy snapshot, snapshot.metadata_extends⟩
     | @ExpressionFormEvaluates.directCall _ _ _ _ _ _ argumentsHeap _ _ _
         instantiation _ _ argumentValues
         calleeEvidence _ _ _ callee_contains callee_form callee_requirements
@@ -1371,9 +1371,9 @@ mutual
             invocation.heap_extends⟩
         · rcases staged with ⟨inner, impossible, inner_typed⟩
           cases impossible
-    | @CallableApplies.closure _ _ _ _ _ _ _ function _ environment outcome _ parameterTypes
-        callContext finalContext invocation_eq frame parameters_extend allocate
-        execute returned => by
+    | @CallableApplies.closure _ _ _ _ _ _ _ _ function _ _ environment outcome _
+        parameterTypes callContext finalContext invocation_eq frame parameters_extend
+        copy allocate execute returned => by
         rcases callable_typed.closure_function_inv with
           ⟨parameter_eq, result_eq, signatures_eq, code, closure_evidence,
             captures⟩
@@ -1408,14 +1408,15 @@ mutual
                   (function.parameters.map
                     fun binder => binder.scheme.body).length := by
               simpa using allocate.length_eq.symm
-            have arguments_typed := packing.unpackTypes closure_packed_typed
-              arguments_length
-            have bound_typed := allocate.preservesHeapTyping closure_before_typed
-              arguments_typed
-            have allocation_extension := allocate.extendsHeapTypes
+            have arguments_typed := (packing.unpackTypes closure_packed_typed
+              arguments_length).mono copy.metadata_extends
+            have bound_typed := allocate.preservesHeapTyping
+              (closure_before_typed.copy copy) arguments_typed
+            have allocation_extension :=
+              copy.metadata_extends.trans allocate.extendsHeapTypes
             have bound_environment := allocate.preservesEnvironmentAgreement
               (monoBinders_toBinders static_parameters_extend)
-              (monoBinders_monomorphic static_parameters_extend) captures
+              (monoBinders_monomorphic static_parameters_extend) (copy.agrees captures)
             have fields :=
               Solcore.SourceSemantics.Dynamic.MonoBindersExtend.runtimeContextFields
                 static_parameters_extend
@@ -1453,9 +1454,9 @@ mutual
                     (fields.targetVariablesClosed code.variables_closed)
                     runtime.residual_variables_open,
                   allocation_extension.trans execution_extension⟩
-    | @CallableApplies.closureUnit _ _ _ _ _ _ _ function _ environment outcome parameterTypes
-        callContext finalContext invocation_eq frame result_unit parameters_extend
-        allocate execute fell_through => by
+    | @CallableApplies.closureUnit _ _ _ _ _ _ _ _ function _ _ environment outcome
+        parameterTypes callContext finalContext invocation_eq frame result_unit
+        parameters_extend copy allocate execute fell_through => by
         rcases callable_typed.closure_function_inv with
           ⟨parameter_eq, result_eq, signatures_eq, code, closure_evidence,
             captures⟩
@@ -1490,14 +1491,15 @@ mutual
                   (function.parameters.map
                     fun binder => binder.scheme.body).length := by
               simpa using allocate.length_eq.symm
-            have arguments_typed := packing.unpackTypes closure_packed_typed
-              arguments_length
-            have bound_typed := allocate.preservesHeapTyping closure_before_typed
-              arguments_typed
-            have allocation_extension := allocate.extendsHeapTypes
+            have arguments_typed := (packing.unpackTypes closure_packed_typed
+              arguments_length).mono copy.metadata_extends
+            have bound_typed := allocate.preservesHeapTyping
+              (closure_before_typed.copy copy) arguments_typed
+            have allocation_extension :=
+              copy.metadata_extends.trans allocate.extendsHeapTypes
             have bound_environment := allocate.preservesEnvironmentAgreement
               (monoBinders_toBinders static_parameters_extend)
-              (monoBinders_monomorphic static_parameters_extend) captures
+              (monoBinders_monomorphic static_parameters_extend) (copy.agrees captures)
             have fields :=
               Solcore.SourceSemantics.Dynamic.MonoBindersExtend.runtimeContextFields
                 static_parameters_extend
@@ -1747,7 +1749,7 @@ mutual
         | letInitializedGeneralized polymorphic _requirements_well_formed
             _generalizes initializer_type static_extension =>
             exact (polymorphic runtime_monomorphic).elim
-    | .letInitializedGeneralized contains form_eq captures runtime_polymorphic
+    | .letInitializedGeneralized contains form_eq snapshot captures runtime_polymorphic
         extension allocate => by
         rcases
             Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
@@ -1763,16 +1765,17 @@ mutual
             requirements_well_formed generalizes initializer_type
             static_extension =>
             have function_typed := captures.wellTyped runtime
-              environment_agrees static_polymorphic requirements_well_formed
-              generalizes initializer_type static_extension
+              (snapshot.agrees environment_agrees) static_polymorphic
+              requirements_well_formed generalizes initializer_type static_extension
+            have snapshot_extension := snapshot.metadata_extends
             have allocation_extension :=
               HeapTypesExtend.of_generalized_allocation allocate
-            have after_typed := before_typed.allocateGeneralized function_typed
-              allocate
+            have after_typed := (before_typed.copy snapshot).allocateGeneralized
+              function_typed allocate
             cases static_extension
             exact {
               heap_typed := after_typed
-              heap_extends := allocation_extension
+              heap_extends := snapshot_extension.trans allocation_extension
               outcome_typed := .fallthrough
                 (.cons allocate.reads_new
                   (by simpa only using (congrArg
@@ -1783,7 +1786,8 @@ mutual
                       captures.binder_eq))
                     (by simpa only using (congrArg TypedBinder.scheme
                       captures.binder_eq)))
-                  (environment_agrees.mono allocation_extension))
+                  ((environment_agrees.mono snapshot_extension).mono
+                    allocation_extension))
             }
     | .returnUnit contains form_eq => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
@@ -2507,7 +2511,7 @@ mutual
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
         rfl
-    | .letInitializedGeneralized contains form_eq captures runtime_polymorphic
+    | .letInitializedGeneralized contains form_eq _snapshot captures runtime_polymorphic
         extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
@@ -3139,7 +3143,7 @@ mutual
         | letInitializedGeneralized polymorphic _generalizes initializer_type
             static_extension =>
             exact (polymorphic runtime_monomorphic).elim
-    | .letInitializedGeneralized captures runtime_polymorphic extension
+    | .letInitializedGeneralized snapshot captures runtime_polymorphic extension
         allocate => by
         cases typing with
         | letInitialized initializer_type static_monomorphic _generalizes
@@ -3149,15 +3153,16 @@ mutual
             requirements_well_formed generalizes initializer_type
             static_extension =>
             have function_typed := captures.wellTyped runtime
-              environment_agrees static_polymorphic requirements_well_formed
-              generalizes initializer_type static_extension
+              (snapshot.agrees environment_agrees) static_polymorphic
+              requirements_well_formed generalizes initializer_type static_extension
+            have snapshot_extension := snapshot.metadata_extends
             have allocation_extension :=
               HeapTypesExtend.of_generalized_allocation allocate
-            have after_typed := before_typed.allocateGeneralized function_typed
-              allocate
+            have after_typed := (before_typed.copy snapshot).allocateGeneralized
+              function_typed allocate
             cases static_extension
             cases extension
-            exact ⟨rfl, after_typed, allocation_extension,
+            exact ⟨rfl, after_typed, snapshot_extension.trans allocation_extension,
               .cons allocate.reads_new
                 (by simpa only using (congrArg
                   (fun retained : TypedBinder => retained.scheme.body)
@@ -3167,7 +3172,8 @@ mutual
                     captures.binder_eq))
                   (by simpa only using (congrArg TypedBinder.scheme
                     captures.binder_eq)))
-                (environment_agrees.mono allocation_extension)⟩
+                ((environment_agrees.mono snapshot_extension).mono
+                  allocation_extension)⟩
     | .expression evaluate => by
         cases typing with
         | expression expression_type =>

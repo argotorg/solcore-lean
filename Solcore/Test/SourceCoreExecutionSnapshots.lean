@@ -79,11 +79,11 @@ def run : IO Unit := do
   let initial ← boot (← artifact.bootstrapFromPrefix inert)
   let made ← execute initial (← key 0) [word 10]
   let snapshot ← get "public heap snapshot" (← made.session.snapshot)
-  require (snapshot.prefixSize == 2 && snapshot.heapSize == 4 && snapshot.nativeHeapSize == made.session.heapSize)
+  require (snapshot.prefixSize == 2 && snapshot.heapSize == 5 && snapshot.nativeHeapSize == made.session.heapSize)
     "public snapshot changed prefix/allocation counts"
-  require (snapshot.cells.map (·.location) == [0, 1, 2, 3] && !snapshot.pendingAllocation)
+  require (snapshot.cells.map (·.location) == [0, 1, 2, 3, 4] && !snapshot.pendingAllocation)
     "public snapshot exposed administrative cells or changed source locations"
-  let stored ← match snapshot.cellAt? 3 with
+  let stored ← match snapshot.cellAt? 4 with
     | some {value := some (.data (.function handle)), ..} => pure handle
     | _ => throw (IO.userError "public snapshot did not export the stored callable")
   match artifact.preparePrefix [⟨stored.sourceType, some (.function stored)⟩] with
@@ -95,7 +95,7 @@ def run : IO Unit := do
   let restored ← match snapshot.restore with
     | .ready session => pure session | _ => throw (IO.userError "ready snapshot became suspended")
   match ← restored.invokePacked stored (word 4) {executionFuel := 300000} with
-  | .ok (.succeeded completion) => require (completion.value == word 14) "snapshot callable lost shared capture"
+  | .ok (.succeeded completion) => require (completion.value == word 14) "snapshot callable lost its captured value"
   | _ => throw (IO.userError "snapshot callable did not invoke")
   let foreign ← boot (← artifact.bootstrap)
   match foreign.restoreSnapshot snapshot with
@@ -104,10 +104,10 @@ def run : IO Unit := do
   let reused ← boot (← artifact.bootstrapFromPrefix snapshot.prefix)
   let completePrefix ← get "public full heap export" snapshot.exportPrefix
   require (completePrefix.heapSize == snapshot.heapSize) "public heap export lost source cells"
-  match (completePrefix.cells[3]? : Option SourceCoreHeapSnapshot.Cell) with
+  match (completePrefix.cells[4]? : Option SourceCoreHeapSnapshot.Cell) with
   | some {value := some (.legacy observed), ..} =>
       match observed.view with
-      | .closure _ _ _ captures _ => require (captures.map (·.2) == [2]) "public heap export changed raw captures"
+      | .closure _ _ _ captures _ => require (captures.map (·.2) == [3]) "public heap export changed raw captures"
       | _ => throw (IO.userError "public exported prefix lost callable metadata")
   | _ => throw (IO.userError "public exported prefix did not retain an inert callable")
   let migrated ← boot (← artifact.bootstrapFromPrefix completePrefix)
@@ -116,17 +116,17 @@ def run : IO Unit := do
   | _ => throw (IO.userError "public prefix export transferred live handle ownership")
   let migratedMade ← execute migrated (← key 0) [word 20]
   let migratedSnapshot ← get "public full prefix reuse" (← migratedMade.session.snapshot)
-  require (migratedSnapshot.prefixSize == 4 && migratedSnapshot.heapSize == 6)
+  require (migratedSnapshot.prefixSize == 5 && migratedSnapshot.heapSize == 8)
     "public full heap reuse lost prefix or allocation offsets"
   let generic ← execute reused (← key 1) [word 8]
   let genericSnapshot ← get "public principal snapshot" (← generic.session.snapshot)
-  require (genericSnapshot.prefixSize == 2 && genericSnapshot.heapSize == 4)
+  require (genericSnapshot.prefixSize == 2 && genericSnapshot.heapSize == 5)
     "public principal snapshot changed allocation count"
-  match genericSnapshot.cellAt? 3 with
+  match genericSnapshot.cellAt? 4 with
   | some {value := some (.principal principal), ..} =>
       require (!principal.scheme.quantified.isEmpty) "public principal snapshot erased its generic scheme"
       match principal.observation.view with
-      | .closure _ _ _ captures _ => require (captures.map (·.2) == [2]) "public principal snapshot changed source capture"
+      | .closure _ _ _ captures _ => require (captures.map (·.2) == [3]) "public principal snapshot changed source capture"
       | _ => throw (IO.userError "public principal observation lost its closure metadata")
   | _ => throw (IO.userError "unused native Unit was not exposed as a readonly principal")
   let failed ← match ← generic.session.run (← key 2) [] {executionFuel := 300000} with
@@ -136,7 +136,7 @@ def run : IO Unit := do
         | _ => throw (IO.userError "snapshot fault classification changed")
     | _ => throw (IO.userError "snapshot uninitialized source cell did not fail")
   let failedSnapshot ← get "public failed heap snapshot" (← failed.snapshot)
-  require (failedSnapshot.heapSize == 5 && (failedSnapshot.cellAt? 4).any (·.value.isNone))
+  require (failedSnapshot.heapSize == 6 && (failedSnapshot.cellAt? 5).any (·.value.isNone))
     "public failed snapshot lost the allocated uninitialized cell"
   let spinning ← get "public snapshot spin" (failed.start (← key 3) [])
   let pending ← match ← spinning.resume 200 with

@@ -118,7 +118,7 @@ def runForward : IO Unit := do
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
     sequence.repeatedRead.completion.session.heapSize, sequence.thirdRead.completion.session.heapSize]
-  unless stores == [5,8,11,20,23,32,41,50] do
+  unless stores == [5,11,17,29,35,47,59,71] do
     throw (IO.userError s!"coercion public stores changed: {reprStr stores}")
   IO.println "COERCION_PUBLIC_FORWARD_PASS: seven Source calls; all seven sufficient public fuel bounds; three retained closures; scalar41/7/41/7; original constrained direct call and Bool-to-Word coercion"
 

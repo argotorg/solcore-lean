@@ -43,6 +43,7 @@ structure Fixture where
   identity : Tests.SourceCoreCoercionPublic.SelectedIdentityShape keep.named.specialized.function .bool
   makeResult : make.named.specialized.function.inferredBodyType = .function .unit .word
   makeBinder : shape.binder.scheme = .mono .bool
+  makeCopied : CaptureBinders.copiedBinder? make.named.specialized.function.typedBody shape.binder.id = some shape.binder
   keepBinder : identity.binder.scheme = .mono .bool
   target : shape.call.instantiation = CallableNamedCanonicalOrder.retainedInstantiation keep.named.specialized
   available : SourceTypedRuntime.RuntimeEvidenceEnvironment
@@ -91,6 +92,8 @@ def fixture : IO Fixture := do
     actual.keepRow.same.symm ▸ actual.keepShape
   let ⟨makeResult⟩ ← observed (make.named.specialized.function.inferredBodyType = .function .unit .word) "coerced factory result"
   let ⟨makeBinder⟩ ← observed (shape.binder.scheme = .mono .bool) "coerced original make binder"
+  let ⟨makeCopied⟩ ← observed (CaptureBinders.copiedBinder? make.named.specialized.function.typedBody shape.binder.id =
+    some shape.binder) "coerced original make binder copied"
   let ⟨keepBinder⟩ ← observed (identity.binder.scheme = .mono .bool) "coerced original keep binder"
   let ⟨target⟩ ← observed (shape.call.instantiation = CallableNamedCanonicalOrder.retainedInstantiation keep.named.specialized) "coerced complete direct instantiation"
   match resolved : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment compiled.sourceProgram
@@ -147,6 +150,7 @@ def fixture : IO Fixture := do
               identity := identity
               makeResult := makeResult
               makeBinder := makeBinder
+              makeCopied := makeCopied
               keepBinder := keepBinder
               target := target
               available := available

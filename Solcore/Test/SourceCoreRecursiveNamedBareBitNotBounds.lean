@@ -99,8 +99,11 @@ def run : IO Unit := do
   let compiled ← SourceCoreUnifiedCorpusSupport.prepare "bounded bare unary update" content
     ["wordMask", "doubleLoop", "firstFault"]
   let initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.comptime .word, none⟩, ⟨.word, some (wordValue 819)⟩]}
+  let mask : SourceTypedRuntime.Value := .word (Core.Word.ofNatModulo 7).bitNot
+  -- `read` copies `root` and `seed` when it is created, so `root ~=` reaches
+  -- only `root` and the call returns the snapshot's 7.
   let cases : List (String × List SourceTypedRuntime.Value × SourceTypedRuntime.Value) := [
-    ("wordMask", [wordValue 7], .word (Core.Word.ofNatModulo 7).bitNot),
+    ("wordMask", [wordValue 7], wordValue 7),
     ("doubleLoop", [wordValue 7], wordValue 7)]
   let baselines ← cases.mapM fun (name, arguments, _) => finish compiled name arguments 400000 initial
   let faultBaseline ← finish compiled "firstFault" [wordValue 7] 400000 initial
@@ -117,6 +120,12 @@ def run : IO Unit := do
         SourceCoreUnifiedCorpusSupport.assertTrue
           (final.isDeeplySafe 500 compiled.indexed.base.sourceProgram.signatures compiled.indexed.base.plan)
           s!"unary heap/capture safety {name}"
+        if name == "wordMask" then
+          -- `seed` and `root`, then the snapshot of `root` and `seed`.
+          SourceCoreUnifiedCorpusSupport.assertTrue
+            (reprStr (((final.heap.drop initial.heap.length).take 4).map (·.value)) ==
+              reprStr [some (wordValue 7), some mask, some (wordValue 7), some (wordValue 7)])
+            "unary write missed root or reached the captured snapshot"
       | other => throw (IO.userError s!"unary {name}: {reprStr other}")
     let result ← finish compiled "firstFault" [wordValue 7] fuel initial
     SourceCoreUnifiedCorpusSupport.assertTrue (reprStr result == reprStr faultBaseline) "unary fault resume changed"
@@ -131,5 +140,5 @@ def run : IO Unit := do
       SourceCoreUnifiedCorpusSupport.assertTrue (!(SourceCoreUnifiedCorpusSupport.hasWord final 99))
         "unary first fault ran continuation"
     | other => throw (IO.userError s!"unary first fault: {reprStr other}")
-  IO.println "bounded bare unary: actual compiler, independent source trace, strict original continuation, seven typed slots, capture/loops/prior writes/fault/resume GREEN"
+  IO.println "bounded bare unary: actual compiler, independent source trace, strict original continuation, seven typed slots, capture snapshot/loops/prior writes/fault/resume GREEN"
 end Tests.SourceCoreRecursiveNamedBareBitNotBounds

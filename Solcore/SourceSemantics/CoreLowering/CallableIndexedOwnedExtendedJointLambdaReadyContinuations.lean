@@ -61,12 +61,12 @@ theorem source_continuation (budget : Nat)
           functions (Program.ofChecked compiled.sourceProgram) (CallableIndexedOwnedExtendedJointReadyFamilyInputs.origin index))) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached child strict outcome after trace
+  intro entry added length copied spine kept reached child strict outcome after trace
   let index := CallableIndexedOwnedLambdaReadyFamilyReceipts.of_source_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable
-    principal observed prefixContext sourceSeed syntaxTree entry added length spine reached
+    principal observed prefixContext sourceSeed syntaxTree entry added length copied spine kept reached
   let actualEntry := CallableIndexedOwnedLambdaNestedReadyContinuations.source_admitted_entry
     captured code history inputs functions owner caller body beforeTyped argumentsTyped stable
-    principal observed prefixContext sourceSeed entry added length spine reached
+    principal observed prefixContext sourceSeed entry added length copied spine kept reached
   have ready := below (.existing (.lambda index layouts)) child strict
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds,
       frame, metadata, exit, returned, related, _post⟩ :=

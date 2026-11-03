@@ -156,6 +156,7 @@ theorem collected
       cases checked
       have sameType := ensure_same checkedType
       subst payload
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted

@@ -68,6 +68,74 @@ theorem decorated_snapshot_result {definitions : DataEnvironment} {context : Cor
           cases same
           rfl
 
+/-- Renaming keeps the literal annotations of the decorated snapshot, so any
+typing of a renamed copy fixes the same result. -/
+theorem decorated_snapshot_result_rename {definitions : DataEnvironment} {context : Core.Context}
+    {table : SourceCoreStageCodebook.Table} {origin : SourceCoreStageCodebook.Origin}
+    (descriptor : SourceCoreCallableContracts.Descriptor table origin)
+    (dispatch : SourceCoreCallableIndexedDispatch.Table) (layout : SourceCoreCallableIndexedFrames.Layout)
+    (selected : Word) (referenceIndex : Nat) (parameter result : Ty) (body : Expr) (σ : Renaming)
+    {nativeType : Ty}
+    (typed : HasType context
+      ((LanguageResult.success (descriptor.wrap (TaggedFunction.anonymous
+        (SourceCoreCallableIndexedAncestry.snapshotLambda dispatch layout selected referenceIndex parameter result
+          body)))).rename σ)
+      nativeType definitions) :
+    nativeType = LanguageResult.resultType (CallableContract.functionType parameter result) := by
+  cases typed with
+  | inRight _ wrapped =>
+    cases wrapped with
+    | pair tagged contract =>
+      cases contract
+      cases tagged with
+      | pair identity closure =>
+        cases identity with
+        | inLeft _ unit =>
+          cases unit
+          cases closure with
+          | letE _ lambda =>
+            cases lambda
+            rfl
+
+/-- A typed copy chain types its innermost expression at the same type, in a
+context extended by the copies. Only the chain's `let`s are inverted, so this
+holds for any allocator. -/
+private theorem copyChain_type {definitions : DataEnvironment} {allocator : Option SourceCoreSourceCells.Allocator}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {base : Nat → Nat} (inner : Expr) :
+    ∀ (rest : SourceCoreLocalCell.Scope) (index ordinal : Nat) {emitted : Expr} {context : Core.Context} {type : Ty},
+      SourceCoreSourceCells.copyChain allocator source scope base rest index ordinal inner = .ok emitted →
+      HasType context emitted type definitions → ∃ extended, HasType extended inner type definitions := by
+  intro rest
+  induction rest with
+  | nil =>
+    intro index ordinal emitted context type accepted typed
+    simp only [SourceCoreSourceCells.copyChain, pure, Except.pure, Except.ok.injEq] at accepted
+    subst accepted
+    exact ⟨context, typed⟩
+  | cons slot rest ih =>
+    intro index ordinal emitted context type accepted typed
+    obtain ⟨id, slotType⟩ := slot
+    cases copied : SourceSemantics.CaptureBinders.copiedBinder? source id with
+    | none =>
+      simp only [SourceCoreSourceCells.copyChain, copied] at accepted
+      exact ih (index + 1) ordinal accepted typed
+    | some binder =>
+      simp only [SourceCoreSourceCells.copyChain, copied] at accepted
+      cases copyAccepted : SourceCoreSourceCells.copyCell allocator source scope
+          (SourceCoreSourceCells.copyReferences source scope binder base ordinal) binder slotType
+          (.var (base index + ordinal)) with
+      | error error => simp [copyAccepted, bind, Except.bind] at accepted
+      | ok copy =>
+        cases chainAccepted : SourceCoreSourceCells.copyChain allocator source scope base rest (index + 1)
+            (ordinal + 1) inner with
+        | error error => simp [copyAccepted, chainAccepted, bind, Except.bind] at accepted
+        | ok continuation =>
+          simp only [copyAccepted, chainAccepted, bind, Except.bind, pure, Except.pure,
+            Except.ok.injEq] at accepted
+          subst accepted
+          cases typed with
+          | letE _ body => exact ih (index + 1) (ordinal + 1) chainAccepted body
+
 /-- One authentic compiler lambda certificate normalizes the raw child
 typing obtained from its actual enclosing body. Descriptor existence is derived
 from that hook's selected codebook row, before any Code/Site is constructed. -/
@@ -95,12 +163,22 @@ theorem certificate_native {checked : SourceCoreCompatibleCatalog.Checked}
   rw [callables, ActualCallablePolicy.lambda_decoration _ [] compilation view node id
     receipt.parameterCore receipt.resultCore _ descriptor] at decorated
   have sameExpression := Except.ok.inj decorated
-  have rawTyped : HasType nativeContext receipt.expression nativeType prepared.layouts.definitions := by
+  have snapshotted : HasType nativeContext receipt.snapshotted nativeType prepared.layouts.definitions := by
     simpa only [receipt.emitted] using typed
+  have renamed : ∃ extended σ, HasType extended (receipt.expression.rename σ) nativeType
+      prepared.layouts.definitions := by
+    have snapshot := receipt.snapshot
+    split at snapshot
+    · obtain ⟨extended, copiedTyped⟩ := copyChain_type _ scope 0 0 snapshot snapshotted
+      exact ⟨extended, _, copiedTyped⟩
+    · have same := Except.ok.inj snapshot
+      rw [← same] at snapshotted
+      exact ⟨nativeContext, Renaming.id, by rw [Expr.rename_id]; exact snapshotted⟩
+  obtain ⟨extended, σ, rawTyped⟩ := renamed
   rw [← sameExpression, emitted] at rawTyped
-  have exactType := decorated_snapshot_result descriptor prepared.ancestry.graph.table prepared.ancestry.layout.frame
-    origin (SourceCoreCallableIndexedAncestry.creationReferenceIndex compilation scope)
-    receipt.parameterCore receipt.resultCore body rawTyped
+  have exactType := decorated_snapshot_result_rename descriptor prepared.ancestry.graph.table
+    prepared.ancestry.layout.frame origin (SourceCoreCallableIndexedAncestry.creationReferenceIndex compilation scope)
+    receipt.parameterCore receipt.resultCore body σ rawTyped
   have checkedType := receipt.checked
   rw [callables] at checkedType
   unfold SourceCoreBasic.ensureType at checkedType

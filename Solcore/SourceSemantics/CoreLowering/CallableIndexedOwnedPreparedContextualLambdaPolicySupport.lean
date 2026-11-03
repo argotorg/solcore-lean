@@ -284,22 +284,29 @@ local notation "history" => CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFor
 local notation "carrier" => value code (CallableIndexedLambdaValues.Captures.embedding capturedAt) (History.native history) actual
 
 include callerGlobals callerReceipt head environment captured prefixContext actualSites sites packet profile observed in
-/-- The existing formation endpoint receives the derived same-Code policy qualification. -/
-theorem formation_member (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
-      (head.toFormation.function environment).context (head.toFormation.function environment).evidence
-      (head.toFormation.function environment).source (head.toFormation.function environment).captured
-      heap (code).id (.closure (head.toFormation.function environment)) heap ∧
-    Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) (.inRight .word carrier) store ∧
-    CallableIndexedOwnedPreparedContextualQualification.StaticMember (policyFacet compiled)
-      headers keys bodyRegistry faults mapping world (head.toFormation.function environment) carrier
-      (code).receipt.loweredParameters (code).receipt.parameterCore (code).receipt.resultCore ∧
-    (∀ result finalStore, Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
+/-- The existing formation endpoint receives the derived same-Code policy qualification
+at every recaptured environment; the formation copies the captured cells. -/
+theorem formation_member
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store) :
+    ∃ formed : Formed model capturedAt code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
+        (head.toFormation.function environment).context (head.toFormation.function environment).evidence
+        (head.toFormation.function environment).source (head.toFormation.function environment).captured
+        heap (code).id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) (.inRight .word (value code formed.embedding (History.native history) formed.closureActual))
+        formed.finalStore ∧
+      CallableIndexedOwnedPreparedContextualQualification.StaticMember (policyFacet compiled)
+        headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure (value code formed.embedding (History.native history) formed.closureActual)
+        (code).receipt.loweredParameters (code).receipt.parameterCore (code).receipt.resultCore ∧
+      (∀ result finalStore, Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (History.native history) formed.closureActual) ∧ finalStore = formed.finalStore) := by
   exact CallableIndexedOwnedPreparedQualifiedFormationReceipts.Ordinary.formation_member
-    capturedAt code owner (policyFacet compiled) profile support callerGlobals callerReceipt (head.prepared_at environment).2
-    actualSites sites (head.prepared_at environment).1 initial packet rfl observed stored
-    head.toFormation.ordinary head.toFormation.coercions
+    capturedAt code owner (policyFacet compiled) profile support callerGlobals callerReceipt
+    (fun copies => (head.prepared_at copies).2) actualSites sites (head.prepared_at environment).1 initial packet rfl
+    observed heaps head.toFormation.ordinary head.toFormation.coercions
 
 end Ordinary
 
@@ -333,20 +340,26 @@ local notation "carrier" => value code (CallableIndexedLambdaValues.Captures.emb
 
 include head environment captured prefixContext actualSites sites packet profile in
 /-- The principal endpoint retains its original method, dictionary and cached Compilation. -/
-theorem formation_member (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
-      (head.function environment).context (head.function environment).evidence
-      (head.function environment).source (head.function environment).captured
-      heap (code).id (.closure (head.function environment)) heap ∧
-    Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) (.inRight .word carrier) store ∧
-    CallableIndexedOwnedPreparedContextualQualification.StaticMember (policyFacet compiled)
-      headers keys bodyRegistry faults mapping world (head.function environment) carrier
-      (code).receipt.loweredParameters (code).receipt.parameterCore (code).receipt.resultCore ∧
-    (∀ result finalStore, Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) result finalStore →
-      result = .inRight .word carrier ∧ finalStore = store) := by
+theorem formation_member
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store) :
+    ∃ formed : Formed model capturedAt code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
+        (head.function environment).context (head.function environment).evidence
+        (head.function environment).source (head.function environment).captured
+        heap (code).id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) (.inRight .word (value code formed.embedding (History.native history) formed.closureActual))
+        formed.finalStore ∧
+      CallableIndexedOwnedPreparedContextualQualification.StaticMember (policyFacet compiled)
+        headers keys bodyRegistry faults formed.finalMap formed.finalWorld formed.closure (value code formed.embedding (History.native history) formed.closureActual)
+        (code).receipt.loweredParameters (code).receipt.parameterCore (code).receipt.resultCore ∧
+      (∀ result finalStore, Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) result finalStore →
+        result = .inRight .word (value code formed.embedding (History.native history) formed.closureActual) ∧ finalStore = formed.finalStore) := by
   exact CallableIndexedOwnedPreparedQualifiedFormationReceipts.Principal.formation_member
-    capturedAt code owner (policyFacet compiled) profile support (head.prepared_at environment).2
-    actualSites sites (head.prepared_at environment).1 initial packet stored head.ordinary head.coercions
+    capturedAt code owner (policyFacet compiled) profile support (fun copies => (head.prepared_at copies).2)
+    actualSites sites (head.prepared_at environment).1 initial packet heaps head.ordinary head.coercions
 
 end Principal
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedContextualLambdaPolicySupport

@@ -108,8 +108,9 @@ def headerWorkspace : Workspace.RawWorkspace := {
     "function initialize(value: Word) returns (Word) { for (value += 1; false; value += 1) { } return value; }"
   ]}] }
 
-/-- The runtime companion retains one captured cell across successful calls and
-an operand fault after an indirect RHS call mutates that captured cell. -/
+/-- The runtime companion's retained closure starts every call from the value
+it captured at creation: neither a successful call nor the indirect RHS call
+before an operand fault carries its captured assignment over to a later call. -/
 def captureWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "function make(value: Word) returns (function(Word) returns (Word)) { return lam(next: Word) -> Word { value += next; return value; }; }",
@@ -145,11 +146,11 @@ def run : IO Unit := do
       | throw (IO.userError "compound factory failed")
     let .function handle := made.value | throw (IO.userError "compound captured handle missing")
     let first ← handleSuccess made.session handle (word 7) (word 17)
-    let second ← handleSuccess first handle (word 20) (word 37)
+    let second ← handleSuccess first handle (word 20) (word 30)
     let failed ← failure second missingRhs [.function handle] .add
-    let reused ← handleSuccess failed handle (word 0) (word 46)
+    let reused ← handleSuccess failed handle (word 0) (word 10)
     require ([initial.heapSize, made.session.heapSize, first.heapSize, second.heapSize, failed.heapSize, reused.heapSize]
-      == [3, 6, 9, 12, 21, 24]) "compound captured RHS native stores changed"
+      == [3, 9, 15, 21, 33, 39]) "compound captured RHS native stores changed"
     IO.println s!"COMPOUND_CAPTURE_HEAPS: {[initial.heapSize, made.session.heapSize, first.heapSize, second.heapSize, failed.heapSize, reused.heapSize]}"
   IO.println "COMPOUND_COMPILER_PROFILE_FORWARD_PASS"
 

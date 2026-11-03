@@ -2,9 +2,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
+import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
 
 /-! The original completion of an actual indexed lambda exposes its frame,
-manifest and marked parameter prefix. Every sized body witness is a child of
+manifest, the marked copies of its captures and its marked parameter prefix. Every sized body witness is a child of
 that original completion. The reached source/native state is existential;
 identity with an arbitrary older Entry is not asserted. Source body meaning,
 source grades and reflection remain independent of this native prefix result.
@@ -131,7 +132,10 @@ structure PrefixFor {values : SourceCoreCompatibleValues.Context} {prepared : Pr
   mapping : LocationMap
   world : StoreTyping
   embedding : Renaming
-  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  copies : Dynamic.Environment
+  copiedHeap : Dynamic.Heap
+  copy : Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap
+  allocation : Dynamic.BindersAllocate copies copiedHeap function.parameters arguments environment heap
   environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
     captured.administrative
     (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
@@ -142,8 +146,8 @@ structure PrefixFor {values : SourceCoreCompatibleValues.Context} {prepared : Pr
   worlds : WorldExtends initialWorld world
   frame : AdministrativePreserved initialMap (initialStore.set location (encode prepared.ancestry.layout.frame next)) mapping store
   metadata : Dynamic.HeapMetadataExtend before heap
-  spine : ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-    canonical = added ++ captured.canonical
+  spine : ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+    canonical = added ++ copied ∧ (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
   lookups : EnvironmentsAgree embedding canonical actual
   actualTyped : RuntimeEnvironmentHasTypes world actual actualContext prepared.layouts.definitions
   reference : canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + prepared.base.globals.length]? =
@@ -172,7 +176,10 @@ structure Prefix {values : SourceCoreCompatibleValues.Context} {prepared : Prepa
   mapping : LocationMap
   world : StoreTyping
   embedding : Renaming
-  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  copies : Dynamic.Environment
+  copiedHeap : Dynamic.Heap
+  copy : Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap
+  allocation : Dynamic.BindersAllocate copies copiedHeap function.parameters arguments environment heap
   environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
     captured.administrative
     (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
@@ -183,8 +190,8 @@ structure Prefix {values : SourceCoreCompatibleValues.Context} {prepared : Prepa
   worlds : WorldExtends initialWorld world
   frame : AdministrativePreserved initialMap (initialStore.set location (encode prepared.ancestry.layout.frame next)) mapping store
   metadata : Dynamic.HeapMetadataExtend before heap
-  spine : ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-    canonical = added ++ captured.canonical
+  spine : ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+    canonical = added ++ copied ∧ (∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
   lookups : EnvironmentsAgree embedding canonical actual
   actualTyped : RuntimeEnvironmentHasTypes world actual actualContext prepared.layouts.definitions
   reference : canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + prepared.base.globals.length]? =
@@ -206,7 +213,8 @@ def Prefix.toFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepa
     (reached : Prefix captured code history inputs profile registry arguments before initialStore location current) :
     PrefixFor captured code history inputs (model prepared profile) registry arguments before initialStore location current :=
   ⟨reached.next, reached.nextHistory, reached.environment, reached.heap, reached.canonical, reached.actual,
-    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.allocation,
+    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.copies,
+    reached.copiedHeap, reached.copy, reached.allocation,
     reached.environments, reached.heaps, reached.locals, reached.maps, reached.worlds,
     reached.frame, reached.metadata, reached.spine, reached.lookups, reached.actualTyped,
     reached.reference, reached.read, reached.unmapped⟩
@@ -224,7 +232,8 @@ def PrefixFor.toLegacy {values : SourceCoreCompatibleValues.Context} {prepared :
     (reached : PrefixFor captured code history inputs (model prepared profile) registry arguments before initialStore location current) :
     Prefix captured code history inputs profile registry arguments before initialStore location current :=
   ⟨reached.next, reached.nextHistory, reached.environment, reached.heap, reached.canonical, reached.actual,
-    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.allocation,
+    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.copies,
+    reached.copiedHeap, reached.copy, reached.allocation,
     reached.environments, reached.heaps, reached.locals, reached.maps, reached.worlds,
     reached.frame, reached.metadata, reached.spine, reached.lookups, reached.actualTyped,
     reached.reference, reached.read, reached.unmapped⟩
@@ -254,6 +263,8 @@ namespace Stateful
 variable {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
   (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol prepared.layouts prepared.ancestry.layout.frame
     (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+  (rebinds : ProtectedStateTransition.Rebinds protocol)
   (initial : protocol.State ⟨scope, mapping, world, before,
     store.set location (encode prepared.ancestry.layout.frame
       (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current)),
@@ -261,7 +272,7 @@ variable {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
   (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary location
     (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current))
 
-include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer initial readyAt in
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer transport rebinds initial readyAt in
 /-- Frame and manifest steps are strict even for an empty parameter prefix.
 The final body witness comes only from the supplied original completion. -/
 theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
@@ -329,23 +340,44 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
   obtain ⟨nextValueEq, nextStoreEq⟩ := evaluation_deterministic nextEval.sound nextEvaluation
   rw [nextValueEq, nextStoreEq, body_rename, emitted] at rawEval
   obtain ⟨manifest, manifestTyped, manifestSize⟩ := manifest_prefix captured.represented actualLayout
-    descriptor fields code.receipt.allocatedBody (store.set location (encode layout next))
+    descriptor fields code.receipt.copiedBody (store.set location (encode layout next))
   obtain ⟨parameterSize, parameterLess, parameterEval⟩ := manifestSize.remaining rawEval
+  obtain ⟨copies, copiedHeap, copiedCanonical, copiedActual, copiedContext, copiedStore, copiedMap,
+      copiedWorld, copiedEmbedding, copy, copiedEnvironments, slots, copiedHeaps, copiedMaps, copiedWorlds,
+      copiedFrame, copiedRead, copiedLookups, _copiedTypes, copiedTyped, copyAgreement⟩ :=
+    CaptureCopies.marked_copies_prefix (pre := [argument])
+      (preContext := [SourceCoreCompatibleCatalog.packTypes (code.receipt.loweredParameters.map Prod.snd)])
+      (CallableIndexedLambdaEntryPrefix.copies_accepted code) rfl registered captured.represented installedHeaps
+      (GenericExpressionMeaning.agree_prefix actualLayout manifest) rfl
+      (CallableIndexedLambdaEntryPrefix.body_respects captured.respects _ layout.type _)
+      (.cons manifestTyped actualTyped) (by simpa [inputs.referenceIndex] using reference) installedCurrent.read
+  have sourceCopy := copy.of_copiedBinder (LambdaMetadataViews.MetadataView.copiedBinder code.viewOfSource).symm
+  obtain ⟨copiedSize, copiedLe, copiedEval⟩ := copyAgreement.unwrap parameterEval
+  obtain ⟨copiedUnmapped, _⟩ := copiedFrame location unmapped
+    (List.getElem?_eq_some_iff.mp installedCurrent.read).1
+  obtain ⟨extendedState, extendedRelated⟩ := ProtectedStateTransition.AdministrativeTransport.transition protocol
+    transport initial copiedMaps copiedWorlds copiedFrame sourceCopy.metadata_extends
+  obtain ⟨reboundState, reboundRelated⟩ := rebinds extendedState copiedCanonical slots
+  have copiedReference : copiedCanonical[scope.length + 1 + prepared.base.globals.length]? =
+      some (.cellRef layout.type location) := by
+    rw [slots _ (by omega)]
+    simpa [inputs.referenceIndex] using reference
   have tree := CallableIndexedParameterCertificates.of_accepted code.allocationError
     (CallableIndexedLambdaEntryPrefix.prefix_accepted code)
-  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) captured.canonical
-      (argument :: captured.canonical) := by intro index value found; exact found
+  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) copiedCanonical
+      (argument :: copiedCanonical) := by intro index value found; exact found
   have length : (code.receipt.loweredParameters.map Prod.snd).length = nativeArguments.length := by
     simpa using represented.length.2
   obtain ⟨environment, heap, canonical, logical, bodyActual, prefixStore, finalMap, finalWorld, embedding, child,
       allocated, environments, finalHeaps, maps, worlds, frame, sourceLayout, lookups, spine, finalTyped,
       bodyEval, childBound, _, transition⟩ :=
-    RecursiveNamedCallBounds.Stateful.parameter_prefix tree protocol producer rfl registered represented captured.represented installedHeaps
-      sourceLayout (GenericExpressionMeaning.agree_prefix actualLayout manifest) (.cons manifestTyped actualTyped)
+    RecursiveNamedCallBounds.Stateful.parameter_prefix tree protocol producer rfl registered
+      (represented.extend copiedMaps copiedWorlds) copiedEnvironments copiedHeaps
+      sourceLayout copiedLookups copiedTyped
       (allTypes := code.receipt.loweredParameters.map Prod.snd) (named := false) rfl (by simp) length
       (fun {_ _} found => by simpa using found)
       (by simpa only [← code.viewOfSource.inputs] using inputs.kinds)
-      (by simpa [inputs.referenceIndex] using reference) installedCurrent.read unmapped initial readyAt parameterEval
+      (by simpa using copiedReference) copiedRead copiedUnmapped reboundState readyAt copiedEval
   obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
   have finalReference : canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + prepared.base.globals.length]? =
       some (.cellRef layout.type location) := by
@@ -354,7 +386,7 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
     have index : code.receipt.loweredParameters.length + scope.length + 1 + prepared.base.globals.length =
         added.length + (scope.length + 1 + prepared.base.globals.length) := by omega
     rw [index, List.getElem?_append_right (by omega)]
-    simpa [inputs.referenceIndex, layout] using reference
+    simpa using copiedReference
   have finalLookups : EnvironmentsAgree (Renaming.comp embedding (Renaming.insertion code.receipt.loweredParameters.length))
       canonical bodyActual := by
     intro index value found
@@ -367,19 +399,27 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
   rw [bodyEq] at bodyEval
   rw [← CallableIndexedLambdaEntryPrefix.parameters code] at allocated
   have mono := FunctionCallBody.mono_binders inputs.extended
-  obtain ⟨finalUnmapped, unchanged⟩ := frame location unmapped
-    (List.getElem?_eq_some_iff.mp installedCurrent.read).1
+  obtain ⟨finalUnmapped, unchanged⟩ := frame location copiedUnmapped
+    (List.getElem?_eq_some_iff.mp copiedRead).1
+  have copiedLocals := Dynamic.EnvironmentCopies.agrees locals sourceCopy
   refine ⟨⟨next, nextHistory, environment, heap, canonical, bodyActual, _, prefixStore, finalMap, finalWorld,
-    Renaming.comp embedding (Renaming.insertion code.receipt.loweredParameters.length), allocated,
-    by simpa [CallableIndexedParameters.scope_eq] using environments, finalHeaps,
-    GenericLexicalContext.binders_agree mono.1 mono.2 locals allocated,
-    maps, worlds, frame, GenericLexicalContext.binders_metadata allocated,
-    ⟨added, prefixLength, canonicalEq⟩, finalLookups, finalTyped,
-    finalReference, unchanged.trans installedCurrent.read, finalUnmapped⟩,
-    child, bodyStore, Nat.lt_trans (Nat.lt_of_le_of_lt childBound parameterLess) rawLess, bodyEval, restored, ?_⟩
-  simpa only [CallableIndexedParameters.scope_eq] using transition
+    Renaming.comp embedding (Renaming.insertion code.receipt.loweredParameters.length), copies, copiedHeap,
+    sourceCopy, allocated, by simpa [CallableIndexedParameters.scope_eq] using environments, finalHeaps,
+    GenericLexicalContext.binders_agree mono.1 mono.2 copiedLocals allocated,
+    copiedMaps.trans maps, copiedWorlds.trans worlds, copiedFrame.trans frame,
+    sourceCopy.metadata_extends.trans (GenericLexicalContext.binders_metadata allocated),
+    ⟨added, copiedCanonical, prefixLength, canonicalEq, slots⟩, finalLookups, finalTyped,
+    finalReference, unchanged.trans copiedRead, finalUnmapped⟩,
+    child, bodyStore, Nat.lt_trans (Nat.lt_of_le_of_lt childBound
+      (Nat.lt_of_le_of_lt copiedLe parameterLess)) rawLess, bodyEval, restored, ?_⟩
+  have composed : ProtectedStateTransition.Transition protocol initial
+      ⟨code.receipt.loweredParameters.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope,
+        finalMap, finalWorld, heap, prefixStore, canonical⟩ := by
+    obtain ⟨reached, related⟩ := transition
+    exact ⟨reached, protocol.trans (protocol.trans extendedRelated reboundRelated) related⟩
+  simpa only [CallableIndexedParameters.scope_eq] using composed
 
-include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer initial readyAt in
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer transport rebinds initial readyAt in
 /-- The authenticated payload application adds its original strict body edge.
 The argument and complete captured environment are exactly the stored values;
 stage guards and the enclosing expression head are separate boundaries. -/
@@ -400,7 +440,7 @@ theorem application_prefix_for {size : Nat} {result : Value} {finalStore : Store
     (.second (.first (.var rfl))) (.var rfl)
   obtain ⟨reached, child, bodyStore, childLess, evaluated, restored, transition⟩ :=
     body_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed
-      protocol producer initial readyAt applied
+      protocol producer transport rebinds initial readyAt applied
   exact ⟨reached, child, bodyStore, Nat.lt_trans childLess smaller, evaluated, restored, transition⟩
 
 end Stateful
@@ -420,6 +460,7 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
       ProtectedStateTransition.OrdinaryAllocation.unitProtocol
       (ProtectedStateTransition.MarkedAllocation.unitProducer prepared.layouts prepared.ancestry.layout.frame
         (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+      ProtectedStateTransition.OrdinaryAllocation.unitTransport ProtectedStateTransition.OrdinaryAllocation.unitRebinds
       () (by intro index state read; trivial) completed
   exact ⟨reached, child, bodyStore, smaller, evaluated, restored⟩
 
@@ -439,6 +480,7 @@ theorem application_prefix_for {size : Nat} {result : Value} {finalStore : Store
       ProtectedStateTransition.OrdinaryAllocation.unitProtocol
       (ProtectedStateTransition.MarkedAllocation.unitProducer prepared.layouts prepared.ancestry.layout.frame
         (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+      ProtectedStateTransition.OrdinaryAllocation.unitTransport ProtectedStateTransition.OrdinaryAllocation.unitRebinds
       () (by intro index state read; trivial) completed
   exact ⟨reached, child, bodyStore, smaller, evaluated, restored⟩
 

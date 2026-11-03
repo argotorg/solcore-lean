@@ -78,7 +78,8 @@ theorem of_expression
     CallableIndexedLambdaGeneration.of_certificate compiled.indexed sourceContext evidence [] certificate actualAccepted
       profile (by rw [← sourceEq]; exact LambdaMetadataViews.MetadataView.refl _)
       (by simpa only [← sourceEq] using found) form found rfl
-      root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType native
+      root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType
+      (by rw [root.compilerPolicy.snapshotLambda]) native
   have issuedRecipe : CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained prepared.named site.code := by
     apply CallableIndexedOwnedContextualLambdaIssuedRecipes.Retained.of_recipes (rootFuel := rootFuel)
       prepared.compilation (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic) (sameBody.trans root.selected.recipe) _ site.compilation

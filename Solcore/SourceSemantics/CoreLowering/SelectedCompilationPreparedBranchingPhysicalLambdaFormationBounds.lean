@@ -9,7 +9,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedEx
 
 /-! Ordinary lambda formation uses the actual named packet and keeps the
 same positive closure member in the public receiving model. The retained
-Site and body are static compiler receipts; captures come from this input. -/
+Site and body are static compiler receipts; captures come from this input,
+and the formation copies them, so the caller packet is transported to the
+formed state. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -99,7 +101,8 @@ theorem preserves (size : Nat) :
     simpa only [sameSource, receipt.produced.identifier, CallableIndexedLambdaGeneration.closure] using receipt.produced.site.code.sourceFound
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  have changed : outcome = .value (.closure (head.function environment)) ∧ after = before := by
+  have changed : ∃ captured, outcome = .value (.closure {head.function environment with captured := captured}) ∧
+      Dynamic.EnvironmentCopies (head.function environment).source (head.function environment).captured before captured after := by
     cases outcome with
     | value value =>
       have evaluated : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
@@ -107,10 +110,10 @@ theorem preserves (size : Nat) :
           (head.function environment).source (head.function environment).captured before code.id value after := by
         simpa only [sameSource, code, head, PreparedLambdaBodyFormation.Formation.code, PreparedLambdaBodyFormation.Formation.function,
           CallableIndexedLambdaGeneration.closure, recaptureCode, receipt.produced.identifier] using trace.sound.value_plain
-      obtain ⟨rfl, rfl⟩ := source_value_of_code (values := .initial compiled.compatible.checked) code
+      obtain ⟨captured, rfl, copy⟩ := source_value_of_code (values := .initial compiled.compatible.checked) code
         (by simpa only [head, PreparedLambdaBodyFormation.Formation.function, CallableIndexedLambdaGeneration.closure, ← sameSource] using unique)
         receipt.coercions evaluated
-      exact ⟨rfl, rfl⟩
+      exact ⟨captured, rfl, copy⟩
     | fault failure =>
       cases failure with
       | semantic reason =>
@@ -122,17 +125,24 @@ theorem preserves (size : Nat) :
           CallableIndexedLambdaGeneration.closure, recaptureCode, receipt.produced.identifier] using trace.sound.semanticFault_plain
       | stage failedScope call reason =>
         exact False.elim (no_stage unique sourceFound receipt.produced.site.code.sourceForm receipt.coercions trace)
-  obtain ⟨rfl, rfl⟩ := changed
-  obtain ⟨payload, native, represented⟩ := SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
+  obtain ⟨captured, rfl, copy⟩ := changed
+  obtain ⟨formedCaptured, formedHeap, payload, finalStore, finalMap, finalWorld, formedCopy, native, represented,
+      finalHeaps, maps, worlds, frame⟩ := SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
     prefixZero receipt environments heaps agrees nativeTyped initial.base.property initial.base.val
-  refine ⟨.inRight .word payload, store, mapping, world, native, .value represented,
-    heaps, .refl _, .refl _, .refl _ _, .refl _, initial, Relates.refl initial.base.val.val, ?_⟩
-  have closureTyped := SelectedCompilationLambdaAdmission.value_typed runtime covers locals
+  obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formedCopy
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedPhysicalNestedCanonicalState.protocol (headers := headers) owner caller)
+    (CallableIndexedOwnedPhysicalNestedCanonicalState.administrativeTransport (headers := headers) owner caller)
+    initial maps worlds frame copy.metadata_extends
+  refine ⟨.inRight .word payload, finalStore, finalMap, finalWorld, native, .value represented,
+    finalHeaps, maps, worlds, frame, copy.metadata_extends, reached, related, ?_⟩
+  have closureTyped := SelectedCompilationLambdaAdmission.value_typed runtime covers (copy.agrees locals)
     sourceFound receipt.produced.site.code.sourceForm receipt.coercions typed
-  refine ⟨admitted.rows, ?_⟩
+  refine ⟨CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative ((bridge).pool initial)
+    ((bridge).pool reached) admitted.rows frame, ?_⟩
   intro value same
   cases same
-  refine ⟨?_, admitted.heap⟩
+  refine ⟨?_, admitted.heap.copy copy⟩
   simpa only [head, PreparedLambdaBodyFormation.Formation.function, CallableIndexedLambdaGeneration.closure, ← sameSource] using closureTyped
 
 include globals slots prefixZero sameSource runtime covers in
@@ -146,28 +156,35 @@ theorem reflects (size : Nat) :
     simpa only [sameSource, receipt.produced.identifier, CallableIndexedLambdaGeneration.closure] using receipt.produced.site.code.sourceFound
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨payload, native, represented⟩ := SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
+  obtain ⟨captured, after, payload, formedStore, finalMap, finalWorld, copy, native, represented, finalHeaps, maps,
+      worlds, frame⟩ := SelectedCompilationPreparedBranchingPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
     prefixZero receipt environments heaps agrees nativeTyped initial.base.property initial.base.val
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic native completed.sound
   have sourceTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages
       (Staging.Recursive.Size.stepSize []) invocation context environment before id
-      (.value (.closure (receipt.function environment))) before := by
+      (.value (.closure (receipt.function captured))) after := by
     apply Staging.Recursive.Size.Expression.atomicValue (lookupExpression?_sound sourceFound)
       (receipt.produced.site.code.sourceForm ▸ Staging.Recursive.AtomicForm.lambda _ _ _) receipt.coercions
     rw [receipt.produced.site.code.sourceForm]
     simpa only [PreparedLambdaBodyFormation.Formation.function, CallableIndexedLambdaGeneration.closure, ← sameSource, receipt.coercions] using
       (Dynamic.ExpressionFormEvaluates.lambda (program := Program.ofChecked compiled.sourceProgram)
         (context := context) (evidence := invocation.evidence) (source := invocation.source)
-        (environment := environment) (heap := before)
-        (parameters := receipt.parameters) (returnType := receipt.result) (body := receipt.statements) receipt.ordinary)
-  refine ⟨Staging.Recursive.Size.stepSize [], _, before, mapping, world, sourceTrace, .value represented,
-    heaps, .refl _, .refl _, .refl _ _, .refl _, initial, Relates.refl initial.base.val.val, ?_⟩
-  have closureTyped := SelectedCompilationLambdaAdmission.value_typed runtime covers locals
+        (environment := environment) (before := before) (after := after) (captured := captured)
+        (parameters := receipt.parameters) (returnType := receipt.result) (body := receipt.statements) receipt.ordinary
+        (by rw [sameSource]; exact copy))
+  obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
+    (CallableIndexedOwnedPhysicalNestedCanonicalState.protocol (headers := headers) owner caller)
+    (CallableIndexedOwnedPhysicalNestedCanonicalState.administrativeTransport (headers := headers) owner caller)
+    initial maps worlds frame copy.metadata_extends
+  refine ⟨Staging.Recursive.Size.stepSize [], _, after, finalMap, finalWorld, sourceTrace, .value represented,
+    finalHeaps, maps, worlds, frame, copy.metadata_extends, reached, related, ?_⟩
+  have closureTyped := SelectedCompilationLambdaAdmission.value_typed runtime covers (copy.agrees locals)
     sourceFound receipt.produced.site.code.sourceForm receipt.coercions typed
-  refine ⟨admitted.rows, ?_⟩
+  refine ⟨CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative ((bridge).pool initial)
+    ((bridge).pool reached) admitted.rows frame, ?_⟩
   intro value same
   cases same
-  refine ⟨?_, admitted.heap⟩
+  refine ⟨?_, admitted.heap.copy copy⟩
   simpa only [ PreparedLambdaBodyFormation.Formation.function, CallableIndexedLambdaGeneration.closure, ← sameSource] using closureTyped
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedBranchingPhysicalLambdaFormationBounds

@@ -39,19 +39,20 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
   cases original with
   | returnValue tupleTyped =>
     obtain ⟨type,callTyped⟩ := shape.call_typed state.runtime.graph.nodeOccurrencesUnique tupleTyped
-    have allocatedPrefix : HeapAppends before (identityHeap shape.f context environment before) := ⟨_,rfl⟩
-    have flagNext := (flagStored.mono allocatedPrefix).under ⟨before.cells.length⟩ shape.fFlag
+    have allocatedPrefix : HeapAppends before (identityHeap shape.f context environment before) :=
+      identityHeap_appends shape.f context environment before
+    have flagNext := (flagStored.mono allocatedPrefix).under (identityLocation source environment before) shape.fFlag
     obtain ⟨after, callTrace, append⟩ := stored.invoke stateNext wellFormed shape.call (.inr rfl)
       callTyped (read_value shape.flagRead flagNext)
     have builtinTrace : Dynamic.ExpressionEvaluates program middle evidence source
-        ((shape.f.binder.id,⟨before.cells.length⟩) :: environment) after shape.builtin.id
+        ((shape.f.binder.id,(identityLocation source environment before)) :: environment) after shape.builtin.id
         (.builtin ⟨.wordToInteger⟩) after := by
       apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.builtinFound)
       · rw [shape.builtinForm,shape.builtinRequirements,shape.builtinCoercions]
         exact .builtinFunction rfl
       · rw [shape.builtinCoercions]; exact .nil
     have tupleTrace : Dynamic.ExpressionEvaluates program middle evidence source
-        ((shape.f.binder.id,⟨before.cells.length⟩) :: environment)
+        ((shape.f.binder.id,(identityLocation source environment before)) :: environment)
         (identityHeap shape.f context environment before) shape.tuple.id
         (.product (.bool flag) (.builtin ⟨.wordToInteger⟩)) after := by
       apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.tupleFound)

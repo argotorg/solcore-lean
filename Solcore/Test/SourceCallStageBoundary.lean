@@ -40,7 +40,7 @@ private theorem rejected : Staging.CallBoundary.GuardRejects frame (id 0) [id 2]
 
 private theorem callee (heap : Dynamic.Heap) :
     Dynamic.ExpressionEvaluates program context [] source [] heap (id 1) (.closure function) heap :=
-  .intro ⟨List.mem_singleton_self _, rfl⟩ (.lambda rfl) .nil
+  .intro ⟨List.mem_singleton_self _, rfl⟩ (.lambda rfl (.nil heap)) .nil
 
 /-- The absent argument would fail if evaluated. -/
 example (heap : Dynamic.Heap) : Dynamic.ExpressionFaults program context [] source [] heap (id 2)

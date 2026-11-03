@@ -91,10 +91,10 @@ theorem lifts
       (registry := registry) (invocation := invocation) bridge producer context scope mode statements := by
   induction tree with
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
-      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same remaining ih =>
-    exact CellAwareSourceFlowGeneralizedLifting.generalized bridge compiled record producer registered
+      found form declaration polymorphic extended ordinary initializerFound initializerForm valueType requirements coercions site initial nativeTyped allocation annotation same captured copied remaining ih =>
+    exact CellAwareSourceFlowGeneralizedLifting.generalized bridge bindings compiled record producer registered
       (type := type) (body := body) found form declaration polymorphic extended ordinary initializerFound initializerForm
-      valueType requirements coercions site initial nativeTyped allocation annotation same sourceEq issuer ih
+      valueType requirements coercions site initial nativeTyped allocation annotation same copied sourceEq issuer ih
   | @initialized context nextContext scope mode id node binder initializer initializerNode rest expected type lowered body
       found form member mono extended ordinary initializerFound valueType typed certified allocation annotation same remaining ih =>
     exact CellAwareSourceFlowOrdinaryLifting.initialized bridge producer registered (type := type) (body := body)

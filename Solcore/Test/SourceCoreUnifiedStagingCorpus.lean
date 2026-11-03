@@ -43,12 +43,14 @@ def run : IO Unit := do
   let deep : Value := .product (.word (word 4)) (.product (.word (word 5)) (.word (word 6)))
   for spent in [0, 43, 300000] do
     discard <| expect compiled "nestedComptime" [deep] deep spent
+    /- Closures capture by value: `bump` writes its call's copies of `total`
+    and `table`. -/
     let effects ← expect compiled "markedEffects" [.word (word 9)] (.word (word 12)) spent
     assertTrue (hasWord effects 12 && effects.heap.any (fun cell => match cell.value with
       | some (.mapping _ _ entries) => entries.any (fun entry => match entry with
         | (.word key, .word value) => key == word 0 && value == word 12
         | _ => false)
-      | _ => false)) "marked call lost its captured writes and mapping update"
+      | _ => false)) "marked call lost the writes and mapping update in its captured copies"
     for (name, expected) in [("markedClosureClosed", 21), ("markedGlobalClosed", 22),
         ("markedResultIndirectStaged", 24)] do
       discard <| expect compiled name [] (.word (word expected)) spent
@@ -56,13 +58,15 @@ def run : IO Unit := do
     let owner ← key compiled.sourceProgram name
     let occurrence ← indirectOccurrence compiled name
     let arguments := if name == "markedResultIndirectBlocked" then [] else [.word (word 21)]
+    -- The closure of `markedClosureRuntime` also holds its snapshot copy of `value`.
+    let argumentCells := if name == "markedClosureRuntime" then 3 else 2
     for spent in [0, 43, 300000] do
       let first ← execute compiled name arguments spent
       let final ← get "staging guard native resume" (SourceCoreUnifiedCompilation.Result.resume first 300000)
       match final.observation with
       | .fault (.comptimeArgumentStageMismatch caller id 0 _ .runtime) state =>
         assertTrue (name != "markedResultIndirectBlocked" && caller == owner && id == occurrence &&
-          state.heap.length == 2 && hasWord state 21)
+          state.heap.length == argumentCells && hasWord state 21)
           "marked argument guard lost its source site or allocated the guarded parameter"
       | .fault (.comptimeResultStageMismatch caller id _ .deferred) state =>
         assertTrue (name == "markedResultIndirectBlocked" && caller == owner && id == occurrence &&

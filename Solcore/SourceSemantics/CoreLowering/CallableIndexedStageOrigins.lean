@@ -257,57 +257,83 @@ theorem formation_condition (checkedProgram : CheckedProgram) :
 
 variable (profile : values.checked.catalog.callableContracts = true)
   (stored : RuntimeStoreHasTypes world store indexed.layouts.definitions)
+  {projects : GenericHeap.Projection}
+  {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog values.checked.catalog) projects
+    indexed.layouts.definitions}
+  (heaps : GenericHeap.HeapRepresents model mapping world heap store)
 
-include header slots profile stored in
-/-- Source formation and native formation retain the same actual full store
-and captured environment under the stronger static predicate. -/
-theorem formation (checkedProgram : CheckedProgram) :
-    let captured := captures complete globals entry related agrees typed
-    let code := head.actualCode environment
-    let history := head.history entry environment
-    Dynamic.ExpressionEvaluates program context evidence (head.formed environment).source environment heap
-      code.id (.closure (head.formed environment)) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    RepresentsWith indexed (bodySupport indexed (expressionSyntax := expressionSyntax) (certificates := certificates)
+include header slots in
+/-- The formed closure keeps both conditions: the copies keep the catalog
+slots past the scope, and the source and its preparation are unchanged. -/
+theorem formed_condition (checkedProgram : CheckedProgram)
+    (formed : Formed model (captures complete globals entry related agrees typed) (head.actualCode environment)
+      (head.history entry environment) heap store entry.catalog.authority.frameLocation) :
+    provenanceCondition indexed checkedProgram
+      (bodySupport indexed (expressionSyntax := expressionSyntax) (certificates := certificates)
         (program := program) (registry := registry) (faults := faults))
-      (provenanceCondition indexed checkedProgram _ (capturePrior indexed (headers := headers) (locations := locations)
-        (expressionSyntax := expressionSyntax) (certificates := certificates) (registry := registry) (faults := faults)))
-      mapping world (FunctionValues.sourceType (head.formed environment)) (.closure (head.formed environment))
-      (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  exact CallableIndexedLambdaRuntimeValues.formation_with indexed program
-    (captures complete globals entry related agrees typed) (head.actualCode environment) (head.history entry environment)
-    (head.actualBody environment)
-    (formation_condition indexed head header complete globals slots entry related agrees typed checkedProgram)
-    profile stored (head.reference complete globals entry related agrees typed) entry.catalog.authority.frame.read
-    heap head.ordinary head.coercions
+      (capturePrior indexed (headers := headers) (locations := locations)
+        (expressionSyntax := expressionSyntax) (certificates := certificates) (registry := registry) (faults := faults))
+      (function := formed.closure) formed.captures formed.closureCode formed.closureHistory
+      (head.actualBody formed.captured) :=
+  ⟨⟨trivial, entry.catalog.authority.frameLocation,
+      (capture_globals complete globals slots entry related agrees typed).of_slots formed.slots⟩,
+    formation_receipt indexed head header checkedProgram formed.captured⟩
 
-include header slots profile stored in
+include header slots profile stored heaps in
+/-- Source formation and native formation copy the same captured cells and
+retain the same actual full store under the stronger static predicate. -/
+theorem formation (checkedProgram : CheckedProgram) :
+    ∃ formed : Formed model (captures complete globals entry related agrees typed) (head.actualCode environment)
+        (head.history entry environment) heap store entry.catalog.authority.frameLocation,
+      Dynamic.ExpressionEvaluates program context evidence (head.formed environment).source environment heap
+        (head.actualCode environment).id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store ((head.actualCode environment).lowered.expression.rename
+          (captures complete globals entry related agrees typed).embedding)
+        (.inRight .word (value (head.actualCode environment) formed.embedding (head.history entry environment).native
+          formed.closureActual)) formed.finalStore ∧
+      RepresentsWith indexed (bodySupport indexed (expressionSyntax := expressionSyntax) (certificates := certificates)
+          (program := program) (registry := registry) (faults := faults))
+        (provenanceCondition indexed checkedProgram _ (capturePrior indexed (headers := headers) (locations := locations)
+          (expressionSyntax := expressionSyntax) (certificates := certificates) (registry := registry) (faults := faults)))
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType (head.formed environment)) (.closure formed.closure)
+        (value (head.actualCode environment) formed.embedding (head.history entry environment).native formed.closureActual)
+        (CallableContract.functionType (head.actualCode environment).receipt.parameterCore
+          (head.actualCode environment).receipt.resultCore) := by
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation (captures complete globals entry related agrees typed)
+    (head.actualCode environment) (head.history entry environment) head.snapshots
+    (RecursiveNamedLambdaFormationHeads.LambdaWith.reference_index head) heaps
+    (head.reference complete globals entry related agrees typed) entry.catalog.authority.frame.read
+  exact ⟨formed, CallableIndexedLambdaRuntimeValues.formation_with indexed program formed (head.actualBody formed.captured)
+    (formed_condition indexed head header complete globals slots entry related agrees typed checkedProgram formed)
+    profile stored head.ordinary head.coercions⟩
+
+include header slots profile stored heaps in
 /-- The original native completion gives the same source formation, result,
 and full store. The static predicate is built from the actual site again. -/
 theorem reflects_original (checkedProgram : CheckedProgram) {result : Value} {after : Store}
     (completed : Evaluates actual store
       ((head.actualCode environment).lowered.expression.rename ξ) result after) :
-    let captured := captures complete globals entry related agrees typed
-    let code := head.actualCode environment
-    let history := head.history entry environment
-    result = .inRight .word (value code captured.embedding history.native actual) ∧ after = store ∧
-    Dynamic.ExpressionEvaluates program context evidence (head.formed environment).source environment heap
-      code.id (.closure (head.formed environment)) heap ∧
-    RepresentsWith indexed (bodySupport indexed (expressionSyntax := expressionSyntax) (certificates := certificates)
-        (program := program) (registry := registry) (faults := faults))
-      (provenanceCondition indexed checkedProgram _ (capturePrior indexed (headers := headers) (locations := locations)
-        (expressionSyntax := expressionSyntax) (certificates := certificates) (registry := registry) (faults := faults)))
-      mapping world (FunctionValues.sourceType (head.formed environment)) (.closure (head.formed environment))
-      (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) := by
-  exact CallableIndexedLambdaRuntimeValues.reflects_with indexed program
-    (captures complete globals entry related agrees typed) (head.actualCode environment) (head.history entry environment)
-    (head.actualBody environment)
-    (formation_condition indexed head header complete globals slots entry related agrees typed checkedProgram)
-    profile stored (head.reference complete globals entry related agrees typed) entry.catalog.authority.frame.read
-    heap head.ordinary head.coercions completed
+    ∃ formed : Formed model (captures complete globals entry related agrees typed) (head.actualCode environment)
+        (head.history entry environment) heap store entry.catalog.authority.frameLocation,
+      result = .inRight .word (value (head.actualCode environment) formed.embedding (head.history entry environment).native
+        formed.closureActual) ∧ after = formed.finalStore ∧
+      Dynamic.ExpressionEvaluates program context evidence (head.formed environment).source environment heap
+        (head.actualCode environment).id (.closure formed.closure) formed.finalHeap ∧
+      RepresentsWith indexed (bodySupport indexed (expressionSyntax := expressionSyntax) (certificates := certificates)
+          (program := program) (registry := registry) (faults := faults))
+        (provenanceCondition indexed checkedProgram _ (capturePrior indexed (headers := headers) (locations := locations)
+          (expressionSyntax := expressionSyntax) (certificates := certificates) (registry := registry) (faults := faults)))
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType (head.formed environment)) (.closure formed.closure)
+        (value (head.actualCode environment) formed.embedding (head.history entry environment).native formed.closureActual)
+        (CallableContract.functionType (head.actualCode environment).receipt.parameterCore
+          (head.actualCode environment).receipt.resultCore) := by
+  obtain ⟨formed⟩ := CallableIndexedLambdaValues.formation (captures complete globals entry related agrees typed)
+    (head.actualCode environment) (head.history entry environment) head.snapshots
+    (RecursiveNamedLambdaFormationHeads.LambdaWith.reference_index head) heaps
+    (head.reference complete globals entry related agrees typed) entry.catalog.authority.frame.read
+  exact ⟨formed, CallableIndexedLambdaRuntimeValues.reflects_with indexed program formed (head.actualBody formed.captured)
+    (formed_condition indexed head header complete globals slots entry related agrees typed checkedProgram formed)
+    profile stored head.ordinary head.coercions completed⟩
 
 end Formation
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedStageOrigins

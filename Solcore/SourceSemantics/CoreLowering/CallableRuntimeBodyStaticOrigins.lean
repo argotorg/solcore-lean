@@ -203,7 +203,7 @@ def lambda_named_entry
     (escapedFault : faults .controlEscapedFunction code.compilation.internalReason)
     (reached : CallableIndexedLambdaViewPrefix.Entry indexed.ancestry.layout.frame indexed.base.globals.length
       frameLocation native values functions registry function body.context outerScope code.receipt.loweredParameters
-      arguments before initialStore initialMap initialWorld administrative actualContext actual ξ code.receipt.allocatedBody code.receipt.body)
+      arguments before initialStore initialMap initialWorld administrative actualContext actual ξ code.receipt.copiedBody code.receipt.body)
     (initial : protocol.State ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ outerScope,
       reached.mapping, reached.world, reached.heap, reached.store, reached.canonical⟩)
     (gate : conditionGate frameLocation native) :
@@ -216,7 +216,7 @@ def lambda_named_entry
   heap := reached.heap
   store := reached.store
   embedding := reached.embedding
-  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters actualContext
+  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters reached.copiedContext
   frameLocation := frameLocation
   native := native
   environments := reached.environments
@@ -238,7 +238,7 @@ def lambda_nested_entry
     (escapedFault : faults .controlEscapedFunction code.compilation.internalReason)
     (reached : CallableIndexedLambdaViewPrefix.Entry indexed.ancestry.layout.frame indexed.base.globals.length
       frameLocation native values functions registry function body.body.context outerScope code.receipt.loweredParameters
-      arguments before initialStore initialMap initialWorld administrative actualContext actual ξ code.receipt.allocatedBody code.receipt.body)
+      arguments before initialStore initialMap initialWorld administrative actualContext actual ξ code.receipt.copiedBody code.receipt.body)
     (initial : protocol.State ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ outerScope,
       reached.mapping, reached.world, reached.heap, reached.store, reached.canonical⟩)
     (gate : conditionGate frameLocation native) :
@@ -251,7 +251,7 @@ def lambda_nested_entry
   heap := reached.heap
   store := reached.store
   embedding := reached.embedding
-  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters actualContext
+  actualContext := CallableIndexedParameterTyped.prefixContext code.receipt.loweredParameters reached.copiedContext
   frameLocation := frameLocation
   native := native
   environments := reached.environments

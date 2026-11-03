@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceCoreFunctions
+import Solcore.SourceSemantics.CoreLowering.CaptureCopyTyping
 
 /-! Static certificates for the actual function-expression compiler.  A body
 certificate is extracted from the supplied body compiler's accepted output;
@@ -88,15 +89,18 @@ structure LambdaCertificate (bodyCertificate : BodyCertificate)
   resultProjection : policy.projectType (.occurrence id.occurrence) resultType = .ok resultCore
   parametersTree : Parameters policy source scope parameters loweredParameters bodyScope
   bodyTree : bodyCertificate source bodyScope statements resultCore bodyCode
-  emitted : lowered = ⟨reportedType, Core.LanguageResult.success (Core.TaggedFunction.anonymous
-    (.lambda parameterCore (Core.LanguageResult.resultType resultCore)
-      (SourceCoreFunctions.bindParameters loweredParameters resultCore (bodyCode.weakenAt loweredParameters.length))))⟩
+  emitted : lowered = ⟨reportedType, SourceCoreSourceCells.copyScopePlain source scope (fun index => index)
+    (Core.LanguageResult.success (Core.TaggedFunction.anonymous
+      (.lambda parameterCore (Core.LanguageResult.resultType resultCore)
+        (SourceCoreSourceCells.copyScopePlain source scope (· + 1)
+          (SourceCoreFunctions.bindParameters loweredParameters resultCore
+            (bodyCode.weakenAt loweredParameters.length))))))⟩
 
 /-- Static extraction is relative to the chosen metadata policy and body
 compiler.  Their certificates are kept explicit, and no child evaluation is
 assumed. This certificate uses the default tagged callable representation,
-ordinary source-cell allocation, the unchanged lambda-body hook and an absent
-special-expression hook. -/
+ordinary source-cell allocation, the unchanged lambda-body hook, an absent
+special-expression hook and a creation-time copy of the captures. -/
 theorem lambda_of_accepted
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy}
     {lowerBody : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -109,6 +113,7 @@ theorem lambda_of_accepted
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (defaultCallables : policy.callables = {})
+    (snapshot : policy.snapshotLambda id = true)
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
     (form : node.form = .lambda parameters resultType statements)
@@ -157,7 +162,8 @@ theorem lambda_of_accepted
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
                     simp only [compiledBody, pure, Except.pure, defaultCallables, ordinaryBody,
-                      SourceCoreFunctions.unchangedLambdaBody, ordinaryExpression, SourceCoreFunctions.unchangedLambdaExpression] at accepted
+                      SourceCoreFunctions.unchangedLambdaBody, ordinaryExpression, SourceCoreFunctions.unchangedLambdaExpression,
+                      SourceCoreSourceCells.copyScope_none, snapshot, ↓reduceIte] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (Core.TaggedFunction.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
@@ -188,6 +194,7 @@ theorem lambda_of_accepted_metadata
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (defaultCallables : policy.callables = {})
+    (snapshot : policy.snapshotLambda id = true)
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
     (readSound : ∀ selected type, policy.readExpression source id = .ok (selected, type) →
@@ -211,7 +218,8 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression defaultCallables found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression defaultCallables
+      snapshot found read form extractBody accepted⟩
 
 def LambdaCertificate.rawBody
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
@@ -219,11 +227,34 @@ def LambdaCertificate.rawBody
     {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
     {reportedType : Core.Ty} {lowered : SourceCoreBasic.LoweredExpr}
     (certificate : LambdaCertificate bodyCertificate policy source scope id node parameters resultType statements reportedType lowered) : Core.Expr :=
-  SourceCoreFunctions.bindParameters certificate.loweredParameters certificate.resultCore
-    (certificate.bodyCode.weakenAt certificate.loweredParameters.length)
+  SourceCoreSourceCells.copyScopePlain source scope (· + 1)
+    (SourceCoreFunctions.bindParameters certificate.loweredParameters certificate.resultCore
+      (certificate.bodyCode.weakenAt certificate.loweredParameters.length))
+
+/-- The callable created at the lambda, before its creation-time copies. -/
+def LambdaCertificate.callable
+    {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
+    {reportedType : Core.Ty} {lowered : SourceCoreBasic.LoweredExpr}
+    (certificate : LambdaCertificate bodyCertificate policy source scope id node parameters resultType statements reportedType lowered) : Core.Expr :=
+  Core.LanguageResult.success (Core.TaggedFunction.anonymous
+    (.lambda certificate.parameterCore (Core.LanguageResult.resultType certificate.resultCore)
+      certificate.rawBody))
+
+theorem LambdaCertificate.emitted_callable
+    {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
+    {reportedType : Core.Ty} {lowered : SourceCoreBasic.LoweredExpr}
+    (certificate : LambdaCertificate bodyCertificate policy source scope id node parameters resultType statements reportedType lowered) :
+    lowered = ⟨reportedType, SourceCoreSourceCells.copyScopePlain source scope (fun index => index)
+      certificate.callable⟩ :=
+  certificate.emitted
 
 /-- Whole-output Core checking supplies wrapper typing independently of the
-body certificate's semantic interpretation. -/
+body certificate's semantic interpretation. The creation-time copies have the
+types of the slots they copy, so they leave the body's typing unchanged. -/
 theorem LambdaCertificate.rawBody_hasType
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
@@ -237,7 +268,10 @@ theorem LambdaCertificate.rawBody_hasType
       (Core.LanguageResult.resultType certificate.resultCore) definitions := by
   have emitted := congrArg SourceCoreBasic.LoweredExpr.expression certificate.emitted
   rw [emitted] at typed
-  cases typed with
+  dsimp only at typed
+  have callable := CaptureCopyTyping.copyScopePlain_body_hasType (fun _ _ same => same) typed
+  rw [Core.LanguageResult.success, Core.TaggedFunction.anonymous] at callable
+  cases callable with
   | inRight _ function =>
     cases function with
     | pair _ closure =>

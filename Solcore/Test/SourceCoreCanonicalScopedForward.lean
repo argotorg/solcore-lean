@@ -163,6 +163,6 @@ def runForward : IO Unit := do
   let relayStages ← observeStages fixture observed.relayRow
   let sequence ← observeSequence fixture observed
   have _meaning := closed_forward_meaning fixture observed extra identityStages makeStages relayStages sequence
-  IO.println "Scoped direct relay: make10/make20/A10/make30/B20/A11, exact Source heaps/history, all six public fuel bounds proved"
+  IO.println "Scoped direct relay: make10/make20/A10/make30/B20/A10, exact Source heaps/history, all six public fuel bounds proved"
 
 end Tests.SourceCoreCanonicalScoped

@@ -2,7 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLa
 
 /-! The actual chosen compiler receipt supplies the local member constructor
 at its literal recaptured index. Each endpoint invokes the committed formation
-core once with one model for the input heap and returned relation. -/
+core once with one model for the input heap and returned relation. The
+formation copies the captured cells, so the member sits at the formed
+closure's index over the copies. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -48,51 +50,67 @@ variable {sourceContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
     headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
 
 include chosen observed in
-/-- The known receipt and actual packet build this positive member directly.
-Typing is supplied independently by the original formation core. -/
+/-- The known receipt and actual packet build this positive member directly at
+the formed closure's literal recaptured index, over the copies. Typing is
+supplied independently by the original formation core. -/
 theorem chosen_at
-    (nativeTyped : RuntimeValueHasType world
-      (value (index receipt environment captured prefixContext).code
-        (index receipt environment captured prefixContext).captured.embedding
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions} {location : Location}
+    (formed : Formed model (index receipt environment captured prefixContext).captured
+      (index receipt environment captured prefixContext).code
+      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
+        (index receipt environment captured prefixContext).captured
+        (index receipt environment captured prefixContext).code
+        (index receipt environment captured prefixContext).support owner initial packet) heap store location)
+    (nativeTyped : RuntimeValueHasType formed.finalWorld
+      (value (index receipt environment captured prefixContext).code formed.embedding
         (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
           (index receipt environment captured prefixContext).captured
           (index receipt environment captured prefixContext).code
-          (index receipt environment captured prefixContext).support owner initial packet).native actual)
+          (index receipt environment captured prefixContext).support owner initial packet).native formed.closureActual)
       (CallableContract.functionType (index receipt environment captured prefixContext).code.receipt.parameterCore
         (index receipt environment captured prefixContext).code.receipt.resultCore) compiled.indexed.layouts.definitions) :
-    let i := index receipt environment captured prefixContext
-    ChosenAt root expressionSyntax headers keys registry faults i
-      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet) := by
+    ChosenAt root expressionSyntax headers keys registry faults (index receipt formed.captured formed.captures rfl)
+      formed.closureHistory := by
   let i := index receipt environment captured prefixContext
-  exact .ordinary owner (.formed receipt chosen environment captured prefixContext)
-    (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin i.captured i.code i.support owner initial packet)
-    rfl observed (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index i.captured i.code i.support) nativeTyped
+  exact .ordinary owner (.formed receipt chosen formed.captured formed.captures rfl)
+    ⟨(CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin i.captured i.code i.support owner initial packet).metadata⟩
+    rfl (observed.of_slots formed.slots)
+    (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index i.captured i.code i.support) nativeTyped
 
 include chosen observed in
-/-- One actual formation creates the new model member at this same known index.
-There is no whole-model inclusion premise. -/
+/-- One actual formation over the copies creates the new model member at the
+formed closure's literal recaptured index. There is no whole-model inclusion
+premise. -/
 theorem formation
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
+      mapping world heap store) :
     let i := index receipt environment captured prefixContext
     let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
-      i.function.source i.function.captured heap i.code.id (.closure i.function) heap ∧
-    Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
-      (.inRight .word (value i.code i.captured.embedding history.native actual)) store ∧
-    (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile).Represents
-      registry mapping world (FunctionValues.sourceType i.function) (.closure i.function)
-      (value i.code i.captured.embedding history.native actual)
-      (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
-      result = .inRight .word (value i.code i.captured.embedding history.native actual) ∧ finalStore = store) := by
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile))
+        i.captured i.code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
+        i.function.source i.function.captured heap i.code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
+        (.inRight .word (value i.code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile).Represents
+        registry formed.finalMap formed.finalWorld (FunctionValues.sourceType i.function) (.closure formed.closure)
+        (value i.code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
+        result = .inRight .word (value i.code formed.embedding history.native formed.closureActual) ∧
+          finalStore = formed.finalStore) := by
   let i := index receipt environment captured prefixContext
-  let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet
   exact CallableIndexedOwnedPreparedOrdinaryLambdaFormation.formation_with_member
     i.captured i.code i.support owner initial packet profile observed
     (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
-    (fun nativeTyped => .chosen_ordinary i history
-      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed nativeTyped))
-    stored receipt.formation.ordinary receipt.formation.coercions
+    (fun formed nativeTyped => .chosen_ordinary (index receipt formed.captured formed.captures rfl) formed.closureHistory
+      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed
+        formed nativeTyped))
+    heaps (receipt.formation.snapshots environment) receipt.formation.ordinary receipt.formation.coercions
 
 variable
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
@@ -110,8 +128,9 @@ variable
     (receipt.formation.function environment).context ⟨initial, packet⟩)
 
 include chosen observed wellFormed runtime covers locals typed heaps admitted in
-/-- The Source endpoint supplies the actual member internally and preserves
-all original heap/effect/admission fields under this same function model. -/
+/-- The Source endpoint supplies the actual member of the formed closure
+internally and preserves all heap/effect/admission fields, in the formed state,
+under this same function model. -/
 theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) size
       (receipt.formation.function environment).context (receipt.formation.function environment).evidence
@@ -123,13 +142,14 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
       (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
       outcome after result finalStore := by
   let i := index receipt environment captured prefixContext
-  let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet
   exact CallableIndexedOwnedPreparedOrdinaryLambdaFormation.preserves_at_with_member
     i.captured i.code i.support owner initial packet profile observed
     (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
-    wellFormed runtime covers locals typed receipt.formation.sourceType receipt.formation.ordinary receipt.formation.coercions heaps admitted
-    (fun nativeTyped => .chosen_ordinary i history
-      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed nativeTyped)) trace
+    wellFormed runtime covers locals typed receipt.formation.sourceType (receipt.formation.snapshots environment)
+    receipt.formation.ordinary receipt.formation.coercions heaps admitted
+    (fun formed nativeTyped => .chosen_ordinary (index receipt formed.captured formed.captures rfl) formed.closureHistory
+      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed
+        formed nativeTyped)) trace
 
 include chosen observed wellFormed runtime covers locals typed heaps admitted in
 /-- Native reflection uses the same actual closure formation and current packet;
@@ -146,12 +166,13 @@ theorem reflects_at {size : Nat} {result : Value} {finalStore : Store}
         (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
         outcome after result finalStore := by
   let i := index receipt environment captured prefixContext
-  let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet
   exact CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reflects_at_with_member
     i.captured i.code i.support owner initial packet profile observed
     (CallableIndexedOwnedChosenOrdinaryLambdaValues.model root expressionSyntax headers keys registry faults profile)
-    wellFormed runtime covers locals typed receipt.formation.sourceType receipt.formation.ordinary receipt.formation.coercions heaps admitted
-    (fun nativeTyped => .chosen_ordinary i history
-      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed nativeTyped)) completed
+    wellFormed runtime covers locals typed receipt.formation.sourceType (receipt.formation.snapshots environment)
+    receipt.formation.ordinary receipt.formation.coercions heaps admitted
+    (fun formed nativeTyped => .chosen_ordinary (index receipt formed.captured formed.captures rfl) formed.closureHistory
+      (chosen_at root expressionSyntax receipt chosen environment captured prefixContext owner initial packet observed
+        formed nativeTyped)) completed
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaFormation

@@ -18,6 +18,7 @@ structure Shape (source : TypedSource) where
   outer : StatementNode
   inputs : source.inputs = [binder]
   binderType : binder.scheme = .mono .bool
+  binderCopied : CaptureBinders.copiedBinder? source binder.id = some binder
   roots : source.roots = [.statement outer.id]
   readFound : source.lookupExpression? read.id = some read
   readForm : read.form = .reference binder.name (.local binder.id)
@@ -32,13 +33,23 @@ structure Shape (source : TypedSource) where
   outerFound : source.lookupStatement? outer.id = some outer
   outerForm : outer.form = .returnStmt (some lambda.id)
 
-def capturedHeap (flag : Bool) : Dynamic.Heap := ⟨[{type := .bool, value := some (.bool flag)}]⟩
+def capturedCell (flag : Bool) : Dynamic.Cell := {type := .bool, value := some (.bool flag)}
+
+/-- The factory's parameter cell. -/
+def parameterHeap (flag : Bool) : Dynamic.Heap := ⟨[capturedCell flag]⟩
+
+/-- The parameter cell and the closure's snapshot of it. -/
+def capturedHeap (flag : Bool) : Dynamic.Heap := ⟨[capturedCell flag, capturedCell flag]⟩
+
+/-- A call appends its own copy of the snapshot. -/
+def calledHeap (flag : Bool) : Dynamic.Heap :=
+  ⟨[capturedCell flag, capturedCell flag, capturedCell flag]⟩
 
 def capturedFunction {compiled : SourceCoreUnifiedCompilation.Compiled}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (shape : Shape header.function.source) : Dynamic.Closure := {
   parameters := [], resultType := .word, body := [shape.inner.id]
-  source := header.function.source, captured := [(shape.binder.id, ⟨0⟩)]
+  source := header.function.source, captured := [(shape.binder.id, ⟨1⟩)]
   context := header.context, evidence := header.function.evidence }
 
 private theorem roots_injective {left right : List StatementId}
@@ -64,7 +75,8 @@ theorem input_types : header.types = [.bool] := by
   have types := Dynamic.MonoBindersExtend.bodyTypes_eq header.extended
   simpa only [params, List.map_cons, List.map_nil, shape.binderType, TypeSystem.Scheme.mono] using types.symm
 
-/-- Build the factory execution directly from its original allocation and lambda. -/
+/-- Build the factory execution directly from its original allocation and
+lambda, which copies the parameter cell into the closure's snapshot. -/
 theorem factory_plain {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {global : Dynamic.GlobalFunction}
     (sourceAt : NamedSourceAt header rawD global) (invocation : Staging.Recursive.Scope) (flag : Bool) :
     RecursiveNamedPublicPhysicalSessionState.PlainValue header header invocation ⟨[]⟩ [.bool flag]
@@ -72,24 +84,28 @@ theorem factory_plain {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {gl
   have params : header.function.parameters = [shape.binder] :=
     header.parameters.trans (header.inputs.symm.trans shape.inputs)
   have allocated : Dynamic.Heap.Allocates ⟨[]⟩ shape.binder.scheme.body
-      (some (.bool flag)) ⟨0⟩ (capturedHeap flag) := by
+      (some (.bool flag)) ⟨0⟩ (parameterHeap flag) := by
     rw [shape.binderType]
     exact .append
   have bound : Dynamic.BindersAllocate [] ⟨[]⟩ header.function.parameters [.bool flag]
-      [(shape.binder.id, ⟨0⟩)] (capturedHeap flag) := by
+      [(shape.binder.id, ⟨0⟩)] (parameterHeap flag) := by
     rw [params]
     exact .cons allocated (.nil _ _)
+  have stored : Dynamic.Heap.Allocates ⟨[]⟩ .bool (some (.bool flag)) ⟨0⟩ (parameterHeap flag) := .append
+  have snapshot : Dynamic.EnvironmentCopies header.function.source [(shape.binder.id, ⟨0⟩)]
+      (parameterHeap flag) [(shape.binder.id, ⟨1⟩)] (capturedHeap flag) :=
+    .copied shape.binderCopied stored.reads_new .append (.nil _)
   have roots : header.function.body = [shape.outer.id] :=
     roots_injective (header.agreement.roots.symm.trans shape.roots)
   have expression : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
       header.context header.function.evidence header.function.source [(shape.binder.id, ⟨0⟩)]
-      (capturedHeap flag) shape.lambda.id (.closure (capturedFunction header shape)) (capturedHeap flag) := by
+      (parameterHeap flag) shape.lambda.id (.closure (capturedFunction header shape)) (capturedHeap flag) := by
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.lambdaFound)
     · rw [shape.lambdaForm]
-      exact .lambda (by rw [shape.lambdaRequirements, shape.lambdaCoercions]; rfl)
+      exact .lambda (by rw [shape.lambdaRequirements, shape.lambdaCoercions]; rfl) snapshot
     · rw [shape.lambdaCoercions]; exact .nil
   have body : Dynamic.FunctionStatementsExecute (Program.ofChecked compiled.sourceProgram)
-      header.context header.function.evidence header.function.source [(shape.binder.id, ⟨0⟩)] (capturedHeap flag)
+      header.context header.function.evidence header.function.source [(shape.binder.id, ⟨0⟩)] (parameterHeap flag)
       header.function.body header.context (.returned (.closure (capturedFunction header shape))) (capturedHeap flag) := by
     rw [roots]
     exact .singleton (lookupStatement?_sound shape.outerFound)

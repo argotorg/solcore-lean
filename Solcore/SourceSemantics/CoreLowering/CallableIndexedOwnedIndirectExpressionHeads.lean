@@ -600,12 +600,12 @@ theorem source_continuations_of_canonical
     (arguments := arguments) (nativeArguments := payloads)
     future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
     (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) (callerBridge.pool argumentState) (future.bodyOrigin escaped) budget
-    (fun entry added length spine reached child strict => meaning child strict
+    (fun entry added length copied spine kept reached child strict => meaning child strict
       (CallableIndexedOwnedLambdaCanonicalEntries.source_entry
         (arguments := arguments) (nativeArguments := payloads)
         future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) (callerBridge.pool argumentState) (future.bodyOrigin escaped)
-        entry added length spine reached))
+        entry added length copied spine kept reached))
 
 /-- The real ordered argument post and its actual effects select an entry-specific
 native body continuation. No arbitrary origin entry is admitted. -/

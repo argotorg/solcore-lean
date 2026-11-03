@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreClosedOwnedAnonymousInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceAdapters
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
 
 /-! Complete indirect expressions close their literal/read children and their
 actual anonymous body internally. The same concrete returned pool supplies all
@@ -214,30 +215,34 @@ private theorem boolean_arguments (boolean : Bool)
     exact .builtinBoolean rfl
   · rw [coercions]; exact .nil
 
-/-- This real Source cell is appended after the callee/arguments heap. -/
+/-- This real Source cell is appended after the call's copies of the captured
+cells. -/
 def parameterHeap (before : Dynamic.Heap) (binder : TypedBinder) (boolean : Bool) : Dynamic.Heap :=
   ⟨before.cells ++ [⟨binder.scheme.body, some (.bool boolean), none⟩]⟩
 
-/-- A nonempty parameter allocation and an actual nil Unit body construct the
-original closure application. No body trace or body meaning is a premise. -/
+/-- The call's copies of the captured cells, a nonempty parameter allocation and
+an actual nil Unit body construct the original closure application. No body
+trace or body meaning is a premise. -/
 private theorem boolean_nil_call {function : Dynamic.Closure} (binder : TypedBinder) (boolean : Bool)
     (parameters : function.parameters = [binder]) (emptyBody : function.body = [])
     (unitResult : function.resultType = .unit) (frame : Dynamic.ClosureFrame program function)
     {callContext : SourceSemantics.Context} {types : List TypeSystem.Ty}
-    (extended : MonoBindersExtend function.source.owner function.context function.parameters types callContext) :
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types callContext)
+    {copies : Dynamic.Environment} {copiedHeap : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap) :
     RecursiveNamedCallBounds.CallOutcome program (SourceExecutionSize.stepSize [SourceExecutionSize.stepSize []])
       context evidence function.evidence before (.closure function) [.bool boolean] (.value .unit)
-      (parameterHeap before binder boolean) := by
-  have allocated : Dynamic.BindersAllocate function.captured before function.parameters [.bool boolean]
-      ((binder.id, ⟨before.cells.length⟩) :: function.captured) (parameterHeap before binder boolean) := by
+      (parameterHeap copiedHeap binder boolean) := by
+  have allocated : Dynamic.BindersAllocate copies copiedHeap function.parameters [.bool boolean]
+      ((binder.id, ⟨copiedHeap.cells.length⟩) :: copies) (parameterHeap copiedHeap binder boolean) := by
     rw [parameters]
     exact .cons .append (.nil _ _)
   have executed : SourceExecutionSize.FunctionStatementsExecute program (SourceExecutionSize.stepSize [])
-      callContext function.evidence function.source ((binder.id, ⟨before.cells.length⟩) :: function.captured)
-      (parameterHeap before binder boolean) function.body callContext
-      (.fallthrough ((binder.id, ⟨before.cells.length⟩) :: function.captured)) (parameterHeap before binder boolean) := by
+      callContext function.evidence function.source ((binder.id, ⟨copiedHeap.cells.length⟩) :: copies)
+      (parameterHeap copiedHeap binder boolean) function.body callContext
+      (.fallthrough ((binder.id, ⟨copiedHeap.cells.length⟩) :: copies)) (parameterHeap copiedHeap binder boolean) := by
     rw [emptyBody]; exact .nil
-  exact .value (.closureUnit rfl frame unitResult extended allocated executed ⟨_, rfl⟩)
+  exact .value (.closureUnit rfl frame unitResult extended copy allocated executed ⟨_, rfl⟩)
 end SourceChildren
 
 section ClosedParent
@@ -347,22 +352,26 @@ include parent parameters emptyBody unitResult escaped rawResult nativeResult st
   ordinaryCode sourceLookup sourceRead ordinaryCell stored nativeLookup nativeRead
   extension faithful observations functionTypes sameLedger runtimeLedger unique uninitialized missing in
 /-- This full accepted indirect parent is constructed from real read/literal
-children and a genuine nonempty Source allocation. Its body and child meaning
-families are closed internally; the returned pool is the actual restored post. -/
+children, the call's copies of the captured cells and a genuine nonempty
+Source allocation. Its body and child meaning families are closed internally;
+the returned pool is the actual restored post. -/
 theorem parent_source_post :
-    ∃ sourceSize value finalStore finalMap finalWorld,
+    ∃ copies copiedHeap sourceSize value finalStore finalMap finalWorld,
+      Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap ∧
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment before id
-        (.value .unit) (parameterHeap before binder boolean) ∧
+        (.value .unit) (parameterHeap copiedHeap binder boolean) ∧
       Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
       GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
           (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
         finalMap finalWorld compiler.original.type lowered.type faults (.value .unit) value ∧
       CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile)
-        finalMap finalWorld (parameterHeap before binder boolean) finalStore ∧
+        finalMap finalWorld (parameterHeap copiedHeap binder boolean) finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before (parameterHeap before binder boolean) ∧
-      ∃ reached : State headers keys ⟨scope, finalMap, finalWorld, parameterHeap before binder boolean, finalStore, canonical⟩,
+      AdministrativePreserved mapping store finalMap finalStore ∧
+      Dynamic.HeapMetadataExtend before (parameterHeap copiedHeap binder boolean) ∧
+      ∃ reached : State headers keys ⟨scope, finalMap, finalWorld, parameterHeap copiedHeap binder boolean, finalStore,
+        canonical⟩,
         Relates initial reached ∧ poolObservations initial reached := by
   obtain ⟨calleeSize, calleeTrace⟩ := actual_callee_read (context := context) readCode sourceLookup sourceRead ordinaryCell stored
   have calleeEvaluation := native_callee compiler readCode ordinaryCode nativeLookup nativeRead
@@ -370,9 +379,11 @@ theorem parent_source_post :
     wellFormed runtime covers locals heapTyped sourceTyped calleeTrace.sound).1
   have args := boolean_arguments (program := program) (context := context) (evidence := evidence)
     (environment := environment) (before := before) boolean booleanFound booleanForm booleanRequirements booleanCoercions
+  obtain ⟨copies, copiedHeap, copy⟩ := CellAwareGeneralizedSourceInversion.copies_exist function.source
+    (show Dynamic.EnvironmentAgrees before function.context.locals function.captured from captures)
   have called := boolean_nil_call (program := program) (context := context) (evidence := evidence)
     (before := before) binder boolean (source_parameters closure parameters) emptyBody unitResult
-    (closure.bodyOrigin escaped).frame closure.inputs.extended
+    (closure.bodyOrigin escaped).frame closure.inputs.extended copy
   let argumentsSize := SourceExecutionSize.stepSize
     [SourceExecutionSize.stepSize [SourceExecutionSize.stepSize [], SourceExecutionSize.stepSize []], SourceExecutionSize.stepSize []]
   let callSize := SourceExecutionSize.stepSize [SourceExecutionSize.stepSize []]
@@ -393,8 +404,8 @@ theorem parent_source_post :
       initial (Relates.refl initial) (.refl _) (.refl _) (AdministrativePreserved.refl _ _) (Dynamic.HeapMetadataExtend.refl _)
       calleeTrace calleeEvaluation stageAccepted arityAccepted
       (SourceSuffix.of_call args called) (Nat.le_max_left _ _) (Nat.le_max_right _ _)
-  exact ⟨sourceSize, value, finalStore, finalMap, finalWorld, original, evaluated, represented, finalHeaps,
-    maps, worlds, frame, metadata, reached, related, reached_pool_observations related⟩
+  exact ⟨copies, copiedHeap, sourceSize, value, finalStore, finalMap, finalWorld, copy, original, evaluated, represented,
+    finalHeaps, maps, worlds, frame, metadata, reached, related, reached_pool_observations related⟩
 
 include parent parameters emptyBody unitResult escaped rawResult nativeResult stageAccepted arityAccepted
   booleanFound booleanForm booleanType binderType booleanRequirements booleanCoercions booleanTyped codes

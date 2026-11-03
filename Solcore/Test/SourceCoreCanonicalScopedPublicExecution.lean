@@ -56,7 +56,7 @@ structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgra
   repeatedPacking : Dynamic.ValuesPack repeatedArguments (.product (.word repeatedNext) (.product (.bool false) (.bool false)))
   repeatedReadTrace : SourceInvocation support
     (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
-    secondReadState.heap first.source repeatedArguments (.value (.word firstNext)) finalState.heap
+    secondReadState.heap first.source repeatedArguments (.value (.word seed)) finalState.heap
 
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (extra : ObservedMake fixture observed)

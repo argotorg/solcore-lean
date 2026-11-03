@@ -67,7 +67,7 @@ structure ObservedSequence (fixture : CompiledFixture) (observed : ObservedProgr
   thirdValue : thirdRead.completion.value = .word (Core.Word.ofNatModulo 55)
   heapSizes : [first.session.heapSize, first.completion.session.heapSize, second.completion.session.heapSize,
     firstRead.completion.session.heapSize, third.completion.session.heapSize, secondRead.completion.session.heapSize,
-    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [13,31,49,122,140,213,286,340]
+    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [13,40,67,149,176,258,340,403]
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -92,6 +92,6 @@ def observeSequence (fixture : CompiledFixture) (program : ObservedProgram fixtu
   let ⟨thirdValue⟩ ← observed (thirdRead.completion.value = .word (Core.Word.ofNatModulo 55)) "third compiled indirect output"
   let ⟨heapSizes⟩ ← observed ([first.session.heapSize, first.completion.session.heapSize, second.completion.session.heapSize,
     firstRead.completion.session.heapSize, third.completion.session.heapSize, secondRead.completion.session.heapSize,
-    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [13,31,49,122,140,213,286,340]) "exact seven-session heap sequence"
+    repeatedRead.completion.session.heapSize, thirdRead.completion.session.heapSize] = [13,40,67,149,176,258,340,403]) "exact seven-session heap sequence"
   return {first, second, secondType, firstRead, firstValue, third, thirdType, firstSecond, firstThird, secondThird, secondRead, secondValue, repeatedRead, repeatedValue, thirdRead, thirdValue, heapSizes}
 end Tests.SourceCoreMethodOwnEvidence

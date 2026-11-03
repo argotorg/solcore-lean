@@ -82,6 +82,37 @@ theorem policy_fields (fixture : AcceptedFixture) :
         none none fuel (source fixture.packet.named) scope id reason) := by
   exact ⟨rfl, rfl, rfl, fun _ _ _ _ => rfl⟩
 
+private theorem lowerBinder_missing {catalog : SourceCoreLocalPolymorphism.Catalog}
+    {caller : SourceCoreLocalPolymorphism.Key} {active : TypeSystem.Substitution} {source : TypedSource}
+    {scope : SourceCoreBasic.Scope} {binder : TypedBinder}
+    (missing : catalog.bindings.filter (fun entry => decide (entry.caller = caller ∧ entry.binder.id = binder.id)) = []) :
+    ∃ error, SourceCoreLocalPolymorphism.lowerBinder catalog caller active source scope binder = .error error := by
+  unfold SourceCoreLocalPolymorphism.lowerBinder SourceCoreLocalPolymorphism.Catalog.binding
+  simp only [missing]
+  repeat' split
+  all_goals exact ⟨_, rfl⟩
+
+/-- The actual local binder is monomorphic: a polymorphic binder needs a
+generalized catalog binding, which the actual parent rows exclude. The
+initialized `let` therefore takes no snapshot of its scope. -/
+theorem binder_monomorphic (fixture : AcceptedFixture) :
+    fixture.graph.binder.scheme.quantified.isEmpty = true := by
+  cases polymorphic : fixture.graph.binder.scheme.quantified.isEmpty with
+  | true => rfl
+  | false =>
+    have prepared := fixture.calls.binderPrepared
+    unfold binderAction SourceCoreGeneralFunctions.contextualBinder at prepared
+    rw [polymorphic, if_neg Bool.false_ne_true] at prepared
+    have missing : fixture.packet.compiled.indexed.base.locals.bindings.filter (fun entry =>
+        decide (entry.caller = fixture.packet.named.signature.key ∧ entry.binder.id = fixture.graph.binder.id)) = [] := by
+      rw [List.filter_eq_nil_iff]
+      intro entry member
+      exact List.any_eq_false.mp fixture.parentRows.generalized entry member
+    obtain ⟨error, failed⟩ := lowerBinder_missing (active := []) (source := source fixture.packet.named)
+      (scope := initialScope fixture.packet) missing
+    rw [failed] at prepared
+    cases prepared
+
 /-- One original body acceptance supplies the initialized and returned branches. -/
 theorem of_body (fixture : AcceptedFixture) : Nonempty (Receipt fixture) := by
   obtain ⟨readPolicy, cells, binderPolicy, expressionPolicy⟩ := policy_fields fixture
@@ -126,6 +157,7 @@ theorem of_body (fixture : AcceptedFixture) : Nonempty (Receipt fixture) := by
   have resultMatch := ensure_same resultMatch
   have tailEq : tail = returned fixture := Except.ok.inj tailGenerated.symm
   subst tail
+  rw [if_pos (binder_monomorphic fixture)] at generated
   simp only [SourceCoreSourceCells.letInitialized, cells] at generated
   obtain ⟨allocationCode, allocationAccepted, generated⟩ := bind_ok generated
   obtain ⟨allocation, annotation, same, allocationEq⟩ :=

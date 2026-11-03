@@ -1,12 +1,16 @@
 import Solcore.Test.SourceCoreMixedImperativeSource
 
-/-! Independent source steps expose the exact local cells and append order. -/
+/-! Independent source steps expose the exact local cells and append order.
+Closures capture by value: a generalized `let` copies the environment before
+storing its descriptor, and each identity call copies the descriptor's
+captures before allocating its parameter. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreMixedImperative
 open Solcore Core Frontend SourceInference SourceSemantics
 open Tests.SourceCoreGeneralizedIdentity (IdentityShape)
 open Tests.SourceCoreSelectedInterleavedLocal (CallShape)
+open Tests.SourceSemanticsCaptureCopies
 
 def StoredValue (binder : TypedBinder) (environment : Dynamic.Environment)
     (heap : Dynamic.Heap) (value : Dynamic.Value) : Prop :=
@@ -20,6 +24,16 @@ def StoredIdentity {source : TypedSource} (shape : IdentityShape source)
     Dynamic.Heap.Reads heap location cell ∧
     cell.generalized = some (shape.descriptor definitionContext captured) ∧
     Dynamic.RuntimeContextFields definitionContext context
+
+/-- Copying a captured environment only appends cells. -/
+theorem HeapAppends.of_copies (source : TypedSource) (environment : Dynamic.Environment) (heap : Dynamic.Heap) :
+    HeapAppends heap (copies source environment heap).2 :=
+  copies_appends source environment heap
+
+theorem HeapAppends.of_environmentCopies {source : TypedSource} {environment copied : Dynamic.Environment}
+    {before after : Dynamic.Heap} (copy : Dynamic.EnvironmentCopies source environment before copied after) :
+    HeapAppends before after :=
+  appends_of_copies copy
 
 theorem StoredValue.mono {binder : TypedBinder} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {value : Dynamic.Value} (stored : StoredValue binder environment before value)
@@ -97,7 +111,7 @@ theorem StoredIdentity.invoke {program : SourceSemantics.Program} {source : Type
     (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument value argumentsHeap) :
     ∃ after, Dynamic.ExpressionEvaluates program context evidence source environment before call.node.id value after ∧
       HeapAppends argumentsHeap after := by
-  obtain ⟨calleeType, argumentType, callee, _argument⟩ := call_typed call state.runtime.graph.nodeOccurrencesUnique typed
+  obtain ⟨calleeType, argumentType, callee, argumentTyped⟩ := call_typed call state.runtime.graph.nodeOccurrencesUnique typed
   obtain ⟨node,contains,sameType⟩ := callee.stored_type
   have sameNode := Option.some.inj ((lookupExpression?_complete state.runtime.graph.nodeOccurrencesUnique contains).symm.trans call.callee.found)
   subst node
@@ -106,17 +120,38 @@ theorem StoredIdentity.invoke {program : SourceSemantics.Program} {source : Type
     · rw [same]; exact ⟨callee.type_admissible.binders,.builtin .word⟩
     · rw [same]; exact ⟨callee.type_admissible.binders,.builtin .bool⟩
   rcases stored with ⟨definitionContext,captured,location,cell,lookup,read,descriptor,fields⟩
+  have descriptorTyped := ((state.heapTyped cell read.member).generalized_inv descriptor).2
+  have argumentKept := wellFormed.wholeLanguagePreservation.expression _ _ _ _ _ _ _ _ _
+    state.runtime state.covers state.locals state.heapTyped argumentTyped argumentTrace
+  have readable : Readable argumentsHeap captured :=
+    (Readable.of_agrees descriptorTyped.captures).mono argumentKept.heap_extends
   have trace := shape.invoke_from_typed call captured environment evidence state.runtime
     (by simpa only [state.runtime.signatures] using wellFormed.signatures)
     state.covers state.locals state.heapTyped (sameType.symm ▸ callee) ground lookup read descriptor fields argumentTrace
-  exact ⟨_,trace,⟨_,rfl⟩⟩
+    (copies_spec_applySubstitution [(shape.typeVariable, type)] source readable)
+  exact ⟨_,trace,(HeapAppends.of_copies source captured argumentsHeap).trans ⟨_,rfl⟩⟩
 
 
 def valueHeap (before : Dynamic.Heap) (binder : TypedBinder) (value : Dynamic.Value) : Dynamic.Heap :=
   ⟨before.cells ++ [{type := binder.scheme.body, value := some value}]⟩
+
+/-- The generalized `let` copies the environment, then stores the principal
+descriptor over the copies. -/
 def identityHeap {source : TypedSource} (shape : IdentityShape source) (context : SourceSemantics.Context)
     (environment : Dynamic.Environment) (before : Dynamic.Heap) : Dynamic.Heap :=
-  ⟨before.cells ++ [{type := shape.binder.scheme.body, value := none, generalized := some (shape.descriptor context environment)}]⟩
+  ⟨(copies source environment before).2.cells ++
+    [{type := shape.binder.scheme.body, value := none,
+      generalized := some (shape.descriptor context (copies source environment before).1)}]⟩
+
+/-- The descriptor's location, after the copies of the environment. -/
+def identityLocation (source : TypedSource) (environment : Dynamic.Environment) (before : Dynamic.Heap) :
+    Dynamic.Location :=
+  ⟨(copies source environment before).2.cells.length⟩
+
+theorem identityHeap_appends {source : TypedSource} (shape : IdentityShape source) (context : SourceSemantics.Context)
+    (environment : Dynamic.Environment) (before : Dynamic.Heap) :
+    HeapAppends before (identityHeap shape context environment before) :=
+  (HeapAppends.of_copies source environment before).trans ⟨_,rfl⟩
 
 theorem generalized_step {program : SourceSemantics.Program} {source : TypedSource}
     (shape : IdentityShape source) (site : StatementAt source (.letDecl shape.binder (some shape.lambda.id)))
@@ -126,23 +161,28 @@ theorem generalized_step {program : SourceSemantics.Program} {source : TypedSour
     {control : ControlContext} {facts : StatementFacts}
     (typed : StatementHasType source control context site.node.id final facts) :
     Dynamic.StatementExecutes program context evidence source environment before site.node.id final
-      (.fallthrough ((shape.binder.id,⟨before.cells.length⟩) :: environment)) (identityHeap shape context environment before) ∧
-    SourceState program source final evidence ((shape.binder.id,⟨before.cells.length⟩) :: environment)
+      (.fallthrough ((shape.binder.id,identityLocation source environment before) :: environment))
       (identityHeap shape context environment before) ∧
-    StoredIdentity shape final ((shape.binder.id,⟨before.cells.length⟩) :: environment) (identityHeap shape context environment before) ∧
+    SourceState program source final evidence ((shape.binder.id,identityLocation source environment before) :: environment)
+      (identityHeap shape context environment before) ∧
+    StoredIdentity shape final ((shape.binder.id,identityLocation source environment before) :: environment)
+      (identityHeap shape context environment before) ∧
     BinderExtends source.owner context shape.binder final := by
   have form := form_at state.runtime.graph.nodeOccurrencesUnique site.found typed
   rw [site.formEq] at form
   cases form with
   | letInitialized _ mono _ => rw [shape.scheme] at mono; cases mono
   | letInitializedGeneralized polymorphic _ _ _ extended =>
-    have allocation : Dynamic.Heap.AllocatesGeneralized before (shape.descriptor context environment)
-        ⟨before.cells.length⟩ (identityHeap shape context environment before) := .append
+    have snapshot := copies_spec source (Readable.of_agrees state.locals)
+    have allocation : Dynamic.Heap.AllocatesGeneralized (copies source environment before).2
+        (shape.descriptor context (copies source environment before).1)
+        (identityLocation source environment before) (identityHeap shape context environment before) := .append
     have trace := Dynamic.StatementExecutes.letInitializedGeneralized (program := program)
-      (evidence := evidence) (lookupStatement?_sound site.found) site.formEq (shape.captures context environment)
-      polymorphic extended allocation
+      (evidence := evidence) (lookupStatement?_sound site.found) site.formEq snapshot
+      (shape.captures context (copies source environment before).1) polymorphic extended allocation
     exact ⟨trace,state.after_statement wellFormed typed trace,
-      ⟨context,environment,_,_,.head,allocation.reads_new,rfl,.ofBinderExtends extended⟩,extended⟩
+      ⟨context,(copies source environment before).1,_,_,.head,allocation.reads_new,rfl,.ofBinderExtends extended⟩,
+      extended⟩
 
 theorem ordinary_step {program : SourceSemantics.Program} {source : TypedSource}
     {binder : TypedBinder} {initializer : ExpressionId} (site : StatementAt source (.letDecl binder (some initializer)))

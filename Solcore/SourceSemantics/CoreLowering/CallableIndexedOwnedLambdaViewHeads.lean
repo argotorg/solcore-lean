@@ -263,8 +263,93 @@ theorem nested_entry_frame
   exact (initial.rows owner.position).frame_eq
 
 /-- Formation uses the original supported nested body and authentic current
-metadata. Its native closure retains the complete actual captured environment;
-formation changes neither the store nor any row's records. -/
+metadata. Its native closure captures the copies of the captured cells; the
+copies extend the store, and no row's records change. The represented closure
+is transferred forward into any including function model. -/
+theorem formation_in
+    (head : LambdaAt (values := .initial compiled.compatible.checked) headers caller registry faults rank
+      source context evidence scope id lowered)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers)
+    (globals : caller.globals = compiled.indexed.base.globals.length)
+    (slots : ∀ header, header ∈ headers → header.slot < compiled.indexed.base.globals.length)
+    (initial : State headers keys ⟨scope, mapping, world, heap, store, canonical⟩)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (prefixZero : owner.key.capturePrefix = 0)
+    (observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+      (values := .initial compiled.compatible.checked) (program := program)
+      headers owner.key.locations 1 scope canonical owner.key.frameLocation)
+    (history : Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
+      (initial.rows owner.position).authority.current (initial.rows owner.position).authority.ghost
+      (some (CallableIndexedNamedGeneration.state caller.named)))
+    (bundle : (canonical.map Value.type)[scope.length]? = some caller.named.signature.parameterType)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+      mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
+    {functions : FunctionModel compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
+    (inclusion : (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile).Includes functions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functions mapping world heap store) :
+    ∃ value captured finalHeap finalStore finalMap finalWorld,
+      Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
+        environment heap id (.closure (formed head captured)) finalHeap ∧
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment heap captured
+        finalHeap ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) finalStore ∧
+      CompatiblePayload.ValueRep compiled.compatible.checked registry functions
+        finalMap finalWorld head.code.sourceNode.type (.closure (formed head captured)) value lowered.type ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld finalHeap
+        finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap finalHeap ∧
+      ProtectedStateTransition.Transition (protocol headers keys) initial
+        ⟨scope, finalMap, finalWorld, finalHeap, finalStore, canonical⟩ := by
+  let entry := nested_entry initial owner prefixZero observed history bundle globals
+  let captured : Captures compiled.indexed mapping world scope environment actual :=
+    captures_for complete globals entry related agrees typed
+  let code : Code compiled.indexed (formed head environment) scope captured.administrative := actualCode head environment
+  let currentHistory : History code := historyAt head entry environment
+  let body : CallableIndexedOwnedFunctionValues.StaticSupport headers registry faults code := actualSupport head environment
+  have origin : CallableIndexedOwnedFunctionValues.ActualSourceOrigin code currentHistory body :=
+    CallableIndexedOwnedFunctionValues.ActualSourceOrigin.of_nested head entry environment
+  have captureGlobals := capture_globals_for complete globals slots entry related agrees typed
+  have captureGlobals' : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+      (values := .initial compiled.compatible.checked) (program := program)
+      headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation := by
+    have frame : entry.catalog.authority.frameLocation = owner.key.frameLocation := by
+      exact (initial.rows owner.position).frame_eq
+    simpa only [frame] using captureGlobals
+  have current : (initial.rows owner.position).authority.current = currentHistory.native := by
+    rfl
+  have ghost : (initial.rows owner.position).authority.ghost = currentHistory.ghost := by
+    rfl
+  obtain ⟨formedRecord, sourceValue, native, represented, _determined⟩ :=
+    CallableIndexedOwnedFunctionValues.lambda_of_formation (compiled := compiled) (program := program)
+      (headers := headers) (keys := keys) (function := formed head environment) initial owner captured code currentHistory body origin
+      captureGlobals' (reference_index head) current ghost profile heaps head.snapshots
+      (by change Dynamic.OrdinaryRequirementLayout head.code.sourceNode.requirements head.code.sourceNode.coercions []
+          rw [head.requirements, head.coercions]; rfl) head.coercions
+  refine ⟨CallableIndexedLambdaValues.value code formedRecord.embedding currentHistory.native formedRecord.closureActual,
+    formedRecord.captured, formedRecord.finalHeap, formedRecord.finalStore, formedRecord.finalMap,
+    formedRecord.finalWorld, ?_, formedRecord.copy, ?_, ?_, formedRecord.heaps, formedRecord.maps, formedRecord.worlds,
+    formedRecord.frame, formedRecord.copy.metadata_extends,
+    ProtectedStateTransition.AdministrativeTransport.transition (protocol headers keys)
+      (administrativeTransport headers keys) initial formedRecord.maps formedRecord.worlds formedRecord.frame
+      formedRecord.copy.metadata_extends⟩
+  · change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
+      environment heap head.code.id (.closure (formed head formedRecord.captured)) formedRecord.finalHeap at sourceValue
+    simpa only [head.identifier] using sourceValue
+  · exact Eq.mp (congrArg (fun expression => Evaluates actual store expression
+      (.inRight .word (CallableIndexedLambdaValues.value code formedRecord.embedding currentHistory.native
+        formedRecord.closureActual)) formedRecord.finalStore)
+      (congrArg (fun output : SourceCoreBasic.LoweredExpr => output.expression.rename ξ) head.emitted)) native
+  · rw [head.sourceType, head.nativeType]
+    exact .function (inclusion represented)
+
+/-- Formation in the owned function model itself. -/
 theorem formation
     (head : LambdaAt (values := .initial compiled.compatible.checked) headers caller registry faults rank
       source context evidence scope id lowered)
@@ -287,51 +372,26 @@ theorem formation
       mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
-    ∃ value,
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store) :
+    ∃ value captured finalHeap finalStore finalMap finalWorld,
       Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-        environment heap id (.closure (formed head environment)) heap ∧
-      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) store ∧
+        environment heap id (.closure (formed head captured)) finalHeap ∧
+      Dynamic.EnvironmentCopies (CallableIndexedNamedGeneration.source caller.named) environment heap captured
+        finalHeap ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inRight .word value) finalStore ∧
       CompatiblePayload.ValueRep compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile)
-        mapping world head.code.sourceNode.type (.closure (formed head environment)) value lowered.type ∧
+        finalMap finalWorld head.code.sourceNode.type (.closure (formed head captured)) value lowered.type ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld finalHeap
+        finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap finalHeap ∧
       ProtectedStateTransition.Transition (protocol headers keys) initial
-        ⟨scope, mapping, world, heap, store, canonical⟩ := by
-  let entry := nested_entry initial owner prefixZero observed history bundle globals
-  let captured : Captures compiled.indexed mapping world scope environment actual :=
-    captures_for complete globals entry related agrees typed
-  let code : Code compiled.indexed (formed head environment) scope captured.administrative := actualCode head environment
-  let currentHistory : History code := historyAt head entry environment
-  let body : CallableIndexedOwnedFunctionValues.StaticSupport headers registry faults code := actualSupport head environment
-  have origin : CallableIndexedOwnedFunctionValues.ActualSourceOrigin code currentHistory body :=
-    CallableIndexedOwnedFunctionValues.ActualSourceOrigin.of_nested head entry environment
-  have captureGlobals := capture_globals_for complete globals slots entry related agrees typed
-  have captureGlobals' : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
-      (values := .initial compiled.compatible.checked) (program := program)
-      headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation := by
-    have frame : entry.catalog.authority.frameLocation = owner.key.frameLocation := by
-      exact (initial.rows owner.position).frame_eq
-    simpa only [frame] using captureGlobals
-  have current : (initial.rows owner.position).authority.current = currentHistory.native := by
-    rfl
-  have ghost : (initial.rows owner.position).authority.ghost = currentHistory.ghost := by
-    rfl
-  obtain ⟨sourceValue, native, represented, _determined⟩ :=
-    CallableIndexedOwnedFunctionValues.lambda_of_formation (compiled := compiled) (program := program)
-      (headers := headers) (keys := keys) (function := formed head environment) initial owner captured code currentHistory body origin
-      captureGlobals' (reference_index head) current ghost profile stored
-      (by change Dynamic.OrdinaryRequirementLayout head.code.sourceNode.requirements head.code.sourceNode.coercions []
-          rw [head.requirements, head.coercions]; rfl) head.coercions
-  refine ⟨CallableIndexedLambdaValues.value code captured.embedding currentHistory.native actual, ?_, ?_, ?_,
-    ProtectedStateTransition.Transition.refl (protocol headers keys) initial⟩
-  · change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
-      environment heap head.code.id (.closure (formed head environment)) heap at sourceValue
-    simpa only [head.identifier] using sourceValue
-  · exact Eq.mp (congrArg (fun expression => Evaluates actual store expression
-      (.inRight .word (CallableIndexedLambdaValues.value code captured.embedding currentHistory.native actual)) store)
-      (congrArg (fun output : SourceCoreBasic.LoweredExpr => output.expression.rename ξ) head.emitted)) native
-  · rw [head.sourceType, head.nativeType]
-    exact .function represented
+        ⟨scope, finalMap, finalWorld, finalHeap, finalStore, canonical⟩ :=
+  formation_in head profile complete globals slots initial owner prefixZero observed history bundle related agrees typed
+    (fun represented => represented) heaps
 
 theorem formation_preserves
     (head : LambdaAt (values := .initial compiled.compatible.checked) headers caller registry faults rank
@@ -379,15 +439,17 @@ theorem formation_preserves
   | value evaluated =>
     rename_i result
     have original : Dynamic.ExpressionEvaluates program (formed head environment).context (formed head environment).evidence
-        (formed head environment).source (formed head environment).captured heap code.id result after := by
+        (formed head environment).source environment heap code.id result after := by
       simpa only [code, actualCode, recaptureCode, formed, CallableIndexedLambdaGeneration.closure, head.identifier] using evaluated
-    obtain ⟨rfl, rfl⟩ := source_value_of_code (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
+    obtain ⟨captured, rfl, copy⟩ := source_value_of_code (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
       (program := program) (function := formed head environment) (scope := scope) (administrative := nativePrefix (values := .initial compiled.compatible.checked) (indexed := compiled.indexed) (program := program) caller)
       code unique emptyCoercions original
-    obtain ⟨value, _source, native, represented, transition⟩ :=
-      formation head profile complete globals slots initial owner prefixZero observed history bundle related agrees typed heaps.runtime_hasTypes
-    exact ⟨.inRight .word value, store, mapping, world, native, .value represented, heaps,
-      .refl _, .refl _, .refl _ _, .refl _, transition⟩
+    obtain ⟨value, formedCaptured, finalHeap, finalStore, finalMap, finalWorld, _source, formedCopy, native, represented,
+        finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
+      formation head profile complete globals slots initial owner prefixZero observed history bundle related agrees typed heaps
+    obtain ⟨rfl, rfl⟩ := Dynamic.EnvironmentCopies.functional copy formedCopy
+    exact ⟨.inRight .word value, finalStore, finalMap, finalWorld, native, .value represented, finalHeaps,
+      maps, worlds, frame, metadata, transition⟩
   | fault failed =>
     rename_i reason
     have original : Dynamic.ExpressionFaults program (formed head environment).context (formed head environment).evidence
@@ -436,15 +498,16 @@ theorem formation_reflects
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) initial
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  obtain ⟨nativeValue, sourceValue, native, represented, transition⟩ :=
-    formation head profile complete globals slots initial owner prefixZero observed history bundle related agrees typed heaps.runtime_hasTypes
+  obtain ⟨nativeValue, captured, finalHeap, formedStore, finalMap, finalWorld, sourceValue, _, native, represented,
+      finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
+    formation head profile complete globals slots initial owner prefixZero observed history bundle related agrees typed heaps
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound native
   have original : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment heap id
-      (.value (.closure (formed head environment))) heap := by
+      (.value (.closure (formed head captured))) finalHeap := by
     simpa only [sameSource] using (Dynamic.ExpressionEvaluatesOutcome.value sourceValue)
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size original
-  exact ⟨sourceSize, _, heap, mapping, world, sized, .value represented, heaps,
-    .refl _, .refl _, .refl _ _, .refl _, transition⟩
+  exact ⟨sourceSize, _, finalHeap, finalMap, finalWorld, sized, .value represented, finalHeaps,
+    maps, worlds, frame, metadata, transition⟩
 
 end Formation
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaViewHeads

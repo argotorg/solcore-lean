@@ -1,8 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationGeneralizedFlow
-import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationAllocationReceipt
+import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationSnapshotReceipt
 
-/-! The actual compiler allocation callback supplies its exact receipts.
-The common flow proof keeps compiler request Source and runtime Source distinct. -/
+/-! The actual compiler allocation callback supplies its exact receipts for the
+scope copies and the marked descriptor allocation of a generalized
+declaration. The common flow proof keeps compiler request Source and runtime
+Source distinct; both copy the same identifiers. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -11,7 +13,7 @@ namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationGeneralizedAcc
 open Core Frontend SourceInference GeneralHeap ReadOnly CoreProof
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedFlowOutcomes (Represents Post restore_post)
-open TypedLexicalWhile (initializedRequest sequence)
+open SourceSemantics.CaptureBinders (copiedBinder?)
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header whole program)}
@@ -54,7 +56,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     lowered.expression (LanguageResult.resultType lowered.type) whole.indexed.layouts.definitions)
   {code : Expr}
   (childType : SourceCoreBasic.ensureType (.binder binder.id) payload lowered.type = .ok ())
-  (allocated : SourceCoreSourceCells.letInitialized index.policy.sourceCells index.compilerSource scope Renaming.id
+  (allocated : SourceCoreSourceCells.letInitializedSnapshot index.policy.sourceCells index.compilerSource scope
     binder (LocalLoop.controlType type) payload lowered.expression body = .ok code)
   (sourceEq : invocation.source = index.source)
 
@@ -74,11 +76,13 @@ theorem preserves (budget : Nat)
     · exact sameType
     · simp [SourceCoreBasic.ensureType, sameType] at childType
   subst payload
-  obtain ⟨allocation, annotation, same, emitted⟩ := index.let_initialized_receipt allocated
+  obtain ⟨allocation, annotation, same, captured, copied, emitted⟩ := index.let_initialized_snapshot_receipt allocated
   rw [emitted]
   have compilerOrdinary := index.compiler_noninput ordinary
+  have copiedIds : ∀ id, (copiedBinder? index.compilerSource id).isSome = (copiedBinder? index.source id).isSome :=
+    fun id => (index.copied_ids id).symm
   apply CellAwareInvocationGeneralizedFlow.preserves_at_source
-    (allocation := allocation) (annotation := annotation) <;> assumption
+    (allocation := allocation) (annotation := annotation) (copied := copied) <;> assumption
 
 variable {initializerNode : ExpressionNode} {parameters : List TypedBinder}
   {result : TypeSystem.Ty} {lambdaBody : List StatementId}
@@ -103,11 +107,13 @@ theorem reflects (budget : Nat)
     · exact sameType
     · simp [SourceCoreBasic.ensureType, sameType] at childType
   subst payload
-  obtain ⟨allocation, annotation, same, emitted⟩ := index.let_initialized_receipt allocated
+  obtain ⟨allocation, annotation, same, captured, copied, emitted⟩ := index.let_initialized_snapshot_receipt allocated
   rw [emitted]
   have compilerOrdinary := index.compiler_noninput ordinary
+  have copiedIds : ∀ id, (copiedBinder? index.compilerSource id).isSome = (copiedBinder? index.source id).isSome :=
+    fun id => (index.copied_ids id).symm
   apply CellAwareInvocationGeneralizedFlow.reflects_at_source
-    (allocation := allocation) (annotation := annotation) <;> assumption
+    (allocation := allocation) (annotation := annotation) (copied := copied) <;> assumption
 
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationGeneralizedAcceptedAllocation

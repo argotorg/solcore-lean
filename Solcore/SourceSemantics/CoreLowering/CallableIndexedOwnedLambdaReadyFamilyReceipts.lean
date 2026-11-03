@@ -78,7 +78,8 @@ def of_source_entry
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩) :
@@ -86,7 +87,7 @@ def of_source_entry
   ⟨owner, principal, function, scope, captured.administrative, code, history, inputs, body,
     prefixContext, sourceSeed, syntaxTree,
     (CallableIndexedOwnedLambdaNestedReadyContinuations.source_admitted_entry captured code history inputs functions owner caller body
-      beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length spine reached).source.runtime⟩
+      beforeTyped argumentsTyped stable principal observed prefixContext sourceSeed entry added length copied spine kept reached).source.runtime⟩
 
 /-- The measured native prefix retains the same compiler/body receipts and
 supplies independent raw Source admission at its own reached pool. -/
@@ -117,12 +118,12 @@ theorem source_continuation (budget : Nat)
           functions program (origin index))) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs functions owner caller body budget := by
-  intro entry added length spine reached child strict outcome after trace
+  intro entry added length copied spine kept reached child strict outcome after trace
   let index := of_source_entry captured code history inputs functions owner caller body beforeTyped argumentsTyped stable
-    principal observed prefixContext sourceSeed syntaxTree entry added length spine reached
+    principal observed prefixContext sourceSeed syntaxTree entry added length copied spine kept reached
   let actualEntry := CallableIndexedOwnedLambdaNestedReadyContinuations.source_admitted_entry
     captured code history inputs functions owner caller body beforeTyped argumentsTyped stable
-    principal observed prefixContext sourceSeed entry added length spine reached
+    principal observed prefixContext sourceSeed entry added length copied spine kept reached
   have ready := below index child strict
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds,
       frame, metadata, exit, returned, related, _post⟩ :=

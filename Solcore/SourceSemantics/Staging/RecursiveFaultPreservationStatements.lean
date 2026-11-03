@@ -423,8 +423,9 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           exact ⟨afterTyped.transportClosed fields.signatures.symm middleClosed runtime.closed
             (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             allocationExtends.trans tailExtends⟩
-  | @letGeneralized nextSize mode scope context middleContext finalContext environment before bound after
-      id rest node binder initializer function location outcome contains form captures polymorphic extension allocated next =>
+  | @letGeneralized nextSize mode scope context middleContext finalContext environment before snapshotHeap bound
+      after id rest node binder initializer captured function location outcome contains form snapshot captures
+      polymorphic extension allocated next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
@@ -432,9 +433,11 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | letInitializedGeneralized _ requirements generalizes initializerTyped staticExtension =>
           have sameContext := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension staticExtension
           subst staticMiddle
-          have functionTyped := captures.wellTyped runtime locals polymorphic requirements generalizes initializerTyped extension
-          have allocationExtends := HeapTypesExtend.of_generalized_allocation allocated
-          have boundTyped := heap.allocateGeneralized functionTyped allocated
+          have functionTyped := captures.wellTyped runtime (snapshot.agrees locals) polymorphic requirements
+            generalizes initializerTyped extension
+          have allocationExtends :=
+            snapshot.metadata_extends.trans (HeapTypesExtend.of_generalized_allocation allocated)
+          have boundTyped := (heap.copy snapshot).allocateGeneralized functionTyped allocated
           have boundEnvironment : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
             cases extension
             exact .cons allocated.reads_new (congrArg (fun retained : TypedBinder => retained.scheme.body) captures.binder_eq)
@@ -687,13 +690,14 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | cons headTyped tailTyped =>
         exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
           runtime covers locals heap headTyped tailTyped (.letUninitialized mono extended allocated) next
-  | @initializedGeneralized nextSize scope context middleContext finalContext environment before bound after
-      binder initializer rest function location outcome captures polymorphic extended allocated next =>
+  | @initializedGeneralized nextSize scope context middleContext finalContext environment before snapshotHeap
+      bound after binder initializer rest captured function location outcome snapshot captures polymorphic extended
+      allocated next =>
       cases typed with
       | cons headTyped tailTyped =>
         exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
           runtime covers locals heap headTyped tailTyped
-          (.letInitializedGeneralized captures polymorphic extended allocated) next
+          (.letInitializedGeneralized snapshot captures polymorphic extended allocated) next
   | @initialized childSize nextSize scope context middleContext finalContext environment before middle bound after
       binder initializer rest value location outcome mono extended child allocated next =>
       cases typed with

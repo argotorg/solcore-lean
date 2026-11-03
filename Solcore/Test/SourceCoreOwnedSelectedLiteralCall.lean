@@ -1,11 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectBodies
 import Solcore.Test.SourceCoreClosedOwnedLexicalBody
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
 
 /-! A literal lambda call uses its authentic formation receipt and caller packet.
 The lambda-only child family and selected anonymous body continuations are closed
-here from static receipts. Empty arguments, empty parameters and a nil Unit body
-construct the complete Source parent; native reflection retains its own Source
-grade and the exact actual returned pool. -/
+here from static receipts. The formation and the call each copy the captured
+cells; empty arguments, empty parameters and a nil Unit body then construct the
+complete Source parent; native reflection retains its own Source grade and the
+exact actual returned pool. -/
 set_option autoImplicit false
 set_option maxHeartbeats 2400000
 set_option maxRecDepth 8192
@@ -114,14 +116,18 @@ variable {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : Sour
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (agrees : EnvironmentsAgree ξ canonical actual)
   (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
-  (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+    (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store)
 
 private def bridge := CallableIndexedOwnedIndirectCallerProtocol.forget_slots
   (CallableIndexedOwnedNestedCallerProtocol.carrier (headers := headers) owner caller)
 
-private def selectedClosure :=
+local notation "Record" => CallableIndexedOwnedSelectedIndirectHeads.CalleeRecord owner caller prefixZero profile complete
+  callerGlobals head (bridge owner caller) initial initial.property related agrees typed
+
+private def selectedClosure (formedRecord : Record) :=
   CallableIndexedOwnedSelectedIndirectHeads.formedReceipt owner caller prefixZero profile complete callerGlobals slots head
-    (bridge owner caller) initial initial.property related agrees typed stored
+    (bridge owner caller) initial initial.property related agrees typed heaps formedRecord
 
 
 variable (bodyUninitialized : ∀ id location, faults (.uninitializedLocation location) ((actualCode head.formation environment).reasonAt id))
@@ -129,29 +135,38 @@ variable (bodyUninitialized : ∀ id location, faults (.uninitializedLocation lo
     faults (.missingMappingDefault value) (((actualCode head.formation environment).reasonAt id).add tag))
 
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes owners
-  uninitialized missing escaped profiles callerGlobals related agrees typed stored bodyUninitialized bodyMissing in
+  uninitialized missing escaped profiles callerGlobals related agrees typed heaps bodyUninitialized bodyMissing in
 /-- The exact argument post selects the internally closed authentic body. -/
-private theorem closed_source (budget : Nat) :
+private theorem closed_source (formedRecord : Record)
+    (reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
+      ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore, canonical⟩)
+    (budget : Nat) :
     SourceContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) (head.selected environment).escaped
-      (bridge owner caller) initial budget := by
+      (environment := environment) (ids := head.ids) profile
+      (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed heaps formedRecord)
+      (head.selected environment).escaped (bridge owner caller) reached budget := by
   exact CallableIndexedOwnedSelectedIndirectBodies.source_continuations owner prefixZero profile complete globals slots sameLayouts
-    extension faithful observations functionTypes owners uninitialized missing escaped ranks profiles (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) rfl rfl
-    callerGlobals bodyUninitialized bodyMissing (head.selected environment).escaped (bridge owner caller) initial budget
+    extension faithful observations functionTypes owners uninitialized missing escaped ranks profiles
+    (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed heaps formedRecord) rfl rfl
+    callerGlobals bodyUninitialized bodyMissing (head.selected environment).escaped (bridge owner caller) reached budget
 
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes
-  uninitialized missing escaped profiles callerGlobals related agrees typed stored bodyUninitialized bodyMissing in
-private theorem closed_native (budget : Nat) :
+  uninitialized missing escaped profiles callerGlobals related agrees typed heaps bodyUninitialized bodyMissing in
+private theorem closed_native (formedRecord : Record)
+    (reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
+      ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore, canonical⟩)
+    (budget : Nat) :
     NativeContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) (head.selected environment).escaped
-      (bridge owner caller) initial budget := by
+      (environment := environment) (ids := head.ids) profile
+      (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed heaps formedRecord)
+      (head.selected environment).escaped (bridge owner caller) reached budget := by
   exact CallableIndexedOwnedSelectedIndirectBodies.native_continuations owner prefixZero profile complete globals slots sameLayouts
-    extension faithful observations functionTypes uninitialized missing escaped ranks profiles (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) rfl rfl
-    callerGlobals bodyUninitialized bodyMissing (head.selected environment).escaped (bridge owner caller) initial budget
+    extension faithful observations functionTypes uninitialized missing escaped ranks profiles
+    (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed heaps formedRecord) rfl rfl
+    callerGlobals bodyUninitialized bodyMissing (head.selected environment).escaped (bridge owner caller) reached budget
 
 
 variable
-  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) mapping world heap store)
   (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
   (heapTyped : Dynamic.HeapWellTyped context heap)
   (stable : StableRows initial.val)
@@ -160,45 +175,53 @@ variable
   (covers : evidence.Covers context)
   (unique : NodeOccurrencesUnique source)
 
-include prefixZero profile complete callerGlobals slots initial related agrees typed stored wellFormed runtime covers locals heapTyped noArguments noParameters emptyBody unitResult in
+include prefixZero profile complete callerGlobals slots initial related agrees typed heaps wellFormed runtime covers locals heapTyped noArguments noParameters emptyBody unitResult in
 /-- The complete original Source parent is constructed from genuine formation,
-empty ordered arguments, actual empty parameters and the nil Unit body. -/
+which copies the captured cells, empty ordered arguments, the call's own copies,
+actual empty parameters and the nil Unit body. -/
 theorem actual_source :
-    ∃ size, RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment heap id
-      (.value .unit) heap := by
-  let closure := (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored)
-  obtain ⟨calleeSource, _native⟩ := CallableIndexedOwnedSelectedIndirectHeads.formed_receipts owner caller prefixZero
-    profile complete callerGlobals slots head (bridge owner caller) initial initial.property related agrees typed stored
+    ∃ size after, RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment heap id
+      (.value .unit) after := by
+  obtain ⟨formedRecord⟩ := CallableIndexedOwnedLambdaFormationReceipts.formation_exists head.formation complete
+    callerGlobals slots ((bridge owner caller).pool initial) owner prefixZero initial.property.observed
+    initial.property.carried initial.property.bundle related agrees typed heaps
+  let closure := (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed heaps formedRecord)
+  obtain ⟨calleeSource, _copy, _native⟩ := CallableIndexedOwnedSelectedIndirectHeads.formed_receipts owner caller prefixZero
+    profile complete callerGlobals slots head (bridge owner caller) initial initial.property related agrees typed heaps
+    formedRecord
   obtain ⟨calleeSize, calleeTrace⟩ := SourceExecutionSize.ExpressionEvaluates.has_size calleeSource
-  have arguments : SourceExecutionSize.ExpressionsEvaluate program (SourceExecutionSize.stepSize [])
-      context evidence source environment heap head.ids [] heap := by
-    rw [noArguments]; exact .nil
-  have parameters : (formed head.formation environment).parameters = [] := noParameters
-  have body : (formed head.formation environment).body = [] := emptyBody
-  have result : (formed head.formation environment).resultType = .unit := unitResult
-  have allocated : Dynamic.BindersAllocate (formed head.formation environment).captured heap
-      (formed head.formation environment).parameters [] (formed head.formation environment).captured heap := by
+  let function := formed head.formation formedRecord.captured
+  have noArgumentsAt : ∀ heap', SourceExecutionSize.ExpressionsEvaluate program (SourceExecutionSize.stepSize [])
+      context evidence source environment heap' head.ids [] heap' := by
+    intro heap'; rw [noArguments]; exact .nil
+  have arguments := noArgumentsAt formedRecord.finalHeap
+  have capturesValid : Dynamic.EnvironmentAgrees formedRecord.finalHeap function.context.locals function.captured :=
+    formedRecord.copy.agrees locals
+  obtain ⟨copies, after, callCopy⟩ := CellAwareGeneralizedSourceInversion.copies_exist function.source capturesValid
+  have parameters : function.parameters = [] := noParameters
+  have body : function.body = [] := emptyBody
+  have result : function.resultType = .unit := unitResult
+  have allocated : Dynamic.BindersAllocate copies after function.parameters [] copies after := by
     rw [parameters]; exact .nil _ _
   have executed : SourceExecutionSize.FunctionStatementsExecute program (SourceExecutionSize.stepSize [])
-      closure.inputs.context (formed head.formation environment).evidence (formed head.formation environment).source
-      (formed head.formation environment).captured heap (formed head.formation environment).body closure.inputs.context
-      (.fallthrough (formed head.formation environment).captured) heap := by
+      closure.inputs.context function.evidence function.source copies after function.body closure.inputs.context
+      (.fallthrough copies) after := by
     have nilTrace : SourceExecutionSize.FunctionStatementsExecute program (SourceExecutionSize.stepSize [])
-        closure.inputs.context (formed head.formation environment).evidence (formed head.formation environment).source
-        (formed head.formation environment).captured heap [] closure.inputs.context
-        (.fallthrough (formed head.formation environment).captured) heap := .nil
+        closure.inputs.context function.evidence function.source copies after [] closure.inputs.context
+        (.fallthrough copies) after := .nil
     exact Eq.mp (congrArg (fun statements => SourceExecutionSize.FunctionStatementsExecute program (SourceExecutionSize.stepSize [])
-      closure.inputs.context (formed head.formation environment).evidence (formed head.formation environment).source
-      (formed head.formation environment).captured heap statements closure.inputs.context
-      (.fallthrough (formed head.formation environment).captured) heap) body.symm) nilTrace
+      closure.inputs.context function.evidence function.source copies after statements closure.inputs.context
+      (.fallthrough copies) after) body.symm) nilTrace
   have called : RecursiveNamedCallBounds.CallOutcome program
       (SourceExecutionSize.stepSize [SourceExecutionSize.stepSize []]) context evidence
-      (formed head.formation environment).evidence heap (.closure (formed head.formation environment)) [] (.value .unit) heap :=
+      function.evidence formedRecord.finalHeap (.closure function) [] (.value .unit) after :=
     .value (.closureUnit rfl (closure.bodyOrigin (head.selected environment).escaped).frame result
-      closure.inputs.extended allocated executed ⟨_, rfl⟩)
-  exact SourceSuffix.to_expression head.compiler.found head.compiler.originalForm head.parent.requirements
-    head.parent.coercions head.compiler.argumentCoercions head.parent.arity wellFormed runtime covers locals heapTyped
+      closure.inputs.extended callCopy allocated executed ⟨_, rfl⟩)
+  obtain ⟨size, sourceTrace⟩ := SourceSuffix.to_expression head.compiler.found head.compiler.originalForm
+    head.parent.requirements head.parent.coercions head.compiler.argumentCoercions head.parent.arity wellFormed runtime
+    covers (locals.mono formedRecord.copy.metadata_extends) (heapTyped.copy formedRecord.copy)
     head.sourceArguments head.sourceCount calleeTrace (SourceSuffix.of_call arguments called)
+  exact ⟨size, after, sourceTrace⟩
 
 
 /-- Observations refer to every real reached row, retaining duplicate records. -/
@@ -226,53 +249,51 @@ theorem observe_transition {firstIndex finalIndex : ProtectedStateTransition.Ind
       (initial := first.val) (final := reached.val) related⟩
 
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes owners
-  uninitialized missing escaped profiles callerGlobals sameSource related agrees typed stored heaps locals heapTyped stable
+  uninitialized missing escaped profiles callerGlobals sameSource related agrees typed heaps locals heapTyped stable
   wellFormed runtime covers unique bodyUninitialized bodyMissing noArguments noParameters emptyBody unitResult in
 /-- This whole literal call has no expression or body execution law as input.
 The same actual callee, argument and body posts supply the restored caller pool. -/
 theorem literal_call_source_post :
-    ∃ sourceSize,
+    ∃ sourceSize after,
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment heap id
-        (.value .unit) heap ∧
+        (.value .unit) after ∧
       ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
       GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
         finalMap finalWorld head.compiler.original.type lowered.type faults (.value .unit) value ∧
       CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld heap finalStore ∧
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap heap ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       ProtectedStateTransition.Transition (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller)
-        initial ⟨scope, finalMap, finalWorld, heap, finalStore, canonical⟩ := by
-  obtain ⟨sourceSize, sourceTrace⟩ := actual_source
+        initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨sourceSize, after, sourceTrace⟩ := actual_source
     (owner := owner) (prefixZero := prefixZero) (profile := profile) (complete := complete)
     (slots := slots) (caller := caller) (callerGlobals := callerGlobals) (head := head)
-    (initial := initial) (related := related) (agrees := agrees) (typed := typed) (stored := stored)
+    (initial := initial) (related := related) (agrees := agrees) (typed := typed) (heaps := heaps)
     (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals) (heapTyped := heapTyped)
     (noArguments := noArguments) (noParameters := noParameters) (emptyBody := emptyBody) (unitResult := unitResult)
-  have bodies : SourceContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) (head.selected environment).escaped
-      (bridge owner caller) initial sourceSize := closed_source (owner := owner) (prefixZero := prefixZero) (profile := profile) (complete := complete)
-    (globals := globals) (slots := slots) (sameLayouts := sameLayouts) (extension := extension) (faithful := faithful)
-    (observations := observations) (functionTypes := functionTypes) (owners := owners) (uninitialized := uninitialized)
-    (missing := missing) (escaped := escaped) (ranks := ranks) (profiles := profiles) (caller := caller)
-    (callerGlobals := callerGlobals) (head := head) (initial := initial) (related := related) (agrees := agrees)
-    (typed := typed) (stored := stored) (bodyUninitialized := bodyUninitialized) (bodyMissing := bodyMissing) sourceSize
-  refine ⟨sourceSize, sourceTrace, ?_⟩
+  refine ⟨sourceSize, after, sourceTrace, ?_⟩
   exact CallableIndexedOwnedSelectedIndirectHeads.preserves_bounded
       (owner := owner) (caller := caller) (prefixZero := prefixZero) (profile := profile) (complete := complete)
       (globals := callerGlobals) (slots := slots) (head := head) (bridge := bridge owner caller) (initial := initial)
-      (packet := initial.property) (related := related) (agrees := agrees) (typed := typed) (stored := stored)
+      (packet := initial.property) (related := related) (agrees := agrees) (typed := typed)
       (heaps := heaps) (locals := locals) (heapTyped := heapTyped) (stable := stable) (wellFormed := wellFormed)
       (runtime := runtime) (covers := covers) (unique := unique) (budget := sourceSize)
       (arguments := fun child _ => children_preserve (owner := owner) (prefixZero := prefixZero) (profile := profile)
         (complete := complete) (caller := caller) (callerGlobals := callerGlobals) (slots := slots)
         (sameSource := sameSource) child unique)
-      (bodies := bodies) sourceTrace (Nat.le_refl _)
+      (bodies := fun formedRecord reached _ => closed_source (owner := owner) (prefixZero := prefixZero) (profile := profile)
+        (complete := complete) (globals := globals) (slots := slots) (sameLayouts := sameLayouts) (extension := extension)
+        (faithful := faithful) (observations := observations) (functionTypes := functionTypes) (owners := owners)
+        (uninitialized := uninitialized) (missing := missing) (escaped := escaped) (ranks := ranks) (profiles := profiles)
+        (caller := caller) (callerGlobals := callerGlobals) (head := head) (initial := initial) (related := related)
+        (agrees := agrees) (typed := typed) (heaps := heaps) (bodyUninitialized := bodyUninitialized)
+        (bodyMissing := bodyMissing) formedRecord reached sourceSize) sourceTrace (Nat.le_refl _)
 
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes
-  uninitialized missing escaped profiles callerGlobals sameSource related agrees typed stored heaps locals heapTyped stable
+  uninitialized missing escaped profiles callerGlobals sameSource related agrees typed heaps locals heapTyped stable
   wellFormed runtime covers bodyUninitialized bodyMissing in
 /-- Native completion follows the same actual selection and body family and
 returns a genuine independently graded whole Source parent at the real post. -/
@@ -289,24 +310,22 @@ theorem literal_call_native_post {size : Nat} {value : Value} {finalStore : Stor
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       ProtectedStateTransition.Transition (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller)
         initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  have bodies : NativeContinuations (source := source) (context := context) (evidence := evidence)
-      (environment := environment) (ids := head.ids) profile (selectedClosure owner prefixZero profile complete slots caller callerGlobals head initial related agrees typed stored) (head.selected environment).escaped
-      (bridge owner caller) initial size := closed_native (owner := owner) (prefixZero := prefixZero) (profile := profile) (complete := complete)
-    (globals := globals) (slots := slots) (sameLayouts := sameLayouts) (extension := extension) (faithful := faithful)
-    (observations := observations) (functionTypes := functionTypes) (uninitialized := uninitialized)
-    (missing := missing) (escaped := escaped) (ranks := ranks) (profiles := profiles) (caller := caller)
-    (callerGlobals := callerGlobals) (head := head) (initial := initial) (related := related) (agrees := agrees)
-    (typed := typed) (stored := stored) (bodyUninitialized := bodyUninitialized) (bodyMissing := bodyMissing) size
   exact CallableIndexedOwnedSelectedIndirectHeads.reflects_bounded
       (owner := owner) (caller := caller) (prefixZero := prefixZero) (profile := profile) (complete := complete)
       (globals := callerGlobals) (slots := slots) (head := head) (bridge := bridge owner caller) (initial := initial)
-      (packet := initial.property) (related := related) (agrees := agrees) (typed := typed) (stored := stored)
+      (packet := initial.property) (related := related) (agrees := agrees) (typed := typed)
       (heaps := heaps) (locals := locals) (heapTyped := heapTyped) (stable := stable) (wellFormed := wellFormed)
       (runtime := runtime) (covers := covers) (budget := size)
       (arguments := fun child _ => children_reflect (owner := owner) (prefixZero := prefixZero) (profile := profile)
         (complete := complete) (caller := caller) (callerGlobals := callerGlobals) (slots := slots)
         (sameSource := sameSource) child)
-      (bodies := bodies) completed (Nat.le_refl _)
+      (bodies := fun formedRecord reached _ => closed_native (owner := owner) (prefixZero := prefixZero) (profile := profile)
+        (complete := complete) (globals := globals) (slots := slots) (sameLayouts := sameLayouts) (extension := extension)
+        (faithful := faithful) (observations := observations) (functionTypes := functionTypes)
+        (uninitialized := uninitialized) (missing := missing) (escaped := escaped) (ranks := ranks) (profiles := profiles)
+        (caller := caller) (callerGlobals := callerGlobals) (head := head) (initial := initial) (related := related)
+        (agrees := agrees) (typed := typed) (heaps := heaps) (bodyUninitialized := bodyUninitialized)
+        (bodyMissing := bodyMissing) formedRecord reached size) completed (Nat.le_refl _)
 
 end Parent
 end Tests.SourceCoreOwnedSelectedLiteralCall

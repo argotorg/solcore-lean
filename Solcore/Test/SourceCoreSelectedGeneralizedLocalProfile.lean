@@ -47,7 +47,7 @@ def run : IO Unit := do
         session := completed.session
         heaps := heaps ++ [session.heapSize]
       | _ => throw (IO.userError "generalized retained-session invocation failed")
-    require (heaps == [2,14,26,38]) "generalized exact native heaps changed"
+    require (heaps == [2,23,44,65]) "generalized exact native heaps changed"
     IO.println "GENERALIZED_LOCAL_COMPLETE_PROFILE: originals1/cache1/profile1"
     IO.println "GENERALIZED_LOCAL_SOURCE_FIRST: original typed body to actual initial public output"
     IO.println s!"GENERALIZED_LOCAL_REUSE_NATIVE_HEAPS: {heaps}"

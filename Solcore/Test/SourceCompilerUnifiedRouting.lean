@@ -76,16 +76,18 @@ def run : IO Unit := do
   | .outOfFuel state => assertTrue (reprStr state == reprStr initial) "zero fuel changed source prefix"
   | other => throw (IO.userError s!"zero fuel did not suspend: {reprStr other}")
   let resumed ← get "native source resume" (paused.resume 150000)
+  /- Closures capture by value: each call of `f` starts again from the
+  captured `value`, so `f(4)` returns 14. -/
   match resumed.observation with
   | .done (.word value) final =>
-      assertTrue (value == w 17 && reprStr (final.heap.take 2) == reprStr initial.heap) "resumed captures or source prefix changed"
+      assertTrue (value == w 14 && reprStr (final.heap.take 2) == reprStr initial.heap) "resumed captures or source prefix changed"
   | other => throw (IO.userError s!"resumed source checkpoint did not complete: {reprStr other}")
   let failure ← compile program "failAfterWrite"
   let failed ← get "cached source language fault" (failure.cached.run failure.key [] options.inputValidationFuel options.executionFuel initial)
   match failed.observation with
   | .fault (.uninitializedLocal _) state =>
       assertTrue (state.heap.any fun cell => match cell.value with | some (.word value) => value == w 3 | _ => false)
-        "language failure lost preceding captured mutation"
+        "language failure lost the closure call's preceding write to its copy"
   | other => throw (IO.userError s!"public source fault changed: {reprStr other}")
   let spin ← compile program "spin"
   let paused ← get "recursive native checkpoint" (spin.cached.run spin.key [] options.inputValidationFuel 43 initial)
@@ -102,7 +104,7 @@ def run : IO Unit := do
   let rawPublic : SourceCoreExecution.Value := .mapping (.comptime .word) (.comptime .word)
     [(.word (w 1), .word (w 7)), (.word (w 1), .word (w 9))]
   assertTrue ((← mapping.run [rawPublic]) == rawPublic) "public mapping header/order changed"
-  capture.checkResume [.word (w 10)] (.word (w 17)) 0
+  capture.checkResume [.word (w 10)] (.word (w 14)) 0
   let publicFailure ← failure.invoke []
   match publicFailure.outcome with
   | .failed reason _ =>

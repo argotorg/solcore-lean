@@ -76,6 +76,7 @@ def special (inputs : Inputs) (prepared : SourceCoreLocalEvidence.Prepared) (fue
 def policy (inputs : Inputs) (prepared : SourceCoreLocalEvidence.Prepared) (fuel : Nat) : SourceCoreFunctions.Policy :=
   { (representation inputs prepared).expressions with
     callables := SourceCoreGeneralFunctions.callablePolicy inputs.native prepared.substitution
+    snapshotLambda := fun lambda => some inputs.initializer ≠ some lambda
     lowerBinder := binder inputs prepared
     readExpression := fun source id => do
       let source ← SourceCoreGeneralFunctions.contextualSource inputs.program inputs.current.plan

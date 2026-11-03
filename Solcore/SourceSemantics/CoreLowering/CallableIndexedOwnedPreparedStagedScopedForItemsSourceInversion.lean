@@ -50,7 +50,7 @@ theorem initialized {binder : TypedBinder} {initializer : ExpressionId}
       Size.ForItems program registry tailSize invocation nextContext
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   cases trace with
-  | initializedGeneralized _ polymorphic _ _ _ => exact False.elim (polymorphic monomorphic)
+  | initializedGeneralized _ _ polymorphic _ _ _ => exact False.elim (polymorphic monomorphic)
   | initialized _ actualExtended child allocated remaining =>
       cases extended
       cases actualExtended

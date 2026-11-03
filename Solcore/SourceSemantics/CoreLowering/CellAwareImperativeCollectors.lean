@@ -6,6 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeTree
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNativeBodyCollectors
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotTyping
 
 /-! The native body collector follows the actual named compiler and its
 marked lexical allocations. Source typing supplies context extension; the
@@ -229,8 +230,14 @@ theorem collected
       have same := ensure_same sameType
       subst payload
       obtain ⟨tailCode, generatedTail, accepted⟩ := bind_ok accepted
-      simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
+      have generalizedBinder : binder.scheme.quantified.isEmpty = false := by
+        cases quantified : binder.scheme.quantified with
+        | nil => exact absurd quantified polymorphic
+        | cons _ _ => rfl
+      simp only [generalizedBinder, Bool.false_eq_true, ↓reduceIte, SourceCoreSourceCells.letInitializedSnapshot,
+        allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
+      obtain ⟨captured, copied, accepted⟩ := bind_ok accepted
       cases accepted
       obtain ⟨allocation, annotation, same, rfl⟩ :=
         CallableIndexedAllocationCompletion.accepted_receipts (fun error => .sourceAllocation (reprStr error)) generatedAllocation
@@ -245,13 +252,14 @@ theorem collected
       subst fuel
       obtain ⟨initial⟩ := GeneralizedLocalInitializerPackets.of_receipt prepared initial
         (profiles site childFuel) (bodyProfiles site childFuel) rfl rfl rfl rfl rfl rfl rfl
-      obtain ⟨_, childTyped⟩ := computation_child nativeTyped
+      obtain ⟨⟨_, childTyped⟩, tailTyped⟩ := CellAwareGeneralizedSnapshotTyping.snapshot_children allocation annotation
+        same copied (fun _ _ _ found => CellAwareGeneralizedSnapshotTyping.scope_cell found) nativeTyped
       have tail := ih
         (CellAwareNativeBodyCollectors.scope_generalized lowered.type declarations declaration polymorphic extended)
-        (by cases extended; exact sourceSignatures) generatedTail (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
+        (by cases extended; exact sourceSignatures) generatedTail tailTyped
       exact .generalizedInitialized found form declaration polymorphic extended ordinary
         initializerFound initializerForm valueType requirements coercions site initial
-        (initial.typed childTyped) allocation annotation same tail
+        (initial.typed childTyped) allocation annotation same copied tail
   | @initialized sourceContext nextContext mode id node binder initializer initializerNode rest found form member mono extended ordinary initializerFound valueType typed value remaining ih =>
     cases fuel with
     | zero => cases accepted
@@ -270,6 +278,7 @@ theorem collected
       have same := ensure_same sameType
       subst payload
       obtain ⟨tailCode, generatedTail, accepted⟩ := bind_ok accepted
+      simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
       simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
       obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
       cases accepted

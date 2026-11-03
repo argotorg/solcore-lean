@@ -1611,26 +1611,28 @@ mutual
           (.closure function) arguments
           (.argumentArityMismatch function.parameters.length arguments.length) heap
     | closureBody
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment parameterTypes callContext finalContext reason}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment parameterTypes callContext finalContext reason}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (fault : FunctionStatementsFault program callContext function.evidence
           function.source environment bound function.body finalContext reason after) :
         CallableFaults program context callerEvidence invocationEvidence before
           (.closure function) arguments reason after
     | closureControlEscape
-        {context callerEvidence invocationEvidence before bound after function
-          arguments environment parameterTypes callContext finalContext outcome}
+        {context callerEvidence invocationEvidence before copied bound after function
+          arguments entry environment parameterTypes callContext finalContext outcome}
         (invocation_eq : invocationEvidence = function.evidence)
         (frame : ClosureFrame program function)
         (parameters_extend : MonoBindersExtend function.source.owner
           function.context function.parameters parameterTypes callContext)
-        (allocate : BindersAllocate function.captured before function.parameters
+        (copy : EnvironmentCopies function.source function.captured before entry copied)
+        (allocate : BindersAllocate entry copied function.parameters
           arguments environment bound)
         (execute : FunctionStatementsExecute program callContext function.evidence
           function.source environment bound function.body finalContext outcome after)

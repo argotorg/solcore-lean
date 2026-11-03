@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterNativeTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionScalarNativeTyping
+import Solcore.SourceSemantics.CoreLowering.CaptureCopyIndexedTyping
 
 /-! Native typing is assembled before a lambda Code exists. Actual compiler
 receipts retain the parameter fold, manifest, frame snapshot and descriptor.
@@ -121,12 +122,24 @@ theorem certificate_native {checked : SourceCoreCompatibleCatalog.Checked}
     (fun binding member => (parameterWF binding member).extend_definitions extension)
     ordinary administrative current bodyTyped
   rw [← bundle] at allocated
+  have copiedAccepted := receipt.copied
+  rw [allocation] at copiedAccepted
+  have copied := CaptureCopyTyping.copyScopeIndexed_hasType copiedAccepted rfl
+    (CallableIndexedAmbient.frame_registered prepared)
+    (by
+      intro index id payload found
+      have bound := (List.getElem?_eq_some_iff.mp found).1
+      simp only [List.cons_append, List.getElem?_cons_succ]
+      rw [List.getElem?_append_left (by simpa [SourceCoreLocalCell.coreContext] using bound)]
+      simp [SourceCoreLocalCell.coreContext, found])
+    (fun binding member => (scopeWF binding member).extend_definitions extension)
+    (by simpa using current) allocated
   have raw := manifest_native (manifest ▸ receipt.bodyHook)
     (fun binding member => (scopeWF binding member).extend_definitions extension) (context := SourceCoreLocalCell.coreContext scope ++ administrative)
     (by
       intro position binding found
       rw [List.getElem?_append_left (by simpa [SourceCoreLocalCell.coreContext] using (List.getElem?_eq_some_iff.mp found).1)]
-      simp [SourceCoreLocalCell.coreContext, found, OptionalCell.referenceType]) allocated
+      simp [SourceCoreLocalCell.coreContext, found, OptionalCell.referenceType]) copied
   obtain ⟨origin, actualBody, _, rawEq, _, globals, _, emitted⟩ :=
     CallableIndexedFormation.expressionHook_receipt prepared.ancestry (expressionHook ▸ receipt.expressionHook)
   have sameBody := (Expr.lambda.inj rawEq).2.2
@@ -147,7 +160,25 @@ theorem certificate_native {checked : SourceCoreCompatibleCatalog.Checked}
   · rename_i sameType
     change reported = CallableContract.functionType receipt.parameterCore receipt.resultCore at sameType
     have typed := LanguageResult.success_hasType (descriptor.wrap_hasType (TaggedFunction.anonymous_hasType lambdaTyped))
-    simpa only [receipt.emitted, ← sameExpression, sameType] using typed
+    rw [sameExpression] at typed
+    have snapshot := receipt.snapshot
+    have snapshotTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) receipt.snapshotted
+        (LanguageResult.resultType (CallableContract.functionType receipt.parameterCore receipt.resultCore))
+        prepared.layouts.definitions := by
+      split at snapshot
+      · rw [allocation] at snapshot
+        exact CaptureCopyTyping.copyScopeIndexed_hasType snapshot rfl (CallableIndexedAmbient.frame_registered prepared)
+          (by
+            intro index id payload found
+            have bound := (List.getElem?_eq_some_iff.mp found).1
+            show (SourceCoreLocalCell.coreContext scope ++ administrative)[index]? = _
+            rw [List.getElem?_append_left (by simpa [SourceCoreLocalCell.coreContext] using bound)]
+            simp [SourceCoreLocalCell.coreContext, found])
+          (fun binding member => (scopeWF binding member).extend_definitions extension)
+          (by simpa using current) typed
+      · rw [← Except.ok.inj snapshot]
+        exact typed
+    simpa only [receipt.emitted, sameType] using snapshotTyped
   · cases checkedType
 
 private theorem ensure_same {site : SourceCoreElaboration.ErrorSite} {expected actual : Ty}

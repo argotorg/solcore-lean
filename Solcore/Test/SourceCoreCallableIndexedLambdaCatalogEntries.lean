@@ -1,8 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeEntry
 import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeBody
 
-/-! The actual lambda allocator and its retained spine supply a catalog entry
-with the full lambda history. Initial capture coherence and catalog authority
+/-! The actual lambda allocator and its retained spine, the parameters over
+the copies of the captured scope, supply a catalog entry with the full lambda
+history. Initial capture coherence and catalog authority
 are explicit observations, independent of native typing. The source entry
 stays distinct from a named entry. Lambda body meaning remains the existing
 builtin fragment; this unit supplies the catalog boundary needed by a later
@@ -57,9 +58,9 @@ theorem actual_source_entry :
         sourceEntry.catalog.authority.current = entry.next ∧
         CompatibleAmbientHeap.HeapRepresents values.checked registry functions
           entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store := by
-  obtain ⟨entry, added, length, spine⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
+  obtain ⟨entry, added, copied, length, spine, slots⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
     captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed
-  exact ⟨entry, source_entry entry initial sameFrame length spine, sameFrame, rfl, entry.entry.heaps⟩
+  exact ⟨entry, source_entry entry initial sameFrame length spine slots, sameFrame, rfl, entry.entry.heaps⟩
 
 include captured code inputs initial reference in
 /-- Capture coherence observes the actual canonical slots. The separate
@@ -69,23 +70,24 @@ theorem actual_capture_globals : CaptureGlobals headers locations callerPrefix s
 
 variable (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history inputs functions registry
     arguments nativeArguments before store location current currentGhost)
-  {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
-  (spine : entry.entry.canonical = added ++ captured.canonical)
+  {added copied : Environment} (length : added.length = code.receipt.loweredParameters.length)
+  (spine : entry.entry.canonical = added ++ copied)
+  (slots : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
 
-include initial sameFrame length spine in
+include initial sameFrame length spine slots in
 theorem reached_ordered_global
     (header : RecursiveNamedCatalog.Header prepared.ancestry values prepared.layouts.definitions program)
     (member : header ∈ headers) :
     entry.entry.canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length +
       callerPrefix + header.slot]? = some (.cellRef (OptionalCell.cellType header.named.signature.functionType) (locations header)) :=
-  (source_entry entry initial sameFrame length spine).catalog.globals header member
+  (source_entry entry initial sameFrame length spine slots).catalog.globals header member
 
-include initial sameFrame length spine in
+include initial sameFrame length spine slots in
 theorem full_carried_history :
     Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table
-      (source_entry entry initial sameFrame length spine).catalog.authority.current
+      (source_entry entry initial sameFrame length spine slots).catalog.authority.current
       (.lambda code.descriptor.id history.ghost) (some history.metadata) :=
-  (source_entry entry initial sameFrame length spine).carried
+  (source_entry entry initial sameFrame length spine slots).carried
 
 variable (reached : CallableIndexedLambdaEntryBounds.PrefixFor captured code history inputs functions registry arguments before store location current)
 

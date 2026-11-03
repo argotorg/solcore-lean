@@ -17,6 +17,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole (Program.ofChecked whole.sourceProgram))}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
+  (bindings : ProtectedStateTransition.Bindings protocol)
   {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   (compiled : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics namedCode)
   (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key = .ok named.specialized)
@@ -50,7 +51,7 @@ variable
   (registered : whole.indexed.ancestry.layout.frame.Registered whole.indexed.layouts.definitions)
 
 
-include record receiver extension authority selectedBodies registered in
+include bindings record receiver extension authority selectedBodies registered in
 theorem lifts_selected
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {context : SourceSemantics.Context} {expected : TypeSystem.Ty}
@@ -60,7 +61,7 @@ theorem lifts_selected
     CellAwareSourceBodyLiftBounds.Lifts (named := named) (administrative := administrative)
       (registry := stages) (invocation := invocation) bridge producer context
       (CellAwareLexicalNamedBodySupport.scope named) compiled.statements := by
-  exact CellAwareLexicalSourceTreeLifting.lifts bridge compiled record producer registered
+  exact CellAwareLexicalSourceTreeLifting.lifts bridge bindings compiled record producer registered
     (fun childContext childRuntime childCovers childLedger size =>
       CellAwareNamedExpressionSourceLifting.lifts_selected compiled bridge profile receiver extension authority sourceEq issuer
         record childLedger (by simpa only [sourceEq] using childRuntime) selectedBodies childCovers size)
@@ -70,7 +71,7 @@ theorem lifts_selected
     sourceEq body.tree issuer
 
 /- Compatibility adapters for callers with a whole-program receipt. -/
-include record receiver extension authority wellFormed registered in
+include bindings record receiver extension authority wellFormed registered in
 theorem lifts
     (sourceEq : invocation.source = source named)
     {administrative : Core.Context} {context : SourceSemantics.Context} {expected : TypeSystem.Ty}
@@ -80,6 +81,6 @@ theorem lifts
     CellAwareSourceBodyLiftBounds.Lifts (named := named) (administrative := administrative)
       (registry := stages) (invocation := invocation) bridge producer context
       (CellAwareLexicalNamedBodySupport.scope named) compiled.statements := by
-  apply lifts_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (record := record) (receiver := receiver) (extension := extension) (authority := authority) (registered := registered) <;> assumption
+  apply lifts_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed) (bindings := bindings) (record := record) (receiver := receiver) (extension := extension) (authority := authority) (registered := registered) <;> assumption
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareLexicalSourceBodyLifting

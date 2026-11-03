@@ -57,7 +57,8 @@ def run : IO Unit := do
   for (flag, expected) in [(true, 42), (false, 8)] do
     testWord program "converted" [.bool flag] expected
     testWord program "indirect" [.bool flag] (expected + 5)
-  testWord program "operatorEffects" [] 12
+  -- Both operand closures assign only their call's copy of `count`.
+  testWord program "operatorEffects" [] 0
   let token ← match program.signatures.dataTypes.filter (·.name == "Token") with
     | [token] => pure token
     | _ => throw (IO.userError "Token missing")

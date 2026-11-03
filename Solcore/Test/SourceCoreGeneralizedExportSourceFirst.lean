@@ -48,32 +48,36 @@ theorem MakeShape.body_from_source {source : TypedSource} (shape : MakeShape sou
     {program : SourceSemantics.Program} {control : ControlContext}
     {context final : SourceSemantics.Context} {facts : BodyFacts}
     (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    {captured : Dynamic.Environment} {middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (unique : NodeOccurrencesUnique source)
     (typed : StatementsHaveType source control context
       [shape.principal.initialized.id,shape.returned.id] final facts) :
     ∃ next, Dynamic.FunctionStatementsExecute program context evidence source environment before
       [shape.principal.initialized.id,shape.returned.id] next
-      (.returned (shape.value context environment evidence))
-      (shape.principal.allocatedHeap context environment before) := by
+      (.returned (shape.value context captured evidence))
+      (shape.principal.allocatedHeap context captured middle) := by
   obtain ⟨next,_,_,first,_⟩ := head_tail typed
   obtain ⟨extended,wellformed,fields⟩ := shape.principal.context_after unique first
-  exact ⟨next,shape.body_trace evidence environment before extended fields wellformed
+  exact ⟨next,shape.body_trace evidence environment before snapshot extended fields wellformed
     ⟨wellformed.binders,.builtin .word⟩ ⟨wellformed.binders,.builtin .bool⟩⟩
 
 theorem CaptureShape.body_from_source {source : TypedSource} (shape : CaptureShape source)
     {program : SourceSemantics.Program} {control : ControlContext}
     {context final : SourceSemantics.Context} {facts : BodyFacts}
     (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment) (before : Dynamic.Heap)
+    {captured : Dynamic.Environment} {middle : Dynamic.Heap}
+    (snapshot : Dynamic.EnvironmentCopies source environment before captured middle)
     (unique : NodeOccurrencesUnique source)
     (typed : StatementsHaveType source control context
       [shape.principal.initialized.id,shape.returned.id] final facts) :
     ∃ next, Dynamic.FunctionStatementsExecute program context evidence source environment before
       [shape.principal.initialized.id,shape.returned.id] next
-      (.returned (shape.value context environment evidence))
-      (shape.principal.allocatedHeap context environment before) := by
+      (.returned (shape.value context captured evidence))
+      (shape.principal.allocatedHeap context captured middle) := by
   obtain ⟨next,_,_,first,_⟩ := head_tail typed
   obtain ⟨extended,wellformed,fields⟩ := shape.principal.context_after unique first
-  exact ⟨next,shape.body_trace evidence environment before extended fields wellformed
+  exact ⟨next,shape.body_trace evidence environment before snapshot extended fields wellformed
     ⟨wellformed.binders,.builtin .bool⟩⟩
 
 end Tests.SourceCoreGeneralizedExport

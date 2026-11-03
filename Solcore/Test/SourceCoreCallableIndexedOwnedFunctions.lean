@@ -183,9 +183,9 @@ section LambdaFormation
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
   {actual : Environment} {callerPrefix : Nat}
 
-/-- Formation consumes a reached owner row and generated static support.
-The resulting value supports source runtime guards and remains owned when
-the explicit key domain grows. -/
+/-- Formation consumes a reached owner row and generated static support, and
+copies the captured cells. The formed value supports source runtime guards and
+remains owned when the explicit key domain grows. -/
 theorem literal_formation_retains_owner
     (pool : CallableIndexedAuthorityPool.Pool (prepared := compiled.indexed.ancestry)
       (values := .initial compiled.compatible.checked)
@@ -202,26 +202,33 @@ theorem literal_formation_retains_owner
     (current : (pool.rows owner.position).authority.current = history.native)
     (ghost : (pool.rows owner.position).authority.ghost = history.ghost)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) projects
+      compiled.indexed.layouts.definitions}
+    (heaps : GenericHeap.HeapRepresents model mapping world heap store)
+    (copied : code.policy.snapshotLambda code.id = true)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = [])
     (extra : List (CallableIndexedOwnedFunctionValues.Key compiled program)) :
-    Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
-      code.id (.closure function) heap ∧
-    Evaluates actual store (code.lowered.expression.rename captured.embedding)
-      (.inRight .word (value code captured.embedding history.native actual)) store ∧
-    CallableIndexedOwnedFunctionValues.Represents headers keys bodyRegistry faults mapping world
-      (FunctionValues.sourceType function) (.closure function) (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    CallableIndexedOwnedFunctionValues.Represents headers (keys ++ extra) bodyRegistry faults mapping world
-      (FunctionValues.sourceType function) (.closure function) (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
-    Dynamic.ValueRuntimeTypeMatches (.closure function) (FunctionValues.sourceType function) ∧
-    (KeyEmbedding.append keys extra |>.map owner).key = owner.key := by
+    ∃ formed : Formed model captured code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates program function.context function.evidence function.source function.captured heap
+        code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (code.lowered.expression.rename captured.embedding)
+        (.inRight .word (value code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      CallableIndexedOwnedFunctionValues.Represents headers keys bodyRegistry faults formed.finalMap formed.finalWorld
+        (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      CallableIndexedOwnedFunctionValues.Represents headers (keys ++ extra) bodyRegistry faults formed.finalMap
+        formed.finalWorld (FunctionValues.sourceType function) (.closure formed.closure)
+        (value code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+      Dynamic.ValueRuntimeTypeMatches (.closure formed.closure) (FunctionValues.sourceType function) ∧
+      (KeyEmbedding.append keys extra |>.map owner).key = owner.key := by
   have origin := ActualSourceOrigin.of_support history body metadata
-  obtain ⟨sourceTrace, nativeTrace, related, _⟩ := CallableIndexedOwnedFunctionValues.lambda_of_formation
-    pool owner captured code history body origin globals referenceIndex current ghost profile stored ordinary coercions
-  exact ⟨sourceTrace, nativeTrace, related,
+  obtain ⟨formed, sourceTrace, nativeTrace, related, _⟩ := CallableIndexedOwnedFunctionValues.lambda_of_formation
+    pool owner captured code history body origin globals referenceIndex current ghost profile heaps copied ordinary coercions
+  exact ⟨formed, sourceTrace, nativeTrace, related,
     CallableIndexedOwnedFunctionValues.Represents.map_keys (KeyEmbedding.append keys extra) related,
     CallableIndexedOwnedFunctionValues.runtime_views keys bodyRegistry faults profile (registry := bodyRegistry) related,
     (KeyEmbedding.append keys extra).same owner⟩

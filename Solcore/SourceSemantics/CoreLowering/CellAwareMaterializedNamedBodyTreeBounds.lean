@@ -181,28 +181,32 @@ theorem preserves {budget : Nat}
       (by simpa only [sourceEq] using expressionFound) (by simpa only [sourceEq] using typed) valueType
       environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace within
   | @generalizedInitialized context nextContext scope mode id node binder initializer initializerNode parameters result lambdaBody rest expected type lowered body childFuel
-      found form declaration polymorphic extended ordinary _initializerFound _initializerForm _valueType _requirements _coercions site initialReceipt nativeTyped allocation annotation same remaining ih =>
+      found form declaration polymorphic extended ordinary _initializerFound _initializerForm _valueType _requirements _coercions site initialReceipt nativeTyped allocation annotation same captured copied remaining ih =>
     cases modeEq
     intro size within mapping world actualContext environment canonical actual before store embedding
       environments heaps locals agrees actualTyped runtime covers sameLedger sourceTyped initial admitted authority physical owner sameLocation ready
       finalContext outcome after trace
     have unique := runtime.graph.nodeOccurrencesUnique
-    obtain ⟨tailSize, function, location, bound, sameSize, captures, allocated, remainingTrace⟩ :=
+    obtain ⟨tailSize, copies, snapshotHeap, function, location, bound, sameSize, snapshot, captures, allocated,
+        remainingTrace⟩ :=
       CellAwareGeneralizedSourceInversion.generalized (by simpa only [sourceEq] using unique)
         (by simpa only [sourceEq] using found) form polymorphic
         (by simpa only [sourceEq] using extended) trace
-    have capturesNamed : Dynamic.GeneralizedClosureCaptures context (source named) environment binder initializer function := by
+    have snapshotNamed : Dynamic.EnvironmentCopies (source named) environment before copies snapshotHeap := by
+      simpa only [sourceEq] using snapshot
+    have capturesNamed : Dynamic.GeneralizedClosureCaptures context (source named) copies binder initializer function := by
       simpa only [sourceEq] using captures
     obtain ⟨control, next, facts, headTyped⟩ := head_typed sourceTyped
-    have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime locals headTyped
+    have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime (snapshotNamed.agrees locals)
+      headTyped
       found form polymorphic capturesNamed
     have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
       rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
-    obtain ⟨values, marker, agreement, _smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
+    obtain ⟨values, marker, copiedStore, copiedMap, copiedWorld, agreement, _smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
         preserved, effect, nextAuthority, reached, related, nextAdmitted, nextPhysical, locationEq, nativeEq⟩ :=
       CellAwareNamedGeneralizedPrefix.complete bridge compiled record site initialReceipt issuer declaration polymorphic extended
-        ordinary nativeTyped allocation annotation same producer registered environments heaps locals agrees actualTyped
-        initial admitted authority physical (ready initial physical.read) capturesNamed functionTyped allocated type body
+        ordinary nativeTyped allocation annotation same copied producer bindings registered environments heaps locals agrees
+        actualTyped initial admitted authority physical ready snapshotNamed capturesNamed functionTyped allocated type body
     have nextReady : ProtectedStateTransition.CellAllocation.ReadyAt producer nextPhysical.location nextPhysical.native := by
       intro index current stored
       have previous := ready current (by simpa only [locationEq, nativeEq] using stored)
@@ -217,15 +221,15 @@ theorem preserves {budget : Nat}
         reached nextAdmitted nextAuthority nextPhysical owner (sameLocation.trans locationEq.symm) nextReady remainingTrace
     let finalState := bindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
       (id := binder.id) (type := lowered.type)
-      (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState
+      (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState
     refine ⟨value, finalStore, finalMap, finalWorld, agreement.wrap evaluated, represented, output, finalHeaps,
       effect.maps.trans maps, effect.worlds.trans worlds, preserved.trans finalFrame,
       effect.metadata.trans metadata, effect.trans finalEffect, finalState,
       protocol.trans related (protocol.trans tailRelated (bindings.restore_related
         (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
         (id := binder.id) (type := lowered.type)
-        (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState)), ?_⟩
+        (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState)), ?_⟩
     exact restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-      (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (store.length + 2)) tailState post
+      (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (copiedStore.length + 2)) tailState post
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedNamedBodyTreeBounds

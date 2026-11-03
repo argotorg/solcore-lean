@@ -86,7 +86,7 @@ private theorem declared_inv (unique : NodeOccurrencesUnique source) (found : so
     rw [form] at formEq
     cases formEq
     exact ⟨_, _, _, evaluate, extension, allocate, rfl⟩
-  | letInitializedGeneralized contains formEq _ polymorphic _ _ =>
+  | letInitializedGeneralized contains formEq _ _ polymorphic _ _ =>
     obtain rfl := same_node unique found contains
     rw [form] at formEq
     cases formEq

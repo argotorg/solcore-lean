@@ -87,6 +87,28 @@ private inductive Selection : Option Node → Option Node → Prop where
   | none : Selection none none
   | some {before after : Node} (related : NodeView before after) : Selection (some before) (some after)
 
+private theorem nodes_declared {a b : List Node} (related : ListRel NodeView a b) :
+    a.flatMap SourceSemantics.CaptureBinders.nodeBinders = b.flatMap SourceSemantics.CaptureBinders.nodeBinders := by
+  induction related with
+  | nil => rfl
+  | cons head _ ih =>
+    cases head with
+    | expression _ form => simp only [List.flatMap_cons, SourceSemantics.CaptureBinders.nodeBinders, form, ih]
+    | statement => simp only [List.flatMap_cons, ih]
+
+/-- A metadata view declares the same binders, so closures copy the same
+captured bindings under it. -/
+theorem MetadataView.copiedBinder {original view : TypedSource} (related : MetadataView original view) :
+    SourceSemantics.CaptureBinders.copiedBinder? original = SourceSemantics.CaptureBinders.copiedBinder? view := by
+  funext id
+  have declared : SourceSemantics.CaptureBinders.declaredBinders original =
+      SourceSemantics.CaptureBinders.declaredBinders view := by
+    unfold SourceSemantics.CaptureBinders.declaredBinders
+    rw [related.inputs]
+    congr 1
+    exact nodes_declared related.nodes
+  simp only [SourceSemantics.CaptureBinders.copiedBinder?, declared]
+
 private theorem find_related {a b : List Node} (related : ListRel NodeView a b) (id : OccurrenceId) :
     Selection (a.find? fun node => decide (node.occurrenceId = id))
       (b.find? fun node => decide (node.occurrenceId = id)) := by

@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInitializerPackets
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
+import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotCode
 
 /-! A selected named body keeps ordinary terminal expressions and generalized
 native bundle declarations in one lexical tree. Actual marked allocations and
@@ -63,9 +64,14 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
         (prepared.layouts.allocatorAt named.signature.key [] (fun error => .sourceAllocation (reprStr error)))
         (initializedRequest (source named) scope binder lowered.type))
       (same : annotation.original = allocation.expression)
+      {captured : Expr}
+      (copied : SourceCoreSourceCells.copyScope (some (CallableIndexedNamedGeneration.allocator prepared named))
+        (source named) scope (fun index => index)
+        (CellAwareGeneralizedSnapshotCode.snapshotInner lowered.type lowered.expression annotation.expression) =
+          .ok captured)
       (remaining : Tree prepared named compiled certificates administrative reasonAt
         nextContext ((binder.id, lowered.type) :: scope) mode rest expected type body) :
       Tree prepared named compiled certificates administrative reasonAt sourceContext scope mode (id :: rest)
-        expected type (sequence type lowered.expression annotation.expression body)
+        expected type (CellAwareGeneralizedSnapshotCode.snapshotSequence type captured body)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareNativeBodyTree

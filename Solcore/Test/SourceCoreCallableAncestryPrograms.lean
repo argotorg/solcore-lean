@@ -3,7 +3,9 @@ import Solcore.Frontend.SourceCoreAllocationLedger
 import Solcore.Frontend.ProgramChecking
 
 /-! Real checked multi-root compilation with one fixed allocation suffix.
-Execution and resumption use the shared typed Core machine. -/
+Execution and resumption use the shared typed Core machine. Closures capture by
+value: each call starts again from the values its captures had when the lambda
+was created. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCallableAncestryPrograms
 open Solcore Solcore.Frontend SourceInference
@@ -72,6 +74,40 @@ private def runSuccess {checked : SourceCoreCompatibleCatalog.Checked}
         | _ => false) "source invocation omitted allocation markers"
     | observation => throw (IO.userError s!"marked result did not succeed: {reprStr observation}")
 
+/-- The binder `name` declared in `key`'s checked body. -/
+private def binder (plan : SourceSpecializationWorklist.Plan) (key : Key) (name : String) : IO Resolved.LocalId := do
+  let specialized ← match SourceCompilationPlan.exactSpecialization plan key with
+    | .ok specialized => pure specialized
+    | .error error => throw (IO.userError s!"marked specialization missing: {reprStr error}")
+  match (SourceCoreDataPlaces.declaredBinders specialized.function.typedBody).filter (·.name == name) with
+  | [binder] => pure binder.id
+  | _ => throw (IO.userError s!"marked fixture binder missing {name}")
+
+/-- A lambda created before a captured local is assigned copies that local
+uninitialized, so its read in the body faults at every call. -/
+private def runUninitialized {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : Solcore.Frontend.SourceCoreCallableAncestryPrograms.Prepared checked) (key : Key)
+    (arguments : List SourceTypedRuntime.Value) (missing : Resolved.LocalId) : IO Unit := do
+  for fuel in [0, 7, 37, 150000] do
+    let completion ← match prepared.runSource key arguments fuel 500 with
+      | .ok completion => pure completion
+      | .error error => throw (IO.userError s!"marked run failed: {reprStr error}")
+    let completion := completion.resume 150000
+    let opaqueInitial : List SourceTypedRuntime.Cell := [⟨.word, none⟩]
+    let _ ← match SourceCoreCallableAncestryLedger.scan completion opaqueInitial with
+      | .ok receipt => pure receipt
+      | .error error => throw (IO.userError s!"frame-aware failure ledger failed: {reprStr error}")
+    match completion.result.native.observation with
+    | .failed reason store =>
+      let diagnostic ← match completion.result.diagnostics.diagnostic? reason with
+        | some diagnostic => pure diagnostic
+        | none => throw (IO.userError "marked uninitialized capture diagnostic missing")
+      assertTrue (diagnostic.error == .uninitializedLocal missing && diagnostic.span.isSome)
+        "read of a lambda's uninitialized capture copy did not fault at its source site"
+      assertTrue (store[0]? == some (SourceCoreCallableContextFrames.encode prepared.ancestry.layout.frame .empty))
+        "language failure did not restore its administrative callable frame"
+    | observation => throw (IO.userError s!"marked uninitialized capture changed: {reprStr observation}")
+
 private def manyRoots : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc"
@@ -118,8 +154,12 @@ def run : IO Unit := do
   runSuccess prepared (← key program "local") [.mapping .word .word [(.word (w 1), .word (w 9))]]
     (.mapping .word .word [(.word (w 1), .word (w 9))])
   runSuccess prepared (← key program "lazy") [] (.mapping .word .word [(.word (w 1), .word (w 7))])
-  runSuccess prepared (← key program "capture") [.word (w 10)] (.word (w 17))
-  runSuccess prepared (← key program "recursive") [.word (w 4)] (.word (w 4))
+  -- Both calls of `f` start again from `value = 10`; the second returns 10 + 4.
+  runSuccess prepared (← key program "capture") [.word (w 10)] (.word (w 14))
+  -- `f` is still uninitialized when its lambda is created, so the lambda's copy
+  -- of `f` is too, and the first recursive read faults.
+  let recursive ← key program "recursive"
+  runUninitialized prepared recursive [.word (w 4)] (← binder plan recursive "f")
   runSuccess prepared (← key program "unused") [] (.word (w 7))
   runSuccess prepared (← key program "tuple") [.product (.word (w 13)) (.bool true)] (.word (w 13))
   runSuccess prepared (← key program "looping") [.word (w 4)] (.word (w 6))

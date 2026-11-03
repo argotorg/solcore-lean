@@ -36,8 +36,9 @@ private def failure {artifact : SourceCoreExecution.Artifact}
   pure after
 
 /-- The first call consumes the independent Source proof before completion.
-Header controls and captured-cell reuse are runtime companions in the same
-original eight-function program and the same public session. -/
+Header controls and a retained closure whose every call starts from its
+creation-time capture are runtime companions in the same original
+eight-function program and the same public session. -/
 def run : IO Unit := do
   let fixture ← compileFixture
   let observed ← observeProgram fixture
@@ -75,11 +76,11 @@ def run : IO Unit := do
   let pendingLast ← get "bitnot captured repeated" (first.session.startHandlePacked handle (word 0))
   let .succeeded last ← pendingLast.resume 100000 1000
     | throw (IO.userError "bitnot captured reuse failed")
-  require (last.value == word 7) "bitnot captured reused result changed"
+  require (last.value == flipped 7) "bitnot captured reused result changed"
   let heaps := [started.session.heapSize, one.session.heapSize, two.heapSize, three.heapSize,
     four.heapSize, five.heapSize, six.heapSize, seven.heapSize, eight.heapSize,
     made.session.heapSize, first.session.heapSize, last.session.heapSize]
-  require (heaps == [9, 12, 16, 23, 30, 33, 40, 43, 46, 49, 52, 55])
+  require (heaps == [9, 12, 16, 23, 30, 33, 40, 43, 46, 52, 58, 64])
     "bitnot original native stores changed"
   IO.println s!"BITNOT_CACHE: cache{fixture.recipe.compiled.indexed.base.functions.length}/table{profile.table.rows.length}"
   IO.println s!"BITNOT_NATIVE_HEAPS: {heaps}"

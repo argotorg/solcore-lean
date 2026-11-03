@@ -119,7 +119,7 @@ theorem code_at_read (compiled : SourceCoreUnifiedCompilation.Compiled)
           (.inl (.root (by simp [lambdaRoots, initializer]))) packet.found
         exact ⟨node, found, form⟩) typedLowered
   exact ⟨code, compilation, active, id, lowered, policy, lowerBody, fuel, descriptor, certificate, codeView, reasons,
-    GeneralizedLocalMaterializedCode.value_eq indexed code lowered captured.embedding native actual⟩
+    GeneralizedLocalMaterializedCode.value_eq indexed code lowered policy id captured.embedding native actual⟩
 
 end Solcore.SourceSemantics.CoreLowering.GeneralizedLocalReachedMaterialization
 

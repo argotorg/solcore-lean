@@ -61,12 +61,12 @@ theorem preserves_at (size : Nat) :
     simpa only [sameSource, CallableIndexedLambdaGeneration.closure, head.identifier] using head.code.sourceFound
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨result, finalStore, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨result, finalStore, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedAdmittedOrdinaryLambdaFormation.preserves_at head profile complete globals slots owner prefixZero
       initial.val initial.property environments agrees nativeTyped wellFormed runtime covers locals typed
       sameSource unique heaps admitted trace
-  exact ⟨result, finalStore, mapping, world, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨result, finalStore, finalMap, finalWorld, native, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 include complete globals slots prefixZero wellFormed runtime covers sameSource unique in
@@ -84,12 +84,12 @@ theorem reflects_at (size : Nat) :
     simpa only [sameSource, CallableIndexedLambdaGeneration.closure, head.identifier] using head.code.sourceFound
   have same := Option.some.inj (found.symm.trans sourceFound)
   subst node
-  obtain ⟨sourceSize, outcome, after, trace, native, represented, finalHeaps, maps, worlds, frame, metadata,
+  obtain ⟨sourceSize, outcome, after, trace, native, finalMap, finalWorld, represented, finalHeaps, maps, worlds, frame, metadata,
       reached, related, post⟩ :=
     CallableIndexedOwnedAdmittedOrdinaryLambdaFormation.reflects_at head profile complete globals slots owner prefixZero
       initial.val initial.property environments agrees nativeTyped wellFormed runtime covers locals typed
       sameSource unique heaps admitted completed
-  exact ⟨sourceSize, outcome, after, mapping, world, trace, represented, finalHeaps, maps, worlds, frame, metadata,
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata,
     reached, related, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaFormationHeads

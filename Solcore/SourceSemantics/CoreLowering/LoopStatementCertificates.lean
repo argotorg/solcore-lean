@@ -86,6 +86,7 @@ theorem tree_of_lowerFlowStatements
                   obtain ⟨checkedUnit, checked, accepted⟩ := bind_ok accepted
                   cases checkedUnit
                   obtain ⟨body, compiledBody, accepted⟩ := bind_ok accepted
+                  simp only [certificate.monomorphic, List.isEmpty_nil, ↓reduceIte] at accepted
                   cases accepted
                   obtain ⟨_, _, valueTree⟩ := PrimitiveExpressions.tree_of_lowerExpression unique compiledValue
                   rw [← ensureType_ok checked] at valueTree

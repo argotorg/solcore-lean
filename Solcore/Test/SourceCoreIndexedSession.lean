@@ -82,7 +82,7 @@ def run : IO Unit := do
   let used ← execute made.session (← key "use") [made.value, word 2]
   require (used.value == word 13) "returned native capture/global call failed"
   let reused ← execute used.session (← key "use") [made.value, word 3]
-  require (reused.value == word 16) "capture was copied instead of shared"
+  require (reused.value == word 14) "reused closure did not restart from its captured value"
   require (reused.session.installedGlobalsPresent && reprStr reused.session.inertPrefix == reprStr sentinel) "later invocation replaced globals or prefix"
   let mirrored ← execute reused.session (← key "mirror") [made.value]
   require (mirrored.value == made.value && mirrored.session.functionCount == 1) "handle registry did not retain exact native closure"
@@ -91,7 +91,7 @@ def run : IO Unit := do
     | .product left right => pure (left, right) | _ => throw (IO.userError "twins did not return two handles")
   let first ← execute pair.session (← key "use") [left, word 2]
   let second ← execute first.session (← key "use") [right, word 3]
-  require (first.value == word 22 && second.value == word 25) "two handles lost aliased capture"
+  require (first.value == word 22 && second.value == word 23) "two handles shared a captured cell instead of each keeping its own value"
   let box ← execute second.session (← key "boxed") [left]
   let unboxed ← execute box.session (← key "unbox") [box.value]
   require (unboxed.value == left) "nominal payload function did not preserve the handle"
@@ -114,7 +114,7 @@ def run : IO Unit := do
     | .outOfFuel next => pure next | _ => throw (IO.userError "partial call did not suspend")
   let resumed ← match ← next.resume 300000 with
     | .succeeded result => pure result | _ => throw (IO.userError "native checkpoint did not complete")
-  require (resumed.value == word 17 && resumed.session.installedGlobalsPresent) "resume lost capture/global authority"
+  require (resumed.value == word 12 && resumed.session.installedGlobalsPresent) "resume lost capture/global authority"
   let branchedA ← execute initial (← key "make") [word 50]
   let branchedB ← execute initial (← key "make") [word 50]
   match branchedB.session.authenticate 1024 functionType branchedA.value with
@@ -141,7 +141,7 @@ def run : IO Unit := do
   let afterFault ← match ← failedPair.session.run (← key "use") [fails, word 4] 300000 with
     | .ok (.failed _ session) => pure session | _ => throw (IO.userError "language failure changed category")
   let observed ← execute afterFault (← key "get") [observes]
-  require (observed.value == word 74) "language fault rolled back shared mutation"
+  require (observed.value == word 70) "a write before a language fault reached another closure's captured value"
   let spinning ← get "spin" (observed.session.start (← key "spin") [])
   let spinningNext ← match ← spinning.resume 200 with
     | .outOfFuel next => pure next | _ => throw (IO.userError "spin completed")

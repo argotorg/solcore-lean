@@ -115,10 +115,10 @@ def run : IO Unit := do
     | .function handle => pure handle
     | _ => throw (IO.userError "maker did not export an owned function")
   let first ← execute made.session consumer.key [.function handle, word 2]
-  assertTrue (first.value == word 13) "another root lost the original globals or captured cell"
+  assertTrue (first.value == word 13) "another root lost the original globals or captured value"
   let second ← execute first.session duplicate.key [.function handle, word 3]
-  assertTrue (second.value == word 16 && second.session.heapSize > first.session.heapSize)
-    "duplicate root execution lost shared mutation across world extension"
+  assertTrue (second.value == word 14 && second.session.heapSize > first.session.heapSize)
+    "duplicate root execution did not restart from the captured value across world extension"
   let mirrored ← execute second.session mirror.key [.function handle]
   assertTrue (mirrored.value == .function handle) "another root re-exported a different function capability"
   let boxed ← execute mirrored.session box.key [.function handle]
@@ -135,7 +135,7 @@ def run : IO Unit := do
     | .outOfFuel next => pure next
     | _ => throw (IO.userError "multi-root checkpoint failed to suspend")
   match ← next.resume 65536 with
-  | .succeeded completion => assertTrue (completion.value == word 20) "multi-root resume lost captured mutation"
+  | .succeeded completion => assertTrue (completion.value == word 15) "multi-root resume changed the captured value"
   | _ => throw (IO.userError "multi-root checkpoint failed to finish")
   match session.authenticate 1024 functionType (.function handle) with
   | .error {code := .unknownHandle, ..} => pure ()

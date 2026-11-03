@@ -96,7 +96,7 @@ def unitProtocol : Protocol Unit where
   refl _ := True.intro
   trans _ _ := True.intro
 
-private def unitTransport : AdministrativeTransport unitProtocol where
+def unitTransport : AdministrativeTransport unitProtocol where
   extend := fun {_initial} _state {_mapping _world _heap _store} _maps _worlds _frame _metadata => ()
   related := fun {_initial} _state {_mapping _world _heap _store} _maps _worlds _frame _metadata => True.intro
   records_eq := fun {_initial} _state {_mapping _world _heap _store} _maps _worlds _frame _metadata => rfl
@@ -108,6 +108,8 @@ private def unitBindings : Bindings unitProtocol where
   restore _ := ()
   restore_related _ := True.intro
   restore_records _ := rfl
+
+theorem unitRebinds : Rebinds unitProtocol := fun _state _canonical _slots => ⟨(), True.intro⟩
 
 def unitProducer (layouts : SourceCoreAllocationLayouts.Prepared) (layout : SourceCoreCallableIndexedFrames.Layout)
     (model : GenericHeap.PayloadModel catalog projects nativeDefinitions) : Producer unitProtocol layouts layout model :=

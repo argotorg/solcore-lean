@@ -41,6 +41,15 @@ def CaptureGlobals.catalog {mapping : LocationMap} {world : StoreTyping} {heap :
     RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix scope mapping world heap store canonical :=
   ⟨authority, observed.globals⟩
 
+/-- Global and frame slots lie past the scope, so a canonical environment that
+keeps every slot past the scope, such as the copies a closure makes, keeps them. -/
+theorem CaptureGlobals.of_slots {canonical copied : Environment} {location : Location}
+    (observed : CaptureGlobals headers locations callerPrefix scope canonical location)
+    (slots : ∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) :
+    CaptureGlobals headers locations callerPrefix scope copied location :=
+  ⟨fun header member => (slots _ (by omega)).trans (observed.globals header member),
+    (slots _ (by omega)).trans observed.reference⟩
+
 /-- Keeping a finite supported prefix preserves its observed global and frame
 slots. Bounds are independent static evidence about those actual slots. -/
 theorem CaptureGlobals.take {canonical : Environment} {location : Location}
@@ -71,7 +80,8 @@ def catalog_after_prefix
     (maps : LocationMap.Extends mapping futureMap) (worlds : WorldExtends world futureWorld)
     (frame : AdministrativePreserved mapping (store.set location (encode prepared.ancestry.layout.frame next)) futureMap futureStore)
     (metadata : Dynamic.HeapMetadataExtend before after)
-    (spine : ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧ futureCanonical = added ++ canonical) :
+    (spine : ∃ added copied : Environment, added.length = code.receipt.loweredParameters.length ∧
+      futureCanonical = added ++ copied ∧ ∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) :
     RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
       futureMap futureWorld after futureStore futureCanonical := by
@@ -81,13 +91,14 @@ def catalog_after_prefix
     simpa only [sameFrame] using frame
   refine ⟨installed.extend maps worlds installedFrame metadata, ?_⟩
   intro header member
-  obtain ⟨added, length, canonicalEq⟩ := spine
+  obtain ⟨added, copied, length, canonicalEq, kept⟩ := spine
   rw [canonicalEq]
   simp only [List.length_append, List.length_map, List.length_reverse]
   have index : code.receipt.loweredParameters.length + scope.length + callerPrefix + header.slot =
       added.length + (scope.length + callerPrefix + header.slot) := by omega
-  rw [index, List.getElem?_append_right (by omega)]
-  simpa only [Nat.add_sub_cancel_left] using initial.globals header member
+  rw [index, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left,
+    kept _ (by omega)]
+  exact initial.globals header member
 
 end Prefix
 
@@ -171,8 +182,9 @@ variable {mapping : LocationMap} {world : StoreTyping} {capturedActual : Environ
   (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost)
   (initial : RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix scope mapping world before store captured.canonical)
   (sameFrame : initial.authority.frameLocation = location)
-  {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
-  (spine : entry.entry.canonical = added ++ captured.canonical)
+  {added copied : Environment} (length : added.length = code.receipt.loweredParameters.length)
+  (spine : entry.entry.canonical = added ++ copied)
+  (slots : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
 
 /-- Unsized prefix construction retains its exact returned entry and spine.
 No completion or grade is extracted from its continuation agreement. -/
@@ -180,12 +192,12 @@ def catalog_entry : RecursiveNamedCatalog.Entry headers locations capturePrefix 
     (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
     entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store entry.entry.canonical :=
   catalog_after_prefix initial sameFrame entry.nextHistory entry.entry.maps entry.entry.worlds entry.entry.frame
-    entry.entry.metadata ⟨added, length, spine⟩
+    entry.entry.metadata ⟨added, copied, length, spine, slots⟩
 
 def source_entry : SourceEntry code history headers locations capturePrefix callerPrefix
     (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
     entry.entry.mapping entry.entry.world entry.entry.heap entry.entry.store entry.entry.canonical :=
-  { catalog := catalog_entry entry initial sameFrame length spine
+  { catalog := catalog_entry entry initial sameFrame length spine slots
     ghost := rfl
     carried := entry.nextHistory
     reference := by

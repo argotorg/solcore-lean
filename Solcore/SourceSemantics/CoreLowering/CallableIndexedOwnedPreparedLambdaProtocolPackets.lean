@@ -45,10 +45,10 @@ def packets : Packets (registry := registry) (arguments := arguments) (nativeArg
     captured code history support.body.toBody functions
     (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller) owner caller where
   source := by
-    intro entry added length spine reached
+    intro entry added length copied spine kept reached
     exact ⟨⟨reached, CallableIndexedOwnedLambdaNestedEntries.source_packet
       captured code history support.body.toBody.toContext functions owner support.caller
-      observed prefixContext origin.metadata caller entry added length spine reached⟩, rfl⟩
+      observed prefixContext origin.metadata caller entry added length copied spine kept reached⟩, rfl⟩
   native := by
     intro entry reached
     exact ⟨⟨reached, CallableIndexedOwnedLambdaNestedEntries.native_packet
@@ -72,10 +72,10 @@ def packets : Packets (registry := registry) (arguments := arguments) (nativeArg
     captured code history support.body.toBody functions
     (CallableIndexedOwnedMethodLambdaEntries.bridge (headers := headers) owner support.principal.named) owner caller where
   source := by
-    intro entry added length spine reached
+    intro entry added length copied spine kept reached
     refine ⟨⟨reached, ?_⟩, rfl⟩
     apply CallableIndexedOwnedOriginCanonicalState.packet_of_stable_read owner support.principal.named reached
-    · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+    · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
         entry.entry.reference⟩
     · exact entry.entry.environments
     · exact leading
@@ -84,9 +84,9 @@ def packets : Packets (registry := registry) (arguments := arguments) (nativeArg
   native := by
     intro entry reached
     refine ⟨⟨reached, ?_⟩, rfl⟩
-    obtain ⟨added, length, spine⟩ := entry.spine
+    obtain ⟨added, copied, length, spine, kept⟩ := entry.spine
     apply CallableIndexedOwnedOriginCanonicalState.packet_of_stable_read owner support.principal.named reached
-    · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length spine,
+    · exact ⟨CallableIndexedOwnedLambdaCanonicalEntries.globals_after_prefix captured code owner 1 observed added length copied spine kept,
         entry.reference⟩
     · exact entry.environments
     · exact leading

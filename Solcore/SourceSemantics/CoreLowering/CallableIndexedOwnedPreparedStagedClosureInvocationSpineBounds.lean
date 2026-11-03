@@ -38,17 +38,18 @@ private theorem source_body {program : Program} {stages : Registry}
     (arity : function.parameters.length = arguments.length)
     (trace : Size.Applies program stages size invocation callContext before
       (.closure function) arguments outcome after) :
-    ∃ childSize child environment bound finalContext bodyOutcome,
+    ∃ childSize child entry copied environment bound finalContext bodyOutcome,
       stages.Closure function child ∧ Dynamic.ClosureFrame program function ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+      Dynamic.EnvironmentCopies function.source function.captured before entry copied ∧
+      Dynamic.BindersAllocate entry copied function.parameters arguments environment bound ∧
       Size.Statements program stages childSize child bodyContext environment bound function.body
         finalContext bodyOutcome after ∧ BodyResult function.resultType bodyOutcome outcome ∧ childSize < size := by
   cases trace with
   | closureArity mismatch => exact False.elim (mismatch arity)
-  | closure selected valid extended allocated body resultRule =>
+  | closure selected valid extended copy allocated body resultRule =>
       have same := binders_context_eq extended parameters
       subst same
-      exact ⟨_, _, _, _, _, _, selected, valid, allocated, body, resultRule,
+      exact ⟨_, _, _, _, _, _, _, _, selected, valid, copy, allocated, body, resultRule,
         Size.child_lt_stepSize (by simp)⟩
 
 section Invocation
@@ -94,7 +95,8 @@ theorem invocation_preserves (budget : Nat)
         arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost),
       ∀ (added : Environment) (_length : added.length = code.receipt.loweredParameters.length)
-        (_spine : entry.entry.canonical = added ++ captured.canonical),
+        (copied : Environment) (_spine : entry.entry.canonical = added ++ copied)
+        (_kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?),
       ∀ reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩,
@@ -114,16 +116,18 @@ theorem invocation_preserves (budget : Nat)
     rw [CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) code,
       List.length_map]
     exact represented.length.1
-  obtain ⟨childSize, child, environment, bound, finalContext, bodyOutcome,
-    selected, valid, allocated, bodyTrace, resultRule, smaller⟩ := source_body inputs.extended arity trace
-  obtain ⟨entry, added, length, spine, parameterState, parameterRelated⟩ :=
+  obtain ⟨childSize, child, copies, copiedHeap, environment, bound, finalContext, bodyOutcome,
+    selected, valid, copy, allocated, bodyTrace, resultRule, smaller⟩ := source_body inputs.extended arity trace
+  obtain ⟨entry, added, copied, length, spine, kept, parameterState, parameterRelated⟩ :=
     CallableIndexedOwnedLambdaInvocationBounds.parameters_with_state captured code history inputs
       functions represented owner caller heaps locals reference currentCarried allowed
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
     bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyTransition⟩ :=
-    bodies entry added length spine parameterState childSize (Nat.lt_of_lt_of_le smaller within)
+    bodies entry added length copied spine kept parameterState childSize (Nat.lt_of_lt_of_le smaller within)
       selected valid bodyTrace resultRule
   obtain ⟨bodyState, bodyRelated, bodyPost⟩ := bodyTransition
   have maps := entry.entry.maps.trans bodyMaps
@@ -154,7 +158,8 @@ theorem application_preserves (budget : Nat)
         arguments nativeArguments before store owner.key.frameLocation
         (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost),
       ∀ (added : Environment) (_length : added.length = code.receipt.loweredParameters.length)
-        (_spine : entry.entry.canonical = added ++ captured.canonical),
+        (copied : Environment) (_spine : entry.entry.canonical = added ++ copied)
+        (_kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?),
       ∀ reached : State headers keys
         ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
           entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩,

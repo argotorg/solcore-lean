@@ -1,35 +1,43 @@
 import Solcore.Test.SourceCoreSelectedFaultingLocalSource
+import Solcore.Test.SourceSemanticsCaptureCopies
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.Fault
 
 /-! Independent Source execution of the original identity body after a genuine
-local-scheme instance has been selected. No target execution is a premise. -/
+local-scheme instance has been selected. No target execution is a premise.
+Closures capture by value: the generalized `let` copies the function's
+environment once, and each instance call copies the descriptor's captures
+again before allocating its parameter. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreSelectedFaultingLocal
 open Solcore Frontend SourceInference SourceSemantics
+open Tests.SourceSemanticsCaptureCopies
 
-/-- The exact materialized body reads its newly allocated parameter and returns
-it. The supplied frame is static Source code/evidence validity. -/
+/-- The exact materialized body copies the descriptor's captures, reads its
+newly allocated parameter and returns it. The supplied frame is static Source
+code/evidence validity. -/
 theorem Shape.identity_applies {source : TypedSource} (shape : Shape source)
     {program : SourceSemantics.Program} {definitionContext context : SourceSemantics.Context}
     (captured : Dynamic.Environment) (substitution : TypeSystem.Substitution)
     (evidence callerEvidence : Dynamic.EvidenceEnvironment)
     (before : Dynamic.Heap) (argument : Dynamic.Value)
+    {entry : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies (source.applySubstitution substitution) captured before entry copied)
     (frame : Dynamic.ClosureFrame program
       ((shape.descriptor definitionContext captured).instantiate substitution evidence)) :
     Dynamic.CallableApplies program context callerEvidence evidence before
       (.closure ((shape.descriptor definitionContext captured).instantiate substitution evidence))
       [argument] argument
-      ⟨before.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
+      ⟨copied.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
   let function := (shape.descriptor definitionContext captured).instantiate substitution evidence
   let parameter := shape.parameter.applySubstitution substitution
-  let after : Dynamic.Heap := ⟨before.cells ++ [{type := parameter.scheme.body, value := some argument}]⟩
-  have allocation : Dynamic.Heap.Allocates before parameter.scheme.body (some argument)
-      ⟨before.cells.length⟩ after := .append
+  let after : Dynamic.Heap := ⟨copied.cells ++ [{type := parameter.scheme.body, value := some argument}]⟩
+  have allocation : Dynamic.Heap.Allocates copied parameter.scheme.body (some argument)
+      ⟨copied.cells.length⟩ after := .append
   have read : Dynamic.ExpressionEvaluates program
       (function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements)
-      evidence function.source ((parameter.id, ⟨before.cells.length⟩) :: captured)
+      evidence function.source ((parameter.id, ⟨copied.cells.length⟩) :: entry)
       after shape.parameterRead.node.id argument after := by
     apply Dynamic.ExpressionEvaluates.intro
       (FlexibleSubstitution.ContainsExpression.applySubstitution substitution
@@ -41,7 +49,7 @@ theorem Shape.identity_applies {source : TypedSource} (shape : Shape source)
       exact .nil
   have returned : Dynamic.StatementExecutes program
       (function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements)
-      evidence function.source ((parameter.id, ⟨before.cells.length⟩) :: captured)
+      evidence function.source ((parameter.id, ⟨copied.cells.length⟩) :: entry)
       after shape.identityReturn.id
       (function.context.withLocal parameter.id parameter.scheme parameter.schemeRequirements)
       (.returned argument) after := by
@@ -68,7 +76,7 @@ theorem Shape.identity_applies {source : TypedSource} (shape : Shape source)
     cases extended with
     | intro wellformed fresh =>
       apply Dynamic.CallableApplies.closure rfl frame
-        (parameterList.symm ▸ MonoBindersExtend.cons scheme (.intro wellformed fresh) (.nil _))
+        (parameterList.symm ▸ MonoBindersExtend.cons scheme (.intro wellformed fresh) (.nil _)) copy
       · exact .cons allocation (.nil _ _)
       · apply Dynamic.FunctionStatementsExecute.singleton
           (FlexibleSubstitution.ContainsStatement.applySubstitution substitution
@@ -81,7 +89,8 @@ theorem Shape.identity_applies {source : TypedSource} (shape : Shape source)
       · rfl
 
 /-- A read selects the actual instance before the ordered argument evaluation.
-The call allocates the identity parameter only after that argument finishes. -/
+The call copies the captures and allocates the identity parameter only after
+that argument finishes. -/
 theorem Shape.invoke {source : TypedSource} (shape : Shape source)
     {argumentId : ExpressionId} {type : TypeSystem.Ty}
     (call : CallShape source shape.binder argumentId type)
@@ -100,9 +109,11 @@ theorem Shape.invoke {source : TypedSource} (shape : Shape source)
       ((shape.descriptor definitionContext captured).instantiate substitution
         (produced ++ evidence.applySubstitution substitution)))
     (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment
-      before argumentId argument argumentsHeap) :
+      before argumentId argument argumentsHeap)
+    {entry : Dynamic.Environment} {copied : Dynamic.Heap}
+    (copy : Dynamic.EnvironmentCopies (source.applySubstitution substitution) captured argumentsHeap entry copied) :
     Dynamic.ExpressionEvaluates program context evidence source environment before call.node.id
-      argument ⟨argumentsHeap.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
+      argument ⟨copied.cells ++ [{type := (shape.parameter.applySubstitution substitution).scheme.body, value := some argument}]⟩ := by
   have callee : Dynamic.ExpressionEvaluates program context evidence source environment before
       call.callee.node.id
       (.closure ((shape.descriptor definitionContext captured).instantiate substitution
@@ -120,7 +131,7 @@ theorem Shape.invoke {source : TypedSource} (shape : Shape source)
       callee (.cons argumentTrace .nil) (.singleton argument)
       (by rw [call.argumentCoercions]; exact .nil) (.singleton argument)
       (by rw [call.arity]; rfl) (by rw [call.arity]; rfl)
-      (shape.identity_applies captured substitution _ evidence argumentsHeap argument frame)
+      (shape.identity_applies captured substitution _ evidence argumentsHeap argument copy frame)
   · rw [call.coercions]; exact .nil
 
 /-- The two runtime instances use an exact singleton substitution. Original
@@ -164,10 +175,19 @@ theorem Shape.frame {source : TypedSource} (shape : Shape source)
   obtain ⟨_parameter, _result, same, code, closed, _captured⟩ := materialized.closure_function_inv
   exact ⟨same.trans signatures, code.owner, code, code.requirement_ledger.idsUnique, closed⟩
 
+/-- The heap after the generalized `let`: the copies of the function's
+environment, then the principal descriptor over those copies. -/
+def Shape.declaredHeap {source : TypedSource} (shape : Shape source)
+    (context : SourceSemantics.Context) (environment : Dynamic.Environment)
+    (before : Dynamic.Heap) : Dynamic.Heap :=
+  shape.allocatedHeap context (copies source environment before).1 (copies source environment before).2
+
+/-- The Word call copies the descriptor's captures, then allocates its
+parameter. -/
 def Shape.wordHeap {source : TypedSource} (shape : Shape source)
     (context : SourceSemantics.Context) (environment : Dynamic.Environment)
     (before : Dynamic.Heap) : Dynamic.Heap :=
-  ⟨(shape.allocatedHeap context environment before).cells ++
+  ⟨(copies source (copies source environment before).1 (shape.declaredHeap context environment before)).2.cells ++
     [{type := (shape.parameter.applySubstitution [(shape.typeVariable, .word)]).scheme.body, value := some (.word (Core.Word.ofNatModulo 11))}]⟩
 
 def Shape.valueHeap {source : TypedSource} (shape : Shape source)
@@ -187,8 +207,9 @@ def Shape.failure {source : TypedSource} (shape : Shape source)
     (before : Dynamic.Heap) : Dynamic.SemanticFault :=
   .uninitializedLocation ⟨(shape.valueHeap context environment before).cells.length⟩
 
-/-- The Word call and ordinary allocation occur before the absent read. The
-later Bool call is not evaluated after the first tuple element fails. -/
+/-- The environment copies, the Word call with its own copies and the ordinary
+allocation occur before the absent read. The later Bool call, and so its copies,
+is not evaluated after the first tuple element fails. -/
 theorem Shape.body_trace {source : TypedSource} (shape : Shape source)
     {program : SourceSemantics.Program} {context nextContext valueContext finalContext : SourceSemantics.Context}
     (evidence : Dynamic.EvidenceEnvironment) (environment : Dynamic.Environment)
@@ -202,25 +223,33 @@ theorem Shape.body_trace {source : TypedSource} (shape : Shape source)
     (word : TypeWellFormed nextContext .word)
     {literalType : TypeSystem.Ty}
     (literal : ExpressionHasType source nextContext shape.literal.node.id literalType)
+    (readable : Readable before environment)
     (wordFrame : Dynamic.ClosureFrame program
-      ((shape.descriptor context environment).instantiate [(shape.typeVariable, .word)]
+      ((shape.descriptor context (copies source environment before).1).instantiate [(shape.typeVariable, .word)]
         (evidence.applySubstitution [(shape.typeVariable, .word)]))) :
     Dynamic.FunctionStatementsFault program context evidence source environment before
       [shape.initialized.id, shape.valueInitialized.id, shape.absentDeclared.id, shape.returned.id] finalContext
       (shape.failure context environment before) (shape.finalHeap context environment before) := by
-  let allocated := shape.allocatedHeap context environment before
+  let captured := (copies source environment before).1
+  let middle := (copies source environment before).2
+  have snapshot : Dynamic.EnvironmentCopies source environment before captured middle :=
+    copies_spec source readable
+  let allocated := shape.declaredHeap context environment before
   let first := shape.wordHeap context environment before
   let bound := shape.valueHeap context environment before
   let after := shape.finalHeap context environment before
-  let locals := (shape.binder.id, ⟨before.cells.length⟩) :: environment
-  have allocation : Dynamic.Heap.AllocatesGeneralized before (shape.descriptor context environment)
-      ⟨before.cells.length⟩ allocated := .append
+  let locals := (shape.binder.id, ⟨middle.cells.length⟩) :: environment
+  have allocation : Dynamic.Heap.AllocatesGeneralized middle (shape.descriptor context captured)
+      ⟨middle.cells.length⟩ allocated := .append
+  have capturedAllocated : Readable allocated captured :=
+    (Readable.of_copies snapshot readable).mono (Dynamic.HeapMetadataExtend.of_generalized_allocation allocation)
+  have wordCopy := copies_spec_applySubstitution [(shape.typeVariable, .word)] source capturedAllocated
   have literalTrace : Dynamic.ExpressionEvaluates program nextContext evidence source locals
       allocated shape.literal.node.id (.word (Core.Word.ofNatModulo 11)) allocated := by
     simpa only [shape.literalValue] using shape.literal.evaluates evidence locals allocated unique literal
-  have firstTrace := shape.invoke shape.wordCall environment locals [(shape.typeVariable, .word)] evidence []
+  have firstTrace := shape.invoke shape.wordCall captured locals [(shape.typeVariable, .word)] evidence []
     Dynamic.Environment.LooksUp.head allocation.reads_new rfl fields
-    (shape.instance evidence wellformed word) wordFrame literalTrace
+    (shape.instance evidence wellformed word) wordFrame literalTrace wordCopy
   have valueAllocation : Dynamic.Heap.Allocates first shape.valueBinder.scheme.body
       (some (.word (Core.Word.ofNatModulo 11))) ⟨first.cells.length⟩ bound := .append
   let valueLocals := (shape.valueBinder.id, ⟨first.cells.length⟩) :: locals
@@ -246,7 +275,7 @@ theorem Shape.body_trace {source : TypedSource} (shape : Shape source)
     apply Dynamic.ExpressionFaults.form (lookupExpression?_sound shape.tupleFound)
     rw [shape.tupleForm]
     exact .tuple (by rw [shape.tupleRequirements, shape.tupleCoercions]; rfl) (.head absentFault)
-  exact .tail (shape.initializes evidence environment before extended)
+  exact .tail (shape.initializes evidence snapshot extended)
     (.tail initialized (.tail absent (.singleton
       (.returnValue (lookupStatement?_sound shape.returnedFound) shape.returnedForm tupleFault))))
 

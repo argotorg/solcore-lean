@@ -10,8 +10,10 @@ import Solcore.Frontend.SourceCoreExecution
 #check_failure Solcore.Frontend.SourceCoreExecution.Authentication.mk
 
 /-! The same public value, artifact, session and checkpoint types execute data,
-recursive calls and returned native functions. The empty compilation has no
-callable code. All setup is cached before opening an ownership domain. -/
+recursive calls and returned native functions. Closures capture by value: every
+call of a retained closure starts again from its creation-time captures. The
+empty compilation has no callable code. All setup is cached before opening an
+ownership domain. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreExecution
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -82,6 +84,52 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : Compiled}
 example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWordProgram}
     (accepted : compileStaticWord raw options = .ok compiled) :
     checkProgram raw options.checkingFuel = .ok compiled.compiled.program := compileStaticWord_checked_source accepted
+
+/-- solcore-rs #120's programs, a repeated call, a loop-carried capture and
+upstream's `control-flow-capture-identity` fixture without its pragma, std
+wrappers and inline Yul: a closure keeps the values captured at its creation,
+and each call starts again from them. -/
+private def captureWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    "function issue120First() returns (Word) { let x: Word = 40; let f = lam(step: Word) { return x + step; }; x = 99; return f(2); }",
+    "function issue120Second() returns (Word) { let x: Word = 41; let f = lam() { x = 42; return x; }; let result: Word = f(); return result + x; }",
+    "function repeated() returns (Word) { let x: Word = 0; let f = lam() { x = x + 1; return x; }; let a: Word = f(); let b: Word = f(); return a * 10 + b + x * 100; }",
+    "function loopCarried(count: Word) returns (Word) { let i: Word = 0; let acc: Word = 0; while (i < count) { let f = lam() { let w: Word = i * 10; i = i + 100; return w + acc; }; acc = f(); i = i + 1; } return acc + i * 1000; }",
+    "function branch(flag: Bool, value: Word) returns (Word) { let x: Word = value; if (flag) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; let second = lam() { let result: Word; result = x; return result; }; return first() + second(); } return 0; }",
+    "function loop(count: Word, value: Word) returns (Word) { let x: Word = value; let total: Word = 0; for (let i: Word = 0; i < count; i = i + 1) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; let second = lam() { let result: Word; result = x; return result; }; total = first() + second(); } return total; }",
+    "function nested(flag: Bool, count: Word, value: Word) returns (Word) { let x: Word = value; let total: Word = 0; if (flag) { for (let i: Word = 0; i < count; i = i + 1) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; { let second = lam() { let result: Word; result = x; return result; }; x = x + 7; if (flag) { let third = lam() { let result: Word; result = x; return result; }; total = first() + second() + third(); } } } } return total; }"
+  ]}] }
+
+private def runCaptures : IO Unit := do
+  let program ← get "capture check" (checkProgram captureWorkspace)
+  let seeds ← ["issue120First", "issue120Second", "repeated", "loopCarried", "branch", "loop", "nested"].mapM (seed program)
+  let compiled ← get "capture compilation"
+    (compile captureWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "capture root missing")
+  let initial ← boot (← compiled.open)
+  let first ← execute initial (← key 0) []
+  require (first.value == word 42) "a later outer assignment reached the closure"
+  let second ← execute first.session (← key 1) []
+  require (second.value == word 83) "a closure assignment reached the enclosing scope"
+  let repeated ← execute second.session (← key 2) []
+  require (repeated.value == word 11) "a closure call did not restart from the captured values"
+  let loopNone ← execute repeated.session (← key 3) [word 0]
+  let loopFour ← execute loopNone.session (← key 3) [word 4]
+  require (loopNone.value == word 0 && loopFour.value == word 4060)
+    "a closure created in a loop body lost a loop-carried capture"
+  let mut session := loopFour.session
+  let yes : Value := .bool true
+  let no : Value := .bool false
+  let cases : List (Nat × List Value × Nat) :=
+    [(4, [yes, word 3], 13), (4, [yes, word 0], 7), (4, [no, word 3], 0),
+     (5, [word 0, word 3], 0), (5, [word 1, word 3], 13), (5, [word 2, word 3], 27),
+     (6, [yes, word 1, word 3], 30), (6, [yes, word 2, word 3], 72),
+     (6, [no, word 1, word 3], 0), (6, [yes, word 0, word 3], 0)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == word expected) s!"capture identity case {index} gave {reprStr completed.value}"
+    session := completed.session
 
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
@@ -173,14 +221,14 @@ def run : IO Unit := do
   let made ← execute initial (← key 0) [word 10]
   let first ← execute made.session (← key 1) [made.value, word 2]
   let second ← execute first.session (← key 1) [made.value, word 3]
-  require (first.value == word 12 && second.value == word 15) "public session lost shared capture"
+  require (first.value == word 12 && second.value == word 13) "public closure calls did not restart from the captured seed"
   require (initial.heapSize < made.session.heapSize && made.session.heapSize < second.session.heapSize) "public session replaced its native heap"
   let independent ← execute second.session (← key 0) [word 100]
   let closureMutated ← execute independent.session (← key 1) [made.value, word 5]
-  require (closureMutated.value == word 20) "used-session closure did not retain its earlier capture"
-  let closureNamed ← get "named after closure allocation and mutation"
+  require (closureMutated.value == word 15) "used-session closure did not restart from its captured seed"
+  let closureNamed ← get "named after closure allocation and calls"
     (← closureMutated.session.namedWithReceipt (← key 2))
-  let closureBuiltin ← get "builtin after closure mutation and named issuance"
+  let closureBuiltin ← get "builtin after closure calls and named issuance"
     (← closureNamed.val.session.builtinWithReceipt .wordToInteger)
   have _preservedClosureState : closureMutated.session.SameRuntime closureBuiltin.val.session :=
     closureNamed.property.same_runtime.trans closureBuiltin.property.same_runtime
@@ -193,14 +241,14 @@ def run : IO Unit := do
       (word 3, .product independent.value closureNamed.val.value)]
   let closureBundle : Value := .product closureHolder (.product closureTable closureBuiltin.val.value)
   let closureNested ← execute closureBuiltin.val.session (← key 13) [closureBundle]
-  require (closureNested.value == .integer 81)
-    "nested closure inputs lost current capture, shared aliases or first-match mapping order"
+  require (closureNested.value == .integer 59)
+    "nested closure inputs lost their captures, repeated aliases or first-match mapping order"
   let closureContinued ← execute closureNested.session (← key 1) [made.value, word 1]
-  require (closureContinued.value == word 29) "nested closure execution lost the returned capture mutation"
+  require (closureContinued.value == word 11) "nested closure execution changed the captured seed"
   let independentContinued ← execute closureContinued.session (← key 1) [independent.value, word 1]
   require (independentContinued.value == word 101)
     "nested closure input aliased an independently allocated capture"
-  let afterDistinctIssuance ← get "new named handle after both closure mutations"
+  let afterDistinctIssuance ← get "new named handle after both closure calls"
     (← independentContinued.session.namedWithReceipt (← key 0))
   have _preservedDistinctState : independentContinued.session.SameRuntime afterDistinctIssuance.val.session :=
     afterDistinctIssuance.property.same_runtime
@@ -212,30 +260,30 @@ def run : IO Unit := do
       (word 3, .product independent.value made.value)]
   let distinctBundle : Value := .product made.value distinctTable
   let distinctApplied ← execute afterDistinctIssuance.val.session (← key 14) [distinctBundle]
-  require (distinctApplied.value == word 176)
-    "two nested closure inputs lost current captures, repeated aliases or ordered entries"
+  require (distinctApplied.value == word 135)
+    "two nested closure inputs lost their captures, repeated aliases or ordered entries"
   let firstDistinct ← execute distinctApplied.session (← key 1) [made.value, word 1]
-  require (firstDistinct.value == word 38) "first closure lost its shared mutation after distinct input execution"
+  require (firstDistinct.value == word 11) "first closure changed its captured seed after distinct input execution"
   let secondDistinct ← execute firstDistinct.session (← key 1) [independent.value, word 1]
-  require (secondDistinct.value == word 109) "second closure lost its independent mutation after distinct input execution"
-  let captured ← get "snapshot of both mutated closures" (← secondDistinct.session.snapshotWithReceipt)
+  require (secondDistinct.value == word 101) "second closure changed its captured seed after distinct input execution"
+  let captured ← get "snapshot of both called closures" (← secondDistinct.session.snapshotWithReceipt)
   have _captured : secondDistinct.session.SnapshotAt 1024 captured.val := captured.property
   let afterCapture ← execute secondDistinct.session (← key 1) [made.value, word 9]
-  require (afterCapture.value == word 47) "original closure did not mutate after snapshot capture"
+  require (afterCapture.value == word 19) "original closure did not restart from its seed after snapshot capture"
   let restored ← match afterCapture.session.restoreSnapshot captured.val with
     | .ok (.ready session) => pure session
     | _ => throw (IO.userError "captured ready session did not restore through its original ownership domain")
   require (restored.heapSize == secondDistinct.session.heapSize && restored.heapSize < afterCapture.session.heapSize)
     "restoration retained later allocations or replayed initialization"
   let restoredFirst ← execute restored (← key 1) [made.value, word 1]
-  require (restoredFirst.value == word 39)
+  require (restoredFirst.value == word 11)
     "restoration used post-snapshot storage or lost the original closure handle"
   let restoredSecond ← execute restoredFirst.session (← key 1) [independent.value, word 1]
-  require (restoredSecond.value == word 110)
+  require (restoredSecond.value == word 101)
     "restoration lost the second original handle or aliased its independent capture"
-  let integratedNamed ← get "named receipt after distinct closure mutations"
+  let integratedNamed ← get "named receipt after distinct closure calls"
     (← secondDistinct.session.namedWithReceipt (← key 2))
-  let integratedBuiltin ← get "builtin receipt after distinct closure mutations"
+  let integratedBuiltin ← get "builtin receipt after distinct closure calls"
     (← integratedNamed.val.session.builtinWithReceipt .wordToInteger)
   have _preservedIntegratedState : secondDistinct.session.SameRuntime integratedBuiltin.val.session :=
     integratedNamed.property.same_runtime.trans integratedBuiltin.property.same_runtime
@@ -247,12 +295,12 @@ def run : IO Unit := do
   let integratedHolder : Value := .constructed nestedMetadata [made.value, integratedBuiltin.val.value]
   let integratedBundle : Value := .product integratedHolder (.product distinctTable integratedNamed.val.value)
   let integratedApplied ← execute integratedBuiltin.val.session (← key 15) [integratedBundle]
-  require (integratedApplied.value == .integer 233)
+  require (integratedApplied.value == .integer 166)
     "combined retained and issued function inputs lost captures, aliases, recursive code or mapping order"
   let firstIntegrated ← execute integratedApplied.session (← key 1) [made.value, word 1]
-  require (firstIntegrated.value == word 47) "combined execution lost the older closure's shared mutation"
+  require (firstIntegrated.value == word 11) "combined execution changed the older closure's captured seed"
   let secondIntegrated ← execute firstIntegrated.session (← key 1) [independent.value, word 1]
-  require (secondIntegrated.value == word 117) "combined execution lost the independent closure's mutation"
+  require (secondIntegrated.value == word 101) "combined execution changed the independent closure's captured seed"
   let wrongIntegratedTable : Value := .mapping .word closurePairType
     [(word 3, .product made.value integratedBuiltin.val.value)]
   match integratedBuiltin.val.session.start (← key 15)
@@ -273,26 +321,26 @@ def run : IO Unit := do
   let pairTable : Value := .mapping .word closurePairType
     [(word 3, .product pairLeft pairRight), (word 3, .product pairRight pairLeft)]
   let pairNested ← execute pairData.session (← key 14) [.product pairLeft pairTable]
-  require (pairNested.value == word 144)
-    "product-exported functions lost current captures or a repeated nested alias"
+  require (pairNested.value == word 135)
+    "product-exported functions lost their captures or a repeated nested alias"
   let pairLeftContinued ← execute pairNested.session (← key 1) [pairLeft, word 1]
   let pairRightContinued ← execute pairLeftContinued.session (← key 1) [pairRight, word 1]
-  require (pairLeftContinued.value == word 21 && pairRightContinued.value == word 111)
-    "reused product outputs lost shared mutation, independent captures or first-match mapping order"
+  require (pairLeftContinued.value == word 11 && pairRightContinued.value == word 101)
+    "reused product outputs changed their captured seeds or first-match mapping order"
   let touching ← pairRightContinued.session.runWithReceipt (← key 17) [pairLeft, word 9]
     {executionFuel := 300000}
   let failedPair ← match touching.val with
     | .ok (.failed reason session) =>
-        match ← get "mutation before failure diagnostic" (session.diagnostic (← key 17) reason) with
+        match ← get "closure call before failure diagnostic" (session.diagnostic (← key 17) reason) with
         | some {error := .uninitializedLocal _, span := some _, ..} => pure session
-        | _ => throw (IO.userError "failure after closure mutation lost its actual source diagnosis")
-    | _ => throw (IO.userError "closure mutation followed by failure changed outcome")
+        | _ => throw (IO.userError "failure after a closure call lost its actual source diagnosis")
+    | _ => throw (IO.userError "closure call followed by failure changed outcome")
   let afterFailedData ← execute failedPair (← key 2) [word 2]
-  require (afterFailedData.value == word 31) "data execution could not continue after closure mutation and failure"
+  require (afterFailedData.value == word 31) "data execution could not continue after a closure call and failure"
   let afterFailedLeft ← execute afterFailedData.session (← key 1) [pairLeft, word 1]
   let afterFailedRight ← execute afterFailedLeft.session (← key 1) [pairRight, word 1]
-  require (afterFailedLeft.value == word 31 && afterFailedRight.value == word 112)
-    "failure lost a retained handle, rolled back an earlier capture change or changed the independent capture"
+  require (afterFailedLeft.value == word 11 && afterFailedRight.value == word 101)
+    "failure lost a retained handle or changed a captured seed"
   let recursive ← execute second.session (← key 2) [word 5]
   require (recursive.value == word 31) "public recursive result changed"
   let localResult ← execute recursive.session (← key 3) [.bool true]
@@ -307,7 +355,7 @@ def run : IO Unit := do
   let finished ← checkpoint.resumeWithReceipt 300000
   let resumed ← match finished.val with
     | .succeeded result => pure result | _ => throw (IO.userError "public call did not resume")
-  require (resumed.value == word 19) "public checkpoint lost capture"
+  require (resumed.value == word 14) "public checkpoint lost capture"
   let namedReceipt ← get "public named handle" (← resumed.session.namedWithReceipt (← key 2))
   let named := namedReceipt.val
   have _preservedNamed : resumed.session.SameRuntime named.session := namedReceipt.property.same_runtime
@@ -337,7 +385,7 @@ def run : IO Unit := do
   let direct ← match ← directPending.resume 300000 with
     | .succeeded completion => pure completion
     | _ => throw (IO.userError "public direct call did not resume")
-  require (direct.value == word 23) "public direct invocation lost shared capture"
+  require (direct.value == word 14) "public direct invocation lost its capture"
   let integer ← match ← direct.session.invokePacked (← handle builtin.value) (word 8) {executionFuel := 300000} with
     | .ok (.succeeded completion) => pure completion
     | _ => throw (IO.userError "public direct builtin invocation failed")
@@ -389,5 +437,6 @@ def run : IO Unit := do
   let abiSession ← boot abiArtifact
   let abiResult ← execute abiSession abiRoot.root.key [word 3]
   require (abiResult.value == word 31) "public ABI root changed execution"
+  runCaptures
 
 end Tests.SourceCoreExecution

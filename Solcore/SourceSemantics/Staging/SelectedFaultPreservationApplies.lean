@@ -180,8 +180,9 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
           runtime.residual_variables_open, allocate.extendsHeapTypes.trans bodyExtends⟩
       · rcases staged with ⟨_inner, impossible, _innerTyped⟩
         cases impossible
-  | @closure bodySize scope context before bound after function arguments environment
-      parameterTypes bodyContext finalContext child outcome result selected valid parameters allocate body resultRule =>
+  | @closure bodySize scope context before copied bound after function arguments entry environment
+      parameterTypes bodyContext finalContext child outcome result selected valid parameters copy allocate body
+      resultRule =>
       rcases callableTyped.closure_function_inv with
         ⟨parameterEq, resultEq, signaturesEq, code, closureEvidence, captures⟩
       subst parameter
@@ -209,9 +210,12 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
               (function.parameters.map fun binder => binder.scheme.body).length := by
             simpa using allocate.length_eq.symm
           have argumentsTyped := packing.unpackTypes closurePackedTyped argumentsLength
-          have boundTyped := allocate.preservesHeapTyping closureBeforeTyped argumentsTyped
+          have copiedTyped := closureBeforeTyped.copy copy
+          have copiedArgumentsTyped := argumentsTyped.mono copy.metadata_extends
+          have boundTyped := allocate.preservesHeapTyping copiedTyped copiedArgumentsTyped
           have boundEnvironment := allocate.preservesEnvironmentAgreement
-            (monoBinders_toBinders staticParameters) (monoBinders_monomorphic staticParameters) captures
+            (monoBinders_toBinders staticParameters) (monoBinders_monomorphic staticParameters)
+            (copy.agrees captures)
           have fields := MonoBindersExtend.runtimeContextFields staticParameters
           have callClosed := fields.targetClosed code.closed
           have boundAtCall := boundTyped.transportClosed fields.signatures code.closed callClosed
@@ -240,6 +244,7 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
             (Size.child_lt_stepSize (by simp)) childRuntime childCovers boundEnvironment boundAtCall childType body
           exact ⟨afterTyped.transportClosed (signaturesEq.symm.trans fields.signatures.symm)
             callClosed runtime.closed (fields.targetVariablesClosed code.variables_closed)
-            runtime.residual_variables_open, allocate.extendsHeapTypes.trans bodyExtends⟩
+            runtime.residual_variables_open,
+            copy.metadata_extends.trans (allocate.extendsHeapTypes.trans bodyExtends)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedFaultPreservation

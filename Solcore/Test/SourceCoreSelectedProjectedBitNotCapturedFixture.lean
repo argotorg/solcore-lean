@@ -38,6 +38,7 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
     ⟨resultNode, resultFound, resultForm, resultRequirements, resultCoercions⟩
   let ⟨inputs⟩ ← observed (source.inputs = [table]) "captured inputs"
   let ⟨tableScheme⟩ ← observed (table.scheme = .mono mappingType) "captured mapping scheme"
+  let ⟨tableCopied⟩ ← observed (CaptureBinders.copiedBinder? source table.id = some table) "captured mapping copied"
   let ⟨keyScheme⟩ ← observed (key.scheme = .mono .word) "captured key scheme"
   let ⟨keyTable⟩ ← observed (key.id ≠ table.id) "captured distinct binders"
   let ⟨roots⟩ ← observed (source.roots = [.statement outer.id]) "captured roots"
@@ -55,7 +56,7 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
   let ⟨outerFound⟩ ← observed (source.lookupStatement? outer.id = some outer) "captured outer identity"
   let ⟨outerForm⟩ ← observed (outer.form = .returnStmt (some lambda.id)) "captured outer child"
   return ⟨table, key, resolution, assigned, returned, outer, lambda, keyRead, tableRead, resultKey, result,
-    inputs, tableScheme, keyScheme, keyTable, roots, assignedFound, assignedForm, targetRoot,
+    inputs, tableScheme, tableCopied, keyScheme, keyTable, roots, assignedFound, assignedForm, targetRoot,
     targetProjections, targetType, returnedFound, returnedForm, lambdaFound, lambdaForm,
     lambdaRequirements, lambdaCoercions, outerFound, outerForm⟩
 

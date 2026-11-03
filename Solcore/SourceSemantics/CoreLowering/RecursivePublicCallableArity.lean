@@ -49,7 +49,7 @@ theorem Arity.of_value {program : Program} {registry : Staging.Recursive.Registr
     exact arity ▸ .builtin _
   | global instantiates _ _ _ _ allocate _ _ =>
     exact allocate.length_eq ▸ .global instantiates
-  | closure _ _ _ allocate _ _ =>
+  | closure _ _ _ _ allocate _ _ =>
     exact allocate.length_eq ▸ .closure _
 
 end Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity

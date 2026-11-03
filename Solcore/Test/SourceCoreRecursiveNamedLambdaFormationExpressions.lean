@@ -280,6 +280,8 @@ private def leaf_codes (compiled : SourceCoreUnifiedCompilation.Compiled) : IO (
             node.type == TypeSystem.Ty.function (TypeSystem.Ty.productMany (parameters.map (·.scheme.body))) result && !body.isEmpty)
             "formation original source annotation/requirements/body changed"
           require (scope.length == 1) "formation fixture exact lexical parameter scope changed"
+          require ((SourceCoreSourceCells.copiedSlots source scope).length == 1)
+            "formation fixture lambda no longer copies its lexical parameter"
           leaves := leaves ++ [(descriptor.id, code, leading)]
         | _ => pure ()
       | _ => pure ()
@@ -287,8 +289,11 @@ private def leaf_codes (compiled : SourceCoreUnifiedCompilation.Compiled) : IO (
   pure leaves
 
 /-- Formation executes the original emitted leaf in the actual captured prefix,
-with extra unused native fields retained. This harness does not construct source
-history or infer any Entry identity from the captured environment. -/
+with extra unused native fields retained. Closures capture by value: formation
+first copies the leaf's one lexical slot into a fresh marked cell, saved between
+the frame snapshot and the creation environment. This harness does not
+construct source history or infer any Entry identity from the captured
+environment. -/
 private def formation_suffix (compiled : SourceCoreUnifiedCompilation.Compiled)
     (leaves : List (Word × SourceCoreBasic.LoweredExpr × Core.Context)) (native : Value) (store : Store) : IO Nat := do
   let prepared := compiled.indexed
@@ -297,11 +302,12 @@ private def formation_suffix (compiled : SourceCoreUnifiedCompilation.Compiled)
     | 0 => throw (IO.userError "formation native payload traversal budget")
     | fuel + 1 =>
       match native with
-      | .pair (.pair marker (.closure parameter result executable (lexical :: actual))) (.word origin) =>
+      | .pair (.pair marker (.closure parameter result executable (lexical :: saved))) (.word origin) =>
         match leaves.find? (fun leaf => leaf.1 == origin) with
         | none => throw (IO.userError "formation returned lambda origin lacks original leaf")
         | some leaf =>
           let canonicalTypes := leaf.2.2
+          let actual := saved.drop 1
           let lexicalIndex := (actual.map Value.type).idxOf (canonicalTypes.headD .unit)
           let globalStart := actual.length - (prepared.base.globals.length + 1)
           let embedding : Renaming := fun index =>
@@ -309,6 +315,12 @@ private def formation_suffix (compiled : SourceCoreUnifiedCompilation.Compiled)
             else globalStart + index - 2
           require (canonicalTypes.zipIdx.all (fun slot => (actual.map Value.type)[embedding slot.2]? == some slot.1))
             "formation actual original lexical/global/frame prefix types changed"
+          let (copyType, copied) ← match saved.take 1, actual[lexicalIndex]? with
+            | [.cellRef copyType copied], some (.cellRef lexicalType original) =>
+              require (copyType == lexicalType && copied != original && store[copied]? == store[original]?)
+                "formation snapshot is not a separate copy of the lexical slot"
+              pure (copyType, copied)
+            | _, _ => throw (IO.userError "formation snapshot copy absent")
           let location ← match actual[embedding (canonicalTypes.length - 1)]? with
             | some (.cellRef type location) =>
               require (type == prepared.ancestry.layout.frame.type) "formation physical frame type changed"
@@ -321,10 +333,15 @@ private def formation_suffix (compiled : SourceCoreUnifiedCompilation.Compiled)
             require (Core.infer? (environment.map Value.type) (leaf.2.1.expression.rename embedding) prepared.layouts.definitions ==
               some (LanguageResult.resultType leaf.2.1.type)) "formation full actual environment typing changed"
             match runStateful 300000 (.initial (leaf.2.1.expression.rename embedding) environment installed) with
-            | .done (.inRight .word (.pair (.pair actualMarker (.closure actualParameter actualResult actualCode captures)) (.word actualOrigin))) after =>
+            | .done (.inRight .word (.pair (.pair actualMarker (.closure actualParameter actualResult actualCode
+                (actualLexical :: .cellRef freshType fresh :: captured))) (.word actualOrigin))) after =>
+              -- Formation only appends one marked copy, three cells holding the
+              -- lexical slot's value, and saves it after the frame snapshot.
               require (actualMarker == marker && actualParameter == parameter && actualResult == result &&
-                actualCode == executable && actualOrigin == origin && captures == lexical :: environment && after == installed)
-                "formation lost full ordered actual captures/unused suffix/original code/store"
+                actualCode == executable && actualOrigin == origin && actualLexical == lexical && captured == environment &&
+                freshType == copyType && installed.length ≤ fresh && after[fresh]? == installed[copied]? &&
+                after.take installed.length == installed && after.length == installed.length + 3)
+                "formation lost its snapshot copy or full ordered actual captures/unused suffix/original code/store"
             | other => throw (IO.userError s!"formation original leaf did not complete {reprStr other}")
           pure 1
       | .pair left right => return (← visit fuel left) + (← visit fuel right)
@@ -377,10 +394,12 @@ def run : IO Unit := do
       require (ledger.pending.isNone && ledger.rows.any (fun row => row.entry.key.binder.name == "gap" && row.payload.isNone) &&
         ledger.rows.any (fun row => row.entry.key.binder.name == "written" && row.payload == some (.word (Word.ofNatModulo 5))))
         "formation first missing binder/prior ordered writes changed"
+      -- `laterFault` first runs `maker`: its input and the snapshot its lambda
+      -- takes of it follow `laterFault`'s own input.
       let expected := if name == "firstFault" then
           [("seed", some (Value.word (Word.ofNatModulo 3))), ("written", some (.word (Word.ofNatModulo 5))), ("gap", none)]
         else [("seed", some (Value.word (Word.ofNatModulo 3))), ("seed", some (.word (Word.ofNatModulo 3))),
-          ("written", some (.word (Word.ofNatModulo 5))), ("gap", none)]
+          ("seed", some (.word (Word.ofNatModulo 3))), ("written", some (.word (Word.ofNatModulo 5))), ("gap", none)]
       require (ledger.rows.map (fun row => (row.entry.key.binder.name, row.payload)) == expected)
         "formation original first/later fault full ordered source cells changed"
       faultSizes := faultSizes ++ [(name, store.length)]

@@ -61,17 +61,18 @@ private theorem source_body {invocation : Staging.Recursive.Scope} {callContext 
     (arity : function.parameters.length = arguments.length)
     (trace : Staging.Recursive.Size.Applies program registry size invocation callContext before
       (.closure function) arguments outcome after) :
-    ∃ childSize child environment bound finalContext bodyOutcome,
+    ∃ childSize child copies copied environment bound finalContext bodyOutcome,
       registry.Closure function child ∧
-      Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound ∧
+      Dynamic.EnvironmentCopies function.source function.captured before copies copied ∧
+      Dynamic.BindersAllocate copies copied function.parameters arguments environment bound ∧
       Staging.Recursive.Size.Statements program registry childSize child inputs.context environment bound function.body
         finalContext bodyOutcome after ∧ Staging.Recursive.BodyResult function.resultType bodyOutcome outcome := by
   cases trace with
   | closureArity mismatch => exact False.elim (mismatch arity)
-  | closure selected _valid extended allocated body matched =>
+  | closure selected _valid extended copy allocated body matched =>
     have same := Dynamic.MonoBindersExtend.functional extended inputs.extended
     subst same
-    exact ⟨_, _, _, _, _, _, selected, allocated, body, matched⟩
+    exact ⟨_, _, _, _, _, _, _, _, selected, copy, allocated, body, matched⟩
 
 include frame raw stable runtime selectedBodies in
 /-- Concrete body completion and actual Source execution restore the original
@@ -167,11 +168,13 @@ theorem preserves
   have arity : function.parameters.length = arguments.length := by
     rw [CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) material.code, List.length_map]
     exact argumentsRep.length.1
-  obtain ⟨_size, child, environment, bound, finalContext, bodyOutcome, selected, allocated, bodyTrace, matched⟩ :=
-    source_body material inputs arity trace
+  obtain ⟨_size, child, copies, copied, environment, bound, finalContext, bodyOutcome, selected, copy, allocated,
+      bodyTrace, matched⟩ := source_body material inputs arity trace
   obtain ⟨entry, reached, related, _rows, effect, wrap, _unwrap⟩ :=
     GeneralizedLocalViewedEntry.prepare material view inputs functions owner caller atFrame
       argumentsRep heaps raw.captures stable
+  obtain ⟨sameCopies, sameCopied⟩ := Dynamic.EnvironmentCopies.functional entry.entry.copy copy
+  rw [← sameCopies, ← sameCopied] at allocated
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨body,sameOutcome,sameHeap⟩ :=
@@ -208,7 +211,8 @@ theorem reflects
   have result := finish material view inputs functions owner caller frame raw stable runtime selectedBodies
     entry reached related effect selected body.trace body.matched body.effect.maps body.effect.worlds
     body.represented body.heaps body.preserved body.effect.metadata body.effect
-  refine ⟨_, body.outcome, body.after, .closure selected frame inputs.extended entry.entry.allocation body.trace body.matched, ?_⟩
+  refine ⟨_, body.outcome, body.after,
+    .closure selected frame inputs.extended entry.entry.copy entry.entry.allocation body.trace body.matched, ?_⟩
   rw [finalEq]
   simpa only [sameValue,sameStore] using result
 

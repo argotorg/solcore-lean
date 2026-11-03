@@ -3,8 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedPlainInversion
 import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
-/-! A genuine generalized Source declaration creates the actual mixed physical
-prefix before the remaining ordinary Source statements are lifted. -/
+/-! A genuine generalized Source declaration copies its environment and creates
+the actual mixed physical prefix before the remaining ordinary Source
+statements are lifted. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -19,6 +20,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {keys : List (CallableIndexedOwnedFunctionValues.Key whole program)}
   {protocol : ProtectedStateTransition.Protocol (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) protocol)
+  (bindings : ProtectedStateTransition.Bindings protocol)
   {projects : GenericHeap.Projection}
   {model : GenericHeap.PayloadModel (CompatibleEquality.storageCatalog whole.compatible.checked.catalog)
     projects whole.indexed.layouts.definitions}
@@ -42,7 +44,7 @@ private theorem head_typed {context : SourceSemantics.Context} {id : StatementId
   | singleton head => exact ⟨control, _, _, head⟩
   | cons head _ => exact ⟨control, _, _, head⟩
 
-include record registered in
+include bindings record registered in
 theorem generalized {context nextContext : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {id : StatementId} {node : StatementNode} {binder : TypedBinder} {initializer : ExpressionId}
     {initializerNode : ExpressionNode} {parameters : List TypedBinder} {result : TypeSystem.Ty}
@@ -73,6 +75,11 @@ theorem generalized {context nextContext : SourceSemantics.Context} {scope : Sou
         (whole.indexed.layouts.allocatorAt named.signature.key [] (fun error => .sourceAllocation (reprStr error)))
         (initializedRequest (source named) scope binder lowered.type))
       (same : annotation.original = allocation.expression)
+      {captured : Expr}
+      (copied : SourceCoreSourceCells.copyScope (some (CallableIndexedNamedGeneration.allocator whole.indexed named))
+        (source named) scope (fun index => index)
+        (CellAwareGeneralizedSnapshotCode.snapshotInner lowered.type lowered.expression annotation.expression) =
+          .ok captured)
     (sourceEq : invocation.source = source named)
     (issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named reasonAt)
     (remaining : CellAwareSourceBodyLiftBounds.Lifts (named := named) (administrative := administrative)
@@ -88,20 +95,24 @@ theorem generalized {context nextContext : SourceSemantics.Context} {scope : Sou
   have captures : Dynamic.GeneralizedClosureCaptures context (source named) environment binder initializer descriptor :=
     .directLambda (lookupExpression?_sound initializerFound) initializerForm
       (by simpa only [ExpressionNode.rawType, coercions] using valueType) valueType requirements coercions
-  obtain ⟨tailSize, function, location, bound, _strict, actualCaptures, allocated, tail⟩ :=
+  obtain ⟨tailSize, copies, snapshotHeap, function, location, bound, _strict, snapshot, actualCaptures, allocated, tail⟩ :=
     CellAwareGeneralizedPlainInversion.generalized (mode := true) (invocation := invocation) (by simpa only [sourceEq] using unique)
       (by simpa only [sourceEq] using found) form polymorphic (by simpa only [sourceEq] using extended)
       ⟨descriptor, by simpa only [sourceEq] using captures⟩ trace
-  have capturesNamed : Dynamic.GeneralizedClosureCaptures context (source named) environment binder initializer function := by
+  have snapshotNamed : Dynamic.EnvironmentCopies (source named) environment before copies snapshotHeap := by
+    simpa only [sourceEq] using snapshot
+  have capturesNamed : Dynamic.GeneralizedClosureCaptures context (source named) copies binder initializer function := by
     simpa only [sourceEq] using actualCaptures
   obtain ⟨control, next, facts, headTyped⟩ := head_typed sourceTyped
-  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime locals headTyped
-    found form polymorphic capturesNamed
-  obtain ⟨values, marker, _agreement, _smaller, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped,
-      _preserved, _effect, nextAuthority, reached, _related, nextAdmitted, nextPhysical, locationEq, nativeEq⟩ :=
+  have functionTyped := CellAwareGeneralizedSourceInversion.captured_wellTyped runtime (snapshotNamed.agrees locals)
+    headTyped found form polymorphic capturesNamed
+  obtain ⟨values, marker, copiedStore, copiedMap, copiedWorld, _agreement, _smaller, nextEnvironments, nextHeaps,
+      nextLocals, nextAgrees, nextTyped, _preserved, _effect, nextAuthority, reached, _related, nextAdmitted, nextPhysical,
+      locationEq, nativeEq⟩ :=
     CellAwareNamedGeneralizedPrefix.complete bridge compiled record site initial issuer declaration polymorphic extended
-      ordinary nativeTyped allocation annotation same producer registered environments heaps locals agrees actualTyped
-      current admitted authority physical (ready current physical.read) capturesNamed functionTyped allocated type body
+      ordinary nativeTyped allocation annotation same copied producer bindings registered environments heaps locals agrees
+      actualTyped current admitted authority physical ready snapshotNamed capturesNamed
+      functionTyped allocated type body
   have nextReady : ProtectedStateTransition.CellAllocation.ReadyAt producer nextPhysical.location nextPhysical.native := by
     intro index current stored
     have previous := ready current (by simpa only [locationEq, nativeEq] using stored)
@@ -114,7 +125,7 @@ theorem generalized {context nextContext : SourceSemantics.Context} {scope : Sou
       (ProtectedStateImperativeStatementSuffixTyping.let_decl unique sourceTyped found form extended)
       reached nextAdmitted nextAuthority nextPhysical owner (sameLocation.trans locationEq.symm) nextReady tail
   exact ⟨resultContext, resultOutcome, resultHeap,
-    .letGeneralized (by simpa only [sourceEq] using lookupStatement?_sound found) form actualCaptures polymorphic
+    .letGeneralized (by simpa only [sourceEq] using lookupStatement?_sound found) form snapshot actualCaptures polymorphic
       (by simpa only [sourceEq] using extended) allocated stagedTail, adapted⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareSourceGeneralizedPrefixLifting

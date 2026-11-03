@@ -163,40 +163,51 @@ variable {sourceContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
     headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
 
 include chosen observed in
-/-- The original formation producer runs once. The same complete tuple and
-known formed member retain the positive chosen-factory companion. -/
+/-- The original formation producer runs once over the copies. The same
+complete tuple and known formed member retain the positive chosen-factory
+companion at the formed closure's literal index. -/
 theorem formation_chosen_member
-    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)
+      mapping world heap store) :
     let i := CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt environment captured prefixContext
     let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at
       i.captured i.code i.support owner initial packet
-    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
-      i.function.source i.function.captured heap i.code.id (.closure i.function) heap ∧
-    Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
-      (.inRight .word (value i.code i.captured.embedding history.native actual)) store ∧
-    (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
-      registry mapping world (FunctionValues.sourceType i.function) (.closure i.function)
-      (value i.code i.captured.embedding history.native actual)
-      (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
-    (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
-      result = .inRight .word (value i.code i.captured.embedding history.native actual) ∧ finalStore = store) ∧
-    CallableIndexedOwnedPreparedOrdinaryFormedMembers.FormedAt headers keys registry faults
-      mapping world (FunctionValues.sourceType i.function) (.closure i.function)
-      (value i.code i.captured.embedding history.native actual)
-      (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
-    ChosenAt root expressionSyntax headers keys registry faults i history := by
-  obtain ⟨sourceTrace, evaluated, related, determined, formed, factory⟩ :=
+    ∃ formed : Formed (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile))
+        i.captured i.code history heap store owner.key.frameLocation,
+      Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) i.function.context i.function.evidence
+        i.function.source i.function.captured heap i.code.id (.closure formed.closure) formed.finalHeap ∧
+      Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding)
+        (.inRight .word (value i.code formed.embedding history.native formed.closureActual)) formed.finalStore ∧
+      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Represents
+        registry formed.finalMap formed.finalWorld (FunctionValues.sourceType i.function) (.closure formed.closure)
+        (value i.code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
+      (∀ result finalStore, Evaluates actual store (i.code.lowered.expression.rename i.captured.embedding) result finalStore →
+        result = .inRight .word (value i.code formed.embedding history.native formed.closureActual) ∧
+          finalStore = formed.finalStore) ∧
+      CallableIndexedOwnedPreparedOrdinaryFormedMembers.FormedAt headers keys registry faults
+        formed.finalMap formed.finalWorld (FunctionValues.sourceType i.function) (.closure formed.closure)
+        (value i.code formed.embedding history.native formed.closureActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) ∧
+      ChosenAt root expressionSyntax headers keys registry faults
+        (CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt formed.captured formed.captures rfl)
+        formed.closureHistory := by
+  obtain ⟨formed, sourceTrace, evaluated, related, determined, formedAt, factory⟩ :=
     CallableIndexedOwnedChosenOrdinaryFormedMembers.formation_member_with_factory root expressionSyntax
-      receipt chosen environment captured prefixContext owner initial packet profile observed stored
+      receipt chosen environment captured prefixContext owner initial packet profile observed heaps
   let i := CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt environment captured prefixContext
-  let history := CallableIndexedOwnedPreparedOrdinaryLambdaFormation.history_at i.captured i.code i.support owner initial packet
-  have member : ChosenAt root expressionSyntax headers keys registry faults i history :=
+  have member : ChosenAt root expressionSyntax headers keys registry faults
+      (CallableIndexedOwnedChosenOrdinaryFormedMembers.index receipt formed.captured formed.captures rfl)
+      formed.closureHistory :=
     .ordinary owner factory
-      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin i.captured i.code i.support owner initial packet)
-      rfl observed (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index i.captured i.code i.support)
+      ⟨(CallableIndexedOwnedPreparedOrdinaryLambdaFormation.source_origin i.captured i.code i.support owner initial packet).metadata⟩
+      rfl (observed.of_slots formed.slots)
+      (CallableIndexedOwnedPreparedOrdinaryLambdaFormation.reference_index i.captured i.code i.support)
       ((CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).runtime_hasType
         (registry := registry) related)
-  exact ⟨sourceTrace, evaluated, related, determined, formed, member⟩
+  exact ⟨formed, sourceTrace, evaluated, related, determined, formedAt, member⟩
 end Formation
 
 theorem written_chosen_member

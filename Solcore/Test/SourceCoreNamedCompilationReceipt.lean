@@ -99,7 +99,7 @@ private def content : String := String.intercalate "\n" [
   "function empty(flag: Bool, value: Word) { }",
   "function selected(flag: Bool, value: Word, values: mapping(Word => Word)) returns (Word) { return flag ? values[value] : value; }",
   "function duplicate(values: mapping(Word => Word), key: Word) returns (Word) { return values[key]; }",
-  "function captured(seed: Word) returns (function(Word) returns (Word)) { let shared = seed; return lam(delta: Word) -> Word { shared += delta; return shared; }; }",
+  "function captured(seed: Word) returns (function(Word) returns (Word)) { let total = seed; return lam(delta: Word) -> Word { total += delta; return total; }; }",
   "function identity(value: Word) returns (Word) { return value; }",
   "function invoke(f: function(Word) returns (Word), delta: Word) returns (Word) { return f(delta); }"
 ]
@@ -138,7 +138,8 @@ def run : IO Unit := do
   match first.observation with
   | .done (.closure _ _ _ _ _ captures _) final =>
     SourceCoreUnifiedCorpusSupport.assertTrue (captures.length > 0) "returned closure lost parameter/local captures"
-    SourceCoreUnifiedCorpusSupport.assertTrue (final.heap.length == initial.heap.length + 2) "closure parameter/local cell count"
+    -- The parameter and the local, then the lambda's snapshot copies of both.
+    SourceCoreUnifiedCorpusSupport.assertTrue (final.heap.length == initial.heap.length + 4) "closure parameter/local/snapshot cell count"
   | other => throw (IO.userError s!"closure payload receipt failed: {reprStr other}")
   IO.println "generic named compilation receipt and typed parameter environments: ordered cells, indices, raw mapping, closure and resume GREEN"
 

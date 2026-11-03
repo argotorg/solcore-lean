@@ -52,6 +52,17 @@ theorem prefix_accepted {values : SourceCoreCompatibleValues.Context} {prepared 
   have accepted := code.receipt.allocated
   simpa only [CallableIndexedLambdaCertificates.parameterBody, code.allocationProfile, source] using accepted
 
+theorem copies_accepted {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
+    (code : Code prepared function scope administrative) (source : code.view = function.source) :
+    SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.ancestry.layout.frame prepared.base.globals.length
+        (prepared.layouts.allocatorAt code.compilation.owner code.active code.allocationError)))
+      function.source scope (· + 1) code.receipt.allocatedBody = .ok code.receipt.copiedBody := by
+  have copied := code.receipt.copied
+  rw [code.allocationProfile] at copied
+  simpa only [source] using copied
+
 def bodyEmbedding (ξ : Renaming) : Renaming :=
   Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0)
     (Renaming.comp (Renaming.insertion 1) ξ.lift))
@@ -70,6 +81,21 @@ private theorem body_agrees {canonical actual : Environment} {ξ : Renaming}
   cases index with
   | zero => exact found
   | succ index => exact agrees found
+
+/-- After the manifest, the packed argument and the captured slots keep their
+types through the body embedding. -/
+private theorem body_respects {ξ : Renaming} {context actualContext : Core.Context}
+    (respects : Renaming.Respects ξ context actualContext) (manifestType frameType argumentType : Ty) :
+    Renaming.Respects (Renaming.comp (Renaming.insertion 0) (bodyEmbedding ξ)) (argumentType :: context)
+      (manifestType :: .unit :: frameType :: argumentType :: frameType :: actualContext) := by
+  intro index type found
+  cases index with
+  | zero =>
+    simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+    subst type
+    rfl
+  | succ index =>
+    simpa [bodyEmbedding, Renaming.comp, Renaming.insertion, Renaming.lift] using respects (by simpa using found)
 
 private theorem reference_typed {definitions : DataEnvironment} {world : StoreTyping} {environment : Environment}
     {context : Core.Context} {index location : Nat} {type : Ty}
@@ -100,7 +126,7 @@ structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
   entry : CallableIndexedLambdaPrefix.Entry prepared.ancestry.layout.frame prepared.base.globals.length location next values
     (model prepared profile) registry function body.context scope code.receipt.loweredParameters arguments before
     (store.set location (encode prepared.ancestry.layout.frame next)) mapping world captured.administrative
-    actualContext actual embedding code.receipt.allocatedBody code.receipt.body
+    actualContext actual embedding code.receipt.copiedBody code.receipt.body
   wrap : ∀ {result bodyStore}, Evaluates entry.actualBody entry.store (code.receipt.body.rename entry.embedding) result bodyStore →
     Evaluates (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
       store (code.body.rename captured.embedding.lift.lift) result (bodyStore.set location (encode prepared.ancestry.layout.frame current))
@@ -159,10 +185,11 @@ theorem entry_exists {values : SourceCoreCompatibleValues.Context} {prepared : P
       (.cons (CallableIndexedParameters.Arguments.pack_typed represented)
         (.cons (encode_runtime_typed world registered history.native) captured.typed)))
   obtain ⟨manifest, manifestTyped, manifestAgreement⟩ := CallableIndexedLambdaManifest.agreement
-    captured.represented actualLayout descriptor fields code.receipt.allocatedBody (store.set location (encode layout next))
+    captured.represented actualLayout descriptor fields code.receipt.copiedBody (store.set location (encode layout next))
   obtain ⟨entry⟩ := CallableIndexedLambdaPrefix.entry_of_accepted (model prepared profile) code.allocationError
-    (prefix_accepted code body.source) (parameters code) body.kinds body.extended rfl registered represented
-    captured.represented installedHeaps locals (GenericExpressionMeaning.agree_prefix actualLayout manifest)
+    (prefix_accepted code body.source) (copies_accepted code body.source) (parameters code) body.kinds body.extended rfl
+    registered represented captured.represented installedHeaps locals
+    (GenericExpressionMeaning.agree_prefix actualLayout manifest) (body_respects captured.respects _ layout.type _)
     (.cons manifestTyped actualTyped) (body.referenceIndex ▸ reference) installedCurrent.read unmapped
   have selectedReference : (argument :: lexical :: capturedActual)[captured.embedding code.referenceIndex + 2]? =
       some (.cellRef layout.type location) := by simpa using captured.agrees reference

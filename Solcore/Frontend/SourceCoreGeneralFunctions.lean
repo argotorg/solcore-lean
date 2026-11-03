@@ -260,6 +260,7 @@ def lowerContextualExpression (program : CheckedProgram) (representation : Repre
       let lowerBody := bodyLowererWithRepresentation representation context.solvedRequirements assignments diagnostics context.owner bind
       let policy := { representation.expressions with
         callables
+        snapshotLambda := fun lambda => skipInitializer ≠ some lambda
         lowerBinder := bind
         readExpression := fun source id => do
           let source ← contextualSource program context.plan locals context.owner parent source id

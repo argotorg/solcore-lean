@@ -68,7 +68,7 @@ theorem initial_context {program : Program} {registry : Registry} {invocation : 
           cases Dynamic.BinderExtends.functional extended staticExtended
           exact ih _ (Size.child_lt_stepSize (by simp)) tail next
         | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
-    | initializedGeneralized _ poly extended allocated next =>
+    | initializedGeneralized _ _ poly extended allocated next =>
       cases typed with
       | cons head tail =>
         cases head with

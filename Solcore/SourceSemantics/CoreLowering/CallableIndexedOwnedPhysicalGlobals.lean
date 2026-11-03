@@ -26,6 +26,14 @@ def Slots (compiled : SourceCoreUnifiedCompilation.Compiled) (callerPrefix : Nat
     canonical[scope.length + callerPrefix + slot]? = some
       (.cellRef (OptionalCell.cellType signature.functionType) (location compiled slot))
 
+/-- Global slots lie past the scope, so a canonical environment that keeps every
+slot past the scope, such as the copies a closure makes, keeps them. -/
+theorem Slots.of_slots {callerPrefix : Nat} {scope : SourceCoreLocalCell.Scope} {canonical copied : Environment}
+    (slots : Slots compiled callerPrefix scope canonical)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) :
+    Slots compiled callerPrefix scope copied :=
+  fun slot signature found => (kept _ (by omega)).trans (slots slot signature found)
+
 theorem environment_slots (compiled : SourceCoreUnifiedCompilation.Compiled) :
     Slots compiled 0 [] (environment compiled) := by
   intro slot signature found

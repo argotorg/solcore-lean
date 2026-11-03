@@ -65,13 +65,20 @@ def Code.body {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepar
     (SourceCoreCallableIndexedDispatch.lambdaFrame prepared.ancestry.graph.table prepared.ancestry.layout.frame
       code.descriptor.id (.var 1) (.loadCell (.var (code.referenceIndex + 2)))) (code.receipt.rawBody.weakenAt 1)
 
-theorem Code.emitted {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+/-- The decorated lambda, before any creation-time copies of its captures. -/
+def Code.expression {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) : Expr :=
+  LanguageResult.success (code.descriptor.wrap (TaggedFunction.anonymous
+    (.letE (.loadCell (.var code.referenceIndex))
+      (.lambda code.receipt.parameterCore (LanguageResult.resultType code.receipt.resultCore) code.body))))
+
+theorem Code.decorated {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {viewRelation : TypedSource → TypedSource → Prop}
     (code : Code prepared function scope administrative viewRelation) :
-    code.lowered.expression = LanguageResult.success (code.descriptor.wrap (TaggedFunction.anonymous
-      (.letE (.loadCell (.var code.referenceIndex))
-        (.lambda code.receipt.parameterCore (LanguageResult.resultType code.receipt.resultCore) code.body)))) := by
+    code.receipt.expression = code.expression := by
   have hook := code.receipt.expressionHook
   rw [code.expressionProfile] at hook
   obtain ⟨origin, body, selected, raw, _, _, _, emitted⟩ := CallableIndexedFormation.expressionHook_receipt prepared.ancestry hook
@@ -86,10 +93,45 @@ theorem Code.emitted {checked : SourceCoreCompatibleCatalog.Checked} {prepared :
     code.compilation code.view code.node code.id code.receipt.parameterCore code.receipt.resultCore
     (TaggedFunction.anonymous code.receipt.rawLambda) code.descriptor
   have decoration := Except.ok.inj (decorated.symm.trans expected)
-  apply (congrArg SourceCoreBasic.LoweredExpr.expression code.receipt.emitted).trans
-  change code.receipt.expression = _
   rw [decoration, emitted, sameOrigin, ← bodyEq]
   rfl
+
+/-- The emitted expression is the decorated lambda after the creation-time
+copies that the policy selects. -/
+theorem Code.emitted {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) :
+    code.lowered.expression = code.receipt.snapshotted :=
+  congrArg SourceCoreBasic.LoweredExpr.expression code.receipt.emitted
+
+/-- A lambda whose policy does not snapshot it, a generalized local's
+initializer, emits the decorated lambda unchanged. -/
+theorem Code.emitted_shared {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation)
+    (shared : code.policy.snapshotLambda code.id = false) :
+    code.lowered.expression = code.expression := by
+  have snapshot := code.receipt.snapshot
+  simp only [shared, Bool.false_eq_true, ↓reduceIte] at snapshot
+  rw [code.emitted, ← Except.ok.inj snapshot, code.decorated]
+
+/-- An ordinary lambda emits its creation-time copies around the decorated
+lambda, through the indexed marked allocator. -/
+theorem Code.emitted_copied {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation)
+    (copied : code.policy.snapshotLambda code.id = true) :
+    SourceCoreSourceCells.copyScope
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.ancestry.layout.frame
+        prepared.base.globals.length (prepared.layouts.allocatorAt code.compilation.owner code.active code.allocationError)))
+      code.view scope (fun index => index) code.expression = .ok code.lowered.expression := by
+  have snapshot := code.receipt.snapshot
+  simp only [copied, ↓reduceIte] at snapshot
+  rw [code.emitted, ← code.allocationProfile, ← code.decorated]
+  exact snapshot
 
 /-- Change only the evidence required for the source view. The emitted code,
 capture layout, actual compiler receipt and native callable stay identical. -/
@@ -144,6 +186,22 @@ structure History {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
   source : metadata.metadata.source = function.source
   owner : metadata.metadata.owner = code.compilation.owner
   active : metadata.nativeActive = code.active
+
+/-- The same code serves a closure over another captured environment: no
+field of the code mentions the captured locations. -/
+def Code.recapture {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    (code : Code prepared function scope administrative viewRelation) (captured : Dynamic.Environment) :
+    Code prepared { function with captured := captured } scope administrative viewRelation :=
+  { code with }
+
+def History.recapture {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {viewRelation : TypedSource → TypedSource → Prop}
+    {code : Code prepared function scope administrative viewRelation} (history : History code)
+    (captured : Dynamic.Environment) : History (code.recapture captured) :=
+  { history with }
 
 def value {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}

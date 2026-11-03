@@ -59,14 +59,15 @@ private theorem capturedSlots_after_prefix
     {callerPrefix : Nat} {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     (slots : CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix scope canonical)
     (added : Environment) (length : added.length = bindings.length)
-    {final : Environment} (spine : final = added ++ canonical) :
+    (copied : Environment) {final : Environment} (spine : final = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = canonical[slot]?) :
     CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix
       (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) final := by
   subst final
   intro slot signature found
   have offset : (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + callerPrefix + slot =
       added.length + (scope.length + callerPrefix + slot) := by simp only [List.length_append, List.length_map, List.length_reverse]; omega
-  rw [offset, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left]
+  rw [offset, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left, kept _ (by omega)]
   exact slots slot signature found
 
 private theorem forget_post {index : ProtectedStateTransition.Index}
@@ -93,7 +94,8 @@ theorem source_body_at
       captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
       (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
     (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
-    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (copied : Environment) (spine : entry.entry.canonical = added ++ copied)
+    (kept : ∀ slot, scope.length ≤ slot → copied[slot]? = captured.canonical[slot]?)
     (reached : State headers keys
       ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
         entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩)
@@ -118,7 +120,7 @@ theorem source_body_at
     exact valid.code.graph.nodeOccurrencesUnique
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
-  have slots := capturedSlots_after_prefix capturedSlots added length spine
+  have slots := capturedSlots_after_prefix capturedSlots added length copied spine kept
   let initial : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys callerPrefix).State
       ⟨_, entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := ⟨⟨reached, slots⟩, (physical.install (frameLocation := owner.key.frameLocation)
         (native := (caller.rows owner.position).authority.current) entry.currentRead entry.next).extend entry.entry.frame⟩
@@ -169,15 +171,16 @@ theorem native_body_at
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
       (function.parameters.map (fun binder => binder.scheme.body)) := by
     simpa only [rawTypes] using argumentsTyped
-  have allocated := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped rawArguments entry.allocation
+  have allocated := Dynamic.BindersAllocate.preservesHeapTyping (beforeTyped.copy entry.copy)
+    (rawArguments.mono entry.copy.metadata_extends) entry.allocation
   have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
   have heapTyped : Dynamic.HeapWellTyped inputs.context entry.heap :=
     allocated.transportClosed fields.signatures valid.code.closed (fields.targetClosed valid.code.closed)
       valid.code.variables_closed (fields.targetResidualVariablesOpen valid.code.residual_variables_open)
   have rows := CallableIndexedOwnedPreparedLambdaParameterAdmission.after_parameters
     caller reached owner.position stable entry.nextHistory entry.frame
-  obtain ⟨added, length, spine⟩ := entry.spine
-  have slots := capturedSlots_after_prefix capturedSlots added length spine
+  obtain ⟨added, copied, length, spine, kept⟩ := entry.spine
+  have slots := capturedSlots_after_prefix capturedSlots added length copied spine kept
   let initial : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys callerPrefix).State
       ⟨_, entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩ := ⟨⟨reached, slots⟩, (physical.install (frameLocation := owner.key.frameLocation)
         (native := (caller.rows owner.position).authority.current)

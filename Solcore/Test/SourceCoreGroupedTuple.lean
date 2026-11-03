@@ -84,7 +84,9 @@ def run : IO Unit := do
             | _ => false
         | _ => false
     | _ => false) "regression did not retain the actual grouped tuple source"
-  for (name, expected) in [("plain", 7), ("grouped", 7), ("deep", 7), ("nested", 15), ("three", 15), ("tripleEffects", 9), ("chooseArm", 7), ("effects", 8)] do
+  -- Closures capture by value: each `next()` starts again from `count = 0` and
+  -- returns 1, and no closure assignment reaches the enclosing `count`.
+  for (name, expected) in [("plain", 7), ("grouped", 7), ("deep", 7), ("nested", 15), ("three", 15), ("tripleEffects", 3), ("chooseArm", 7), ("effects", 7)] do
     test program name [.word (w 7), .word (w 8)] [.word (w 7), .word (w 8)] expected
   test program "chooseArm" [.word (w 0), .word (w 8)] [.word (w 0), .word (w 8)] 8
   test program "unitValue" [.unit] [.unit] 7

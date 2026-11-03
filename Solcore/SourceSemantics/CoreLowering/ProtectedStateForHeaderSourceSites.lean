@@ -83,7 +83,7 @@ theorem item_context {program : Program} {context staticFinal runtimeFinal : Sou
     cases typing with
     | letInitialized _ _ _ staticExtended => exact (Dynamic.BinderExtends.functional staticExtended extended).symm
     | letInitializedGeneralized poly _ _ _ _ => exact False.elim (poly mono)
-  | letInitializedGeneralized captures poly extended allocated =>
+  | letInitializedGeneralized _ captures poly extended allocated =>
     cases typing with
     | letInitialized _ mono _ _ => exact False.elim (poly mono)
     | letInitializedGeneralized _ _ _ _ staticExtended => exact (Dynamic.BinderExtends.functional staticExtended extended).symm

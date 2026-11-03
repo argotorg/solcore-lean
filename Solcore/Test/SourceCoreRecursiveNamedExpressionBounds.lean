@@ -4,8 +4,9 @@ import Solcore.Test.SourceCoreUnifiedCorpusSupport
 /-! Original ordered argument and call derivations retain their strict child
 costs. Concrete builtin lexical bodies discharge the pointwise body interface
 at actual catalog entries. Cached executions check order, fault writes, raw
-mapping metadata, capture aliases and resume. The whole recursive expression
-and called-body correspondence remains a separate proof boundary. -/
+mapping metadata, by-value captures of a copied closure and resume. The whole
+recursive expression and called-body correspondence remains a separate proof
+boundary. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreRecursiveNamedExpressionBounds
 open Solcore Core Frontend SourceInference SourceSemantics SourceSemantics.CoreLowering
@@ -169,7 +170,7 @@ private def content : String := String.intercalate "\n" [
   "function mapLeaf(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return raw; }",
   "function rawEcho(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return mapLeaf(raw); }",
   "function defaulted() returns (Word) { let raw: mapping((Bool, Bool) => Word); return raw[(true, false)]; }",
-  "function alias(n: Word) returns (function(Word) returns (Word)) { let shared = n; return lam(x: Word) -> Word { shared += x; return shared; }; }",
+  "function alias(n: Word) returns (function(Word) returns (Word)) { let captured = n; return lam(x: Word) -> Word { captured += x; return captured; }; }",
   "function aliases(n: Word) returns (Word) { let first = alias(n); let second = first; let a = first(2); return a + second(3); }",
   "function self(n: Word) returns (Word) { return n == 0 ? 2 : self(n - 1) + 1; }",
   "function left(n: Word) returns (Word) { return n == 0 ? 7 : right(n - 1); }",
@@ -209,9 +210,11 @@ def run : IO Unit := do
   let initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.comptime .word, none⟩, ⟨.word, some (w 819)⟩]}
   let gap ← faultBinder compiled "fail"
   let afterGap ← faultBinder compiled "failAfter"
+  -- `second` copies the closure `first`. Each call starts again from the
+  -- snapshot `captured = 5` taken when `alias` created it: 7 + 8.
   let cases : List (String × List SourceTypedRuntime.Value × SourceTypedRuntime.Value) := [
     ("ordered", [], w 4), ("rawEcho", [raw], raw), ("defaulted", [], w 0),
-    ("aliases", [w 5], w 17), ("self", [w 3], w 5), ("left", [w 2], w 7), ("right", [w 2], w 11)]
+    ("aliases", [w 5], w 15), ("self", [w 3], w 5), ("left", [w 2], w 7), ("right", [w 2], w 11)]
   let completed ← cases.mapM fun (name, arguments, _) => finish compiled name arguments 300000 initial
   let faultNames := ["firstFault", "laterFault", "bodyFault"]
   let faults ← faultNames.mapM fun name => finish compiled name [] 300000 initial
@@ -246,5 +249,5 @@ def run : IO Unit := do
           else [(.word, some (w 5))]
         cells initial final (earlier ++ inner ++ [(.word, none)]) name
       | other => throw (IO.userError s!"named bound fault {name}: {reprStr other}")
-  IO.println "recursive named expression bounds: original child costs, concrete body budgets, all-target frame restoration, ordered arguments, first faults, raw metadata, aliases and native resume GREEN"
+  IO.println "recursive named expression bounds: original child costs, concrete body budgets, all-target frame restoration, ordered arguments, first faults, raw metadata, by-value closure copies and native resume GREEN"
 end Tests.SourceCoreRecursiveNamedExpressionBounds
