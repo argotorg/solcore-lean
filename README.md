@@ -97,7 +97,14 @@ carry one change forward instead of rolling it back: a committed mutant or
 method directive, or a dropped, duplicated or swapped step, with every later
 step compared across the paths. In a run of the 117 fixtures with two or more
 recorded calls, all 5,462 steps compared after the change in 558 such mutants
-agree on every path.
+agree on every path. Source mutants change the program instead: one literal,
+operator, condition or inline Yul site of a fixture's source, located by the
+pinned parser's spans and compiled on every path the fixture admits. In a run
+of all 168 fixtures the frontend refused 8 of 1,057 such mutants, and 8,135 of
+the others' 8,889 compared steps agree. Five disagree because Sonatina O0's
+first allocation lies at `0x200` and Hull's and solc's at `0x80`, and two fail
+on Hull, whose memory range a store at `2^256 - 1` exceeds while solc's Yul
+removes the store; both are recorded findings.
 Generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
@@ -179,9 +186,9 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the twenty-seven pure profiles with `--backend yul`, and for the
-twenty-seven storage-family profiles and the call-return and call-sequence
-profiles when they are selected. Its EVM bytes are
+available for the twenty-eight pure profiles with `--backend yul`, and for the
+twenty-seven storage-family profiles and the call-return, call-sequence and
+call-branch profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
 object linking and the other two call profiles, which compile a parent and a
 child contract from one source, are outside this comparison.
@@ -192,7 +199,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same fifty-eight-profile suite runs locally with shared time and disk limits.
+The same sixty-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -303,6 +310,14 @@ second variable, are seen. Original Core carries revert data of up to 64 bytes
 in the same byte-list model, and the paths compare them exactly. All 152 fixed
 cases and 96 random cases of eight functions match on O0, O2 and Yul
 ([Solcore revert data](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-revert-data)).
+The `runtime-halts` profile keeps those plans and lets a site halt with
+INVALID instead: std's `assert`, std.opcodes' `invalid()` or inline Yul
+`invalid()`, under a Solcore or a Yul `if`, in the same contexts. Original Core
+marks the halt as revert data of a length no revert data has, imported Hull
+reports `invalid` and the EVM `InvalidFEOpcode`, and a halt matches only when
+all three paths halt. All 96 fixed cases, 31 of them halts, and 96 random
+cases of eight functions match on O0, O2 and Yul
+([Solcore halts](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-halts)).
 
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
@@ -708,7 +723,17 @@ middle phases. The 16 fixed scenarios and sixteen random scenarios at each of
 two node budgets match on both Sonatina levels and on Yul. See
 [call sequences](scripts/SEMANTIC_DIFFERENTIAL.md#compare-call-sequences).
 
-All thirty-one stateful profiles also compare the installed contracts' whole
+The call-branch profile's calls sit in branches and bounded loops, so the
+input decides how many of zero to three it makes. It reads `returndatasize`
+before and after each site and in a loop condition, so a size cached or
+hoisted across a skipped or repeated call would show. An additive choice
+chain, whose phases each request a call or finish, splits original Core's
+parent; the call chain is its special case. The 18 fixed scenarios and
+sixteen random scenarios at each of two node budgets match on both Sonatina
+levels and on Yul. See
+[call branches](scripts/SEMANTIC_DIFFERENTIAL.md#compare-call-branches).
+
+All thirty-two stateful profiles also compare the installed contracts' whole
 committed storage after deployment and after every transaction. Original
 Core's accounts keep an exact ordered list of their present slots, imported
 Hull lists its committed entries, and the EVM path rereads every slot that
@@ -716,8 +741,8 @@ Anvil's `prestateTracer` diffs have reported since deployment;
 `scripts/check-evm-storage-diff.py` checks that method on a hand-written probe.
 Deployment must leave the storage empty, or exactly the decoded record for the
 constructor-argument profile, and a revert must leave each path's whole storage
-unchanged. The latest fixed run of all thirty-one profiles, 505 scenarios and
-1,278 transaction prefixes, matched on Sonatina O0, and every
+unchanged. The latest fixed run of all thirty-two profiles, 523 scenarios and
+1,326 transaction prefixes, matched on Sonatina O0, and every
 corpus has also matched on O2 with whole storage compared. A synthetic stray
 write that the declared slots could not see is caught and reduced to one
 transaction. See

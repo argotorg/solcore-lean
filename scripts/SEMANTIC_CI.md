@@ -27,8 +27,8 @@ python3 scripts/prepare-semantic-tools.py --verify
 
 Preparation fetches the exact pinned Rust revision into a new directory, checks
 its tracked files, and fetches locked dependencies. It builds the two exporters,
-the directive extractor and resolver and the declaration extractor offline, and
-the forty-one native Lean tools in one Lake invocation. Existing
+the directive extractor and resolver and the declaration and site extractors
+offline, and the forty-two native Lean tools in one Lake invocation. Existing
 checkouts with another revision or unrelated edits are rejected. Network
 access requires `--prepare --allow-network`; omit `--allow-network` to prepare
 using existing dependency downloads. Verification is read-only and offline.
@@ -88,33 +88,34 @@ in a separate job with separate reports and artifacts; failure in one does not
 cancel the other. Random generation uses the same recorded seeds independently
 of backend selection, so optimization does not change the generated inputs.
 
-`--backend yul` selects the twenty-seven pure profiles by default (2,010 fixed
+`--backend yul` selects the twenty-eight pure profiles by default (2,106 fixed
 cases). The twenty-seven storage-family profiles also run on Yul when `--profile`
 selects them, with 416 fixed scenarios
 ([storage-family contracts on Yul](SEMANTIC_DIFFERENTIAL.md#compare-storage-family-contracts-on-yul)),
-and so do the call-return and call-sequence profiles, with 45 and 16
-([call returns](SEMANTIC_DIFFERENTIAL.md#compare-call-returns),
-[call sequences](SEMANTIC_DIFFERENTIAL.md#compare-call-sequences));
+and so do the call-return, call-sequence and call-branch profiles, with 45, 16
+and 18 ([call returns](SEMANTIC_DIFFERENTIAL.md#compare-call-returns),
+[call sequences](SEMANTIC_DIFFERENTIAL.md#compare-call-sequences),
+[call branches](SEMANTIC_DIFFERENTIAL.md#compare-call-branches));
 selecting `stateful-calls` or `stateful-forwarded-value` fails before execution. Each random Yul run of
-the default selection with `--cases 16` requests 432 cases. The shared
+the default selection with `--cases 16` requests 448 cases. The shared
 preparation command builds Rust and Lean tools; solc is supplied and checked
 separately.
 
 | Backend | Fixed cases/scenarios | EVM execution | Imported Hull code images |
 | --- | ---: | --- | --- |
-| `sonatina-o0` | 2,515 | Sonatina O0 | Sonatina O0 |
-| `sonatina-o2` | 2,515 | Sonatina O2 | Sonatina O2 |
-| `yul` | 2,010 pure; 416 storage-family, 45 call-return and 16 call-sequence when selected | Optimized solc Yul, Osaka | Sonatina O0 |
+| `sonatina-o0` | 2,629 | Sonatina O0 | Sonatina O0 |
+| `sonatina-o2` | 2,629 | Sonatina O2 | Sonatina O2 |
+| `yul` | 2,106 pure; 416 storage-family, 45 call-return, 16 call-sequence and 18 call-branch when selected | Optimized solc Yul, Osaka | Sonatina O0 |
 
 All rows use the original generated Core as the primary reference. Yul's
 linked layout is not supplied to the Hull importer. Its pure, storage-family,
-call-return and call-sequence results can still be compared with both other
+call-return, call-sequence and call-branch results can still be compared with both other
 paths, because those observations do not depend on code layout; code-dependent
 observations and the two call profiles that compile both contracts from one
 source remain unsupported on Yul. Reports record this
 distinction in `pathBackends`.
 
-The default selection is all fifty-eight profiles: twenty-seven pure profiles,
+The default selection is all sixty profiles: twenty-eight pure profiles,
 storage, storage rollback, parent/child calls, keyed storage, dynamic arrays,
 event logs, call value, bounded bytes, forwarded value, Keccak-addressed
 mappings, a sender-keyed ledger, 256-byte `bytes` payloads, nested `uint256[][]`
@@ -132,10 +133,12 @@ a method that returns std's encoding of a memory array of up to three
 `uint256`, `bytes4`, `bytes` or `uint256[]` elements, a contract whose
 constructor takes Words, `bytes` or a user enum, canonically encoded or
 malformed, a parent that calls a child method through std's `raw_call` and
-decodes its tuple, `bytes` or enum return data, typed or malformed, and a
+decodes its tuple, `bytes` or enum return data, typed or malformed, a
 parent that calls it two or three times in one method and reads the return
-data around each call in inline Yul.
-Fixed mode runs all 2,515 manifest cases or scenarios. It rejects `--cases`,
+data around each call in inline Yul, and a parent whose zero to three calls
+sit in branches and bounded loops, as the input decides, reading the return
+data before and after each site in inline Yul.
+Fixed mode runs all 2,629 manifest cases or scenarios. It rejects `--cases`,
 `--functions` and `--nodes` overrides rather than silently truncating required
 coverage. Repeat `--profile NAME` to select a smaller suite.
 
@@ -217,12 +220,12 @@ python3 scripts/semantic-fuzz.py label --state .upstream/semantic-fuzz SIGNATURE
 Iteration `i` runs the suite in random mode once per backend, with root seed
 `base + i`, so the backends compare the same generated programs. All three
 backends run by default. On Yul the driver runs the pure, the twenty-seven
-storage-family and the call-return and call-sequence profiles, whether profiles
-are configured or not, and never `stateful-calls` or `stateful-forwarded-value`.
+storage-family and the call-return, call-sequence and call-branch profiles,
+whether profiles are configured or not, and never `stateful-calls` or `stateful-forwarded-value`.
 It selects the stateful ones explicitly, since the suite's own Yul default is
-the pure profiles. With the default sixteen cases, this adds 464
-eight-transaction scenarios to each Yul iteration, about 5,430 seconds at the
-default node budgets and 5,590 at doubled ones, estimated from each profile's
+the pure profiles. With the default sixteen cases, this adds 480
+eight-transaction scenarios to each Yul iteration, about 5,730 seconds at the
+default node budgets and 5,890 at doubled ones, estimated from each profile's
 own Yul runs. No storage-family or call profile took more than 345 seconds of
 its 900. Machines that share
 a base seed use their own `--shard-index` of a common `--shard-count`. The
@@ -290,8 +293,9 @@ demanded-bits overflow (`Integer overflow when casting to usize`) on O0, on O2
 and in the Yul runs' O0 code images, its O2 signextend-folding overflow
 (`arithmetic operation overflow`), solc's `StackTooDeepError` on Yul, the
 checked frontend's `SC0401` and `SC0406` rejection of a base method reached
-through two superclass bounds on each backend, and the fixtures' O2 crash.
-Their occurrences count and are shown as known, but never as new, so a fresh
+through two superclass bounds on each backend, the fixtures' O2 crash, and
+Hull's memory-range failure on a fixture source mutant's store at
+`2^256 - 1` that solc's Yul removes. Their occurrences count and are shown as known, but never as new, so a fresh
 state reports only what `questions.md` does not record. The same panic at
 another call site is new. A mismatch's signature is its reduced program, so a
 recorded semantic defect is listed as a class instead. A class names its
@@ -333,22 +337,30 @@ with upstream's recorded expectations, never with original Core.
   (default 8; 0 runs none), a seeded sample. Each carries one change forward
   through every later step: a committed mutant or method directive, or a
   dropped, duplicated or swapped step.
+- Then each fixture runs at most `--fixture-sources` source mutants
+  (default 2; 0 runs none), a seeded sample. Each changes one literal,
+  operator, condition or inline Yul site of the fixture's program and runs
+  the recorded steps on it.
 - An entry past a budget has the status `budget`, and a fixture not started
   in time is unexecuted. Neither is a finding; the ledger counts both. The
   ledger's executed, matched, mismatched and inconclusive counts include the
-  steps compared in sequence mutants, and `sequences` counts the mutants.
+  steps compared in sequence and source mutants, and `sequences` and
+  `sources` count those mutants.
 - Findings register with the backend `fixtures`. A compiler crash or a path
   failure registers by its symptom, a path mismatch or an unmet expectation
   by its fixture and reduced input, and a sequence finding by its fixture,
   operator and reduced sequence, or, unreduced, by its operator, step, change
-  and committed mutant. The first examples keep the
+  and committed mutant. A source mutant's `compile-mismatch` registers by its
+  stage, paths and symptom, as a crash does, and its step finding by its
+  fixture, edit and reduced steps. The first examples keep the
   fixture's result record and the command that replays that fixture alone.
-- The Sonatina O2 crash on `ignored-builtin-effects` is listed as known: it
-  is counted but never new.
+- The Sonatina O2 crash on `ignored-builtin-effects` and Hull's memory-range
+  failure on a source mutant's store at `2^256 - 1` that solc's Yul removes
+  are listed as known: they are counted but never new.
 - Readiness also runs `semantic-fixtures.py --check`. The epoch adds the
   digest of what that check reports: the scripts, the compilers, the
-  directive tools, the declaration extractor, the Lean runner, solc, Anvil,
-  cast and the parity manifests. A state without fixtures keeps its epoch.
+  directive tools, the declaration and site extractors, the Lean runner,
+  solc, Anvil, cast and the parity manifests. A state without fixtures keeps its epoch.
 - Exports are cached in `.upstream/semantic-fixtures` and locked per fixture.
   `--cast` selects cast, and `--bin-dir` also selects the Lean runner.
 

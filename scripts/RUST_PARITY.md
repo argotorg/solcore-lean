@@ -16,12 +16,13 @@ python3 scripts/export-rust-code-image.py --build
 python3 scripts/export-rust-directives.py --build
 python3 scripts/build-rust-directive-resolver.py
 python3 scripts/export-rust-declarations.py --build
+python3 scripts/export-rust-sites.py --build
 ```
 
 These commands build small packages against the pinned upstream dependencies.
 They use Cargo offline and share `.upstream/rust-parity-target`.
 `prepare-semantic-tools.py --prepare` also builds the directive extractor and
-resolver and the declaration extractor offline, and its receipt covers all three
+resolver and the declaration and site extractors offline, and its receipt covers all four
 ([suite preparation](SEMANTIC_CI.md)). The original
 compiler checking pipeline remains enabled. The code-image tool compiles actual
 Sonatina bytes and linker extents; it never executes EVM instructions. The
