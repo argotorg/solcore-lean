@@ -11742,6 +11742,23 @@ repeated call give 42, 83 and 11, where they gave 101, 84 and 212. The probe,
 the design, its alternatives and the proof changes are in
 [Closures capture by value](closure-capture-by-value.md).
 
+**Integer types, `unchecked` blocks and shifts in Lean.** Rows 1 to 3 of the
+table "Following upstream's semantics: the next units" come to Lean's source
+language as builtins. They bring:
+
+- the twelve integer types and unary minus;
+- checked arithmetic, whose panics are a new fault reason and Core failure
+  reason;
+- literals range-checked at their types, defaulting to `uint256`;
+- `unchecked` blocks, desugared into unchecked operators before inference;
+- `<<` and `>>`.
+
+Lane D's probe of the pinned Rust paths matched every call. The design, its
+alternatives and the order of implementation are in [Integer types,
+`unchecked` blocks and shifts](integer-types-unchecked-shifts.md). That order
+is shifts, then blocks, which bring panics through `word` division by zero,
+then the types.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
