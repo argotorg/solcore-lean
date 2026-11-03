@@ -11111,6 +11111,127 @@ Both findings are recorded in `questions.md`, without investigation:
 This is agreement among the compiled paths of programs that no fixture
 records. No original Core reference exists for them.
 
+**Re-pin to upstream main `e2eef194`: feasibility and plan.** The pin moves
+from solcore-rs `2a745e12974c373c3799fec81b48a53c7dce2ab4` (2026-10-23) to
+upstream main `e2eef19409fc8879cd4a9cc342ed60e3152f72c0` (2026-11-02, the
+merge of #145), 88 commits later. This is the first unit of following
+upstream's semantics: it keeps every existing comparison working on the new
+pin and adds no language feature to Lean's source semantics. The probe ran
+offline on a local clone, `.upstream/solcore-rs-20261102`, before any commit:
+- **Toolchain.** Both pins' `rust-toolchain.toml` name Rust 1.97.0. `cargo
+  metadata --offline --locked` resolves every dependency from the local Cargo
+  cache, among them Sonatina `6bd0ce661ea327c149429b00fee3c8608616040f`
+  (formerly `8ee24814ea9b32c762df8ef80c796e7d48797c0f`) and salsa 0.28.5
+  (formerly 0.27.2).
+- **Exporters.** What broke against the new crates, and the fix:
+  - The driver is now a library with two binaries, `solcore-driver` and
+    `solcore`, and depends on `solcore-lsp`. Its `mod emit;` moved from
+    `crates/driver/src/main.rs` to `crates/driver/src/lib.rs`, so the checked
+    Hull serializer's patch moves with it; the injection point in `emit.rs` is
+    unchanged. `rust-hull-export.rs` builds unchanged: Hull's syntax
+    (`crates/hull/src`) did not change, only its emitter.
+  - The generated directive, declaration and site crates pinned
+    `salsa = "=0.27.2"`. With two salsa versions in the graph, their
+    `#[salsa::db]` databases no longer satisfied the HIR's bounds. They now pin
+    0.28.5. A tool lock left by the old pin holds packages the new upstream
+    lock lacks, so the builds reseed such a lock from the upstream lock.
+  - The declaration extractor's type match lacks `TypeRefKind::Array`, the
+    `T[]` of #145; it now prints `{"array": …}`. The fixture harness keeps
+    treating such a parameter as outside std's derived signatures.
+  - The site extractor's operator match lacks the shifts `Shl` and `Shr`
+    (#129) and the five `Unchecked*` operators (#119). A shift becomes a site
+    that no operator of the fixed definitions mutates; an unchecked operator
+    keeps its token and takes that token's swaps.
+  - The code-image tool, the directive extractor and the resolver build
+    unchanged, the code-image tool against Sonatina `6bd0ce66`.
+- **Importer.** Hull's JSON is unchanged: the same schema
+  `solcore-rs.hull.v1`, the same syntax and the same serializer. A fixed
+  comparison of all 182 fixtures admitted every one on Hull, O0, O2 and Yul,
+  among them the three the old checked driver rejected (`storage-array` and
+  `ufcs-array`, Q008, and `module-local-function-evidence`, Q010) and
+  `ignored-builtin-effects` on O2, whose `has_inst` crash is gone. Of 1,699
+  steps, 1,649 agreed and none disagreed. The other 50 are
+  `closure-parameters`: upstream added 13 of its 49 calls, and its
+  constructor now needs between 10,000,000 and 10,500,000 Core steps, beyond
+  the default. With an explicit 15,000,000, as `basic` has, all 50 agree. The
+  only new constructs are std's signed helpers' Yul builtins `slt`, `sgt`,
+  `sdiv`, `smod`, `signextend` and `sar`, in `checked-arith`, `int-ops`,
+  `issue92-checked-defaults` and `evm-word-boundaries`; the importer already
+  lowers them, and those fixtures agree.
+- **Operator meaning.** Every std function and instance over `word` and `bool`
+  is unchanged byte for byte, `addWord` to `tobool` and `Add<word>` to
+  `Ord<word>`, so `+` on `word` still wraps and
+  `ScalarMeaning.Semantics` still describes what std selects. What changed:
+  - `uint256`'s `Add`, `Sub`, `Mul`, `Div` and `Mod` are checked and panic with
+    `Panic(0x11)` or `Panic(0x12)`; `Int<uint256>.fromInteger` checks a
+    comptime integer's range; an integer literal that nothing constrains
+    defaults to `uint256` instead of `word` (#95). The emitters compute on
+    `word` locals and convert only at the ABI boundary, with `uint256(…)` and
+    `Typedef.rep(…)`, so their arithmetic is unchanged.
+  - std's errors (#145): `out_of_bounds()` is now `Panic(0x32)`, for memory,
+    calldata and storage array indices and for `abiArrayGet`, whose former
+    `ArrayOutOfBounds()` was `0x7f52b2bf`; an empty storage pop is
+    `Panic(0x31)`; a wrapping allocation, push or storage offset is
+    `Panic(0x41)`. `slice_` and `truncate` keep `OutOfBounds()` `0xb4120f14`,
+    and the dispatcher keeps `0x4924aef0` and `0x08638556`.
+  - A sum's encoding now zeroes the head words its variant leaves unused.
+- **Pragma (#141).** A source file must start with `pragma solcore;`
+  (`SC0002`); every generated case was rejected without it.
+- **O0 probe.** With the pragma written as below, the complete fixed suite on
+  Sonatina O0 ran: 2,587 of 2,629 cases matched and 42 mismatched, all from one
+  upstream change. An array index past the length reverts with `Panic(0x32)`
+  on Hull and the EVM, which agree, while original Core still modelled the old
+  error: `runtime-memory-values` 18 and `runtime-memory-calls` 19, where Core
+  gave `OutOfBounds()`, and `stateful-enum-array-arguments` 5, where it gave
+  `ArrayOutOfBounds()`.
+- **Stop conditions.** None applies. Core's syntax and semantics are
+  unchanged: the panic is ordinary revert data of a Core reference, and a
+  failure's code is a Word in a reference's right injection. No theorem
+  statement of the shared contract runtime changes, and the importer needs no
+  change.
+
+The plan of this unit:
+1. **Re-pin.** Every pin reference moves to `e2eef194`, except the workflow's
+   cache key, which the user changes. The exporters change as above. The
+   parity manifests are regenerated for the 182 fixture directories (183
+   entries with the README): 77 raw scenarios with 697 calls and 105 method
+   fixtures with 820 calls and sends, 14 of them new, every hash renewed, and
+   `abi-boundaries` (6 → 7 calls) and `closure-parameters` (36 → 49) recounted,
+   the latter with its explicit Core-step limit; the 31 scalar cases and the 22
+   reviewed contract fixtures take new hashes.
+2. **Pragma.** It is written by the harness's source transport, not by the
+   emitters. `compiler_source` in `semantic-source-bundle.py` puts
+   `pragma solcore;` on its own line before an emitted source wherever the
+   harness writes one for the Rust compiler: the pure, storage and call
+   harnesses, the module bundle and `test-source-synthesis-rust.py`. The
+   bundle receipt hashes the files as written. Case files, corpora, replay
+   and the emitters' text theorems stay as they are; those theorems cover the
+   text after the pragma, which has no meaning of its own
+   (`crates/parser/src/lower/pragma.rs`). The four tracked `.sol` fixtures
+   gain it in their text. Emitting it in every emitter would touch about 78
+   emitter files, the scalar meaning's printer, lexer and parser with some 28
+   proof files, and about 30 Lean tests; that waits for Lean's own parser
+   (below).
+3. **Follow #145's panic.**
+   - Enum arrays: the original Core contract reverts with the panic's selector
+     `0x4e487b71` as its Word, std's model in `EnumArrayExecution` with
+     `Panic(0x32)`'s 36 bytes, and the selector rule compares by the
+     rejection's first four bytes and stands the Word for the whole revert
+     data. `functionVersion` becomes `core-enum-array-argument-contract-v2`.
+   - Memory values and memory calls: the references' right injection carries
+     a failure code Word, 0 for a value's Words and bytes (`OutOfBounds()`)
+     and 1 for an array element (`Panic(0x32)`), through every loop chain; the
+     observation turns the code into std's revert data. The generation
+     filters still count every failure as one outcome, so the plan streams do
+     not change. `generatorVersion` becomes `core-memory-values-v2` and
+     `core-memory-calls-v2`.
+4. **Matrices.** The corpus validators, the complete fixed suite on Sonatina
+   O0, Sonatina O2 and Yul, the random matrices and a fuzz-driver iteration
+   with `--fixture-sources`, all frozen; every difference triaged; every known
+   finding of the old pin checked again.
+5. **The next units.** A table of upstream's changes and what Lean needs for
+   each, below once the matrices are recorded.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
