@@ -391,7 +391,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data`, `runtime-checked-arithmetic`, `runtime-shifts` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 | `runtime-halts` | not needed: every accepted plan halts at a boundary input, so none returns all its inputs |
@@ -408,7 +408,10 @@ observation reads `sc_x` back returns its input, so `runtime-memory-values`
 does too, and so does `runtime-memory-calls`, where a helper's read of a zero
 byte added to or xored with `sc_x` can be a plan's only nonzero Word, and
 `runtime-revert-data`, where a plan whose only fold reads `sc_x` back and none
-of whose sites raises at a boundary input returns its input.
+of whose sites raises at a boundary input returns its input. A one-step
+`runtime-checked-arithmetic` or `runtime-shifts` plan at a 256-bit type, such
+as `(sc_a0 + 0)` or `(sc_a0 << 0)`, returns its input too, although none of
+either profile's first 1,000 seeds does, so both apply the filter.
 `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
@@ -2961,6 +2964,131 @@ digest unchanged on every run, under load averages of 7 to 10 from other work:
   O0, O2 and Yul matched all 96, in 81, 79 and 108 seconds.
 
 No mismatch, crash or rejection was found.
+
+## Compare Solcore integer arithmetic and shifts
+
+Every other pure profile computes on `word` and returns `uint256(w)`, so none
+reaches the meaning upstream gave its integer operators: checked `+ - * / %`
+over `uint8` … `uint256` and `int8` … `int256`, which revert with
+`Panic(0x11)` or `Panic(0x12)`, the wrapping instances of
+`unchecked { … }` blocks, and `<<` and `>>` with an unsigned amount of any
+type. Two profiles share one plan module, `Solcore.Synthesis.Core.Integers`,
+each admitting its own plans:
+- `runtime-checked-arithmetic` (contract `SynthesizedCheckedArithmetic`)
+  converts the input Word to one integer type, its first input `sc_a0` and up
+  to two more offset by a constant that sends the boundary inputs to the
+  type's extremes, then runs one to ten steps: `(L op R)`, `(-L)`, compound
+  assignments, calls of up to two helpers whose bodies are checked or in a
+  block, and applications of a lambda whose body is checked or in a block.
+  Groups of steps alternate between the checked context and up to three
+  `unchecked` blocks; a block's variables are declared before it, and calls
+  and lambdas inside a block keep their own scope. Up to two defaulted results
+  `let sc_d<m> = L;` choose a `uint256` literal by a test of the input and
+  compute with another one, so upstream's defaulting decides their type. A
+  quarter of the plans take `run(T)` instead of `run(uint256)`, so std's
+  decoder rejects an argument with dirty high bits with
+  `DirtyHigherBitsForInteger()` (`0x6cc54a63`), and a quarter of the plans
+  with a narrow type return `T`, built with `Typedef.abs` of any Word, for
+  std's encoder to mask or sign-extend.
+- `runtime-shifts` (contract `SynthesizedShifts`) shifts a Word or an integer
+  value of one type by one to three amounts of a Word or an unsigned type,
+  each the input plus an offset converted to its type, or by literal amounts
+  up to 300, inline or as `<<=` and `>>=`, inside and outside blocks.
+
+Every result is folded into the returned Word,
+`sc_acc = ((sc_acc * 1099511628211) ^ W)`, so each step is observed.
+
+The Core reference reads each representation Word as an integer and computes
+the exact result with Core's integers: a zero divisor raises `Panic(0x12)`, a
+quotient rounds toward zero from the floor quotient of the magnitudes, a
+checked result outside its type raises `Panic(0x11)` and an unchecked one
+wraps. `<<` gives 0 for an amount of at least the width, `>>` the floor
+quotient, and an amount of at least 256 gives 0 or `-1`. A panic is the right
+injection of 36 bytes of revert data, the `runtime-revert-data` encoding, and
+`run(T)`'s rejection that of the selector's four bytes. The input
+conversions, the defaulted literals' choice and the fold are the source's own
+Word operations. The adapter compares checked arithmetic revert data exactly
+(`REVERTING_SCHEMAS`) and admits `run(T)` with its selector from
+`RUN_SELECTORS`, `keccak256` of each signature; shift cases compare Words.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-checked-arithmetic \
+  --profile runtime-shifts --backend sonatina-o0 --output .upstream/semantic-integers-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-checked-arithmetic \
+  --profile runtime-shifts --seed 1 --functions 32 --output .upstream/semantic-integers-random
+python3 Tests/scripts/test-semantic-checked-arithmetic-corpus.py
+python3 Tests/scripts/test-semantic-shift-corpus.py
+```
+
+Native commands are `checked-arithmetic-generate` and `shift-generate SEED
+NODES COUNT ATTEMPTS FUEL [seeded-inputs-v1/splitmix64]
+[exclude-boundary-identity-v1]`, and `checked-arithmetic-emit` and
+`shift-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`checkedArithmeticPlan` or `shiftPlan` and the whole Core reference, whose
+exact correspondence native admission checks for every origin, and
+`checkedArithmeticShapes` or `shiftShapes`, which replay recomputes. Replay
+requires a generated plan to be its seed's.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profiles record no G0 step features.
+- The node budget bounds the applied reference: default 1,024, minimum 256,
+  at most 2,048, and 4,096 nodes for a case's reference.
+- Exclusions, under `checked-arithmetic-profile` and `shift-profile`, are a
+  plan still over the budget or not admitted, then one with the same outcome
+  at all eight boundary inputs or one that exhausts fuel. A one-step plan at a
+  256-bit type can return its input, so random campaigns apply
+  `exclude-boundary-identity-v1`.
+- Reductions remove a step or an input or amount, move a step out of its
+  block, lower an operation to `+` and a compound assignment, a call or an
+  application to an inline operation, an unchecked helper or lambda body to a
+  checked one, an operand to `sc_a0` or a zero literal, a shift to an inline
+  one by the literal 0, `run(T)` to `run(uint256)` and a `T` result to
+  `uint256`, then the inputs.
+- `checkedArithmeticRequirements` declares `types`, `operators`, `forms`,
+  `contexts`, `scopes` (an operation in a block, a checked helper or lambda
+  called in a block, an unchecked helper or lambda body), `operands`,
+  `literals`, `parameters` and `returns`, specified by the plan, and the
+  `outcomes`, deciding `panics`, operations that `wraps` and `typeOutcomes`
+  its run reaches at the boundary inputs, 111 values; `shiftRequirements`
+  declares `values`, `amounts`, `operators` (`shl`, `shr`, `sar`), `forms`,
+  `contexts` and `operands`, and the amount `ranges`, the `results` of amounts
+  of at least the width and the `typeRanges` reached, 53 values.
+
+The fixed corpora take, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing value, until nothing is missing, each at
+the eight boundary inputs. Checked arithmetic requires every value but the
+per-type outcomes, which would have taken 37 seeds and are recorded instead:
+seeds 2, 4, 5, 6, 7, 8, 9, 12, 14, 15, 17, 18, 22, 25, 27, 29 and 94 give 136
+cases from 17 sources, 42 returns, 52 `Panic(0x11)`, 30 `Panic(0x12)` and 12
+`DirtyHigherBitsForInteger()`. Shifts require every value: seeds 1, 2, 4, 6,
+7, 12, 13, 14, 19, 21, 22, 27, 32, 36, 44 and 45 give 128 returns from 16
+sources. `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`, and
+`test-semantic-shift-corpus.py` with the shift profile, rebuild that
+selection, admit every plan with their own checker, recompute every shape and
+the shrink measure with their own interpreter over Python integers, re-emit
+every source and compare it exactly, evaluate every case's plan against the
+recorded outcome, and check replay, reductions and tampering natively. That
+model, re-emission and shapes agree with the native ones on every accepted
+plan of the first 1,000 seeds at twelve inputs: 721 checked arithmetic plans
+with 8,652 outcomes, 5,826 of them revert data, and 803 shift plans with
+9,636 returns.
+
+The gate passed before the profiles were committed: the kernel check, 995
+Python tests, `lake build` (10,354 jobs), forty-two native tools, `lake test`,
+twenty-five corpus validator runs and the chunked-generation check over the
+thirty pure profiles. Frozen matrices at `927fe89c3`, with the freeze digest
+unchanged on every run:
+- The fixed corpora matched all 136 and 128 cases on O0, O2 and Yul with
+  complete coverage, in 167, 161 and 238 seconds and 149, 146 and 213.
+- Random suites from root seed 1 with 32 whole functions a profile drew 384
+  checked arithmetic cases from 32 sources, 228 of them revert data, and 94 of
+  the 111 shape values, and 384 shift cases with all 53 values; O0, O2 and
+  Yul matched all of them.
+
+No mismatch, crash or rejection was found. The first random O0 run, at
+`6b2f86b99`, stopped on a race in the suite's disk walk, which
+`927fe89c3` fixes: a case work directory a campaign removed during the walk
+raised `FileNotFoundError`.
 
 ## Compare aggregate compositions with call graphs
 

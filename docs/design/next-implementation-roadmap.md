@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented, counting the recorded upstream findings with stable signatures and the mismatches of recorded mismatch classes as known; automatic CI triggers disabled, manual dispatch only; the complete default fixed suite of fifty-five profiles measured locally within its documented 7,200 seconds and 1 GiB on Sonatina O0 and Yul; no passing hosted run yet; the pinned end-to-end fixture comparison runs only locally, standalone or as the fuzz driver's opt-in fixtures run kind | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the twenty-seven storage-family profiles also run on Yul when selected and are validated locally; the call-return, call-sequence and call-branch profiles also run on Yul when selected; `stateful-calls` and `stateful-forwarded-value` stay on Sonatina; the pinned end-to-end fixtures run on Hull, O0, O2 and Yul in a comparison of the compiled paths, standalone or in the fuzz driver, without an original Core reference, with derived ADT arguments mutated at every boundary Word of their tags, dynamic offsets and `bytes` lengths, with sequence mutants that carry one change forward through every later step, with source mutants that change one literal, operator, condition or inline Yul site of a fixture's program; at `e2eef194` all 182 fixtures compile on every path | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eighteen profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call, revert data and halt profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the eighteen profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call, revert data, halt, checked arithmetic and shift profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata, several-methods, storage-loop, Keccak-loop, tuple-return, inline Yul storage-loop and Keccak-loop, bounded `bytes`-return, enum and struct storage, enum-return, enum-argument, enum-array, array-return, constructor-argument, call-return, call-sequence and call-branch extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, two to four external methods on one contract dispatched as std does, a bounded source loop whose iterations read and write declared slots, a bounded source loop whose iterations read and write Keccak-addressed mapping entries and emit one log each, static ABI tuple returns of two to four Words through the `wordTupleOutcomeV1` contract entry convention, both loop plans with every storage access, entry hash and log in inline Yul blocks around the Solcore step call, `bytes` returns of up to 64 bytes through the `boundedBytesOutcomeV1` convention, user-defined enum and struct values in contract fields and behind mapping keys through `std.StorageGeneric`, returned user-defined enums of two to four constructors through the `enumOutcomeV1` convention, user-defined enum arguments decoded by std's derived decoder, canonical and malformed, compared by std's selector or empty revert data, calldata arrays of user-defined enums read element by element through std's `abiArrayGet`, canonical and malformed, compared by std's selectors, `ArrayOutOfBounds()` among them, or empty revert data, and memory arrays of `uint256`, `bytes4`, `bytes` and `uint256[]` elements returned through std's `abi_encode` and `return_` under `wordTupleOutcomeV1`, the shape read at run time, constructor arguments decoded by std's memory reader from the init code's suffix, canonical and malformed, with the deployment row compared, a parent's decoding of a child method's tuple, `bytes` or enum return data through std's `raw_call` and memory reader, typed and malformed, under a call-and-resume convention, at one call per transaction, a parent's two or three calls with `returndatasize` and in-bounds `returndatacopy` reads around each in inline Yul, under a call chain, and a parent's zero to three calls from sites in branches and bounded loops, as the input decides, with `returndatasize` reads around each site and in a loop condition, under a choice chain; all thirty-two stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions, and storage campaigns compile each distinct source once per backend; `bytes` returns beyond 64 bytes, returned enums, enum arguments, enum arrays, array returns, constructor arguments, call returns, call sequences and call branches beyond the recorded shapes and other dynamic return values are not built; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -11615,6 +11615,122 @@ yet. The definitions were fixed before execution:
   per-type outcomes, which needed 37 seeds and are recorded instead, and took
   17 seeds between 2 and 94 (136 cases); shifts require every value and took
   16 seeds between 1 and 45 (128 cases).
+
+**Checked arithmetic, `unchecked` blocks and shifts: results.** `6b2f86b99`
+implements the definitions above, and `927fe89c3` fixes a race in the suite
+that the first random run met:
+- `Solcore.Synthesis.Core.Integers` (the integer types, the plans of both
+  profiles, their admission, the direct interpreter over Lean integers and the
+  shapes it reaches, the Core reference over Core's integers whose right
+  injection is the revert data, the draws and fitting) and `IntegersShrink`
+  (the plan size and reductions); `IntegersEmitter`, `IntegerCases`, shared
+  by `CheckedArithmeticCases` and `ShiftCases` through one profile record;
+  the case-tool commands `checked-arithmetic-generate`,
+  `checked-arithmetic-emit`, `shift-generate` and `shift-emit`; the adapter's
+  two schemas, `run(T)` signatures from `RUN_SELECTORS` and the checked
+  arithmetic schema in `REVERTING_SCHEMAS`; and campaign and suite
+  registration. Both profiles are runtime-input and identity-filter profiles,
+  not G0-based, with budgets up to 2,048 nodes; their coverage is
+  `checkedArithmeticCoverage` and `shiftCoverage`. No native tool is added;
+  the case tool carries both.
+- A registered Lean test, `Solcore/Test/SourceIntegerCases.lean`, checks:
+  - four fixtures' sources against golden texts, and their results on the
+    Core reference and on the interpreter, against golden values from the
+    corpus validator's Python model, at twelve inputs each. The first takes
+    an `int8` argument and returns `int8`, with a checked division helper, a
+    block holding `MIN / -1`, a negation, an unchecked multiplication helper
+    and a defaulted literal that wraps, then a lambda with an unchecked body,
+    a compound remainder and a checked defaulted subtraction; the second is
+    `uint64` over `run(uint256)`, with a compound product, a defaulted
+    addition, a block holding a subtraction from a zero literal, a checked
+    helper and a checked lambda, then a remainder and a negation; the shift
+    fixtures shift `int16` values by a Word and a `uint8` amount and by
+    literal amounts in and out of a block, and Words by `uint256`, `uint16`
+    and `uint128` amounts. Their results cover returned Words,
+    `Panic(0x11)`, `Panic(0x12)` and `DirtyHigherBitsForInteger()`;
+  - that admission refuses 28 checked arithmetic and 12 shift plans outside
+    the definitions and admits five plans at their bounds;
+  - the reference against the interpreter on 4,800 outcomes of 400 generated
+    plans at twelve inputs, with every kind of revert data;
+  - that generation is deterministic, draws every shape value but the
+    per-type outcomes within 1,000 checked arithmetic and 300 shift seeds and
+    none outside the inventories, replays exactly, also with seeded inputs and
+    the identity filter, and that a 256-node budget drops steps; that
+    tampering is refused and replay never reads the saved observation; and
+    that reductions apply, including `run(uint256)`, a `uint256` result, a
+    step out of its block, a removed input and a checked helper, and replay.
+- Fixed corpora `scripts/semantic-checked-arithmetic-corpus.json`, 136 cases
+  from seeds 2, 4, 5, 6, 7, 8, 9, 12, 14, 15, 17, 18, 22, 25, 27, 29 and 94
+  (30 of the seeds up to 94 were excluded), 42 returns, 52 `Panic(0x11)`, 30
+  `Panic(0x12)` and 12 `DirtyHigherBitsForInteger()`, reaching 23 of the 46
+  per-type outcomes; and `scripts/semantic-shift-corpus.json`, 128 returns
+  from seeds 1, 2, 4, 6, 7, 12, 13, 14, 19, 21, 22, 27, 32, 36, 44 and 45 (11
+  excluded). `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`, and
+  `test-semantic-shift-corpus.py` running its walk with the shift profile,
+  rebuild the selection, admit every plan with their own checker, recompute
+  every shape and the shrink measure with their own interpreter over Python
+  integers, re-emit every source and compare it exactly, evaluate every
+  case's plan against the recorded outcome, and check 35 and 35 shrink
+  candidates natively and 50 and 44 negative checks. That model, re-emission
+  and shapes agree with the Lean side on every accepted plan of the first
+  1,000 seeds at twelve inputs: 721 checked arithmetic plans, 8,652 outcomes
+  (2,826 returns, 3,512 `Panic(0x11)`, 1,160 `Panic(0x12)` and 1,154
+  `DirtyHigherBitsForInteger()`), and 803 shift plans, 9,636 returns.
+- The suite measured each running profile with a walk of its folder that
+  tolerated a file a campaign removed during the walk but not a directory:
+  `Path.rglob` raised `FileNotFoundError` for a case work directory removed
+  between its listing and its scan, and the suite stopped as an adapter error.
+  The first random O0 run stopped that way after 210 checked arithmetic cases,
+  all matched. `927fe89c3` walks with `os.scandir` and counts a file or a
+  directory that disappears as removed; against a directory another process
+  creates and removes, the old walk raised `FileNotFoundError` 62 times in 20
+  seconds of scans and the new one never. A regression test removes a
+  directory before its scan and a file after its listing.
+
+The gate passed before each code commit: the kernel check, 995 and then 996
+Python tests in fifteen suites, `lake build` (10,354 jobs), forty-two native
+tools with offline `--prepare` and `--verify`, `lake test` (30 minutes), and 25
+corpus validator runs (23 validators, two of them on two manifests) with the
+chunked-generation check over the thirty pure profiles.
+
+Frozen matrices at `927fe89c3`, with the five freeze records identical (352
+digests, combined SHA-256 `32af9bca62ebd4cbd05af62da3cfe09dc7549c376196a052e7cbefc52995b1f7`),
+under load averages of about 4 to 8 from other work on the machine:
+- The fixed corpora matched in full on O0, O2 and Yul with complete coverage:
+  136 checked arithmetic cases from 17 sources in 167, 161 and 238 seconds,
+  retaining 20, 19 and 22 MB, and 128 shift cases from 16 sources in 149, 146
+  and 213 seconds, retaining 11, 10 and 13 MB.
+- Random suites from root seed 1 with 32 whole functions a profile (profile
+  seeds 8163767749518515168 and 17611289841213011231), with seeded inputs and
+  the identity filter: checked arithmetic took 47 attempts, excluding 15 plans
+  with one outcome at every boundary input and no identity, and drew 384
+  cases from 32 sources, 156 returns, 142 `Panic(0x11)`, 40 `Panic(0x12)` and
+  46 `DirtyHigherBitsForInteger()`, and 94 of the 111 shape values; shifts
+  took 40 attempts, excluding 8, and drew 384 returns from 32 sources and all
+  53 values. On O0, 384 and 384 cases matched, in 404 and 372 seconds. On O2,
+  of 384 and 384 executed cases, 384 and 384 matched, 0 and 0 mismatched and
+  0 and 0 were inconclusive, with no error or rejection, in 382 and 371
+  seconds. On Yul, 384 and 384 matched, in 542 and 507 seconds.
+- A fixed O0 run of `closed-g0`, `runtime-word`, `runtime-revert-data` and
+  `runtime-halts` matched all 16, 16, 152 and 96 of their cases.
+
+At `6b2f86b99`, before the fix, the same fixed corpora had matched on O0, O2
+and Yul, and the random O0 run stopped on the suite's race after 210 checked
+arithmetic cases, all matched; the random O2 and Yul runs, at 96 and 60
+matched cases, were stopped by hand to run again at the fix.
+
+The probe, the model checks and the matrices found no mismatch, crash or
+rejection, so no upstream defect was recorded and `questions.md` is
+unchanged. The two fixed corpora add about 316 seconds to the complete fixed
+suite on O0, 307 on O2 and 451 on Yul, and 31, 29 and 35 MB. The O0 suite was
+last projected at about 6,550 of its 7,200 seconds before the later call
+profiles, so it may now exceed its budget; splitting the fixed CI job by
+`--profile`, already open, would keep each job within it.
+
+The Lean side of rows 1 to 3 in the table above, the parser, typing, source
+semantics and lowering, is not done; it waits for lane D's closure change,
+which shares `Solcore/SourceSemantics` and `Solcore/Frontend/SourceCore*`.
+The new emitters have no proof yet.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
