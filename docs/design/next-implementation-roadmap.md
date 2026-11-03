@@ -11777,6 +11777,310 @@ The unit is required and paused here. Panics, then row 1, remain. The
 measured costs and the two comparisons to make first are in the [resume
 point](integer-types-unchecked-shifts.md#resume-point).
 
+**Memory arrays, slices and their panics: probe and definitions.** Row 4 of
+the table above makes `T[]` a memory array in locals, parameters and returns,
+adds `new T[](n)`, `a.length`, element reads and writes through a checked
+`memref`, read-only slices and memory arrays in the public ABI, and gives an
+index or slice bound, an empty `pop` and an oversized allocation Solidity's
+panic codes. No generated case uses any of it: the memory-value and
+memory-call profiles spell their Word arrays `memory<DynArray<uint256>>` and
+build them with `allocateDynamicArray` and `IndexAccess.set`, and the array
+return profile encodes its arrays itself, since the checked driver refused
+public array outputs before #131. This unit builds the generator side of row
+4 as two new pure profiles whose original Core references model upstream's
+intended semantics. The existing profiles keep their spelling, which upstream
+still accepts, so both spellings stay covered. The Lean source side waits for
+lane D, which now works in `Solcore/Syntax`, `Solcore/TypeSystem`,
+`Solcore/Frontend` and `Solcore/SourceSemantics`.
+
+Before the definitions, a probe compiled hand-written sources through checked
+Hull export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner
+(on the O0 export), against a Python model of the intended semantics; the
+records are in `.upstream/upstream-unit3-arrays/probe/`:
+- `uint256[]` in function bodies, 40 methods and 8,647 calls per path: `new`
+  at lengths from 0 to 64 and from `2^251 − 5` to `2^256 − 1`, after dirty
+  Words written past the free pointer; literals and aliases; plain and
+  compound element writes; writes whose right side panics after an
+  out-of-range index; `memref` helpers; `new T[][](n)`, rows replaced and
+  written through, and nested literals; the four slice forms, slices of
+  slices and of rows, views of later writes, `toArray`; helpers taking,
+  filling and returning arrays and slices, generic `ridx` and `Length`
+  helpers; a loop over a length; and a storage array's `push`, `pop` and
+  `setLength`, with a storage slice read after `pop` and a nested storage
+  array's member calls on its rows.
+- Arrays of `uint8`, `int8`, `uint64`, `int128` and `int256`, at inputs that
+  reach each type's extremes, 28,110 calls per path: checked and unchecked
+  compound writes, a checked `memref` addition, element negation, a checked
+  sum, slices and `toArray`; and arrays of `address` and `bytes32`.
+- The forms the generators write, for `int8`, `uint16` and `uint256`, 1,326
+  calls per path: index and value variables, flagged lengths and indices,
+  literal elements, writes in `unchecked` blocks, a storage array of the type,
+  generic helpers over it, `toArray` of a storage slice after `pop`, a slice
+  of a grid row, loops over a slice and over storage.
+- Public ABI, 908 calls per path: `T[]` parameters of `uint256`, `uint8`,
+  `int16` and `address` decoded with std's rejections of dirty elements, two
+  array parameters, `calldata<T[]>` reads, slices and `toArray`, `T[]` and
+  `uint256[][]` results, and raw `uint8` and `int8` elements masked and
+  sign-extended by the encoder.
+- The generators below, in drafts, at twelve inputs: 48 plans of each
+  profile, 1,152 outcomes per path, against the plans' own interpreter.
+
+All 40,143 outcomes matched on every path: `Panic(0x32)`, `Panic(0x11)`,
+`Panic(0x12)`, `Panic(0x31)` and `Panic(0x41)` as 36 bytes of revert data,
+std's `DirtyHigherBitsForInteger()` and `DirtyHigherBitsForAddress()` as four
+bytes, zeroed `new` arrays, an index checked before a write's right side is
+evaluated and before a compound write reads, views, copies, aliases and rows,
+storage slices re-checked against the current length, and the ABI encodings.
+Two near spellings of these forms are rejected by the frontend with `SC0299`:
+`new uint256[](uint256(2))`, and `Typedef.rep(s[0])` for a literal index of a
+slice or of a calldata array. Both are recorded in `questions.md` without
+investigation; the generators write a literal length as `2` and a literal
+slice or calldata index as `uint256(0)`, which compile. No path departed from
+the model. Core, `Solcore/SourceSemantics`, `Solcore/Frontend/SourceCore*`,
+the shared contract runtime, the Hull importer and runner, both EVM backends
+and `export-rust-yul.py` need no change, so no stop condition applies; the
+references use Core's existing cells. The pure adapter adds both schemas to
+its revert matching, accepts `runtime-array-abi`'s return data from original
+Core, and recomputes that profile's calldata with its own ABI encoder. The
+existing profiles, corpora, emitters and emitter proofs stay unchanged, and
+the new emitters have no proof yet. The definitions were fixed before
+execution:
+
+- Plans (`core-arrays-v1`), shared by both profiles, each admitting its own:
+  - An element type `T`, one of the twelve integer types of rows 1 to 3. The
+    source imports std, `std.unsigned`, `std.signed` for a signed type, one
+    of `std.unchecked.unsigned` and `std.unchecked.signed` when a write is in
+    an `unchecked` block, std.dispatch, and for a narrow signed type
+    std.opcodes' `signextend` as `sc_signextend`.
+  - `run` begins with `let sc_x: word = Typedef.rep(input);`, then one to
+    three values, `let sc_v<j>: T = Typedef.abs(conv((sc_x + c)));` with the
+    integer profiles' conversions and offsets (the first offset 0), and up to
+    three indices, `let sc_k<j>: uint256 = uint256(((sc_x >> s) & m));` with
+    `s` among 0, 1, 2, 3, 8, 128 and 253 and `m` among 1, 3 and 7, or
+    flagged, `uint256((sc_x & (2^255 + m)))`, which is at most `m` or at
+    least `2^255`. Then `let sc_r: word = 0;`, the steps, and the result;
+    every observation `X` is folded in order with
+    `sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(X));`.
+  - An index is a literal 0 to 7, an index variable, or in the loop its
+    counter `sc_i`; a literal index of a slice or a calldata parameter is
+    written `uint256(k)`. A value is a value variable or one of `T`'s typed
+    literals in the integer profiles, a negative one in parentheses. A
+    length is a literal 0 to 4 or an index variable.
+  - Declarations, each naming the next array `sc_a<n>`, slice `sc_s<n>` or
+    grid `sc_g<n>`: `let sc_a<n>: T[] = new T[](L);`, `= [V, …];` of one to
+    four values, `= A;` (an alias), `= toArray(sc_s<j>);` and
+    `= sc_mk(V, W);`, a helper returning `[V, W]`; `let sc_s<n> = B[S:E];`,
+    `B[S:]`, `B[:E]` and `B[:]`, of a base `B` that is an array, a slice,
+    the storage array, a grid row `sc_g<g>[I]` or a calldata parameter, and
+    `let sc_s<n> = sc_tail(A, S);`, a helper returning `arraySlice<T[]>`;
+    `let sc_g<n>: T[][] = new T[][](L);`, `= [A, …];` of one to three arrays
+    and `= [[V, …], …];` of one to three rows of one to three values. `A`
+    names an array or a memory parameter.
+  - Effects: `A[I] = V;`, `A[I] op= V;` with `op` among `+ - * / %`, alone
+    or as the only statement of an `unchecked { … }` block, and through a
+    `memref`, `sc_put(lidx(A, I), V);` (`CanStore.store`) or
+    `sc_inc(lidx(A, I), V);` (a checked `+` of `CanStore.load`), on an array,
+    a grid row or, except through a `memref`, the storage array; `sc_fill(A,
+    V);`, a helper writing every element of its parameter; `sc_g<g>[I] = A;`;
+    and on the contract field `sc_st: T[]`, the storage array, the member
+    calls `sc_st.push(V);`, `sc_st.pop();` and `sc_st.setLength(L)` with a
+    literal or a masked index.
+  - Observations: `C.length` and `C[I]` of a collection `C` (an array, a
+    slice, the storage array, a grid row or a calldata parameter),
+    `sc_g<g>.length`, `sc_sum(A)` (a helper's checked sum), and the generic
+    helpers `sc_get(C, I)` (`ridx` under `(c, uint256): RValueIdxAccess<T>`)
+    and `sc_len(C)` (`Length`).
+  - At most one loop, `for (let sc_i: uint256 = 0; sc_i < C.length;
+    sc_i += 1) { … }` over a collection of at most four elements, of one or
+    two writes and observations.
+  - Bounds: one to twelve steps; at most four arrays, three slices, two
+    grids and one loop; every array, slice, grid and the storage array at
+    most eight elements by the plan's static bounds; a helper is emitted when
+    a step uses it.
+- `runtime-memory-arrays`: contract `SynthesizedMemoryArrays`, `run(uint256)`
+  returning `uint256(sc_r)`, the field `sc_st` when a step uses it, at least
+  one observation, and no raw value.
+- `runtime-array-abi`: contract `SynthesizedArrayAbi`,
+  `run(sc_p0, [sc_p1,] input: uint256)`, without the storage array:
+  - One or two parameters, each `T[]`, a memory array decoded eagerly and
+    then written like an array, or `calldata<T[]>`, read lazily (lengths,
+    elements, slices, `toArray`, the generic helpers and the loop, but no
+    write). Both sign as `T[]`; the selector is `keccak256` of the signature,
+    pinned for the 24 signatures.
+  - The calldata is the ABI encoding of the parameters made from the input
+    Word `x`, then `x`: each length is a literal 0 to 4 or `((x >> s) & m)`,
+    and element `k` is `x + c + k` modulo `2^256`, `c` among the type's
+    offsets, converted to `T` (clean) or as it is (raw, for a narrow type
+    only), so that raw elements are dirty at some inputs.
+  - The result is `uint256(sc_r)` after at least one observation, or a
+    `T[]`: an array, a memory parameter or `toArray(sc_s<j>)`. A raw value,
+    `let sc_v<j>: T = Typedef.abs((sc_x + c));`, appears only in a plan of a
+    narrow type that returns an array and has no compound write, `sc_inc` or
+    `sc_sum`.
+- Draws come from the case seed by a SplitMix64 stream with a domain per
+  profile (`0x6d656d6172720001` and `0x6172726162690001`):
+  - the element type evenly; one to three values, each raw half the time
+    when raw values are admitted; zero to three indices weighted 1, 3, 3 and
+    2, a quarter of them flagged; for `runtime-array-abi`, one parameter, or
+    two a third of the time, each memory or calldata evenly, with a literal
+    length (0 one time in eight, otherwise 1 to 4) or an input one, of a
+    shift and a mask drawn evenly, evenly, and raw elements half the time for
+    a narrow type, and the result a fold, an array or a copy evenly, a copy
+    without a slice falling back to an array and an array without one to the
+    fold;
+  - three to ten steps (two to eight for `runtime-array-abi`), each drawn by
+    weight among the kinds whose operands exist and drawn again up to four
+    times until the scope admits it, the last an observation when none came
+    before: `new` 3, a literal 3, an alias, a copy and `sc_mk` 1 each, a
+    slice 3, `sc_tail` 1, each grid form 1, a row replacement 1, a write 4,
+    `sc_fill` 1, `push` 2, `pop` 1 and `setLength` 1 (4 and 3 while a storage
+    slice exists), an observation 5 and the loop 2 (once); the storage array
+    and a grid's rows are collections and targets, and `pop` is drawn, only
+    once they can hold an element;
+  - an index into a collection of at most `b` elements is a literal below `b`
+    nine times in ten and otherwise `b` or `b + 1`, an index variable, or in
+    the loop the counter, weighted 3, 3 and 4; a slice bound is a literal up
+    to `b` nine times in ten, otherwise `b + 1`, or an index variable,
+    evenly, a range of two literals put in order; a value is a variable three times in four; a length is a literal
+    one time in three (0 one time in eight, otherwise 1 to 4), otherwise an
+    index variable; a write is plain 3, compound 3 (its operation evenly,
+    unchecked one time in three), `sc_put` 1 or `sc_inc` 1, without compound
+    writes and `sc_inc` when the plan has raw values; an observation is a
+    length 2, an element 4, a grid's length 1, `sc_sum` 1 (not with raw
+    values), `sc_get` 1 or `sc_len` 1.
+- Core reference, with no source text and no data definitions, `fun input =>
+  …` of type `sum P (word × word × word)`, `P` a Word for
+  `runtime-memory-arrays` and, for `runtime-array-abi`, the return data's
+  length in bytes and ten Words, with every helper inlined where it runs:
+  - An array is a pair of a length cell and eight element cells, those past
+    its static bound one shared spare cell. A name, an alias, a grid row and
+    a memory parameter hold the same pair, so a write is seen through each of
+    them; `toArray`, `sc_mk`, a literal and a grid literal's rows make new
+    ones. A grid is its length and its slot cells, each holding an array, the
+    shared empty array after `new T[][](n)`. The storage array is one pair,
+    empty when the call starts.
+  - A slice is its base, start and length; it reads through its base, so a
+    later write to the base is seen, and a slice of a slice reads the inner
+    base at the summed start. A slice of the storage array checks its read
+    against the array's length at the read.
+  - `new T[](n)` and `new T[][](n)` panic with `0x41` for `n ≥ 2^251 − 1`,
+    std's `newArrayP` check, and otherwise make `n` zero elements, a grid's
+    the empty array; the flagged lengths are at most 7 or at least `2^255`,
+    so the free pointer never decides.
+  - Every element read or write checks its index against the current length
+    with `Panic(0x32)`, after a row's check of its row index; a slice checks
+    `start > end`, then `end > length`, with `0x32`, and a slice read checks
+    its index against the slice's length first; `toArray` reads the slice's
+    elements in order.
+  - A compound write reads the element after the index check and applies the
+    integer profiles' checked or unchecked operation, `Panic(0x12)` for a
+    zero divisor and `Panic(0x11)` out of range or wrapped; `sc_inc` and
+    `sc_sum` are checked additions in order.
+  - `push` appends, `pop` of an empty array panics with `0x31` and otherwise
+    zeroes and drops the last element, and `setLength` truncates or extends
+    with zeros.
+  - The loop reads its collection's length, which its body cannot change, and
+    runs at most the collection's static bound of iterations, each guarded by
+    `counter < length`: an iteration's checks raise and its effects happen
+    only where it runs.
+  - For `runtime-array-abi`, memory parameters are decoded first, in order: a
+    raw element whose conversion to `T` differs from it raises
+    `DirtyHigherBitsForInteger()`, `0x6cc54a63`'s four bytes; a raw calldata
+    element is checked the same way when it is read, after its index check.
+    An array result is `0x20`, its length and its elements, each converted to
+    `T` as std's encoder masks or sign-extends it.
+  - A panic is the right injection of `Panic(code)`'s 36 bytes, as in the
+    integer profiles; the left injection is the fold, or the return data. A
+    case observes a returned Word, return data, or revert data, compared
+    exactly with the EVM's and the imported Hull's.
+
+  Admission checks every step against the plan's static scope: names
+  declared before use, operands and counts in range, the static bounds, a
+  slice's and a loop's collections, `memref` writes off the storage array,
+  the loop's two actions, and the profile's own parameters, result and raw
+  values. A direct interpreter of the plans over Lean numbers, independent of
+  the reference, gives the shapes below. Of the first 1,000 seeds, it and the
+  reference agreed on all 11,928 and 11,808 outcomes of the 994 and 984
+  admitted plans, at the eight boundary inputs and four more.
+- Bounds: the node budget, default 1,024, at most 2,048 and at least 256 for
+  `runtime-memory-arrays` and 512 for `runtime-array-abi`, whose decoder and
+  encoder alone take about 300 nodes, bounds the applied reference; steps
+  are dropped from the end while it exceeds the budget and more than one
+  step remains, and a result naming a dropped array or slice becomes the
+  fold, its values converted. A case's reference is at most 4,096 nodes. Of
+  the first 1,000 seeds at the default budget, the memory array references
+  had a median of 396 and at most 1,022 nodes, 18 dropped a step and none
+  stayed over; the array ABI references had a median of 607, 112 dropped a
+  step and 5 stayed over. At 256 nodes, 408 of 500 memory array plans dropped
+  steps and 16 stayed over.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stages `memory-array-profile` and `array-abi-profile`:
+  a plan still over the budget or not admitted, as 6 and 16 of the first
+  1,000 seeds were (a fitted plan left without an observation); then, at the
+  eight boundary inputs, fuel exhaustion (an inconclusive resource
+  exclusion), a result other than a return or revert data, or the same
+  outcome for all eight, as for 423 and 297 of the first 1,000 seeds, most of
+  them an index out of range at every input.
+- Identity filter: a plan whose only observation reads `sc_v0` at a 256-bit
+  type returns its input, as seeds 11, 86, 726 and 968 of the first 1,000
+  memory array plans do, so random campaigns apply
+  `exclude-boundary-identity-v1` to both profiles; an array result is never
+  an identity.
+- Reductions: remove a step with the later steps that read what it declares,
+  renumbering the later names; replace the loop by its body once at counter
+  0; lower a write form to a plain write, an unchecked one to checked and an
+  operation to `+`, `sc_tail` to a slice from its start, `sc_mk` to a
+  literal, a grid to `new T[][](0)` and a slice to `B[:]`; drop the last
+  value, array, row or loop action; lower an index or a length to the literal
+  0, a value to `sc_v0` and an observation to a length; remove the last value
+  or index, its references reading `sc_v0` or the literal 0, a flag and a
+  raw value; remove the second parameter with the steps that read it, lower
+  a parameter's length to 0 and raw elements to clean, and an array result to
+  the fold; then the inputs 0, 1 and half the input. Every candidate is
+  admitted and sealed by the full checker, and strictly smaller in plan size,
+  then input. A shrink response stops before its cases would exceed 1.5 MB.
+- Specified shapes, from the plan and from the runs its interpreter makes at
+  the eight boundary inputs, never measured on a compiled path:
+  - memory arrays, 95 values: `types` (12), `declarations` (`new`, `literal`,
+    `alias`, `copy`, `helper`, `slice-range`, `slice-from`, `slice-to`,
+    `slice-all`, `tail`, `grid-new`, `grid-arrays`, `grid-literal`), `writes`
+    (`plain`, the five operations checked and unchecked, `put`, `inc`,
+    `fill`, `set-row`), `targets` (`array`, `row`, `storage`), `members`
+    (`push`, `pop`, `set-length`), `observations` (`length`, `element`,
+    `grid-length`, `sum`, `get`, `len`), the observed and looped
+    `collections`, the slice `bases` and the `loops` (each `array`, `slice`,
+    `storage`, `row`), `indices` (`literal`, `input`, `flagged`, `counter`),
+    `lengths` (`literal`, `input`, `flagged`), `sharing` (`alias`, a write
+    through one name of an array and a later observation through another;
+    `row`, a write through a grid row or its array seen through the other;
+    `view`, a write to a slice's base after the slice and a later
+    observation of a slice; `copy`, a write and an observation after a
+    `toArray`), the `outcomes` reached (`returned` and the five panics) and
+    the deciding `panics` (`read`, `write`, `row`, `slice-start`,
+    `slice-end`, `slice-read`, `stale` for a storage slice past the array's
+    current length, `pop`, `new`, `grid-new`, `compound-overflow`,
+    `compound-zero`, `inc`, `sum`);
+  - array ABI, 46 values: `types` (12), `parameters` (`memory`, `calldata`,
+    `two`), parameter `lengths` (`literal`, `input`), `elements` and
+    `values` (each `clean`, `raw`), `results` (`word`, `array`,
+    `parameter`, `copy`), `calldataReads` (`length`, `element`, `get`,
+    `slice`, `copy`, `loop`), `parameterWrites` (`plain`, `compound`,
+    `memref`, `fill`), the `encodings` of returned arrays (`canonical`,
+    `normalized`), the `outcomes` (`returned`, `panic-0x11`, `panic-0x12`,
+    `panic-0x32`, `panic-0x41`, `dirty`) and the `dirty` sites (`memory`,
+    `read`, `copy`).
+- Fixed corpora: from seed 1 upwards at the default budget, every accepted
+  plan that covers a missing value, until nothing is missing, each at the
+  eight boundary inputs: memory arrays require every value and took 34
+  seeds between 1 and 2,185 (272 cases), the last for the `stale` panic,
+  which one plan in about 2,000 reaches; array ABI requires every value and
+  took 18 seeds between 4 and 469 (144 cases).
+
+`Panic(0x41)` from a storage array, a `push` at length `2^256 − 1` or an
+offset past `~0 / stride`, cannot occur for word-sized elements, so only
+`new` reaches it.
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
