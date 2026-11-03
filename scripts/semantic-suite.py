@@ -163,13 +163,25 @@ def save(path, value):
 
 
 def directory_bytes(directory):
+    """The bytes of the regular files under `directory`, symbolic links not followed.
+    A campaign may remove a completed export or a case's work directory during this
+    scan; a file or a directory that disappears counts as removed."""
     total = 0
-    for path in directory.rglob("*"):
+    pending = [directory]
+    while pending:
         try:
-            if path.is_file() and not path.is_symlink():
-                total += path.stat().st_size
+            with os.scandir(pending.pop()) as entries:
+                listed = list(entries)
         except FileNotFoundError:
-            pass  # A campaign may remove a completed export during this scan.
+            continue
+        for entry in listed:
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(entry.path)
+                elif entry.is_file(follow_symlinks=False):
+                    total += entry.stat(follow_symlinks=False).st_size
+            except FileNotFoundError:
+                pass
     return total
 
 

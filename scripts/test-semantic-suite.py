@@ -1296,6 +1296,41 @@ class SuiteTests(unittest.TestCase):
                 self.assertNotEqual(code, 0)
                 self.assertEqual(suite.directory_bytes(args.output), (20 + written) * 1024**2)
 
+    def test_disk_walk_counts_what_a_campaign_removes_during_it_as_removed(self):
+        # A campaign removes a case's work directory, or a file in it, at any time.
+        root = self.directory / "walk"
+        (root / "kept" / "deep").mkdir(parents=True)
+        (root / "kept" / "deep" / "a").write_bytes(b"x" * 5)
+        (root / "gone").mkdir()
+        (root / "gone" / "b").write_bytes(b"y" * 7)
+        (root / "vanishing").mkdir()
+        (root / "vanishing" / "c").write_bytes(b"z" * 11)
+        (root / "d").write_bytes(b"w" * 3)
+        os.symlink(root / "d", root / "link")
+        real = os.scandir
+
+        class Removing:
+            """Removes `gone` before it is listed and `vanishing/c` after it is."""
+            def __init__(self, path):
+                if os.path.basename(path) == "gone":
+                    os.remove(os.path.join(path, "b"))
+                    os.rmdir(path)
+                self.inner = real(path)
+                self.path = path
+
+            def __enter__(self):
+                entries = list(self.inner.__enter__())
+                if os.path.basename(self.path) == "vanishing":
+                    os.remove(os.path.join(self.path, "c"))
+                return iter(entries)
+
+            def __exit__(self, *exception):
+                return self.inner.__exit__(*exception)
+
+        with patch.object(suite.os, "scandir", Removing):
+            self.assertEqual(suite.directory_bytes(root), 8)
+        self.assertEqual(suite.directory_bytes(root), 8)
+
     def test_real_profile_logs_count_toward_the_disk_limit(self):
         args = self.args("--disk-bytes", str(32 * 1024**2), "--output-limit", str(16 * 1024**2), "--cleanup-seconds", ".1")
         args.output.mkdir()
