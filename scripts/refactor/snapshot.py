@@ -24,7 +24,8 @@ olean would make the snapshot meaningless (and a deleted module's old olean woul
 modules can define same-named privates, and identical records collapse. Exit status is 1
 when anything was added, removed or changed. A renames file has lines `old<TAB>new` (exact
 names) or `old.*<TAB>new.*` (prefix); a rename moves only those records of A's `old` that B
-has under `new`.
+has under `new`. An exact `old` can have several lines, one for each differing copy of a
+private helper that got a name of its own.
 """
 import argparse, json, os, re, subprocess, sys, time, collections, concurrent.futures
 
@@ -261,7 +262,7 @@ def load(path):
 
 
 def load_renames(path):
-    exact, prefix = {}, []
+    exact, prefix = collections.defaultdict(list), []
     for l in open(path, encoding="utf-8"):
         l = l.rstrip("\n")
         if not l.strip() or l.startswith("#"):
@@ -270,7 +271,7 @@ def load_renames(path):
         if a.endswith(".*") and b.endswith(".*"):
             prefix.append((a[:-1], b[:-1]))
         else:
-            exact[a] = b
+            exact[a].append(b)
     return exact, prefix
 
 
@@ -279,8 +280,8 @@ def rename(n, exact, prefix):
         return exact[n]
     for a, b in prefix:
         if n.startswith(a):
-            return b + n[len(a):]
-    return n
+            return [b + n[len(a):]]
+    return []
 
 
 def describe(rs):
@@ -299,13 +300,15 @@ def diff(args):
         exact, prefix = load_renames(args.renames)
         a2, am2 = collections.defaultdict(set), collections.defaultdict(set)
         for n, rs in a.items():
-            new = rename(n, exact, prefix)
-            moved = {r for r in rs if r in b.get(new, ())} if new != n else set()
+            moved = set()
+            for new in rename(n, exact, prefix):
+                here = {r for r in rs if r in b.get(new, ())}
+                if here:
+                    a2[new] |= here
+                    am2[new] |= am[n]
+                    moved |= here
             # identical records collapse: a record B still has under `old` stays there as well
             stay = (rs - moved) | (rs & b.get(n, set()))
-            if moved:
-                a2[new] |= moved
-                am2[new] |= am[n]
             if stay:
                 a2[n] |= stay
                 am2[n] |= am[n]
