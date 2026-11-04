@@ -1,5 +1,12 @@
 import Solcore.Frontend.SourceCoreExecution
 
+/-!
+# Public source compiler
+
+The public API of the native compiler, exported from `SourceCoreExecution`. It adds no evaluator of
+its own.
+-/
+
 /-! The public source compiler is the common Core execution API. These exports
 name the same compiled artifacts, values, sessions and checkpoints; no separate
 compiler or execution representation is introduced here. -/

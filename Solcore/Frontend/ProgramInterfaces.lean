@@ -1,5 +1,810 @@
-import Solcore.Frontend.ProgramModuleResolution
+import Solcore.Resolved.Identity
+import Solcore.Syntax.Declaration
+import Solcore.Workspace
+import Solcore.Syntax.Unchecked
 
+/-!
+# Program identities, environment and interfaces
+
+The first layers after parsing: identities, the declaration catalog, module resolution and public
+interfaces. Main declarations: `ProgramTraitId`, `ProgramImplId`, `BuiltinFunctionId`,
+`ProgramEnvironment`, `ProgramDeclaration`.
+-/
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramEnvironment
+/-!
+An executable, deliberately small whole-program declaration catalog.
+
+This is the first semantic layer after parsing.  It assigns declaration IDs
+from canonical module identity plus top-level source order, and rejects the
+name collisions that would make type and trait lookup non-deterministic.
+Import/export visibility and nested contract declarations are intentionally
+left to a later layer.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+/-- The declaration forms retained by the first whole-program catalog. -/
+inductive ProgramDeclarationKind where
+  | typeAlias
+  | enum
+  | trait
+  | implementation
+  | contract
+  | function
+  deriving Repr, BEq, DecidableEq
+
+/-- Independent source namespaces needed before overload resolution exists. -/
+inductive ProgramDeclarationNamespace where
+  | type
+  | trait
+  | value
+  deriving Repr, BEq, DecidableEq
+
+/-- One parsed top-level declaration with its stable whole-program identity. -/
+structure ProgramDeclaration where
+  id : Resolved.DeclarationId
+  kind : ProgramDeclarationKind
+  nameSpace : Option ProgramDeclarationNamespace
+  name : Option String
+  genericParameters : List String
+  source : Syntax.TopItem
+  deriving Repr
+
+/-- A parsed source after its syntax identity has been canonicalized. -/
+structure ProgramModule where
+  id : Workspace.ModuleId
+  source : Syntax.ParsedFile
+  deriving Repr
+
+/-- The executable whole-program declaration/type environment. -/
+structure ProgramEnvironment where
+  modules : List ProgramModule
+  declarations : List ProgramDeclaration
+  deriving Repr
+
+/-- Construction failures that make whole-program lookup non-deterministic. -/
+inductive ProgramEnvironmentError where
+  | invalidSourceId (source : Syntax.SourceId)
+  | duplicateModule (moduleId : Workspace.ModuleId)
+  | duplicateDeclaration
+      (moduleId : Workspace.ModuleId)
+      (nameSpace : ProgramDeclarationNamespace)
+      (name : String)
+      (first duplicate : Resolved.DeclarationId)
+  deriving Repr, DecidableEq
+
+/-- Translate the parser's permissive source owner into a canonical library. -/
+def workspaceLibraryOfSyntaxOrigin? :
+    Syntax.SourceOrigin → Option Workspace.LibraryId
+  | .main => some .main
+  | .standard => some .standard
+  | .external name =>
+      (Workspace.ExternalLibraryName.parse name).map Workspace.LibraryId.external
+
+/-- Canonicalize a parser source identity for whole-program use. -/
+def workspaceModuleOfSyntaxSource? (source : Syntax.SourceId) :
+    Option Workspace.ModuleId := do
+  let library ← workspaceLibraryOfSyntaxOrigin? source.origin
+  let path ← Workspace.CanonicalSourcePath.parse source.path
+  pure {
+    library
+    path := path.modulePath
+  }
+
+private def identifierTexts (parameters : List Syntax.Identifier) : List String :=
+  parameters.map (·.value)
+
+private def optionalGenericParameterTexts
+    (parameters : Option Syntax.GenericParameters) : List String :=
+  match parameters with
+  | none => []
+  | some parameters => identifierTexts parameters.elements.toList
+
+private def optionalAliasParameterTexts
+    (parameters : Option (Syntax.DelimitedList Syntax.Identifier)) : List String :=
+  match parameters with
+  | none => []
+  | some parameters => identifierTexts parameters.elements
+
+/-- Produce the catalog row for one semantic top-level item. -/
+def programDeclarationOfTopItem?
+    (moduleId : Workspace.ModuleId) (declarationIndex : Nat)
+    (item : Syntax.TopItem) : Option ProgramDeclaration :=
+  let id : Resolved.DeclarationId := { moduleId, declarationIndex }
+  match item.value with
+  | .typeAlias declaration => some {
+      id
+      kind := .typeAlias
+      nameSpace := some .type
+      name := some declaration.value.name.value
+      genericParameters :=
+        optionalAliasParameterTexts declaration.value.parameters
+      source := item
+    }
+  | .enum declaration => some {
+      id
+      kind := .enum
+      nameSpace := some .type
+      name := some declaration.value.name.value
+      genericParameters :=
+        optionalGenericParameterTexts declaration.value.parameters
+      source := item
+    }
+  | .trait declaration => some {
+      id
+      kind := .trait
+      nameSpace := some .trait
+      name := some declaration.value.name.value
+      genericParameters :=
+        identifierTexts declaration.value.genericParameters.elements.toList
+      source := item
+    }
+  | .impl declaration => some {
+      id
+      kind := .implementation
+      nameSpace := none
+      name := none
+      genericParameters :=
+        optionalGenericParameterTexts declaration.value.genericParameters
+      source := item
+    }
+  | .contract declaration => some {
+      id
+      kind := .contract
+      nameSpace := some .type
+      name := some declaration.value.name.value
+      genericParameters :=
+        optionalGenericParameterTexts declaration.value.genericParameters
+      source := item
+    }
+  | .function declaration => some {
+      id
+      kind := .function
+      nameSpace := some .value
+      name := some declaration.value.signature.name.value
+      genericParameters :=
+        optionalGenericParameterTexts
+          declaration.value.signature.genericParameters
+      source := item
+    }
+  | .importDecl _
+  | .exportDecl _
+  | .pragmaDecl _
+  | .error => none
+
+/-- Cataloged semantic declarations of one module, retaining source indices. -/
+def declarationsOfModule (module : ProgramModule) :
+    List ProgramDeclaration :=
+  module.source.items.zipIdx.filterMap fun (item, declarationIndex) =>
+    programDeclarationOfTopItem? module.id declarationIndex item
+
+/-- Canonicalize all valid parser source identities without dropping errors. -/
+def canonicalizeModules : List Syntax.ParsedFile →
+    List ProgramEnvironmentError × List ProgramModule
+  | [] => ([], [])
+  | source :: rest =>
+      let (errors, modules) := canonicalizeModules rest
+      match workspaceModuleOfSyntaxSource? source.source with
+      | none => (.invalidSourceId source.source :: errors, modules)
+      | some id => (errors, { id, source } :: modules)
+
+def duplicateModuleErrorsAux
+    (seen : List Workspace.ModuleId) :
+    List ProgramModule → List ProgramEnvironmentError
+  | [] => []
+  | module :: rest =>
+      if seen.any fun previous => decide (previous = module.id) then
+        .duplicateModule module.id :: duplicateModuleErrorsAux seen rest
+      else
+        duplicateModuleErrorsAux (module.id :: seen) rest
+
+def duplicateModuleErrors
+    (modules : List ProgramModule) : List ProgramEnvironmentError :=
+  duplicateModuleErrorsAux [] modules
+
+private structure DeclarationCollisionKey where
+  moduleId : Workspace.ModuleId
+  nameSpace : ProgramDeclarationNamespace
+  name : String
+  deriving DecidableEq
+
+private def ProgramDeclaration.collisionKey?
+    (declaration : ProgramDeclaration) : Option DeclarationCollisionKey := do
+  let nameSpace ← declaration.nameSpace
+  let name ← declaration.name
+  -- Values will acquire overload sets.  Type and trait heads must already be
+  -- unique for deterministic resolution.
+  if nameSpace == ProgramDeclarationNamespace.value then
+    none
+  else
+    pure { moduleId := declaration.id.moduleId, nameSpace, name }
+
+private def duplicateDeclarationErrorsAux
+    (seen : List (DeclarationCollisionKey × Resolved.DeclarationId)) :
+    List ProgramDeclaration → List ProgramEnvironmentError
+  | [] => []
+  | declaration :: rest =>
+      match declaration.collisionKey? with
+      | none => duplicateDeclarationErrorsAux seen rest
+      | some key =>
+          match seen.find? fun previous => decide (previous.1 = key) with
+          | none =>
+              duplicateDeclarationErrorsAux ((key, declaration.id) :: seen) rest
+          | some previous =>
+              .duplicateDeclaration key.moduleId key.nameSpace key.name
+                  previous.2 declaration.id ::
+                duplicateDeclarationErrorsAux seen rest
+
+private def duplicateDeclarationErrors
+    (declarations : List ProgramDeclaration) : List ProgramEnvironmentError :=
+  duplicateDeclarationErrorsAux [] declarations
+
+/-- Build one catalog from any number of parsed source files. -/
+def buildProgramEnvironment (sources : List Syntax.ParsedFile) :
+    Except (List ProgramEnvironmentError) ProgramEnvironment :=
+  let canonicalized := canonicalizeModules sources
+  let sourceErrors := canonicalized.1
+  let modules := canonicalized.2
+  let moduleErrors := duplicateModuleErrors modules
+  let declarations := modules.flatMap declarationsOfModule
+  let declarationErrors := duplicateDeclarationErrors declarations
+  let errors := sourceErrors ++ moduleErrors ++ declarationErrors
+  if errors.isEmpty then
+    .ok { modules, declarations }
+  else
+    .error errors
+
+namespace ProgramEnvironment
+
+/-- Find one declaration by its stable identity. -/
+def declaration? (environment : ProgramEnvironment)
+    (id : Resolved.DeclarationId) : Option ProgramDeclaration :=
+  environment.declarations.find? fun declaration => decide (declaration.id = id)
+
+/-- All declarations in one canonical module, preserving source order. -/
+def declarationsIn (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) : List ProgramDeclaration :=
+  environment.declarations.filter fun declaration =>
+    decide (declaration.id.moduleId = moduleId)
+
+/-- Declarations in one namespace with an exact spelling in one module. -/
+def localDeclarationsNamed (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (nameSpace : ProgramDeclarationNamespace)
+    (name : String) :
+    List ProgramDeclaration :=
+  environment.declarations.filter fun declaration =>
+    decide (declaration.id.moduleId = moduleId) &&
+      declaration.nameSpace == some nameSpace &&
+      declaration.name == some name
+
+/-- Declarations in one namespace with an exact spelling anywhere. -/
+def declarationsNamed (environment : ProgramEnvironment)
+    (nameSpace : ProgramDeclarationNamespace) (name : String) :
+    List ProgramDeclaration :=
+  environment.declarations.filter fun declaration =>
+    declaration.nameSpace == some nameSpace &&
+      declaration.name == some name
+
+/-- Type declarations with an exact spelling in one module. -/
+def localTypesNamed (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    List ProgramDeclaration :=
+  environment.localDeclarationsNamed moduleId .type name
+
+/-- Type declarations with an exact spelling anywhere in the program. -/
+def typesNamed (environment : ProgramEnvironment) (name : String) :
+    List ProgramDeclaration :=
+  environment.declarationsNamed .type name
+
+/-- Trait declarations with an exact spelling in one module. -/
+def localTraitsNamed (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    List ProgramDeclaration :=
+  environment.localDeclarationsNamed moduleId .trait name
+
+/-- Trait declarations with an exact spelling anywhere in the program. -/
+def traitsNamed (environment : ProgramEnvironment) (name : String) :
+    List ProgramDeclaration :=
+  environment.declarationsNamed .trait name
+
+/-- Function declarations forming a local overload set. -/
+def localValuesNamed (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    List ProgramDeclaration :=
+  environment.localDeclarationsNamed moduleId .value name
+
+/-- Function declarations with an exact spelling anywhere in the program. -/
+def valuesNamed (environment : ProgramEnvironment) (name : String) :
+    List ProgramDeclaration :=
+  environment.declarationsNamed .value name
+
+/-- Return a result exactly when the candidate set has one element. -/
+def uniqueDeclaration? : List ProgramDeclaration → Option ProgramDeclaration
+  | [declaration] => some declaration
+  | _ => none
+
+/-- Unique type lookup in one module. -/
+def localType? (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    Option ProgramDeclaration :=
+  uniqueDeclaration? (environment.localTypesNamed moduleId name)
+
+/-- Unique trait lookup in one module. -/
+def localTrait? (environment : ProgramEnvironment)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    Option ProgramDeclaration :=
+  uniqueDeclaration? (environment.localTraitsNamed moduleId name)
+
+end ProgramEnvironment
+
+end Solcore.Frontend
+end
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramEnvironmentProperties
+/-!
+Structural guarantees of the executable whole-program declaration catalog.
+
+These results deliberately cover only identities allocated by
+`buildProgramEnvironment`: successful construction rejects repeated canonical
+module identities, and declaration identities inherit that module identity
+together with their unique top-level source position.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+private theorem duplicateModuleErrorsAux_eq_nil
+    (seen : List Workspace.ModuleId) (modules : List ProgramModule)
+    (errors : duplicateModuleErrorsAux seen modules = []) :
+    (modules.map (·.id)).Nodup ∧
+      ∀ module, module ∈ modules → module.id ∉ seen := by
+  induction modules generalizing seen with
+  | nil => simp
+  | cons module rest induction =>
+      unfold duplicateModuleErrorsAux at errors
+      split at errors <;> rename_i duplicate
+      · simp at errors
+      · have tail := induction (module.id :: seen) errors
+        constructor
+        · simp only [List.map_cons, List.nodup_cons]
+          refine ⟨?_, tail.1⟩
+          intro member
+          obtain ⟨tailModule, tailMember, idEq⟩ := List.mem_map.mp member
+          exact (tail.2 tailModule tailMember (by simp [idEq]))
+        · intro candidate member
+          simp only [List.mem_cons] at member
+          rcases member with rfl | member
+          · intro inSeen
+            apply duplicate
+            exact List.any_eq_true.mpr ⟨candidate.id, inSeen, by simp⟩
+          · exact fun inSeen => tail.2 candidate member (by simp [inSeen])
+
+theorem duplicateModuleErrors_eq_nil_ids_nodup
+    {modules : List ProgramModule}
+    (errors : duplicateModuleErrors modules = []) :
+    (modules.map (·.id)).Nodup := by
+  exact (duplicateModuleErrorsAux_eq_nil [] modules errors).1
+
+private theorem programDeclarationOfTopItem?_id
+    {moduleId : Workspace.ModuleId} {index : Nat} {item : Syntax.TopItem}
+    {declaration : ProgramDeclaration}
+    (produced : programDeclarationOfTopItem? moduleId index item =
+      some declaration) :
+    declaration.id = { moduleId, declarationIndex := index } := by
+  cases value : item.value <;>
+    simp [programDeclarationOfTopItem?, value] at produced
+  all_goals subst declaration; rfl
+
+private theorem declarationsOfModule_index_ge_from
+    (moduleId : Workspace.ModuleId) (items : List Syntax.TopItem)
+    (start : Nat) {declaration : ProgramDeclaration}
+    (member : declaration ∈
+      (items.zipIdx start).filterMap (fun item =>
+        programDeclarationOfTopItem? moduleId item.2 item.1)) :
+    start ≤ declaration.id.declarationIndex := by
+  simp only [List.mem_filterMap] at member
+  obtain ⟨item, itemMember, produced⟩ := member
+  have bounds := List.mem_zipIdx itemMember
+  have idEq := programDeclarationOfTopItem?_id produced
+  rw [idEq]
+  exact bounds.1
+
+private theorem declarationsOfModule_ids_nodup_from
+    (module : ProgramModule) (start : Nat) :
+    ((module.source.items.zipIdx start).filterMap (fun item =>
+      programDeclarationOfTopItem? module.id item.2 item.1) |>.map (·.id)).Nodup := by
+  induction module.source.items generalizing start with
+  | nil => simp
+  | cons item rest induction =>
+      simp only [List.zipIdx_cons, List.filterMap_cons]
+      cases declaration : programDeclarationOfTopItem? module.id start item with
+      | none =>
+          exact induction (start + 1)
+      | some value =>
+          have valueId := programDeclarationOfTopItem?_id declaration
+          simp only [List.map_cons, List.nodup_cons]
+          refine ⟨?_, induction (start + 1)⟩
+          intro member
+          obtain ⟨tail, tailMember, idEq⟩ := List.mem_map.mp member
+          have tailBounds := declarationsOfModule_index_ge_from module.id rest
+            (start + 1) tailMember
+          rw [idEq, valueId] at tailBounds
+          change start + 1 ≤ start at tailBounds
+          omega
+
+theorem declarationsOfModule_ids_nodup (module : ProgramModule) :
+    ((declarationsOfModule module).map (·.id)).Nodup := by
+  exact declarationsOfModule_ids_nodup_from module 0
+
+private theorem declarationsOfModule_id_module
+    {module : ProgramModule} {declaration : ProgramDeclaration}
+    (member : declaration ∈ declarationsOfModule module) :
+    declaration.id.moduleId = module.id := by
+  simp only [declarationsOfModule, List.mem_filterMap] at member
+  obtain ⟨item, _, produced⟩ := member
+  have idEq := programDeclarationOfTopItem?_id produced
+  exact congrArg Resolved.DeclarationId.moduleId idEq
+
+private theorem flatMap_declaration_ids_nodup
+    (modules : List ProgramModule)
+    (moduleIds : (modules.map (·.id)).Nodup) :
+    ((modules.flatMap declarationsOfModule).map (·.id)).Nodup := by
+  induction modules with
+  | nil => simp
+  | cons module rest induction =>
+      simp only [List.map_cons, List.nodup_cons] at moduleIds
+      simp only [List.flatMap_cons, List.map_append, List.nodup_append]
+      refine ⟨declarationsOfModule_ids_nodup module,
+        induction moduleIds.2, ?_⟩
+      intro left leftMember right rightMember same
+      obtain ⟨leftDeclaration, leftDeclarationMember, leftId⟩ :=
+        List.mem_map.mp leftMember
+      obtain ⟨rightDeclaration, rightDeclarationMember, rightId⟩ :=
+        List.mem_map.mp rightMember
+      obtain ⟨rightModule, rightModuleMember,
+          rightDeclarationMember⟩ := List.mem_flatMap.mp rightDeclarationMember
+      have leftOwner := declarationsOfModule_id_module leftDeclarationMember
+      have rightOwner := declarationsOfModule_id_module rightDeclarationMember
+      have moduleEq : module.id = rightModule.id := by
+        rw [← leftOwner, ← rightOwner, leftId, rightId, same]
+      exact moduleIds.1 (List.mem_map.mpr
+        ⟨rightModule, rightModuleMember, moduleEq.symm⟩)
+
+/-- Successful environment construction assigns every module a distinct
+canonical identity. -/
+theorem buildProgramEnvironment_success_modules_nodup
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    (environment.modules.map (·.id)).Nodup := by
+  simp only [buildProgramEnvironment] at success
+  split at success <;> rename_i empty
+  · have allErrors := List.isEmpty_iff.mp empty
+    have moduleErrors :
+        duplicateModuleErrors (canonicalizeModules sources).2 = [] := by
+      have parts := List.append_eq_nil_iff.mp allErrors
+      exact (List.append_eq_nil_iff.mp parts.1).2
+    injection success with environmentEq
+    subst environment
+    exact duplicateModuleErrors_eq_nil_ids_nodup moduleErrors
+  · simp at success
+
+/-- Successful environment construction assigns every retained declaration a
+distinct `(module, source-position)` identity. -/
+theorem buildProgramEnvironment_success_declarations_nodup
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    (environment.declarations.map (·.id)).Nodup := by
+  have modules := buildProgramEnvironment_success_modules_nodup success
+  simp only [buildProgramEnvironment] at success
+  split at success
+  · injection success with environmentEq
+    subst environment
+    exact flatMap_declaration_ids_nodup _ modules
+  · simp at success
+
+/-- A successful catalog retains exactly the declarations collected from its
+canonical modules, in module and source order. -/
+theorem buildProgramEnvironment_success_declarations_eq_flatMap
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    environment.declarations =
+      environment.modules.flatMap declarationsOfModule := by
+  simp only [buildProgramEnvironment] at success
+  split at success
+  · injection success with environmentEq
+    subst environment
+    rfl
+  · simp at success
+
+/-- Every retained declaration is owned by one of the canonical modules in
+the successfully constructed environment. -/
+theorem buildProgramEnvironment_success_declaration_module_exists
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment)
+    (member : declaration ∈ environment.declarations) :
+    ∃ module, module ∈ environment.modules ∧
+      module.id = declaration.id.moduleId := by
+  rw [buildProgramEnvironment_success_declarations_eq_flatMap success] at member
+  obtain ⟨module, moduleMember, declarationMember⟩ :=
+    List.mem_flatMap.mp member
+  exact ⟨module, moduleMember,
+    (declarationsOfModule_id_module declarationMember).symm⟩
+
+private theorem find?_eq_some_of_mem_of_nodup_map
+    {alpha beta : Type} [DecidableEq beta] (key : alpha → beta)
+    {items : List alpha} {item : alpha}
+    (unique : (items.map key).Nodup) (member : item ∈ items) :
+    items.find? (fun candidate => decide (key candidate = key item)) =
+      some item := by
+  induction items with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headAbsent, tailUnique⟩
+      simp only [List.mem_cons] at member
+      rcases member with rfl | tailMember
+      · simp
+      · have keysDiffer : key head ≠ key item := by
+          intro keysEqual
+          apply headAbsent
+          rw [keysEqual]
+          exact List.mem_map.mpr ⟨item, tailMember, rfl⟩
+        simp [List.find?, keysDiffer,
+          induction tailUnique tailMember]
+
+/-- Stable-ID lookup returns only a retained declaration with the requested
+identity.  This direction does not require a successful builder run. -/
+theorem ProgramEnvironment.declaration?_sound
+    {environment : ProgramEnvironment} {id : Resolved.DeclarationId}
+    {declaration : ProgramDeclaration}
+    (found : environment.declaration? id = some declaration) :
+    declaration ∈ environment.declarations ∧ declaration.id = id := by
+  constructor
+  · exact List.mem_of_find?_eq_some found
+  · have predicateMatches := List.find?_some found
+    simpa [ProgramEnvironment.declaration?] using predicateMatches
+
+/-- Unique stable identities make membership complete for declaration lookup. -/
+theorem ProgramEnvironment.declaration?_eq_some_of_mem_of_ids_nodup
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    (unique : (environment.declarations.map (·.id)).Nodup)
+    (member : declaration ∈ environment.declarations) :
+    environment.declaration? declaration.id = some declaration := by
+  exact find?_eq_some_of_mem_of_nodup_map ProgramDeclaration.id unique member
+
+/-- Successful construction makes stable-ID lookup complete for every
+retained declaration. -/
+theorem buildProgramEnvironment_success_declaration?_eq_some
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment)
+    (member : declaration ∈ environment.declarations) :
+    environment.declaration? declaration.id = some declaration := by
+  exact ProgramEnvironment.declaration?_eq_some_of_mem_of_ids_nodup
+    (buildProgramEnvironment_success_declarations_nodup success) member
+
+/-- In a successfully constructed catalog, stable-ID lookup is equivalent to
+declarative membership together with identity agreement. -/
+theorem buildProgramEnvironment_success_declaration?_eq_some_iff
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {id : Resolved.DeclarationId} {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    environment.declaration? id = some declaration ↔
+      declaration ∈ environment.declarations ∧ declaration.id = id := by
+  constructor
+  · exact ProgramEnvironment.declaration?_sound
+  · rintro ⟨member, rfl⟩
+    exact buildProgramEnvironment_success_declaration?_eq_some success member
+
+end Solcore.Frontend
+end
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramIdentity
+/-!
+Collision-free identities for compiler functions, traits, and implementations
+in the whole-program frontend.
+
+Source declarations and compiler-provided builtins inhabit disjoint variants.
+The one-way declaration coercions keep source catalog construction concise,
+while consumers that require source declarations must use `declaration?`
+explicitly.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+/-- Compiler-provided functions that do not have source declaration identities. -/
+inductive BuiltinFunctionId where
+  | integerSub
+  | wordFromInteger
+  | integerAdd
+  | integerEq
+  | integerLt
+  | integerMul
+  | wordToInteger
+  deriving Repr, BEq, DecidableEq
+
+namespace BuiltinFunctionId
+
+/-- Compiler functions implemented by the current frontend, in stable
+append-only introduction order.  Name lookup derives from this list so
+extending the identity type cannot silently leave a separate hand-written
+lookup chain stale. -/
+def all : List BuiltinFunctionId :=
+  [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt,
+    .integerMul, .wordToInteger]
+
+/-- Every compiler-function identity occurs in the lookup catalog. -/
+theorem all_complete (function : BuiltinFunctionId) : function ∈ all := by
+  cases function <;> simp [all]
+
+/-- The append-only compiler-function catalog contains no repeated identity. -/
+theorem all_nodup : all.Nodup := by
+  simp [all]
+
+end BuiltinFunctionId
+
+/-- Compiler-provided traits that do not have source declaration identities. -/
+inductive BuiltinTraitId where
+  | int
+  deriving Repr, BEq, DecidableEq
+
+/-- A trait identity from either the compiler or a resolved source declaration. -/
+inductive ProgramTraitId where
+  | builtin (id : BuiltinTraitId)
+  | declaration (id : Resolved.DeclarationId)
+  deriving Repr, BEq, DecidableEq
+
+instance : Coe Resolved.DeclarationId ProgramTraitId where
+  coe := .declaration
+
+namespace ProgramTraitId
+
+/-- Recover the source declaration identity when this is a source trait. -/
+def declaration? : ProgramTraitId → Option Resolved.DeclarationId
+  | .builtin _ => none
+  | .declaration id => some id
+
+end ProgramTraitId
+
+/-- Compiler-provided implementations that do not have source declarations. -/
+inductive BuiltinImplId where
+  | intInteger
+  | intWord
+  deriving Repr, BEq, DecidableEq
+
+/-- An implementation identity from either the compiler or source catalog. -/
+inductive ProgramImplId where
+  | builtin (id : BuiltinImplId)
+  | declaration (id : Resolved.DeclarationId)
+  deriving Repr, BEq, DecidableEq
+
+instance : Coe Resolved.DeclarationId ProgramImplId where
+  coe := .declaration
+
+namespace ProgramImplId
+
+/-- Recover the source declaration identity when this is a source impl. -/
+def declaration? : ProgramImplId → Option Resolved.DeclarationId
+  | .builtin _ => none
+  | .declaration id => some id
+
+end ProgramImplId
+
+end Solcore.Frontend
+end
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramModuleResolution
+/-!
+Canonical module-path resolution shared by imports and re-exports.
+
+Unmarked paths are relative to the importing module's directory.  A leading
+`lib` on a multi-component path starts at the current library root; bare `lib`
+remains relative.  `std` selects the standard library, with the canonical
+local-relative fallback only for a multi-component path whose standard module
+does not exist.  An externally marked path selects the named external library.
+Resolution is purely over the already validated whole-program module set.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+/-- Exact source spelling components of a parsed module path. -/
+def programModulePathComponents (path : Syntax.ModulePath) : List String :=
+  path.value.components.toList.map (·.value)
+
+/-- Exact source spelling components of a parsed export module reference. -/
+def programExportPathComponents (path : Syntax.QualifiedName) : List String :=
+  path.value.components.toList.map (·.value)
+
+private def modulePathComponents (moduleId : Workspace.ModuleId) : List String :=
+  moduleId.path.segments.map (·.text)
+
+private def moduleDirectory (moduleId : Workspace.ModuleId) : List String :=
+  (modulePathComponents moduleId).dropLast
+
+private def moduleWithIdentity?
+    (environment : ProgramEnvironment) (library : Workspace.LibraryId)
+    (components : List String) : Option Workspace.ModuleId :=
+  (environment.modules.find? fun module =>
+    decide (module.id.library = library) &&
+      modulePathComponents module.id == components).map (·.id)
+
+private def externalLibraryNamed?
+    (environment : ProgramEnvironment) (name : String) :
+    Option Workspace.LibraryId :=
+  (environment.modules.findSome? fun module =>
+    match module.id.library with
+    | .external external =>
+        if external.render == name then some module.id.library else none
+    | _ => none)
+
+/-- Resolve a source module path to one loaded canonical module identity.
+
+`external = true` means the first component names an external library.  The
+remaining cases follow the canonical relative / `lib` / `std` path policy.
+-/
+def resolveProgramModuleComponents?
+    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (external : Bool) (components : List String) : Option Workspace.ModuleId :=
+  if external then
+    match components with
+    | [] => none
+    | libraryName :: rest => do
+        let library ← externalLibraryNamed? environment libraryName
+        let logicalPath := if rest.isEmpty then [libraryName] else rest
+        moduleWithIdentity? environment library logicalPath
+  else
+    match components with
+    | "std" :: rest =>
+        let standardPath := if rest.isEmpty then ["std"] else rest
+        match moduleWithIdentity? environment .standard standardPath with
+        | some target => some target
+        | none =>
+            if rest.isEmpty then none
+            else
+              moduleWithIdentity? environment owner.library
+                (moduleDirectory owner ++ components)
+    | "lib" :: rest =>
+        if rest.isEmpty then
+          moduleWithIdentity? environment owner.library
+            (moduleDirectory owner ++ components)
+        else
+          moduleWithIdentity? environment owner.library rest
+    | _ =>
+        moduleWithIdentity? environment owner.library
+          (moduleDirectory owner ++ components)
+
+/-- Resolve a canonical import declaration's module path. -/
+def resolveProgramModulePath?
+    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (path : Syntax.ModulePath) : Option Workspace.ModuleId :=
+  resolveProgramModuleComponents? environment owner
+    path.value.externalMarker.isSome (programModulePathComponents path)
+
+/-- Resolve an export-side module reference in the owner's library policy. -/
+def resolveProgramExportPath?
+    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (path : Syntax.QualifiedName) : Option Workspace.ModuleId :=
+  resolveProgramModuleComponents? environment owner false
+    (programExportPathComponents path)
+
+end Solcore.Frontend
+end
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramInterfaces
 /-!
 Executable public module interfaces for the initial whole-program profile.
 
@@ -645,3 +1450,149 @@ def buildProgramInterfaces (environment : ProgramEnvironment) :
       if errors.isEmpty then .ok interfaces else .error errors
 
 end Solcore.Frontend
+end
+
+section
+-- leanmerge: from Solcore.Frontend.ProgramLoading
+/-! Validation and parsing at the executable whole-program boundary. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+/-- One validated workspace together with every diagnostic-free parsed source. -/
+structure LoadedProgram where
+  workspace : Workspace.ValidatedUserWorkspace
+  sources : List Syntax.ParsedFile
+  environment : ProgramEnvironment
+  deriving Repr
+
+/-- Failures before source type checking begins. -/
+inductive ProgramLoadError where
+  | workspace (error : Workspace.ValidationError)
+  | syntaxInvariant
+      (source : Workspace.SourceId)
+      (error : Syntax.SyntaxInvariantError)
+  | sourceDiagnostics
+      (source : Workspace.SourceId)
+      (lexical : List Syntax.LexicalDiagnostic)
+      (parsing : List Syntax.ParseDiagnostic)
+  | uncheckedBlock
+      (source : Workspace.SourceId)
+      (error : Syntax.Unchecked.Error)
+  | environment (error : ProgramEnvironmentError)
+  deriving Repr
+
+/-- Convert a canonical workspace library into its parser-visible owner. -/
+def syntaxOriginOfWorkspaceLibrary :
+    Workspace.LibraryId → Syntax.SourceOrigin
+  | .main => .main
+  | .standard => .standard
+  | .external name => .external name.render
+
+/-- Preserve a validated identity at the parser boundary. -/
+def syntaxSourceIdOfWorkspaceSource
+    (source : Workspace.SourceId) : Syntax.SourceId := {
+  origin := syntaxOriginOfWorkspaceLibrary source.library
+  path := source.path.render
+}
+
+/-- Present a validated source to the canonical parser. -/
+def syntaxSourceFileOfWorkspaceFile
+    (file : Workspace.WorkspaceFile) : Syntax.SourceFile := {
+  id := syntaxSourceIdOfWorkspaceSource file.id
+  content := file.content
+}
+
+private def parseWorkspaceFile
+    (file : Workspace.WorkspaceFile) :
+    Except ProgramLoadError Syntax.ParsedFile :=
+  let source := syntaxSourceFileOfWorkspaceFile file
+  match Syntax.Unchecked.prepare source with
+  | .error error => .error (.uncheckedBlock file.id error)
+  | .ok (blanked, blocks) =>
+  match Syntax.Parser.parse blanked with
+  | .error error => .error (.syntaxInvariant file.id error)
+  | .ok output =>
+      if output.lexicalDiagnostics.isEmpty &&
+          output.parseDiagnostics.isEmpty then
+        (Syntax.Unchecked.mark (4 * source.content.utf8ByteSize + 4) blocks output.parsed).mapError
+          (.uncheckedBlock file.id)
+      else
+        .error (.sourceDiagnostics file.id output.lexicalDiagnostics
+          output.parseDiagnostics)
+
+private def parseWorkspaceFiles :
+    List Workspace.WorkspaceFile →
+      List ProgramLoadError × List Syntax.ParsedFile
+  | [] => ([], [])
+  | file :: rest =>
+      let (restErrors, restSources) := parseWorkspaceFiles rest
+      match parseWorkspaceFile file with
+      | .ok source => (restErrors, source :: restSources)
+      | .error error => (error :: restErrors, restSources)
+
+/-- Parse and catalog an already validated workspace. -/
+def loadValidatedProgram
+    (workspace : Workspace.ValidatedUserWorkspace) :
+    Except (List ProgramLoadError) LoadedProgram :=
+  let (parseErrors, sources) := parseWorkspaceFiles workspace.files
+  if parseErrors.isEmpty then
+    match buildProgramEnvironment sources with
+    | .ok environment => .ok { workspace, sources, environment }
+    | .error errors => .error (errors.map ProgramLoadError.environment)
+  else
+    .error parseErrors
+
+/-- Validate, parse and catalog one complete caller workspace. -/
+def loadProgram (raw : Workspace.RawWorkspace) :
+    Except (List ProgramLoadError) LoadedProgram :=
+  match Workspace.validate raw with
+  | .error errors => .error (errors.map ProgramLoadError.workspace)
+  | .ok workspace => loadValidatedProgram workspace
+
+/-- A successful validated-workspace load retains the exact declaration
+environment constructed from its parsed sources. -/
+theorem loadValidatedProgram_success_environment
+    {workspace : Workspace.ValidatedUserWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadValidatedProgram workspace = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment := by
+  cases parsed : parseWorkspaceFiles workspace.files with
+  | mk parseErrors sources =>
+      simp only [loadValidatedProgram, parsed] at success
+      by_cases noParseErrors : parseErrors.isEmpty
+      · simp only [noParseErrors, if_true] at success
+        cases environmentResult : buildProgramEnvironment sources with
+        | error errors => simp [environmentResult] at success
+        | ok environment =>
+            simp only [environmentResult, Except.ok.injEq] at success
+            subst loaded
+            exact environmentResult
+      · simp [noParseErrors] at success
+
+/-- A successful raw-workspace load likewise exposes the exact environment
+builder success retained in the loaded carrier. -/
+theorem loadProgram_success_environment
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment := by
+  cases validationResult : Workspace.validate raw with
+  | error errors => simp [loadProgram, validationResult] at success
+  | ok workspace =>
+      apply loadValidatedProgram_success_environment
+      simpa [loadProgram, validationResult] using success
+
+/-- Loaded declaration identities are unique because every successful raw
+load is backed by a successful environment construction. -/
+theorem loadProgram_success_declarations_nodup
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    (loaded.environment.declarations.map (·.id)).Nodup :=
+  buildProgramEnvironment_success_declarations_nodup
+    (loadProgram_success_environment success)
+
+end Solcore.Frontend
+end

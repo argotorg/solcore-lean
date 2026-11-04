@@ -1,6 +1,13 @@
 import Solcore.Frontend.ProgramInterfaces
 
 /-!
+# Program imports
+
+Import visibility over explicit public interfaces. Main declarations: `ProgramImports`,
+`buildProgramImports`, `ProgramImportError`.
+-/
+
+/-!
 Import visibility over explicit whole-program public interfaces.
 
 The target module is resolved canonically, while item imports read only its

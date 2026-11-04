@@ -1,8 +1,276 @@
+import Solcore.Frontend.SourceCore.Internal.Entries
+import Solcore.Frontend.Internal.RuntimeValues
 import Solcore.Frontend.SourceCoreCompiler
+import Solcore.Frontend.ProgramInterfaces
+import Solcore.Abi.StaticWord
 import Solcore.Frontend.SourceCoreIndexedSession
-import Solcore.Frontend.SourceCoreRootDiscovery
-import Solcore.Frontend.SourceCoreHeapInput
 
+/-!
+# Compilation and sessions
+
+One source-facing boundary for compilation, values and sessions, with root discovery. Main
+declarations: `SourceCoreExecution.compile`, `SourceCoreExecution.compileChecked`,
+`SourceCoreExecution.compileEntry`, `SourceCoreExecution.compileStaticWord`,
+`SourceCoreExecution.Compiled`, `SourceCoreExecution.Artifact`, `SourceCoreExecution.Session`,
+`SourceCoreExecution.Checkpoint`, `SourceCoreExecution.Outcome`. Main theorems:
+`SourceCoreExecution.compile_checked_source`, `SourceCoreExecution.compileEntry_checked_source`,
+`SourceCoreExecution.compileStaticWord_checked_source`,
+`SourceCoreExecution.Compiled.plan_validated`.
+-/
+
+section
+-- leanmerge: from Solcore.Frontend.SourceCoreHeapInput
+/-! Data and uninitialized cells for an inert initial heap. Callable cells from
+an existing execution use an authenticated snapshot export. Conversion is pure
+and retains raw nominal metadata and ordered mapping entries. -/
+set_option autoImplicit false
+namespace Solcore.Frontend.SourceCoreHeapInput
+
+structure Cell where
+  type : TypeSystem.Ty
+  value : Option SourceCorePublicValues.Value
+  deriving Repr
+
+inductive PathElement where
+  | cell (index : Nat)
+  | left | right
+  | payload (index : Nat)
+  | key (index : Nat)
+  | mapped (index : Nat)
+  deriving Repr, DecidableEq
+
+inductive ErrorCode where
+  | conversionFuelExhausted
+  | callableRequiresSnapshot
+  | validationRejected (fuel : Nat)
+  | emptyArtifactHeap (size : Nat)
+  deriving Repr, DecidableEq
+
+structure Error where
+  path : List PathElement := []
+  code : ErrorCode
+  deriving Repr, DecidableEq
+
+private def prependPath (element : PathElement) (error : Error) : Error :=
+  {error with path := element :: error.path}
+
+private def convertValue : Nat → SourceCorePublicValues.Value → Except Error SourceTypedRuntime.Value
+  | 0, _ => .error ⟨[], .conversionFuelExhausted⟩
+  | fuel + 1, value => do
+      match value with
+      | .unit => pure .unit
+      | .bool value => pure (.bool value)
+      | .word value => pure (.word value)
+      | .integer value => pure (.integer value)
+      | .proxy type => pure (.proxy type)
+      | .product left right =>
+          let left ← (convertValue fuel left).mapError (prependPath .left)
+          let right ← (convertValue fuel right).mapError (prependPath .right)
+          pure (.product left right)
+      | .constructed instantiation payloads =>
+          let payloads ← payloads.zipIdx.mapM fun (value, index) =>
+            (convertValue fuel value).mapError (prependPath (.payload index))
+          pure (.constructed instantiation payloads)
+      | .mapping keyType valueType entries =>
+          let entries ← entries.zipIdx.mapM fun ((key, value), index) => do
+            let key ← (convertValue fuel key).mapError (prependPath (.key index))
+            let value ← (convertValue fuel value).mapError (prependPath (.mapped index))
+            pure (key, value)
+          pure (.mapping keyType valueType entries)
+      | .function _ => throw ⟨[], .callableRequiresSnapshot⟩
+
+namespace Internal
+/-- Used only by the validating prefix adapter. It adds no runtime behavior. -/
+def convert (cells : List Cell) (fuel : Nat) : Except Error SourceTypedRuntime.RuntimeState := do
+  let cells ← cells.zipIdx.mapM fun (cell, index) => do
+    let value ← match cell.value with
+      | none => pure none
+      | some value => (convertValue fuel value).map some |>.mapError (prependPath (.cell index))
+    pure (⟨cell.type, value⟩ : SourceTypedRuntime.Cell)
+  pure ⟨cells⟩
+end Internal
+end Solcore.Frontend.SourceCoreHeapInput
+end
+
+section
+-- leanmerge: from Solcore.Frontend.SourceCoreRootDiscovery
+/-! Entry and Static Word root discovery, independent of runtime selection.
+All roots subsequently enter the same cached Core compiler and ownership
+session. Loading and checking the conventional entry happens once. -/
+set_option autoImplicit false
+namespace Solcore.Frontend.SourceCoreRootDiscovery
+open TypeSystem
+abbrev Seed := SourceCoreCompiler.Seed
+
+structure CheckedEntry (raw : Workspace.RawWorkspace) (fuel : Nat) where private mk ::
+  program : CheckedProgram
+  moduleId : Workspace.ModuleId
+  private checked : checkProgram raw fuel = .ok program
+
+theorem CheckedEntry.source_checked {raw : Workspace.RawWorkspace} {fuel : Nat}
+    (entry : CheckedEntry raw fuel) : checkProgram raw fuel = .ok entry.program := entry.checked
+
+def checkEntry (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :
+    Except (List ProgramCheckError) (CheckedEntry raw fuel) :=
+  match loaded : loadProgram raw with
+  | .error errors => .error (errors.map ProgramCheckError.loading)
+  | .ok loadedProgram =>
+      match checked : checkLoadedProgram loadedProgram fuel with
+      | .error errors => .error errors
+      | .ok program => .ok ⟨program, loadedProgram.workspace.entry.toModuleId, by
+          simp only [checkProgram, loaded, checked]⟩
+
+def CheckedEntry.seed {raw : Workspace.RawWorkspace} {fuel : Nat} (entry : CheckedEntry raw fuel) : Seed :=
+  SourceCoreCompiler.Seed.named entry.moduleId "main"
+
+structure StaticWordRoot where
+  metadata : Abi.V1.MethodMetadata
+  seed : Seed
+
+/-- Exact discovery failures for the exported Static Word source profile. -/
+inductive StaticWordRootError where
+  | interfaces (errors : List ProgramInterfaceError)
+  | unknownEntryModule (moduleId : Workspace.ModuleId)
+  | invalidMethodName (name : String)
+  | missingSignature (declaration : Resolved.DeclarationId)
+  | duplicateSignatures
+      (declaration : Resolved.DeclarationId) (count : Nat)
+  | genericFunction
+      (declaration : Resolved.DeclarationId) (name : String) (arity : Nat)
+  | unsupportedParameters
+      (declaration : Resolved.DeclarationId) (name : String)
+      (types : List Ty) (comptime : List Bool)
+  | unsupportedResults
+      (declaration : Resolved.DeclarationId) (name : String)
+      (types : List Ty) (comptime : Bool)
+  | duplicateSignature
+      (firstName secondName : String) (signature : String)
+  | selectorCollision
+      (firstName secondName : String)
+      (firstSignature secondSignature : String)
+      (selector : Abi.V1.Selector)
+  | noRoots (moduleId : Workspace.ModuleId)
+  deriving Repr
+
+private def staticWordRootOfEntity (program : CheckedProgram)
+    (entity : ProgramPublicEntity) : Except StaticWordRootError StaticWordRoot := do
+  let methodName ← match Abi.V1.validateMethodName? entity.publicName with
+    | some name => pure name
+    | none => throw (.invalidMethodName entity.publicName)
+  let candidates := program.signatures.functions.filter fun signature =>
+    decide (signature.id = entity.declaration.id)
+  let signature ← match candidates with
+    | [signature] => pure signature
+    | [] => throw (.missingSignature entity.declaration.id)
+    | signatures =>
+        throw (.duplicateSignatures entity.declaration.id signatures.length)
+  unless signature.scheme.parameters.isEmpty do
+    throw (.genericFunction signature.id entity.publicName
+      signature.scheme.parameters.length)
+  match signature.parameters with
+  | [parameter] =>
+      unless parameter.type == .word && !parameter.comptime do
+        throw (.unsupportedParameters signature.id entity.publicName
+          signature.parameterTypes signature.parameterComptime)
+  | _ =>
+      throw (.unsupportedParameters signature.id entity.publicName
+        signature.parameterTypes signature.parameterComptime)
+  unless signature.returnTypes == [.word] && !signature.returnComptime do
+    throw (.unsupportedResults signature.id entity.publicName
+      signature.returnTypes signature.returnComptime)
+  pure {
+    metadata := Abi.V1.MethodMetadata.staticWord methodName
+    seed := SourceCoreCompiler.Seed.declaration signature.id
+  }
+
+private def staticWordRootsOfEntities (program : CheckedProgram) :
+    List ProgramPublicEntity → Except StaticWordRootError (List StaticWordRoot)
+  | [] => .ok []
+  | entity :: rest =>
+      if entity.declaration.kind == .function then do
+        let root ← staticWordRootOfEntity program entity
+        let roots ← staticWordRootsOfEntities program rest
+        pure (root :: roots)
+      else
+        staticWordRootsOfEntities program rest
+
+private structure IndexedStaticWordRoot where
+  root : StaticWordRoot
+  signature : String
+  selector : Abi.V1.Selector
+
+private def indexStaticWordRoot (root : StaticWordRoot) :
+    IndexedStaticWordRoot := {
+  root
+  signature := root.metadata.canonicalSignatureText
+  selector := root.metadata.selector
+}
+
+private def IndexedStaticWordRoot.signatureLE
+    (left right : IndexedStaticWordRoot) : Bool :=
+  (compare left.signature right.signature).isLE
+
+private def canonicalStaticWordRoots
+    (roots : List StaticWordRoot) : List IndexedStaticWordRoot :=
+  (roots.map indexStaticWordRoot).mergeSort IndexedStaticWordRoot.signatureLE
+
+private def firstDuplicateStaticWordSignature? :
+    List IndexedStaticWordRoot →
+      Option (IndexedStaticWordRoot × IndexedStaticWordRoot)
+  | [] => none
+  | first :: rest =>
+      match rest.find? fun later => later.signature == first.signature with
+      | some later => some (first, later)
+      | none => firstDuplicateStaticWordSignature? rest
+
+private def firstStaticWordSelectorCollision? :
+    List IndexedStaticWordRoot →
+      Option (IndexedStaticWordRoot × IndexedStaticWordRoot)
+  | [] => none
+  | first :: rest =>
+      match rest.find? fun later => later.selector == first.selector with
+      | some later => some (first, later)
+      | none => firstStaticWordSelectorCollision? rest
+
+private def validateStaticWordConflicts (roots : List StaticWordRoot) :
+    Except StaticWordRootError Unit :=
+  let indexed := canonicalStaticWordRoots roots
+  match firstDuplicateStaticWordSignature? indexed with
+  | some conflict =>
+      .error (.duplicateSignature
+        conflict.1.root.metadata.name.text
+        conflict.2.root.metadata.name.text conflict.1.signature)
+  | none =>
+      match firstStaticWordSelectorCollision? indexed with
+      | some conflict =>
+          .error (.selectorCollision
+            conflict.1.root.metadata.name.text
+            conflict.2.root.metadata.name.text
+            conflict.1.signature conflict.2.signature conflict.1.selector)
+      | none => .ok ()
+
+/-- Discover the complete exported Static Word root set of one checked entry
+module.  Unsupported exported functions are diagnosed rather than skipped. -/
+def discoverStaticWordRoots (program : CheckedProgram)
+    (entryModule : Workspace.ModuleId) :
+    Except StaticWordRootError (List StaticWordRoot) := do
+  let interfaces ← (buildProgramInterfaces program.environment).mapError
+    StaticWordRootError.interfaces
+  let interface ← match interfaces.interface? entryModule with
+    | some interface => pure interface
+    | none => throw (.unknownEntryModule entryModule)
+  let roots ← staticWordRootsOfEntities program interface.entities
+  if roots.isEmpty then
+    throw (.noRoots entryModule)
+  validateStaticWordConflicts roots
+  pure roots
+
+
+end Solcore.Frontend.SourceCoreRootDiscovery
+end
+
+section
+-- leanmerge: from Solcore.Frontend.SourceCoreExecution
 /-! A single source-facing compilation, value and session boundary. The
 indexed recipe is prepared once from the cached compiler artifact. Opening
 only mints ownership identities; execution uses the owned typed Core session.
@@ -1424,3 +1692,64 @@ theorem Checkpoint.ResumeChain.collapse {artifact : Artifact} {original : Checkp
   | more exhausted continued ih => exact exhausted.then_resume ih
 
 end Solcore.Frontend.SourceCoreExecution
+end
+
+section
+-- leanmerge: from Solcore.Frontend.SourceCoreFailurePreservationReceipts
+/-! Actual finite native failure determines the failed branch of the same
+public resume event. Failure requires no output decoding budget. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+theorem Checkpoint.ResumeAt.native_failed {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {native : Core.Value} {store : Core.Store} {reason : Core.Word}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (completed : checkpoint.NativeDone fuel native store)
+    (decoded : Core.LanguageResult.decode? native = some (.failed reason)) :
+    ∃ returned : Session artifact, outcome = .failed reason returned ∧
+      checkpoint.FailedResultAt fuel native store reason returned := by
+  unfold Checkpoint.NativeDone at completed
+  rcases receipt with ⟨generation, value, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨returned, failed, receipt⟩ := checkpoint.native_failed_result_receipt
+      (generation := generation) (boundaryFuel := boundaryFuel) completed decoded
+    exact ⟨returned, same.symm.trans failed, receipt⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+theorem Checkpoint.ResumeAt.native_failed {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    {value : Core.Value} {store : Core.Store} {reason : Core.Word}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (completed : indexed.NativeDone fuel value store)
+    (decoded : Core.LanguageResult.decode? value = some (.failed reason)) :
+    ∃ returned : Session artifact, outcome = .failed reason returned := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨actualOutcome, resumed, returned⟩ := receipt
+      obtain ⟨actual, failed, _receipt⟩ := resumed.native_failed completed decoded
+      rw [failed] at returned
+      cases outcome with
+      | failed publicReason publicSession =>
+          have reasonEq : reason = publicReason := (Outcome.failed.inj returned).1
+          exact ⟨publicSession, by rw [reasonEq]⟩
+      | succeeded completion => cases returned
+      | outOfFuel checkpoint => cases returned
+      | exportError error session => cases returned
+
+end Solcore.Frontend.SourceCoreExecution
+end

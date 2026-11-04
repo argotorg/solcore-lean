@@ -1,5 +1,12 @@
 import Solcore.Frontend.SourceInference.Expression
 
+/-!
+# Whole-program inference
+
+Public expression, body and whole-program entry points of inference. Main declarations:
+`SourceInference.checkFunctionBody`, `SourceInference.Detail.finalize`.
+-/
+
 /-! Public expression, body, and whole-program source-checking entry points. -/
 
 set_option autoImplicit false

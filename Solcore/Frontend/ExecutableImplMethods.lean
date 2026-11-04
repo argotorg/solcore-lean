@@ -2,6 +2,13 @@ import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.SourceSpecialization
 
 /-!
+# Executable implementation methods
+
+Checked source bodies of implementation methods, between checking and specialization. Main
+declaration: `ExecutableImplMethods.CheckedMethod`.
+-/
+
+/-!
 Checked source bodies for the first executable implementation-method profile.
 
 This boundary accepts explicitly sized implementation evidence together with

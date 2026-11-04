@@ -1,9 +1,18 @@
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.SourceSpecialization
-import Solcore.Frontend.SourceStagedValue
+import Solcore.Frontend.SourceStageAnalysis
 import Solcore.Frontend.WordLiteral
 import Solcore.Core.Primitive
 import Solcore.Resolved.Typing
+
+/-!
+# Elaboration to Core
+
+The bridge from occurrence-addressed typed source to Core: literal evidence, closed types and the
+elaboration errors. Main declarations: `SourceCoreElaboration.Error`,
+`SourceCoreElaboration.ErrorSite`, `SourceCoreElaboration.WordIntegerLiteral`,
+`SourceCoreElaboration.NativeIntegerLiteral`.
+-/
 
 /-!
 The first executable bridge from occurrence-addressed typed source to Semantic

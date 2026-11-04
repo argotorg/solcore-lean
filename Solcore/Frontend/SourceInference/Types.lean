@@ -1,8 +1,16 @@
-import Solcore.Frontend.ProgramLoading
+import Solcore.Frontend.ProgramInterfaces
 import Solcore.Frontend.ProgramSignatureFormation
 import Solcore.Frontend.SourceInference.TypedIR
-import Solcore.Frontend.TypedTraitResolution
+import Solcore.Frontend.TraitResolution
 import Solcore.TypeSystem.Inference
+
+/-!
+# Inference state
+
+Shared data and solver boundaries of inference. Main declarations: `SourceInference.State`,
+`SourceInference.Context`, `SourceInference.CheckedFunction`, `SourceInference.SolvedRequirement`,
+`SourceInference.Error`.
+-/
 
 /-! Shared data and solver boundaries for source-connected inference. -/
 

@@ -1,5 +1,12 @@
-import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
-import Solcore.Frontend.SourceProgramExecution
+import Solcore.Frontend.SourceCoreUnified
+import Solcore.Frontend.SourceCore.Internal.DirectLinking
+
+/-!
+# Core compiler
+
+One compiler entry for an ordered root set. Main declarations: `SourceCoreCompiler.Compiled`,
+`SourceCoreCompiler.Error`, `SourceCoreCompiler.Options`.
+-/
 
 /-! One compiler entry for an ordered source root set. Every root shares the
 actual cached compatible/indexed Core program. The options select finite

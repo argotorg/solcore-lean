@@ -1,5 +1,12 @@
 import Solcore.Frontend.SourceInference.Types
 
+/-!
+# Inference resolution policy
+
+Operator, overload and trait selection used by inference. Main declarations:
+`SourceInference.Detail.withExpected`, `SourceInference.Detail.OperatorDispatch`.
+-/
+
 /-! Operator, overload, and trait selection used by source inference. -/
 
 set_option autoImplicit false

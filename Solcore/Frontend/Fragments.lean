@@ -16,7 +16,6 @@ import Solcore.Frontend.Fragments.Internal.Computation
 import Solcore.Frontend.Fragments.Internal.RuntimeParameters
 import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Frontend.Fragments.Internal.LocalApplication
-import Solcore.Frontend.NumericDigits
 import Solcore.Frontend.WordLiteral
 import Solcore.Frontend.Fragments.Internal.ExpectedLambdas
 

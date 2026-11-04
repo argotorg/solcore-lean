@@ -1,8 +1,40 @@
+import Solcore.Resolved.Identity
 import Solcore.Frontend.ProgramSignatures
-import Solcore.Frontend.SourceInference.Identity
-import Solcore.Frontend.TypedTraitResolution
+import Solcore.Frontend.TraitResolution
 import Solcore.Syntax.Term
 
+/-!
+# Typed source
+
+The occurrence-addressed typed source that inference produces, with no reference to the traversal.
+Main declarations: `SourceInference.ExpressionId`, `SourceInference.TypedBinder`,
+`SourceInference.ExpressionNode`, `SourceInference.ExpressionForm`, `SourceInference.TypedSource`.
+-/
+
+section
+-- leanmerge: from Solcore.Frontend.SourceInference.Identity
+/-! Stable identities allocated by source-connected inference. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend.SourceInference
+
+/-- Function-local identity of one inferred trait or coercion obligation. -/
+structure RequirementId where
+  index : Nat
+  deriving Repr, BEq, DecidableEq
+
+/-- Identity of one source occurrence, scoped to its owning declaration. -/
+structure OccurrenceId where
+  owner : Resolved.DeclarationId
+  index : Nat
+  deriving Repr, BEq, DecidableEq
+
+end Solcore.Frontend.SourceInference
+end
+
+section
+-- leanmerge: from Solcore.Frontend.SourceInference.TypedIR
 /-!
 Occurrence-addressed typed source carrier.
 
@@ -1138,3 +1170,4 @@ open TypeSystem
       instantiation.parameterSubstitution.map Prod.fst := by
   simp [applySubstitution, applyFinalToParameters, List.map_map, Function.comp_def]
 end Solcore.Frontend.SourceInference.DeclarationInstantiation
+end

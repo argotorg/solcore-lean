@@ -2,6 +2,13 @@ import Solcore.Frontend.ProgramImports
 import Solcore.TypeSystem.Substitution
 
 /-!
+# Program type resolution
+
+Resolution of source type expressions in a whole program. Main declarations: `ProgramTypeScope`,
+`validateProgramTypeScope`, `ProgramTypeResolutionError`.
+-/
+
+/-!
 Executable whole-program resolution of canonical source type expressions.
 
 Unqualified names prefer a generic parameter, then the legacy builtins, then

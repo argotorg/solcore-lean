@@ -1,8 +1,14 @@
 import Solcore.Frontend.ProgramTypeResolution
-import Solcore.Frontend.ProgramIdentity
+import Solcore.Frontend.ProgramInterfaces
 import Solcore.Frontend.TraitResolution
-import Solcore.Frontend.TypedTraitResolution
 import Solcore.TypeSystem.Scheme
+
+/-!
+# Program signatures
+
+Source-connected function signatures and implementation rules, before any body is inferred. Main
+declarations: `ProgramFunctionSignature`, `ProgramPredicate`, `ProgramSignatures`.
+-/
 
 /-!
 Source-connected function signatures and implementation rules.

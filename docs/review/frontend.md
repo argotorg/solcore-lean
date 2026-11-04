@@ -74,7 +74,7 @@ Everything else is proof machinery in the `Internal/` directories.
 | [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | `SourceInference.Detail.withExpected`, `SourceInference.Detail.OperatorDispatch` |
 | [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | `SourceInference.Detail.inferExprFuel`, `SourceInference.Detail.inferStatementFuel`, `SourceInference.Detail.inferStatementsFuel` |
 | [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `SourceInference.checkFunctionBody`, `SourceInference.Detail.finalize` |
-| [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError`, `ExecutableImplMethods.CheckedMethod` |
+| [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError` |
 
 ### Staging and specialization
 
@@ -83,6 +83,7 @@ Everything else is proof machinery in the `Internal/` directories.
 | [`SourceStageAnalysis`](../../Solcore/Frontend/SourceStageAnalysis.lean) | `SourceStageAnalysis.Analysis`, `SourceStageAnalysis.Stage`, `SourceStageAnalysis.analyzeFunction`, `SourceStagedValue.Value` |
 | [`SourceSpecialization`](../../Solcore/Frontend/SourceSpecialization.lean) | `SourceSpecialization.SpecializationKey`, `SourceSpecialization.SpecializedFunction` |
 | [`SourceSpecializationWorklist`](../../Solcore/Frontend/SourceSpecializationWorklist.lean) | `SourceSpecializationWorklist.run`, `SourceSpecializationWorklist.Plan`, `SourceSpecializationWorklist.Request` |
+| [`ExecutableImplMethods`](../../Solcore/Frontend/ExecutableImplMethods.lean) | `ExecutableImplMethods.CheckedMethod` |
 | [`SourceCompilationPlan`](../../Solcore/Frontend/SourceCompilationPlan.lean) | `SourceCompilationPlan.Key`, `SourceCompilationPlan.Error`, `SourceCompilationPlan.exactSpecialization`, `SourceCompilationPlan.exactInstantiationKey` |
 
 ### Lowering
@@ -93,14 +94,17 @@ files read in dependency order.
 | File | Main declarations |
 | --- | --- |
 | [`SourceCoreElaboration`](../../Solcore/Frontend/SourceCoreElaboration.lean) | `SourceCoreElaboration.Error`, `SourceCoreElaboration.ErrorSite`, `SourceCoreElaboration.WordIntegerLiteral`, `SourceCoreElaboration.NativeIntegerLiteral` |
-| `SourceCore/Lowering` | `SourceCoreLocalCell.Scope`, `SourceCoreBasic.LoweredExpr`, `SourceCoreCalls.Signature`, `SourceCoreFunctions.Context` |
-| `SourceCore/Data` | `SourceCoreDataCatalog.Catalog`, `SourceCoreDataCatalog.Error`, `SourceCoreGeneralTypes` |
-| `SourceCore/DataPlaces` | `SourceCoreDataPlaces.Error`, `SourceCoreDataPlaces.declaredBinders`, `SourceCoreDataPlaces.rootBinder` |
-| `SourceCore/GeneralFunctions` | `SourceCoreGeneralFunctions.Function`, `SourceCoreGeneralFunctions.CallableContext`, `SourceCoreLocalPolymorphism.Binding`, `SourceCoreStageContracts.Sidecar` |
-| `SourceCore/CompatibleCatalog` | `SourceCoreRawMetadata.Registry`, `SourceCoreCompatibleCatalog.Checked` |
-| `SourceCore/Compatible` | `SourceCoreCompatibleValues.Context`, `SourceCoreCompatibleDataExpressions`, `SourceCoreCompatibleDataPlaces` |
-| `SourceCore/CompatibleFunctions` | `SourceCoreCompatibleFunctions`, `SourceCoreCompatibleInputs`, `SourceCoreCompatibleDataMatches` |
-| [`SourceCoreCompiler`](../../Solcore/Frontend/SourceCoreCompiler.lean) | `SourceCoreCompiler.Compiled`, `SourceCoreCompiler.Error`, `SourceCoreUnifiedCompilation.Compiled` |
+| [`SourceCore/Lowering`](../../Solcore/Frontend/SourceCore/Lowering.lean) | `SourceCoreLocalCell.Scope`, `SourceCoreBasic.LoweredExpr`, `SourceCoreCalls.Signature`, `SourceCoreFunctions.Context` |
+| [`SourceCore/Data`](../../Solcore/Frontend/SourceCore/Data.lean) | `SourceCoreDataCatalog.Catalog`, `SourceCoreDataCatalog.Error` |
+| [`SourceCore/DataExpressions`](../../Solcore/Frontend/SourceCore/DataExpressions.lean) | `SourceCoreDataExpressions`, `SourceCoreGeneralTypes` |
+| [`SourceCore/DataPlaces`](../../Solcore/Frontend/SourceCore/DataPlaces.lean) | `SourceCoreDataPlaces.Error`, `SourceCoreDataPlaces.declaredBinders`, `SourceCoreDataPlaces.rootBinder` |
+| [`SourceCore/GeneralFunctions`](../../Solcore/Frontend/SourceCore/GeneralFunctions.lean) | `SourceCoreGeneralFunctions.Function`, `SourceCoreGeneralFunctions.CallableContext`, `SourceCoreLocalPolymorphism.Binding`, `SourceCoreStageContracts.Sidecar` |
+| [`SourceCore/RawMetadata`](../../Solcore/Frontend/SourceCore/RawMetadata.lean) | `SourceCoreRawMetadata.Registry`, `SourceCoreRawMetadata.Extends` |
+| [`SourceCore/CompatibleCatalog`](../../Solcore/Frontend/SourceCore/CompatibleCatalog.lean) | `SourceCoreCompatibleCatalog.Checked`. This file stays below the value encoder: `Solcore/Test/SourceCoreCompatiblePayload.lean` asserts that |
+| [`SourceCore/Compatible`](../../Solcore/Frontend/SourceCore/Compatible.lean) | `SourceCoreCompatibleValues.Context`, `SourceCoreCompatibleDataExpressions`, `SourceCoreCompatibleDataPlaces` |
+| [`SourceCore/CompatibleFunctions`](../../Solcore/Frontend/SourceCore/CompatibleFunctions.lean) | `SourceCoreCompatibleFunctions`, `SourceCoreCompatibleInputs`, `SourceCoreCompatibleDataMatches` |
+| [`SourceCoreUnified`](../../Solcore/Frontend/SourceCoreUnified.lean) | `SourceCoreUnifiedCompilation.Compiled` |
+| [`SourceCoreCompiler`](../../Solcore/Frontend/SourceCoreCompiler.lean) | `SourceCoreCompiler.Compiled`, `SourceCoreCompiler.Error`, `SourceCoreCompiler.Options` |
 | [`SourceCoreIndexedSession`](../../Solcore/Frontend/SourceCoreIndexedSession.lean) | `SourceCoreIndexedSession.Recipe`, `SourceCoreIndexedSession.Artifact`, `SourceCoreIndexedSession.Session`, `SourceCoreIndexedSession.Checkpoint` |
 | [`SourceCoreLegacyHeapImport`](../../Solcore/Frontend/SourceCoreLegacyHeapImport.lean) |  |
 
@@ -114,7 +118,7 @@ states what a successful compilation retains, in the namespace `Solcore.Frontend
 | Compilation keeps the checked source | `SourceCoreExecution.compile_checked_source`, `SourceCoreExecution.compileEntry_checked_source`, `SourceCoreExecution.compileStaticWord_checked_source` | [`SourceCoreExecution`](../../Solcore/Frontend/SourceCoreExecution.lean) |
 | The plan is validated | `SourceCoreExecution.Compiled.plan_validated` | [`SourceCoreExecution`](../../Solcore/Frontend/SourceCoreExecution.lean) |
 | Sessions stay indexed | `SourceCoreExecution.Bootstrap.ready_indexed`, `SourceCoreExecution.Session.start_indexed` | [`SourceCoreExecution`](../../Solcore/Frontend/SourceCoreExecution.lean) |
-| The runtime adapter agrees with its specialization | `SourceCoreUnifiedPreparationCertificates.run_done_specialization`, `SourceCoreUnifiedPreparationCertificates.run_resume_done_specialization` | [`SourceCoreCompiler`](../../Solcore/Frontend/SourceCoreCompiler.lean) |
+| The runtime adapter agrees with its specialization | `SourceCoreUnifiedPreparationCertificates.run_done_specialization`, `SourceCoreUnifiedPreparationCertificates.run_resume_done_specialization` | [`SourceCoreUnified`](../../Solcore/Frontend/SourceCoreUnified.lean) |
 | What checking guarantees | `checkProgram_success_method_body`, `checkProgram_success_signature_formation`, `checkProgram_success_declarations_nodup` | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) |
 | Checking does not depend on the fuel | `checkProgram_success_unique_fuel` | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) |
 
@@ -124,46 +128,49 @@ Checking and specialization, in `Internal/`:
 
 | File | Topic |
 | --- | --- |
-| `Internal/CheckingProperties` | What successful signature collection, signature formation and trait resolution guarantee. |
-| `Internal/RuntimeValidation` | Source heap typing, deep validation of values and heaps, and static lookup provenance. |
-| `Internal/RuntimeValues` | Source values and heap observations shared by compiler adapters, and bounded input validation. |
-| `Internal/SpecializationProperties` | What successful specialization retains, for the source semantics. |
+| [`Internal/CheckingProperties`](../../Solcore/Frontend/Internal/CheckingProperties.lean) | What successful signature formation and trait resolution guarantee. |
+| [`Internal/RuntimeValidation`](../../Solcore/Frontend/Internal/RuntimeValidation.lean) | Source heap typing, deep validation of values and heaps, and static lookup provenance. |
+| [`Internal/RuntimeValues`](../../Solcore/Frontend/Internal/RuntimeValues.lean) | Source values and heap observations shared by compiler adapters, and bounded input validation. |
+| [`Internal/SignatureProperties`](../../Solcore/Frontend/Internal/SignatureProperties.lean) | What successful signature collection guarantees. Its `@[simp]` lemmas, such as `ProgramFunctionSignature.parameterTypes_length`, rewrite terms that proofs in `SourceInference/Internal/ExpressionProperties` rely on, so this file stays out of their reach. |
+| [`Internal/SpecializationProperties`](../../Solcore/Frontend/Internal/SpecializationProperties.lean) | What successful specialization retains, for the source semantics. |
 
 Inference proofs, in `SourceInference/Internal/`. `ExpressionProperties` is one file of 15,543 lines
 at the base, and stays one file.
 
 | File | Topic |
 | --- | --- |
-| `SourceInference/Internal/ClassifiedCalls` | Classified templates are actual declaration-call requirements, and the selected coercion plan trait. |
-| `SourceInference/Internal/Continuations` | Statement, match and `for` positions keep their inference calls and continuations. |
-| `SourceInference/Internal/DirectCallOrigins` | Each direct-call requirement has an actual declaration-call emitter. |
-| `SourceInference/Internal/DirectCallPredicates` | Direct-call requirements keep their raw ledger row, their catalog declaration and their exact predicate. |
-| `SourceInference/Internal/ExpressionProperties` | Declaration-scoped state preservation for the inference traversals. |
-| `SourceInference/Internal/LocalGeneralization` | Initialized bindings keep the inference action that generalized them, and its boundaries. |
-| `SourceInference/Internal/LocalGeneralizationBounds` | The bounded event traversal of local generalization. |
-| `SourceInference/Internal/LocalReadOrigins` | Local references keep the lookup that issued their requirements, and direct-call classification follows the inference steps. |
-| `SourceInference/Internal/LocalReadScopes` | Inference cannot create a reference to a retired local, and local requirements reach their initializer in time. |
-| `SourceInference/Internal/NodeGraph` | Graph facts of the inference node table, and agreement of inference results across fuel. |
-| `SourceInference/Internal/OccurrenceProperties` | Occurrence allocation is monotone through inference. |
-| `SourceInference/Internal/ProgramProperties` | Success projections of source-inference finalization. |
-| `SourceInference/Internal/RequirementProperties` | Preservation laws for function-local obligation identities. |
-| `SourceInference/Internal/StateProperties` | Allocation and lexical restoration of the typed state, and final substitution over typed source. |
+| [`SourceInference/Internal/Continuations`](../../Solcore/Frontend/SourceInference/Internal/Continuations.lean) | Statement, match and `for` positions keep their inference calls and continuations. |
+| [`SourceInference/Internal/DirectCallInference`](../../Solcore/Frontend/SourceInference/Internal/DirectCallInference.lean) | The inference traversals that establish those invariants. They stay apart from `DirectCallOrigins`, because each side has a private `exceptPure_eq_ok` with its own proof. |
+| [`SourceInference/Internal/DirectCallOrigins`](../../Solcore/Frontend/SourceInference/Internal/DirectCallOrigins.lean) | Each direct-call requirement has an actual declaration-call emitter, and classified templates are a subset of those calls. These are the progress invariants. |
+| [`SourceInference/Internal/DirectCallPredicates`](../../Solcore/Frontend/SourceInference/Internal/DirectCallPredicates.lean) | Direct-call requirements keep their raw ledger row, their catalog declaration and their exact predicate. |
+| [`SourceInference/Internal/ExpressionProperties`](../../Solcore/Frontend/SourceInference/Internal/ExpressionProperties.lean) | Declaration-scoped state preservation for the inference traversals. |
+| [`SourceInference/Internal/LocalGeneralization`](../../Solcore/Frontend/SourceInference/Internal/LocalGeneralization.lean) | Initialized bindings keep the inference action that generalized them, and its boundaries. |
+| [`SourceInference/Internal/LocalGeneralizationBounds`](../../Solcore/Frontend/SourceInference/Internal/LocalGeneralizationBounds.lean) | The bounded event traversal of local generalization. |
+| [`SourceInference/Internal/LocalReadOrigins`](../../Solcore/Frontend/SourceInference/Internal/LocalReadOrigins.lean) | Local references keep the lookup that issued their requirements, and direct-call classification follows the inference steps. |
+| [`SourceInference/Internal/LocalReadScopes`](../../Solcore/Frontend/SourceInference/Internal/LocalReadScopes.lean) | Inference cannot create a reference to a retired local, and local requirements reach their initializer in time. |
+| [`SourceInference/Internal/NodeGraph`](../../Solcore/Frontend/SourceInference/Internal/NodeGraph.lean) | Graph facts of the inference node table, and agreement of inference results across fuel. |
+| [`SourceInference/Internal/OccurrenceProperties`](../../Solcore/Frontend/SourceInference/Internal/OccurrenceProperties.lean) | Occurrence allocation is monotone through inference. |
+| [`SourceInference/Internal/ProgramProperties`](../../Solcore/Frontend/SourceInference/Internal/ProgramProperties.lean) | Success projections of source-inference finalization. |
+| [`SourceInference/Internal/RequirementProperties`](../../Solcore/Frontend/SourceInference/Internal/RequirementProperties.lean) | Preservation laws for function-local obligation identities. |
+| [`SourceInference/Internal/SelectedCoercionPlanTrait`](../../Solcore/Frontend/SourceInference/Internal/SelectedCoercionPlanTrait.lean) | The trait of a selected coercion plan, for the source semantics. |
+| [`SourceInference/Internal/StateProperties`](../../Solcore/Frontend/SourceInference/Internal/StateProperties.lean) | Allocation and lexical restoration of the typed state. Its many `@[simp]` lemmas are why this file stays narrow. |
+| [`SourceInference/Internal/TypedIRProperties`](../../Solcore/Frontend/SourceInference/Internal/TypedIRProperties.lean) | Identity preservation of final substitution over typed source. |
 
 Lowering machinery, in `SourceCore/Internal/`:
 
 | File | Topic |
 | --- | --- |
-| `SourceCore/Internal/Allocation` | Allocation markers, their discovery, fixed layouts, the source ledger and canonical contexts. |
-| `SourceCore/Internal/CallableAncestry` | Dynamic callable ancestry in one ordinary Core cell: programs, templates, captures, read recipes and views. |
-| `SourceCore/Internal/CallableFrames` | Ordinary Core frames for callable ancestry and their decoding. These files import no source semantics: `CallableViewWrappers` in CoreLowering must stay outside `Solcore.SourceSemantics.Context`. |
-| `SourceCore/Internal/CallableIndexed` | Constant-depth ancestry over a finite table: dispatch, programs, templates, captures, views and restoration. |
-| `SourceCore/Internal/CallableOutputs` | Reverse source values and heap exports of the compatible, paired and indexed programs, and the public output codec. |
-| `SourceCore/Internal/CallablePaired` | Ancestry that keeps read-time callers and lexical creators: programs, templates, captures, views and restoration. |
-| `SourceCore/Internal/CallablePrincipals` | Cached principal metadata of direct lambda declarations. This file stands alone: its private instances must stay outside the closure of `Callable/CoercionSpine` in CoreLowering. |
-| `SourceCore/Internal/CallableViews` | Source views of local lambda reads, marked functions, the marked ledger and lambda templates. |
-| `SourceCore/Internal/DirectLinking` | Closed direct-call linking of specialized source, and the raw execution pipeline that seeds it. |
-| `SourceCore/Internal/Entries` | Prepared scalar, recursive, function and general entries, the catalog-backed public values, and the assignment policy. |
-| `SourceCore/Internal/FaultSites` | Source diagnostics for Core language failures: reasons, read and assignment sites, and program-wide identities. |
+| [`SourceCore/Internal/Allocation`](../../Solcore/Frontend/SourceCore/Internal/Allocation.lean) | Allocation markers, their discovery, fixed layouts, the source ledger and canonical contexts. |
+| [`SourceCore/Internal/CallableAncestry`](../../Solcore/Frontend/SourceCore/Internal/CallableAncestry.lean) | Dynamic callable ancestry in one ordinary Core cell: programs, templates, captures, read recipes and views. |
+| [`SourceCore/Internal/CallableIndexed`](../../Solcore/Frontend/SourceCore/Internal/CallableIndexed.lean) | Constant-depth ancestry over a finite table: dispatch, programs, templates, captures, views and restoration. |
+| [`SourceCore/Internal/CallableOutputs`](../../Solcore/Frontend/SourceCore/Internal/CallableOutputs.lean) | Reverse source values and heap exports of the compatible, paired and indexed programs, and the public output codec. |
+| [`SourceCore/Internal/CallablePaired`](../../Solcore/Frontend/SourceCore/Internal/CallablePaired.lean) | Ancestry that keeps read-time callers and lexical creators: programs, templates, captures, views and restoration. |
+| [`SourceCore/Internal/CallablePrincipals`](../../Solcore/Frontend/SourceCore/Internal/CallablePrincipals.lean) | Cached principal metadata of direct lambda declarations. This file stands alone: its private instances must stay outside the closure of `Callable/CoercionSpine` in CoreLowering. |
+| [`SourceCore/Internal/CallableViews`](../../Solcore/Frontend/SourceCore/Internal/CallableViews.lean) | Source views of local lambda reads, marked functions, the marked ledger and lambda templates. |
+| [`SourceCore/Internal/Carriers`](../../Solcore/Frontend/SourceCore/Internal/Carriers.lean) | Heap markers and the ordinary Core frames of callable ancestry, with their decoding. These files import no source semantics, and they must not: `CallableViewWrappers` in CoreLowering has to stay outside `Solcore.SourceSemantics.Context`. |
+| [`SourceCore/Internal/DirectLinking`](../../Solcore/Frontend/SourceCore/Internal/DirectLinking.lean) | Closed direct-call linking of specialized source, and the raw execution pipeline that seeds it. |
+| [`SourceCore/Internal/Entries`](../../Solcore/Frontend/SourceCore/Internal/Entries.lean) | Prepared scalar, recursive, function and general entries, the catalog-backed public values, and the assignment policy. |
+| [`SourceCore/Internal/FaultSites`](../../Solcore/Frontend/SourceCore/Internal/FaultSites.lean) | Source diagnostics for Core language failures: reasons, read and assignment sites, and program-wide identities. |
 
 ## Rust Hull
 
@@ -272,9 +279,9 @@ The same layers have frame-level results below these, each named `compileFrame_p
 ## Fragments
 
 [`Fragments`](../../Solcore/Frontend/Fragments.lean) imports the historical adapters. They are
-separate, narrow compilers for slices of the language, each with its own preservation proof. The
-current pipeline reaches none of them, apart from `WordLiteral`, and the source semantics does not
-use them either. They stay because tests use them.
+narrow adapters from slices of the language to Core, with proofs of their own. The current pipeline
+reaches none of them, apart from `WordLiteral`, and the source semantics does not use them either.
+They stay because tests use them.
 
 | File | Topic |
 | --- | --- |
@@ -297,6 +304,27 @@ use them either. They stay because tests use them.
 
 ## What a reviewer should know
 
+- **The proofs about native lowering are elsewhere.** This area states what compilation retains.
+  That lowered code means what the source means is in `SourceSemantics/CoreLowering`.
+- **Checking sits above its proofs.** `ProgramChecking` imports `SourceInference`, whose umbrella
+  imports the inference proofs, so those proofs are in the compiler's closure. The code itself
+  uses none of them.
+- **Some native files stay apart, and these are not choices.**
+  - `SourceCore/Internal/CallablePrincipals` is alone. Its private instances rival those of
+    `CallableViews`, and they have to stay outside `Callable/CoercionSpine` in CoreLowering.
+  - `SourceCore/Internal/Carriers` imports no source semantics, because `CallableViewWrappers` in
+    CoreLowering has to stay outside `Solcore.SourceSemantics.Context`.
+  - `SourceCore/CompatibleCatalog` stays below `SourceCore/Compatible`, and
+    `SourceCoreLegacyHeapImport` stays out of the public API's closure. Tests assert both with
+    `#check_failure`.
+  - `Internal/SignatureProperties` stays out of reach of `SourceInference/Internal/ExpressionProperties`,
+    whose proofs break once `ProgramFunctionSignature.parameterTypes_length` is a `simp` lemma there.
+  - `SourceCore/Data` stays below lowering. `Core.Expr.rename_weakenAt_zero` would otherwise reach
+    `DataEqualityGeneration` in CoreLowering, and a `simp` argument there would become unused.
+  - `ProgramSignatures` and `ProgramSignatureFormation`, `Internal/RuntimeValues` and
+    `Internal/RuntimeValidation`, `SourceCore/DataExpressions` and `DataPlaces`, and
+    `SourceCore/Compatible` and `CompatibleFunctions` would share matchers in one file, and that would rename the variables
+    of their equation lemmas.
 - **Hull is one directory with one entry.** Nothing in the native pipeline imports it. Only the
   generators reach into it, for `Keccak` and `Memory`, and `RustHull/Memory` keeps those free of
   Hull syntax.

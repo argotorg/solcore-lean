@@ -1,10 +1,16 @@
-import Solcore.Frontend.SourceCorePublicDefaultOutputCodec
-import Solcore.Frontend.SourceCorePublicValues
+import Solcore.Frontend.SourceCore.Internal.CallableOutputs
+import Solcore.Frontend.SourceCore.Internal.Entries
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.SourceCoreUnifiedCompilation
-import Solcore.Frontend.SourceCoreCallableIndexedTemplates
-import Solcore.Frontend.SourceCoreHeapSnapshot
-import Solcore.Frontend.SourceCoreIndexedHeapMigration
+import Solcore.Frontend.SourceCoreUnified
+import Solcore.Frontend.SourceCore.Internal.CallableIndexed
+
+/-!
+# Indexed sessions
+
+Persistent typed Core sessions for the source-compatible indexed program. Main declarations:
+`SourceCoreIndexedSession.Recipe`, `SourceCoreIndexedSession.Artifact`,
+`SourceCoreIndexedSession.Session`, `SourceCoreIndexedSession.Checkpoint`.
+-/
 
 /-! Persistent typed Core sessions for the source-compatible indexed program.
 Bootstrap installs the owned context cell and global closures once. Subsequent

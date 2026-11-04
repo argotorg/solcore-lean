@@ -1,6 +1,13 @@
 import Solcore.Frontend.ProgramSignatures
 
 /-!
+# Signature formation
+
+Formation checks on a completed signature catalog. Main declarations:
+`ProgramSignatureFormationValidated`, `ProgramSignatureFormationError`.
+-/
+
+/-!
 Executable formation validation for a completed resolved signature catalog.
 
 This pass deliberately runs after `buildProgramSignatures`: transparent type

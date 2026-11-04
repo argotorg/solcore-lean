@@ -2,6 +2,13 @@ import Solcore.Frontend.SourceInference.Types
 import Solcore.Frontend.SourceStageAnalysis
 
 /-!
+# Specialization
+
+Closing specialization of checked generic functions. Main declarations:
+`SourceSpecialization.SpecializationKey`, `SourceSpecialization.SpecializedFunction`.
+-/
+
+/-!
 Closing specialization for checked generic source functions.
 
 The resolved signature supplies the authoritative declaration-parameter order,
