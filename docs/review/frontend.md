@@ -42,8 +42,8 @@ means that `SourceCoreExecution.compile` or `Session.run` reaches it.
    `ProgramSignatureFormation`, `TraitResolution`, `SourceInference`, and `ProgramChecking` on top.
 3. **Staging and specialization.** `SourceStageAnalysis`, `SourceSpecialization`,
    `SourceSpecializationWorklist` and `SourceCompilationPlan`.
-4. **Lowering.** `SourceCoreElaboration`, then `SourceCore/`, then `SourceCoreCompiler` and
-   `SourceCoreIndexedSession`.
+4. **Lowering.** `SourceCoreElaboration`, then `SourceCore/`, then `SourceCoreUnified`,
+   `SourceCoreCompiler` and `SourceCoreIndexedSession`.
 5. **Rust Hull.** The syntax, the independent meaning, the compiler, and the main theorems.
 
 Everything else is proof machinery in the `Internal/` directories.
@@ -54,9 +54,9 @@ Everything else is proof machinery in the `Internal/` directories.
 
 | File | Main declarations |
 | --- | --- |
-| [`SourceCompiler`](../../Solcore/Frontend/SourceCompiler.lean) |  |
+| [`SourceCompiler`](../../Solcore/Frontend/SourceCompiler.lean) | The public API of the native compiler, exported from `SourceCoreExecution` |
 | [`SourceCoreExecution`](../../Solcore/Frontend/SourceCoreExecution.lean) | `SourceCoreExecution.compile`, `SourceCoreExecution.compileChecked`, `SourceCoreExecution.compileEntry`, `SourceCoreExecution.compileStaticWord`, `SourceCoreExecution.Compiled`, `SourceCoreExecution.Artifact`, `SourceCoreExecution.Session`, `SourceCoreExecution.Checkpoint`, `SourceCoreExecution.Outcome` |
-| [`Current`](../../Solcore/Frontend/Current.lean) |  |
+| [`Current`](../../Solcore/Frontend/Current.lean) | Imports every stage of the current whole-program pipeline |
 
 ### Checking
 
@@ -100,13 +100,13 @@ files read in dependency order.
 | [`SourceCore/DataPlaces`](../../Solcore/Frontend/SourceCore/DataPlaces.lean) | `SourceCoreDataPlaces.Error`, `SourceCoreDataPlaces.declaredBinders`, `SourceCoreDataPlaces.rootBinder` |
 | [`SourceCore/GeneralFunctions`](../../Solcore/Frontend/SourceCore/GeneralFunctions.lean) | `SourceCoreGeneralFunctions.Function`, `SourceCoreGeneralFunctions.CallableContext`, `SourceCoreLocalPolymorphism.Binding`, `SourceCoreStageContracts.Sidecar` |
 | [`SourceCore/RawMetadata`](../../Solcore/Frontend/SourceCore/RawMetadata.lean) | `SourceCoreRawMetadata.Registry`, `SourceCoreRawMetadata.Extends` |
-| [`SourceCore/CompatibleCatalog`](../../Solcore/Frontend/SourceCore/CompatibleCatalog.lean) | `SourceCoreCompatibleCatalog.Checked`. This file stays below the value encoder: `Solcore/Test/SourceCoreCompatiblePayload.lean` asserts that |
+| [`SourceCore/CompatibleCatalog`](../../Solcore/Frontend/SourceCore/CompatibleCatalog.lean) | `SourceCoreCompatibleCatalog.Checked` |
 | [`SourceCore/Compatible`](../../Solcore/Frontend/SourceCore/Compatible.lean) | `SourceCoreCompatibleValues.Context`, `SourceCoreCompatibleDataExpressions`, `SourceCoreCompatibleDataPlaces` |
 | [`SourceCore/CompatibleFunctions`](../../Solcore/Frontend/SourceCore/CompatibleFunctions.lean) | `SourceCoreCompatibleFunctions`, `SourceCoreCompatibleInputs`, `SourceCoreCompatibleDataMatches` |
 | [`SourceCoreUnified`](../../Solcore/Frontend/SourceCoreUnified.lean) | `SourceCoreUnifiedCompilation.Compiled` |
 | [`SourceCoreCompiler`](../../Solcore/Frontend/SourceCoreCompiler.lean) | `SourceCoreCompiler.Compiled`, `SourceCoreCompiler.Error`, `SourceCoreCompiler.Options` |
 | [`SourceCoreIndexedSession`](../../Solcore/Frontend/SourceCoreIndexedSession.lean) | `SourceCoreIndexedSession.Recipe`, `SourceCoreIndexedSession.Artifact`, `SourceCoreIndexedSession.Session`, `SourceCoreIndexedSession.Checkpoint` |
-| [`SourceCoreLegacyHeapImport`](../../Solcore/Frontend/SourceCoreLegacyHeapImport.lean) |  |
+| [`SourceCoreLegacyHeapImport`](../../Solcore/Frontend/SourceCoreLegacyHeapImport.lean) | An explicit migration adapter |
 
 ### Theorems of the native pipeline
 
@@ -323,15 +323,15 @@ They stay because tests use them.
     `DataEqualityGeneration` in CoreLowering, and a `simp` argument there would become unused.
   - `ProgramSignatures` and `ProgramSignatureFormation`, `Internal/RuntimeValues` and
     `Internal/RuntimeValidation`, `SourceCore/DataExpressions` and `DataPlaces`, and
-    `SourceCore/Compatible` and `CompatibleFunctions` would share matchers in one file, and that would rename the variables
-    of their equation lemmas.
+    `SourceCore/Compatible` and `CompatibleFunctions` would share matchers in one file, and
+    that would rename the variables of their equation lemmas.
 - **Hull is one directory with one entry.** Nothing in the native pipeline imports it. Only the
   generators reach into it, for `Keccak` and `Memory`, and `RustHull/Memory` keeps those free of
   Hull syntax.
 - **Public theorems sit above frame results.** A `compileFrame_preserves` theorem is a step toward
   a contract theorem. The contract theorem is the claim, because it starts at actual compilation
   and ends at public receipts.
-- **Three separations are deliberate.**
+- **Three Hull separations are not choices either.**
   - `Logs` shares `RustHull/Memory`, below `Syntax`. It means `Core.Expr` through an `open`, and
     `RustHull.Expr` would shadow that once `Syntax` is in reach.
   - `CreationRuntime` stays in `RustHull/Effects`, below `Lowering`. It takes `boolean` from
