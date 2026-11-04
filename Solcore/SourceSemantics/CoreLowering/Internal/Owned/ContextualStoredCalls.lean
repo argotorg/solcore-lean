@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 
 /-!
 # Owned callables: contextual stored calls

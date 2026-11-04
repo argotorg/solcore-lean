@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionSelectionIdentity
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 
 /-! Independent method selection retains an ordered dictionary assembled for
 exactly the method assumptions. Empty method assumptions therefore determine

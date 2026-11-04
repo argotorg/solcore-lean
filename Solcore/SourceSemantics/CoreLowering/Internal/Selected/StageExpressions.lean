@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHe
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

@@ -1,12 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
 import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedPreparedInventories
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingCertificates
 import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionSource
-import Solcore.SourceSemantics.CoreLowering.CallableEvidenceEnvironment
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 
 /-!
 # Recursive named rows: call bounds

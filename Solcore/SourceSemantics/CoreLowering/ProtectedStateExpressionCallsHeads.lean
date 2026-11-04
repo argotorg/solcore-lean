@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 
 /-! The existing compositional call-head proofs consume one actual protocol
 and its certified administrative transport. Every ordered child and call leaf

@@ -1,7 +1,7 @@
 import Solcore.Frontend.ResidualScopeTails
 import Solcore.Frontend.ResidualLexicalScopes
 import Solcore.SourceSemantics.SourceSpecializationStatementReferences
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 
 /-! Canonical source-reference paths extend the validator's actual residual
 scope. The suffix keeps its starting scope, so variables introduced by nested

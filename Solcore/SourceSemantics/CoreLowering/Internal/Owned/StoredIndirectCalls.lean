@@ -2,8 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.IndirectSequences
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
-import Solcore.SourceSemantics.CoreLowering.CallableFaultDiagnosticPreparation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-!

@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedBodyFrames
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 
 /-! Indexed frame installation/restoration for a certified compatible body at

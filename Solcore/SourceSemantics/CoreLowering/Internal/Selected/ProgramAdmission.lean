@@ -16,7 +16,7 @@ import Solcore.SourceSemantics.SourceInferenceSelectedCheckedBodyTypingBridge
 import Solcore.SourceSemantics.SourceInferenceSelectedActualSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedScopedRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
-import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedLambdaFormation

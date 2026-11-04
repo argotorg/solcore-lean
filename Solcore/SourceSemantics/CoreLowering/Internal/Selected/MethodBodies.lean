@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalCatalogOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
@@ -19,15 +19,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceShapeTable
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls

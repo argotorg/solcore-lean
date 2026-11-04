@@ -21,7 +21,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.SourceInferenceSoundness
-import Solcore.SourceSemantics.CoreLowering.CallableIndependentSourceViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 

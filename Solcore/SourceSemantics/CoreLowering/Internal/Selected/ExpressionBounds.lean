@@ -1,14 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
 import Solcore.SourceSemantics.SourceExecutableCoercionInterfaces
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
@@ -16,7 +16,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls

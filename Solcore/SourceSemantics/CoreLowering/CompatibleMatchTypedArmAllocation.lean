@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
 
 /-! Two-way finite continuation agreement for the actual marked compatible

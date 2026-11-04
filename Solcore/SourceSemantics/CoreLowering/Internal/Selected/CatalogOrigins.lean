@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.Staging.RecursiveControlTransferFacts
 import Solcore.SourceSemantics.SelectedBodyTypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatalog
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates

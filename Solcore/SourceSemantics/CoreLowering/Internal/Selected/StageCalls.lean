@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectC
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageClosures
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls

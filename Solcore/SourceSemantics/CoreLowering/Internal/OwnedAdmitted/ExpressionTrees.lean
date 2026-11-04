@@ -1,10 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyStaticOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyEntryContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-!

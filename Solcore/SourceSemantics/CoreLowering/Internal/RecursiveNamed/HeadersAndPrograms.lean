@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.TraitSubstitutionProperties
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.Dynamic.Preservation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence

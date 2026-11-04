@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.AcceptedPacke
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterNativeInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 
 /-!
 # Prepared callables: bootstrap

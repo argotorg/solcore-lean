@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedParameterCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameters
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
 
 /-! Parameter installation reaches the actual monomorphic call context. Its

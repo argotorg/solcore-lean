@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies

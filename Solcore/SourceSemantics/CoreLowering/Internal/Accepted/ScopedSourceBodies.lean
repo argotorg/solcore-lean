@@ -7,12 +7,12 @@ import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
 import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
 import Lean
-import Solcore.SourceSemantics.CoreLowering.CallableAncestryComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 
 /-!
 # Scoped Source bodies

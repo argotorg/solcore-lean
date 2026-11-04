@@ -5,7 +5,7 @@ import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreLambdaTemplates
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 import Solcore.Core.Correspondence
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedContextFrames
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize

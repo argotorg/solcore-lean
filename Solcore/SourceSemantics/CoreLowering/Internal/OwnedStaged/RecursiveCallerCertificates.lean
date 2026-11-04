@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorExtra
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 
 /-!
 # Staged bounds: recursive caller certificates

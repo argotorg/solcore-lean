@@ -15,10 +15,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCa
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationStageCoherence
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.CallContractCertificates
 
 /-!

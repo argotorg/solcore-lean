@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAllocationRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 
 /-! Ordinary uninitialized lexical bindings before a fixed-scope compatible

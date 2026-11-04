@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CallableNamedMetadata
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedSequentialBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableLedger
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
 import Solcore.SourceSemantics.CoreLowering.DataPatternExecution
 
 /-! Static receipts extracted from the actual finite codebook traversal.

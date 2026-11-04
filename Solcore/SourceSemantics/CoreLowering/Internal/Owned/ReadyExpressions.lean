@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 
 /-!
 # Owned callables: ready expressions

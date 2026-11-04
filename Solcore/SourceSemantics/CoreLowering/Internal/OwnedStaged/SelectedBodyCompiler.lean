@@ -14,9 +14,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplic
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 
 /-!
 # Staged bounds: selected body compiler

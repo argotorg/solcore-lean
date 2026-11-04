@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalSpecializationOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
@@ -10,16 +10,15 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatalog
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationStageCoherence
-import Solcore.SourceSemantics.CoreLowering.CallableAncestryProfiles
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.SourceSemantics.SourceBodyResultAnnotation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparation
-import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.OrdinaryCallsReady
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-!

@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyEntryContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites

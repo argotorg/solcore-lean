@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultRecei
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedBuiltinValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductSource

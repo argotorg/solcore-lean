@@ -6,9 +6,9 @@ import Solcore.Core.LanguageResult
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeapOperations
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedSnapshots
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameters
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.FunctionCallBody
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
@@ -25,8 +25,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualStoredCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedCellAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 
 /-!

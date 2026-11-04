@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAllocationRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.Frontend.SourceCoreCompatibleDataMatches
 
 /-! Static receipts for the actual compatible match arm allocator. The

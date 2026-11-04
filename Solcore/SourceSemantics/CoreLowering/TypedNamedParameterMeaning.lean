@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 
 /-! Parameter installation reaches the actual monomorphic call context. Its
 finite continuation agreement comes from the production allocation receipts;

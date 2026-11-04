@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableAppliedViewProvenance
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
 import Solcore.SourceSemantics.Staging.RecursiveScope
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 import Solcore.SourceSemantics.Staging.RecursiveTraceProperties

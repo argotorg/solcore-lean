@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CaptureCopies
 import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarkedSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 
 /-! The copies a closure makes of its captured cells through the indexed

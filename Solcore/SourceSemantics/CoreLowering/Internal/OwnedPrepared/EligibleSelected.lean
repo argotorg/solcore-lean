@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActual
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewStaticTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 
 /-!
 # Prepared callables: eligible selected lambdas

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedPrefixes
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies

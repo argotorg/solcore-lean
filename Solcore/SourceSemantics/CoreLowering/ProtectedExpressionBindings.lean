@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 
 /-! Protected named observations survive lexical source binders and the actual
 three-cell marked allocation. Only the caller variable position changes when a

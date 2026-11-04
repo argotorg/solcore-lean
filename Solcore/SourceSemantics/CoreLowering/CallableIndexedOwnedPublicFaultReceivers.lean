@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceiverTables
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.CompatibleRegistryDiagnosticCompleteness
 
 /-! Diagnostic receivers retain the actual owning metadata registry and table.

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
-import Solcore.SourceSemantics.CoreLowering.CallableFaultDiagnosticPreparation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 

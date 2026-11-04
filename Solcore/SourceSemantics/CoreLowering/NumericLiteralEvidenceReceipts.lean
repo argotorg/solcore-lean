@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
-import Solcore.SourceSemantics.CoreLowering.CallableSpecializationEquality
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 
 /-! Receipts from the actual numeric validator retain the exact selected row
 and its premise-free builtin implementation. Only that implementation row is

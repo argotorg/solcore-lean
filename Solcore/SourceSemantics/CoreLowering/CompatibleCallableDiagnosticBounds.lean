@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceiverTables
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 
 /-! The actual callable diagnostic producer starts at its requested minimum.
 This finite receipt exposes the original checked unknown token. -/

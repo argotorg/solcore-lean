@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
-import Solcore.SourceSemantics.CoreLowering.CallableAncestryComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

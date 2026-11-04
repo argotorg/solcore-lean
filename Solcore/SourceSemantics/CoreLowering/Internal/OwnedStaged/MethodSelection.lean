@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
@@ -7,10 +7,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
-import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
-import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginTable
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableMethodResolverTable
 import Solcore.SourceSemantics.CoreLowering.CachedMethodEvidenceCoherence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardTerminals
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics

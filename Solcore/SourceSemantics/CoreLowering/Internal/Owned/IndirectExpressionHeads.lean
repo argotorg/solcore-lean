@@ -1,9 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaTemplatePermission
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Dynamic.Preservation

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CaptureCopies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAllocationRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeap
 
 /-! Support for the marked copies of a closure's captured cells. The copy chain

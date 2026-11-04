@@ -10,10 +10,10 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadFaultPolicie
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedStageOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectApplication
 import Solcore.SourceSemantics.CoreLowering.ReachedLoweredReadOutcomePorts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 
 /-!
 # Owned callables: contextual origins

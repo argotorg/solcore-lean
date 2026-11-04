@@ -4,8 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputR
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 
 /-!

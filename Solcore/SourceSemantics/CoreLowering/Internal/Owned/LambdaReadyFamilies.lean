@@ -2,13 +2,13 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyStaticOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 
 /-!
 # Owned callables: lambda ready families

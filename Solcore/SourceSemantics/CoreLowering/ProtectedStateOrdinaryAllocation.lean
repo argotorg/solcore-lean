@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateBindings
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 
 /-! A marked allocation producer retains the ordinary execution and heap
 receipts together with its concrete protected post-witness. Readiness concerns

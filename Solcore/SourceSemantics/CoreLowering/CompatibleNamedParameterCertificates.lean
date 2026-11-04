@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyCompilation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 
 /-! The named compiler installs parameter cells before passing its raw body to
 its indexed hook. Successful production compilation supplies both the body

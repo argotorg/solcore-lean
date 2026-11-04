@@ -1,17 +1,17 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
-import Solcore.SourceSemantics.CoreLowering.CallableSpecializationEquality
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.SourceResidualNodeSubstitutionAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
-import Solcore.SourceSemantics.CoreLowering.CallableBodyViewSubstitution
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.Frontend.ResidualLexicalScopes
 import Solcore.SourceSemantics.CoreLowering.ResidualScopeReachability
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedCellAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 

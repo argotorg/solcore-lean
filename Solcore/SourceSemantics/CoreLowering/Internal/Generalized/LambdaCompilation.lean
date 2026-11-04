@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductTree
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.SourceSemantics.SourceInferenceSubtreeInverseClosure
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 
 /-!

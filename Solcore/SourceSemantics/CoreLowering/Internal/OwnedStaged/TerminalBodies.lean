@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize

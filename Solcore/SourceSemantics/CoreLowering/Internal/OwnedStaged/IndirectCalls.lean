@@ -11,8 +11,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultRecei
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenOrdinaryCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservationSupport
 
 /-!

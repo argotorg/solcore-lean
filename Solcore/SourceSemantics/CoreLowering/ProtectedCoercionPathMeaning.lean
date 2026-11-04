@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionPathMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionMethods
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
 
 /-! Ordered coercion methods consume the actual reached protocol state.

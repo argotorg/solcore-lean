@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.DecodedCallFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
@@ -20,7 +20,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntri
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.OrdinaryLambdas
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeBody
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 
 /-!
 # Owned callables: lambda receipts

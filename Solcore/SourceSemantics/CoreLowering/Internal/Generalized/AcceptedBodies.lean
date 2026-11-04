@@ -4,10 +4,10 @@ import Solcore.SourceSemantics.CoreLowering.EmptySourceSubstitution
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaTemplatePermission
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 
 /-!
 # Generalized locals: accepted bodies

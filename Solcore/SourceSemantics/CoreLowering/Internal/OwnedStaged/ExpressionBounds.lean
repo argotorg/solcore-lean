@@ -5,8 +5,8 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductCertificates
 import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.WellFormed
@@ -16,12 +16,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodSelectionIdentity
-import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodDictionaryIdentity
-import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualProducts
 
 /-!

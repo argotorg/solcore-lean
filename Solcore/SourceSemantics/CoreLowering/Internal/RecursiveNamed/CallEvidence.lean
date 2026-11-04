@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCertificateNativeTyping
 import Solcore.SourceSemantics.CoreLowering.NativeExpressionContextSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedPreparedInventories
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileAllocation
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderControl
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
@@ -19,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProd
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.Staging.RecursiveTrace
 
 /-!

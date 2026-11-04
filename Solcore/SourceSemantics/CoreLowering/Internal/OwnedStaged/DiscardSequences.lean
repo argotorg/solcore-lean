@@ -6,9 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedBodyCom
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryPreparedScopeAnnotationCallsReady
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.OrdinaryCallsReady
 
 /-!
 # Staged bounds: discard sequences

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
-import Solcore.SourceSemantics.CoreLowering.CallableBodyMetadataViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 
 /-!
 # Actual body invocations

@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenOrdinaryCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState

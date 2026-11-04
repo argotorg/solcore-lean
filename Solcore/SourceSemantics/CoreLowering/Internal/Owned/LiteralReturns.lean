@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.TerminalStatementOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaScalarNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
-import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSourceMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.Staging.RecursiveBareTarget
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins

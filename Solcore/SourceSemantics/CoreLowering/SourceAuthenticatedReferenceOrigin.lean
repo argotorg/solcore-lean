@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.SourceAuthenticatedReferenceForm
-import Solcore.SourceSemantics.CoreLowering.CallableBodyViewSubstitution
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Lean
 
 /-! The actual authenticator identifies the same original caller and read

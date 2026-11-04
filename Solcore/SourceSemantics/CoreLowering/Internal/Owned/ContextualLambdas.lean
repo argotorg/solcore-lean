@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingTerminalDiagnostics
@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticC
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTypingOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads

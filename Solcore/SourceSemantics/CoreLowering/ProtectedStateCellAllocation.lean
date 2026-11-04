@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateBindings
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedCellAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 
 /-! Protected allocation accepts genuine ordinary or generalized Source steps.
 Its actual reached state, captures and full observation are retained by the

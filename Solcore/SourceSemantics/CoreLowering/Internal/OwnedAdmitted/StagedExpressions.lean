@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
-import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinFragmentOutcomePorts
 

@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFuncti
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies

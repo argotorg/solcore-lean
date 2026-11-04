@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSp
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionRawCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize

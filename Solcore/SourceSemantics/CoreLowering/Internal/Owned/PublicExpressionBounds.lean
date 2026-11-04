@@ -17,7 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadC
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchCoupledReadyBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 
 /-!
 # Owned callables: public expression bounds

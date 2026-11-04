@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparation
-import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryAnnotationCoherence
-import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.OrdinaryCallsReady
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
@@ -9,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCa
 import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 

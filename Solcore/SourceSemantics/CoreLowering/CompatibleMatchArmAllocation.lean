@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmCertificates
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 
 /-! Two-way finite continuation agreement for the actual marked compatible
 match arm prefix. Only a completely matched arm allocates source binders. The
