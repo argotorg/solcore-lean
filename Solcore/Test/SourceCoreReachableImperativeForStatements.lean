@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForCertificates
 import Solcore.SourceSemantics.CoreLowering.NamedForFunctionFallthrough
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
-import Solcore.Test.SourceCoreRecursiveNamedImperativeForBounds
+import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedStatements
 
 /-! The existing imperative Tree keeps terminal block/if children in the same
 recursive positions as ordinary statements, for initializers and loop bodies.

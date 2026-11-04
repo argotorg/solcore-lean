@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreMethodOriginEvidenceSource
+import Solcore.Test.SourceSemantics.CoreLowering.Method.OriginFixture
 import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
 set_option autoImplicit false
 set_option Elab.async false

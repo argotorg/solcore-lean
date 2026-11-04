@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreMethodOriginEvidenceFixture
+import Solcore.Test.SourceSemantics.CoreLowering.Method.OriginFixture
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalog
 
 /-! The final ordinary catalog also recovers the two identity rows discovered

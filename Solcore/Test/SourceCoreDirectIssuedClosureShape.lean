@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedCommon
-import Solcore.Test.SourceCoreCapturedReuseSelection
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationPreservation
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 

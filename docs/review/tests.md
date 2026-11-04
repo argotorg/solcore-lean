@@ -201,6 +201,41 @@ Covers [`Solcore/SourceSemantics`](../../Solcore/SourceSemantics): source semant
 | [`SemanticsBoundary`](../../Solcore/Test/SourceSemantics/SemanticsBoundary.lean) | Source semantics boundary tests | 3 |
 | [`SemanticsSubstitution`](../../Solcore/Test/SourceSemantics/SemanticsSubstitution.lean) | Source substitution tests | 1 |
 
+### SourceSemantics/CoreLowering
+
+Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/CoreLowering): source to Core: fixtures, compiled programs, public execution.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Captured/Assignments`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Assignments.lean) | Captured closure assignment tests | 36 |
+| [`Captured/Branches`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Branches.lean) | Captured closure branch tests | 26 |
+| [`Captured/Locals`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Locals.lean) | Captured local tests | 28 |
+| [`Captured/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Loops.lean) | Captured closure loop tests | 26 |
+| [`Captured/Mappings`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Mappings.lean) | Captured mapping tests | 14 |
+| [`Captured/Nested`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Nested.lean) | Nested capture tests | 19 |
+| [`Evidence/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Closure.lean) | Closure evidence tests | 20 |
+| [`Evidence/Direct`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Direct.lean) | Direct evidence tests | 16 |
+| [`Evidence/Method`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Method.lean) | Method evidence tests | 16 |
+| [`Evidence/Scoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Scoped.lean) | Scoped evidence tests | 18 |
+| [`Method/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/Closure.lean) | Method closure tests | 20 |
+| [`Method/DirectEvidence`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/DirectEvidence.lean) | Direct method evidence tests | 23 |
+| [`Method/GenericSubstitution`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/GenericSubstitution.lean) | Generic substitution tests | 23 |
+| [`Method/ImplementationScoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/ImplementationScoped.lean) | Implementation-scoped method tests | 23 |
+| [`Method/NamedScoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/NamedScoped.lean) | Named scoped method tests | 22 |
+| [`Method/OriginEvidence`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/OriginEvidence.lean) | Method origin evidence tests | 32 |
+| [`Method/OriginFixture`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/OriginFixture.lean) | Method origin fixture tests | 16 |
+| [`Method/OwnEvidence`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/OwnEvidence.lean) | Own method evidence tests | 23 |
+| [`Method/PublicSequences`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/PublicSequences.lean) | Method public sequence tests | 24 |
+| [`Method/Scoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/Scoped.lean) | Scoped method tests | 21 |
+| [`Recursive/Formation`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Formation.lean) | Recursive formation tests | 19 |
+| [`Recursive/Index`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Index.lean) | Recursive index tests | 27 |
+| [`Recursive/NamedCatalog`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedCatalog.lean) | Recursive named catalog tests | 20 |
+| [`Recursive/NamedExpressions`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedExpressions.lean) | Recursive named expression tests | 15 |
+| [`Recursive/NamedHeaders`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedHeaders.lean) | Recursive named header tests | 21 |
+| [`Recursive/NamedPublic`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedPublic.lean) | Recursive named public tests | 18 |
+| [`Recursive/NamedStatements`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedStatements.lean) | Recursive named statement tests | 13 |
+| [`Recursive/Stages`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Stages.lean) | Recursive stage tests | 9 |
+
 ### Synthesis
 
 Covers [`Solcore/Synthesis`](../../Solcore/Synthesis): generators, emitters, golden files and fixed corpora.
@@ -247,4 +282,4 @@ for its golden rows, so it can neither move nor share a file with other tuples o
 
 ## Not merged yet
 
-1711 old modules are still flat in `Solcore/Test`.
+1123 old modules are still flat in `Solcore/Test`.

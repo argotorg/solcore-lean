@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedSequence
-import Solcore.Test.SourceCoreCapturedDirectSequence
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 
 /-! A direct named factory call exports a second capture, which is then reused
 through its actual returned session alongside the original capture. -/

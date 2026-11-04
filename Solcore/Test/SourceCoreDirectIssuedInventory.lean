@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreCapturedReuseSelection
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
 set_option autoImplicit false
 set_option Elab.async false

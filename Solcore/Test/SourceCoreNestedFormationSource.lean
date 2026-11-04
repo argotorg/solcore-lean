@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreRecursiveIndexSource
+import Solcore.Test.SourceSemantics.CoreLowering.Recursive.Index
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000

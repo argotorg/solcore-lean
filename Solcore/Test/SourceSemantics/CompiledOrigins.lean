@@ -30,7 +30,7 @@ import Solcore.Test.SourceCoreUnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
-import Solcore.Test.SourceCoreRecursiveNamedTupleExpressions
+import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedExpressions
 import Solcore.SourceSemantics.SourceSelectedTemplateInventory
 import Solcore.SourceSemantics.SourceCompiledGeneralizedBarrierConnection
 

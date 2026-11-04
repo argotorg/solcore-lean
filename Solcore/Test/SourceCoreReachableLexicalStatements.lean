@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBodyTree
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSourceTyping
 import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionFallthrough
-import Solcore.Test.SourceCoreRecursiveNamedLexicalTreeBounds
+import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedStatements
 import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuationMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.Test.SourceCoreUnifiedCorpusSupport

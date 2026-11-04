@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreMethodOriginEvidenceSourceOutcomes
+import Solcore.Test.SourceSemantics.CoreLowering.Method.OriginEvidence
 import Solcore.Test.SourceCoreCanonicalScopedSourceOutcomes
 import Solcore.Test.SourceCoreCertifiedLexicalFailureSourceOutcomes
 

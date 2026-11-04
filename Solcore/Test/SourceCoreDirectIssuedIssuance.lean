@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedSequence
-import Solcore.Test.SourceCoreCapturedReuseSelection
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionIssuance
 
 /-! Real issuer receipts extend the retained history and authenticate exact raw

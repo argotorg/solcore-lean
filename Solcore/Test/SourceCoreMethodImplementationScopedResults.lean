@@ -1,5 +1,0 @@
-import Solcore.Test.SourceCoreEvidenceDirectResults
-set_option autoImplicit false
-namespace Tests.SourceCoreMethodImplementationScoped
-export Tests.SourceCoreEvidenceDirect (ScalarOutput)
-end Tests.SourceCoreMethodImplementationScoped

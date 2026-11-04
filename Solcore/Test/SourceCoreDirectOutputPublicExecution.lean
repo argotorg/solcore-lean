@@ -1,7 +1,5 @@
 import Solcore.Test.SourceCoreDirectOutputFactory
-import Solcore.Test.SourceCoreCapturedReuseSeed
-import Solcore.Test.SourceCoreCapturedReuseClosureShape
-import Solcore.Test.SourceCoreCapturedDirectInvocation
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 
 /-! A direct named factory export becomes a later direct-call input, preserving
 both the new capture and the earlier capture through intervening executions. -/

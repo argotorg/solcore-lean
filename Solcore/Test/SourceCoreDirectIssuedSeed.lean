@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedCommon
-import Solcore.Test.SourceCoreCapturedReuseSelection
+import Solcore.Test.SourceSemantics.CoreLowering.Captured.Locals
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitial
 

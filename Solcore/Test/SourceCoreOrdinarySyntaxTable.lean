@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedScopedAdmission
 import Solcore.Test.SourceCoreCanonicalFormationFixture
 import Solcore.Test.SourceCoreConstructorCallsSource
-import Solcore.Test.SourceCoreMethodOriginEvidenceFixture
+import Solcore.Test.SourceSemantics.CoreLowering.Method.OriginFixture
 set_option autoImplicit false
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 
