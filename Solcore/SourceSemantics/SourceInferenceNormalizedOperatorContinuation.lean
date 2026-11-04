@@ -29,7 +29,7 @@ private theorem binary_result_shape
     {state : State} {result : OperatorInferenceResult}
     (accepted : inferBinaryOperator context operator left right expected literals state = .ok result) :
     result.type = .bool ∨ result.type = .word ∨ result.type = result.state.resolve left := by
-  unfold inferBinaryOperator at accepted
+  unfold inferBinaryOperator binaryOperatorTail at accepted
   simp_all [bind, Except.bind]
   repeat' first | split at accepted
   all_goals try cases accepted

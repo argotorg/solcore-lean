@@ -96,6 +96,9 @@ theorem strict_binary_value {operator : Syntax.BinaryOp}
   | subtract => exact ⟨.word _, rfl, .wordSubtract _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
   | shiftLeft => exact ⟨.word _, rfl, .wordShiftLeft _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
   | shiftRight => exact ⟨.word _, rfl, .wordShiftRight _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
+  | uncheckedAdd => exact ⟨.word _, rfl, .wordUncheckedAdd _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
+  | uncheckedSubtract => exact ⟨.word _, rfl, .wordUncheckedSubtract _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
+  | uncheckedMultiply => exact ⟨.word _, rfl, .wordUncheckedMultiply _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
   | bitAnd => exact ⟨.word _, rfl, .wordBitAnd _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
   | bitXor => exact ⟨.word _, rfl, .wordBitXor _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩
   | bitOr => exact ⟨.word _, rfl, .wordBitOr _ _, fun _ _ => .binary (.var rfl) (.var rfl) rfl⟩

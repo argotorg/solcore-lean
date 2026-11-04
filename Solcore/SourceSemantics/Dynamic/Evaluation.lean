@@ -219,6 +219,15 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
   | shiftRight {left right result : Value}
       (applies : BinaryPrimitiveApplies .shiftRight left right result) :
       AssignmentValueApplies .shiftRight (some left) right result
+  | uncheckedAdd {left right result : Value}
+      (applies : BinaryPrimitiveApplies .uncheckedAdd left right result) :
+      AssignmentValueApplies .uncheckedAdd (some left) right result
+  | uncheckedSubtract {left right result : Value}
+      (applies : BinaryPrimitiveApplies .uncheckedSubtract left right result) :
+      AssignmentValueApplies .uncheckedSubtract (some left) right result
+  | uncheckedMultiply {left right result : Value}
+      (applies : BinaryPrimitiveApplies .uncheckedMultiply left right result) :
+      AssignmentValueApplies .uncheckedMultiply (some left) right result
 
 /-- Bit-not assignment operates on the leaf snapshot captured by place
 resolution. -/

@@ -2,7 +2,8 @@ import Solcore.Syntax.Operator
 import Solcore.Core.Primitive
 
 /- Independent meanings of the fourteen strict source Word binary operators
-other than the shifts, which this fragment does not cover.
+other than the shifts and the unchecked arithmetic, which this fragment does
+not cover.
 Both arguments are actual Words; comparison results are Boolean values.
 The two short-circuit operators are excluded. Division and remainder at zero
 retain the existing total unsigned Word conventions. -/
@@ -57,7 +58,8 @@ def evaluateStrictWordBinary? (operator : Syntax.BinaryOp) (left right : Core.Wo
   | .notEqual => some (.bool (!(left == right)))
   | .lessEqual => some (.bool (!(decide (left > right))))
   | .greaterEqual => some (.bool (!(decide (left < right))))
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => none
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => none
 
 end Solcore.Frontend
 
@@ -98,7 +100,8 @@ theorem evaluateStrictWordBinary?_isSome_iff
     (operator : Syntax.BinaryOp) (left right : Core.Word) :
     (evaluateStrictWordBinary? operator left right).isSome = true ↔
       operator ≠ .logicalAnd ∧ operator ≠ .logicalOr ∧
-        operator ≠ .shiftLeft ∧ operator ≠ .shiftRight := by
+        operator ≠ .shiftLeft ∧ operator ≠ .shiftRight ∧ operator ≠ .uncheckedAdd ∧
+          operator ≠ .uncheckedSubtract ∧ operator ≠ .uncheckedMultiply := by
   cases operator <;> simp [evaluateStrictWordBinary?]
 
 end Solcore.Frontend

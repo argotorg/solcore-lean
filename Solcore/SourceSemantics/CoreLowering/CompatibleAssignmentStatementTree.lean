@@ -44,7 +44,7 @@ structure Head (readFuel : Nat) (values : ValuesContext) (source : TypedSource)
   right : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope rhs lowered
   rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
   rightType : lowered.type = prepared.route.leafType
-  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false
+  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
 
 namespace Head
 variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource}

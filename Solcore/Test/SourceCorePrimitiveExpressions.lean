@@ -202,7 +202,7 @@ example (output : SourceCoreBasic.LoweredExpr) :
 
 private def sourceResultType : Syntax.BinaryOp → TypeSystem.Ty
   | .multiply | .divide | .modulo | .add | .subtract | .shiftLeft | .shiftRight
-  | .bitAnd | .bitXor | .bitOr => .word
+  | .bitAnd | .bitXor | .bitOr | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .word
   | _ => .bool
 private def operatorSource (operator : Syntax.BinaryOp) : TypedSource := {
   owner, inputs := [], roots := [.expression (id 0)]
@@ -220,7 +220,7 @@ private theorem operatorUnique (operator : Syntax.BinaryOp) : NodeOccurrencesUni
   unfold NodeOccurrencesUnique nodeOccurrenceIds
   cases operator <;> decide
 
-/-- All sixteen strict Word operators pass through the real compiler and the
+/-- All nineteen strict Word operators pass through the real compiler and the
 same independently proved semantic bridge, including swapped comparisons. -/
 example (operator : Syntax.BinaryOp) (strict : Dynamic.StrictBinaryOperator operator)
     (program : Program) (evidence : Dynamic.EvidenceEnvironment) :

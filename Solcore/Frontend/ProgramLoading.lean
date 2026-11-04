@@ -1,5 +1,5 @@
 import Solcore.Workspace
-import Solcore.Syntax.Parser
+import Solcore.Syntax.Unchecked
 import Solcore.Frontend.ProgramEnvironmentProperties
 
 /-! Validation and parsing at the executable whole-program boundary. -/
@@ -25,6 +25,9 @@ inductive ProgramLoadError where
       (source : Workspace.SourceId)
       (lexical : List Syntax.LexicalDiagnostic)
       (parsing : List Syntax.ParseDiagnostic)
+  | uncheckedBlock
+      (source : Workspace.SourceId)
+      (error : Syntax.Unchecked.Error)
   | environment (error : ProgramEnvironmentError)
   deriving Repr
 
@@ -53,12 +56,16 @@ private def parseWorkspaceFile
     (file : Workspace.WorkspaceFile) :
     Except ProgramLoadError Syntax.ParsedFile :=
   let source := syntaxSourceFileOfWorkspaceFile file
-  match Syntax.Parser.parse source with
+  match Syntax.Unchecked.prepare source with
+  | .error error => .error (.uncheckedBlock file.id error)
+  | .ok (blanked, blocks) =>
+  match Syntax.Parser.parse blanked with
   | .error error => .error (.syntaxInvariant file.id error)
   | .ok output =>
       if output.lexicalDiagnostics.isEmpty &&
           output.parseDiagnostics.isEmpty then
-        .ok output.parsed
+        (Syntax.Unchecked.mark (4 * source.content.utf8ByteSize + 4) blocks output.parsed).mapError
+          (.uncheckedBlock file.id)
       else
         .error (.sourceDiagnostics file.id output.lexicalDiagnostics
           output.parseDiagnostics)

@@ -179,7 +179,7 @@ theorem whole {route : Route} {prepared : Prepared}
 /-- Staging changes the retained source type, while the actual modifier uses
 the scalar payload. Zero divisors and negative Integer inputs remain total;
 the shifts take Words only. -/
-theorem staged_modifier (operator : Syntax.ValueAssignOp) (notShift : operator.isShift = false) (left right : Int) :
+theorem staged_modifier (operator : Syntax.ValueAssignOp) (notWordOnly : operator.wordOnly = false) (left right : Int) :
     ∃ result value, ValueRep checked compilation.registry (noFunctions checked.catalog) [] []
       (.comptime .integer) result value .integer ∧
       Dynamic.AssignmentValueApplies operator (some (.integer left)) (.integer right) result ∧
@@ -188,7 +188,7 @@ theorem staged_modifier (operator : Syntax.ValueAssignOp) (notShift : operator.i
         (.inRight .word value) [] ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.integer left)) (.integer right) :=
   CompatiblePlaceModifier.initialized_success (sourceType := .comptime .integer) (operator := operator)
-    (environment := [.integer right, .inRight .unit (.integer left)]) observations (.inr (.inr ⟨rfl, notShift⟩))
+    (environment := [.integer right, .inRight .unit (.integer left)]) observations (.inr (.inr ⟨rfl, notWordOnly⟩))
     (.compatible (actual := .integer) rfl (.integer left)) (.compatible (actual := .integer) rfl (.integer right))
     (.var rfl) (.var rfl) [] Word.zero
 
@@ -246,8 +246,8 @@ def run : IO Unit := do
     | .ok _ => exercise described preparedBy
   for (operator, left, right, expected) in
       [(Syntax.ValueAssignOp.divide, (-7 : Int), 3, -3), (.modulo, -7, 3, 2), (.divide, -7, 0, 0), (.modulo, -7, 0, 0), (.bitAnd, -7, 3, 1)] do
-    if notShift : operator.isShift = false then
-      have _meaning := staged_modifier operator notShift left right
+    if notWordOnly : operator.wordOnly = false then
+      have _meaning := staged_modifier operator notWordOnly left right
       let expression := modified .integer (binaryOperator true operator) false (.var 1) (.var 0) Word.zero
       unless runStateful 50 (.initial expression [.integer right, .inRight .unit (.integer left)] []) == .done (.inRight .word (.integer expected)) [] do
         throw (IO.userError "compatible staged Integer modifier changed independent primitive meaning")

@@ -30,8 +30,9 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .notEqual => .unary .boolNot (.binary .integerEq (.var 1) (.var 0))
   | .logicalAnd => .ifE (.var 1) (.var 0) (.bool false)
   | .logicalOr => .ifE (.var 1) (.bool true) (.var 0)
-  -- Shifts take Words only; typing never lowers one at Integer.
-  | .shiftLeft | .shiftRight => .bool false
+  -- Shifts and unchecked arithmetic take Words only; typing never lowers one
+  -- at Integer.
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .bool false
 
 def binaryOperandType : Syntax.BinaryOp → Core.Ty
   | .logicalAnd | .logicalOr => .bool

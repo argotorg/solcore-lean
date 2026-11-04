@@ -130,7 +130,7 @@ def OperandsTyped (source : TypedSource) : Prop :=
 theorem raw_profile {context : SourceSemantics.Context} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
-    operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false := by
+    operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false := by
   cases typed with
   | equal => exact .inl rfl
   | wordCompound _ place _ _ =>

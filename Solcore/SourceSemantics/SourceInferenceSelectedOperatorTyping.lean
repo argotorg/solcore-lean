@@ -128,6 +128,7 @@ private theorem binary_primitive_substitution {context target : SourceSemantics.
   cases typed with
   | wordArithmetic kind => exact .wordArithmetic kind
   | wordShift kind => exact .wordShift kind
+  | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind
@@ -323,7 +324,7 @@ theorem binaryOperatorInferenceCase_hasType_in_active
       have mapped :=
         binary_primitive_substitution (target := active) (substitution := later.inference.substitution) rfl typing
       simpa only [resolvedLeftEq, resolvedRightEq] using mapped
-  | literalFallback requirementsEq operandsEq typeEq fallback notShift =>
+  | literalFallback requirementsEq operandsEq typeEq fallback notShift notUnchecked =>
       have finalOperandsEq :
           later.inference.substitution.apply left =
             later.inference.substitution.apply right := by
@@ -421,7 +422,7 @@ theorem binaryOperatorInferenceCase_hasType_in_active
               if Detail.binaryResultIsBool operator then .bool
               else .integer := by
             rw [resultTypeEq, leftInteger]
-          have typing := binaryInteger_hasType active operator deferredFacts.1 notShift
+          have typing := binaryInteger_hasType active operator deferredFacts.1 notShift notUnchecked
           simpa only [leftInteger, rightInteger, resultInteger,
             requirementsEq] using typing
       · have stagedFacts :
@@ -450,7 +451,7 @@ theorem binaryOperatorInferenceCase_hasType_in_active
             if Detail.binaryResultIsBool operator then .bool
             else .integer := by
           rw [resultTypeEq, leftInteger]
-        have typing := binaryInteger_hasType active operator stagedFacts.1 notShift
+        have typing := binaryInteger_hasType active operator stagedFacts.1 notShift notUnchecked
         simpa only [leftInteger, rightInteger, resultInteger,
           requirementsEq] using typing
   | @trait trait traitName methodName predicates operandsEq dispatch selected

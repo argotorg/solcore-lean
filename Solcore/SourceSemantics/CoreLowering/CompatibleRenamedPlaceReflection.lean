@@ -62,7 +62,7 @@ theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibl
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -216,7 +216,7 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -265,7 +265,7 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -311,7 +311,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -441,7 +441,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)

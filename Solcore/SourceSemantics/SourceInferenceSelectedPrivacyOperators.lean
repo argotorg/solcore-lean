@@ -320,8 +320,35 @@ theorem inferBinaryOperator_private {protectedVars : List TypeVarId}
       valuedLive.unify rightSafeValued (wordSafe valued) amountResult, ?_⟩
     intro row member fresh
     exact absurd member fresh
-  unfold Detail.inferBinaryOperator at accepted
-  rw [if_neg shift] at accepted
+  by_cases unchecked : Detail.isUncheckedOperator operator = true
+  · obtain ⟨unifiedState, prepared, unified, prepare, tailSuccess⟩ :=
+      Detail.inferBinaryOperator_unchecked_result unchecked accepted
+    have unifiedReady := Detail.unify_preserves_inferenceReady ready leftBelow rightBelow unified
+    have unifiedProgress := Detail.unify_inferenceProgress ready.solved leftBelow rightBelow unified
+    have unifiedPrivacy := ProtectedVariables.unify leftSafe rightSafe unified
+    have operandSafe := unifiedPrivacy _ leftSafe
+    have unifiedLive := live.unify leftSafe rightSafe unified
+    apply prepend_unify leftSafe rightSafe unified
+    rcases prepare with preparedEq | wordResult
+    · rw [preparedEq] at tailSuccess
+      exact finishBinary_private catalog unifiedReady operandSafe unifiedLive
+        (show finishBinary context operator left false unifiedState = .ok result from tailSuccess)
+    · have wordSafe : Safe protectedVars unifiedState .word := by
+        intro metavariable member
+        simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
+          TypeSystem.Ty.freeVariables] at member
+      have operandBelow := unifiedReady.solved.variablesBelow_apply
+        (leftBelow.weaken unifiedProgress.next_le)
+      have preparedReady := Detail.unify_preserves_inferenceReady unifiedReady operandBelow
+        (TypeSystem.Ty.variablesBelow_constructor _ _) wordResult
+      have resolvedSafe := safe_resolved unifiedReady operandSafe
+      have preparedPrivacy := ProtectedVariables.unify resolvedSafe wordSafe wordResult
+      have preparedLive := unifiedLive.unify resolvedSafe wordSafe wordResult
+      exact prepend_unify resolvedSafe wordSafe wordResult
+        (finishBinary_private catalog preparedReady (preparedPrivacy _ operandSafe) preparedLive
+          (show finishBinary context operator left false prepared = .ok result from tailSuccess))
+  unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at accepted
+  rw [if_neg shift, if_neg unchecked] at accepted
   cases unified : Detail.unify state left right with
   | error error => simp [unified, bind, Except.bind] at accepted
   | ok unifiedState =>

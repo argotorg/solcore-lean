@@ -97,7 +97,8 @@ private def meaning (op : Syntax.BinaryOp) (l r : Core.Word) : IO {v : Core.Valu
   | .notEqual => pure ⟨.bool (!(l==r)),.notEqual⟩
   | .lessEqual => pure ⟨.bool (!(decide (l>r))),.lessEqual⟩
   | .greaterEqual => pure ⟨.bool (!(decide (l<r))),.greaterEqual⟩
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => throw (IO.userError "not a strict Word operator")
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => throw (IO.userError "not a strict Word operator")
 
 private def invoke (fs : Syntax.Expr) (made : RuntimeValue) (argument other : Core.Word)
     (s : List RuntimeValue) (src : Syntax.Expr)

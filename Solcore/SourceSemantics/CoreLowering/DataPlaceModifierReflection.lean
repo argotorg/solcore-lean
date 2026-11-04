@@ -27,7 +27,7 @@ theorem evaluates {catalog : SourceCoreDataCatalog.Catalog} {signatures : Progra
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
@@ -53,7 +53,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {signatures : Program
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}

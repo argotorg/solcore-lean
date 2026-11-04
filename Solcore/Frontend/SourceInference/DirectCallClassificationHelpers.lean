@@ -132,7 +132,7 @@ theorem inferBinaryOperator_direct_unchanged
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
     Unchanged state result.state := by
-  unfold inferBinaryOperator at success
+  unfold inferBinaryOperator binaryOperatorTail at success
   simp_all [bind, Except.bind]
   repeat' first | split at success
   all_goals try cases success

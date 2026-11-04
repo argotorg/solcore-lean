@@ -242,7 +242,7 @@ theorem preserves_prefix_bounded_with_producers (budget : Nat) {compilation : So
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -402,7 +402,7 @@ theorem preserves_prefix_bounded (budget : Nat) {compilation : SourceCoreCompati
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -486,7 +486,7 @@ theorem preserves_prefix_bounded (budget : Nat) {compilation : SourceCoreCompati
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -540,7 +540,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -1646,7 +1646,7 @@ theorem preserves_bounded_with_producers_with_receipt (budget : Nat) {compilatio
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -1805,7 +1805,7 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -1884,7 +1884,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -1981,7 +1981,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -2040,7 +2040,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -2114,7 +2114,7 @@ theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compil
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -2250,7 +2250,7 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -2317,7 +2317,7 @@ theorem preserves_bounded_with_diagnostics (budget : Nat) {compilation : SourceC
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -2407,7 +2407,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -2462,7 +2462,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -2514,7 +2514,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)

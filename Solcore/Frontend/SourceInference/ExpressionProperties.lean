@@ -2,6 +2,7 @@ import Solcore.Frontend.SourceInference.Expression
 import Solcore.Frontend.SourceInference.OccurrenceProperties
 import Solcore.Frontend.SourceInference.RequirementProperties
 import Solcore.Frontend.SourceInference.ShiftOperatorInference
+import Solcore.Frontend.SourceInference.UncheckedOperatorInference
 import Solcore.Frontend.SourceInference.StateProperties
 import Solcore.Frontend.SourceInference.TypedIRProperties
 import Solcore.Frontend.ProgramSignatureFormationProperties
@@ -3463,8 +3464,35 @@ theorem inferBinaryOperator_inferenceProperties
     rw [typeEq]
     exact ⟨valueProgress.trans amountProgress, amountReady,
       Ty.variablesBelow_constructor _ _⟩
-  unfold inferBinaryOperator at success
-  rw [if_neg shift] at success
+  by_cases unchecked : isUncheckedOperator operator = true
+  · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
+      inferBinaryOperator_unchecked_result unchecked success
+    have unifyProgress := unify_inferenceProgress ready.solved leftBelow
+      rightBelow unifyResult
+    have unifiedReady := unify_preserves_inferenceReady ready leftBelow
+      rightBelow unifyResult
+    have leftAtUnified : left.VariablesBelow unifiedState.inference.next :=
+      leftBelow.weaken unifyProgress.next_le
+    have tailProperties (preparedReady : prepared.InferenceReady)
+        (leftAtPrepared : left.VariablesBelow prepared.inference.next) :=
+      finishBinaryOperator_inferenceProperties preparedReady leftAtPrepared
+        (show finishBinaryOperator context operator left false prepared = .ok result
+          from tailSuccess)
+    rcases prepare with rfl | wordResult
+    · exact ⟨unifyProgress.trans (tailProperties unifiedReady leftAtUnified).1,
+        (tailProperties unifiedReady leftAtUnified).2⟩
+    · have resolvedLeftBelow :
+          (unifiedState.resolve left).VariablesBelow unifiedState.inference.next :=
+        unifiedReady.solved.variablesBelow_apply leftAtUnified
+      have wordProgress := unify_inferenceProgress unifiedReady.solved
+        resolvedLeftBelow (Ty.variablesBelow_constructor _ _) wordResult
+      have wordReady := unify_preserves_inferenceReady unifiedReady
+        resolvedLeftBelow (Ty.variablesBelow_constructor _ _) wordResult
+      have properties := tailProperties wordReady
+        (leftAtUnified.weaken wordProgress.next_le)
+      exact ⟨unifyProgress.trans (wordProgress.trans properties.1), properties.2⟩
+  unfold inferBinaryOperator binaryOperatorTail at success
+  rw [if_neg shift, if_neg unchecked] at success
   cases unifyResult : unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success
@@ -6257,7 +6285,7 @@ private theorem inferBinaryOperator_state_header
   by_cases shift : isShiftOperator operator = true
   · exact inferBinaryOperator_shift_projection (fun state => state.header)
       (fun unified => unify_state_header unified) shift success
-  unfold inferBinaryOperator at success
+  unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp_all [bind, Except.bind]
   repeat' first | split at success
@@ -6278,7 +6306,7 @@ private theorem inferBinaryOperator_lexicalScope
   by_cases shift : isShiftOperator operator = true
   · exact inferBinaryOperator_shift_projection (fun state => state.lexicalScope)
       (fun unified => unify_preserves_lexicalScope unified) shift success
-  unfold inferBinaryOperator at success
+  unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp only [bind, Except.bind] at success
   cases firstResult : unify state left right with
@@ -6306,7 +6334,7 @@ private theorem inferBinaryOperator_nextLocal
   by_cases shift : isShiftOperator operator = true
   · exact inferBinaryOperator_shift_projection (fun state => state.nextLocal)
       (fun unified => unify_preserves_nextLocal unified) shift success
-  unfold inferBinaryOperator at success
+  unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp only [bind, Except.bind] at success
   cases firstResult : unify state left right with
@@ -12723,6 +12751,9 @@ private theorem inferFuel_inferenceProperties_internal :
       | bitOr => exact finishNonEqual (valueInduction place) success
       | shiftLeft => exact finishNonEqual (valueInduction place) success
       | shiftRight => exact finishNonEqual (valueInduction place) success
+      | uncheckedAdd => exact finishNonEqual (valueInduction place) success
+      | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
+      | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
   case case71 =>
     simp [InferExprsFuelInferenceProperties, inferExprsFuel]
   case case72 =>
@@ -14098,6 +14129,9 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | bitOr => exact finishNonEqual (valueInduction place) success
       | shiftLeft => exact finishNonEqual (valueInduction place) success
       | shiftRight => exact finishNonEqual (valueInduction place) success
+      | uncheckedAdd => exact finishNonEqual (valueInduction place) success
+      | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
+      | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
   -- A grouped place delegates directly to its inner place.
   case case67 =>
     intros

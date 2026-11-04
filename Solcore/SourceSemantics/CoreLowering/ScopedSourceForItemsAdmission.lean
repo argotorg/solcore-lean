@@ -109,7 +109,7 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     ExpressionHasType source context rhs assignment.target.type ∧
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false) := by
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
@@ -146,7 +146,7 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     ExpressionHasType source context rhs assignment.target.type ∧
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false) := by
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with

@@ -39,7 +39,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   layout : CompatibleBareAssignment.Layout values place
   generated : policy.lowerExpression fuel source scope rhs reasonAt = .ok child
   childType : child.type = place.route.leafType
-  operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.isShift = false
+  operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.wordOnly = false
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments []) child.expression
     next output (binaryOperator (place.route.leafType = .integer) operator) false
     (invalidOperand site assignment.target.root operator)

@@ -201,7 +201,7 @@ theorem preserves_structural {compilation : SourceCoreCompatibleDataPlaces.Conte
     (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}

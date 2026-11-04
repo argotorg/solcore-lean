@@ -164,7 +164,7 @@ structure AssignmentReceipt (source : TypedSource) (expressionSyntax : Expressio
     WritableLocal context assignment.target.root binder.scheme.body
   right : ExpressionHasType source context rhs assignment.target.type
   profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-    SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false
+    SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false
   children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
     expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type
 

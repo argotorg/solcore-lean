@@ -21,7 +21,7 @@ theorem modifier_total {sourceType : TypeSystem.Ty} {type : Ty} {initial : Optio
     {identities : Dynamic.Value → Word → Prop}
     (observations : FunctionObservations checked.catalog functions identities)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
     (saved : SnapshotRep checked registry functions mapping world sourceType type initial snapshot)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}

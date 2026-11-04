@@ -159,6 +159,9 @@ inductive PrimitiveBinaryHasType :
   | wordShift {operator : Syntax.BinaryOp}
       (kind : ShiftBinaryOperator operator) :
       PrimitiveBinaryHasType operator .word .word
+  | wordUnchecked {operator : Syntax.BinaryOp}
+      (kind : UncheckedBinaryOperator operator) :
+      PrimitiveBinaryHasType operator .word .word
   | wordComparison {operator : Syntax.BinaryOp}
       (kind : ComparisonBinaryOperator operator) :
       PrimitiveBinaryHasType operator .word .bool
@@ -177,6 +180,7 @@ theorem sourceTyping {context : Context} {operator : Syntax.BinaryOp}
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
   | wordShift kind => exact .wordShift kind
+  | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind
@@ -208,6 +212,10 @@ theorem preserves
         try { cases left_typed } <;> try { cases right_typed } <;>
         exact ValueHasType.integer _
   | wordShift kind =>
+      cases kind <;> cases application <;>
+        try { cases left_typed } <;> try { cases right_typed } <;>
+        exact ValueHasType.word _
+  | wordUnchecked kind =>
       cases kind <;> cases application <;>
         try { cases left_typed } <;> try { cases right_typed } <;>
         exact ValueHasType.word _
@@ -345,6 +353,27 @@ theorem wordCompoundPreserves
           cases current_typed with
           | some left_typed =>
               exact primitive.preserves (.wordShift .shiftRight) left_typed
+                right_typed
+  | uncheckedAdd =>
+      cases applies with
+      | uncheckedAdd primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordUnchecked .uncheckedAdd) left_typed
+                right_typed
+  | uncheckedSubtract =>
+      cases applies with
+      | uncheckedSubtract primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordUnchecked .uncheckedSubtract) left_typed
+                right_typed
+  | uncheckedMultiply =>
+      cases applies with
+      | uncheckedMultiply primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordUnchecked .uncheckedMultiply) left_typed
                 right_typed
 
 end AssignmentValueApplies

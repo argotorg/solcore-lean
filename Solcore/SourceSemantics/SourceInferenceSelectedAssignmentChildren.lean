@@ -195,6 +195,9 @@ theorem inferAssignedValueFuel_children_actual_invariants
       | bitOr => exact finishNonEqual success
       | shiftLeft => exact finishNonEqual success
       | shiftRight => exact finishNonEqual success
+      | uncheckedAdd => exact finishNonEqual success
+      | uncheckedSubtract => exact finishNonEqual success
+      | uncheckedMultiply => exact finishNonEqual success
 
 /-- The actual inferred place and RHS are typed in one enclosing statement
 source.  The place is inferred before the RHS; its recorded type is finally

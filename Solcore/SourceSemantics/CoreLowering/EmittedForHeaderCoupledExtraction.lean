@@ -95,7 +95,7 @@ def assign {context scope assignment operator rhs rest body}
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (headFuel : Nat)
     (prepared : head.PreparedAt site headFuel (invalidProjection site assignment.target.root)
       (missingDefault site assignment.target.root))

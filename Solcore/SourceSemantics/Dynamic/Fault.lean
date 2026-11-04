@@ -634,6 +634,9 @@ inductive NumericBinaryOperator : Syntax.BinaryOp → Prop where
 inductive WordBinaryOperator : Syntax.BinaryOp → Prop where
   | shiftLeft : WordBinaryOperator .shiftLeft
   | shiftRight : WordBinaryOperator .shiftRight
+  | uncheckedAdd : WordBinaryOperator .uncheckedAdd
+  | uncheckedSubtract : WordBinaryOperator .uncheckedSubtract
+  | uncheckedMultiply : WordBinaryOperator .uncheckedMultiply
 
 inductive LogicalBinaryOperator : Syntax.BinaryOp → Prop where
   | logicalAnd : LogicalBinaryOperator .logicalAnd
@@ -690,6 +693,9 @@ inductive AssignmentOperatorBinary :
   | bitOr : AssignmentOperatorBinary .bitOr .bitOr
   | shiftLeft : AssignmentOperatorBinary .shiftLeft .shiftLeft
   | shiftRight : AssignmentOperatorBinary .shiftRight .shiftRight
+  | uncheckedAdd : AssignmentOperatorBinary .uncheckedAdd .uncheckedAdd
+  | uncheckedSubtract : AssignmentOperatorBinary .uncheckedSubtract .uncheckedSubtract
+  | uncheckedMultiply : AssignmentOperatorBinary .uncheckedMultiply .uncheckedMultiply
 
 inductive AssignmentOperandsInvalid :
     Syntax.ValueAssignOp → Option Value → Value → Prop where

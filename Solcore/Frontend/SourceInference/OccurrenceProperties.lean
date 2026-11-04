@@ -2244,7 +2244,7 @@ theorem inferBinaryOperator_occurrenceState_eq
       integerLiterals state = .ok result) :
     result.state.nodes = state.nodes ∧
       result.state.nextOccurrence = state.nextOccurrence := by
-  unfold inferBinaryOperator at success
+  unfold inferBinaryOperator binaryOperatorTail at success
   simp_all [bind, Except.bind]
   repeat' first | split at success
   all_goals try cases success

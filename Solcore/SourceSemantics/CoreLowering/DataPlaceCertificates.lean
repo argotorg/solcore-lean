@@ -68,7 +68,7 @@ inductive Generated (checked : Checked) (signatures : ProgramSignatures) (expres
       (lookup : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, route.rootType))
       (preparedBy : prepare checked fuel route invalidProjection missing = .ok prepared)
       (keysGenerated : ListRel (KeyGenerated expression fuel source scope reasonAt) prepared.keys keys)
-      (operatorValid : operator = .equal ∧ rhs.isNone = false ∨ route.leafType = .word ∨ route.leafType = Core.Ty.integer ∧ operator.isShift = false)
+      (operatorValid : operator = .equal ∧ rhs.isNone = false ∨ route.leafType = .word ∨ route.leafType = Core.Ty.integer ∧ operator.wordOnly = false)
       (rhsGenerated : RhsGenerated expression fuel source scope reasonAt route.leafType rhs value) :
       Generated checked signatures expression fuel source scope site assignment operator rhs outputType next
         reasonAt invalidProjection invalidOperand missing
@@ -103,7 +103,7 @@ theorem generated_of_lower {checked : Checked} {signatures : ProgramSignatures} 
       obtain ⟨prepared, preparedBy, accepted⟩ := bind_ok accepted
       obtain ⟨keys, keysCompiled, accepted⟩ := bind_ok accepted
       have keyCertificate := keys_generated keysCompiled
-      have finish (operatorValid : operator = .equal ∧ rhs.isNone = false ∨ route.leafType = .word ∨ route.leafType = Core.Ty.integer ∧ operator.isShift = false)
+      have finish (operatorValid : operator = .equal ∧ rhs.isNone = false ∨ route.leafType = .word ∨ route.leafType = Core.Ty.integer ∧ operator.wordOnly = false)
           (completed : (show Except SourceCoreBasic.Error Expr from match rhs with
             | none => .ok (execute prepared (.var index) (SourceCoreCalls.packArguments keys)
                 (LanguageResult.success .unit) next outputType
@@ -135,7 +135,7 @@ theorem generated_of_lower {checked : Checked} {signatures : ProgramSignatures} 
           · apply finish (.inr (.inl word)); simpa [same, word, pure, Except.pure, bind, Except.bind] using accepted
           · by_cases integer : route.leafType = Core.Ty.integer
             · apply finish (.inr (.inr ⟨integer, by rw [same]; rfl⟩))
-              simpa [same, integer, Syntax.ValueAssignOp.isShift, pure, Except.pure, bind, Except.bind] using accepted
+              simpa [same, integer, Syntax.ValueAssignOp.wordOnly, pure, Except.pure, bind, Except.bind] using accepted
             · simp [same, word, integer, throw] at accepted
         | some id =>
           apply finish (.inl ⟨same, rfl⟩)
@@ -143,7 +143,7 @@ theorem generated_of_lower {checked : Checked} {signatures : ProgramSignatures} 
       · by_cases word : route.leafType = .word
         · apply finish (.inr (.inl word)); cases rhs <;> simpa [same, word, pure, Except.pure, bind, Except.bind] using accepted
         · by_cases integer : route.leafType = Core.Ty.integer
-          · cases shift : operator.isShift
+          · cases shift : operator.wordOnly
             · apply finish (.inr (.inr ⟨integer, shift⟩))
               cases rhs <;> simpa [same, integer, shift, pure, Except.pure, bind, Except.bind] using accepted
             · simp [same, integer, shift, throw] at accepted

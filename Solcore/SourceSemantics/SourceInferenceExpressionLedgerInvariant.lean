@@ -1028,8 +1028,18 @@ theorem inferBinaryOperator
   · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
       Detail.inferBinaryOperator_shift_result shift success
     exact (LedgerEvolution.trans (.unify valueResult) (.unify amountResult)).preserve tracked
-  unfold Detail.inferBinaryOperator at success
-  rw [if_neg shift] at success
+  by_cases unchecked : Detail.isUncheckedOperator operator = true
+  · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
+      Detail.inferBinaryOperator_unchecked_result unchecked success
+    have tail := finishBinaryOperatorLedger_evolution
+      (show finishBinaryOperatorLedger context operator left false prepared = .ok result
+        from tailSuccess)
+    rcases prepare with rfl | wordResult
+    · exact (LedgerEvolution.trans (.unify unifyResult) tail).preserve tracked
+    · exact (LedgerEvolution.trans (.unify unifyResult)
+        (LedgerEvolution.trans (.unify wordResult) tail)).preserve tracked
+  unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at success
+  rw [if_neg shift, if_neg unchecked] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

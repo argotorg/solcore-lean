@@ -53,7 +53,8 @@ private def resolved (op : Syntax.BinaryOp) (l r : Resolved.Expr) : Resolved.Exp
   | .lessEqual => .unary .boolNot (.binary .wordGt l r)
   | .less => .wordLt l r
   | .greaterEqual => .unary .boolNot (.wordLt l r)
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => .unit
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => .unit
 private def code (op : Syntax.BinaryOp) (l r : Core.Expr) : Core.Expr :=
   match op with
   | .add => .binary .wordAdd l r
@@ -70,7 +71,8 @@ private def code (op : Syntax.BinaryOp) (l r : Core.Expr) : Core.Expr :=
   | .lessEqual => .unary .boolNot (.binary .wordGt l r)
   | .less => l.wordLt r
   | .greaterEqual => .unary .boolNot (l.wordLt r)
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => .unit
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => .unit
 
 private theorem mapped_lookup {environment : Resolved.Environment} {id : Resolved.LocalId}
     {value : Core.Value} (found : Resolved.LocalScope.Lookup environment id value) :

@@ -38,14 +38,19 @@ inductive BinaryOp where
   | notEqual
   | logicalAnd
   | logicalOr
+  /-- `+`, `-` and `*` written in an `unchecked` block. The parser never
+  produces them; `Syntax.Unchecked.mark` does. -/
+  | uncheckedAdd
+  | uncheckedSubtract
+  | uncheckedMultiply
   deriving Repr, BEq, DecidableEq
 
 namespace BinaryOp
 
 /-- Larger values bind more tightly. -/
 def precedence : BinaryOp → Nat
-  | .multiply | .divide | .modulo => 9
-  | .add | .subtract => 8
+  | .multiply | .divide | .modulo | .uncheckedMultiply => 9
+  | .add | .subtract | .uncheckedAdd | .uncheckedSubtract => 8
   | .shiftLeft | .shiftRight => 7
   | .bitAnd => 6
   | .bitXor => 5
@@ -80,6 +85,9 @@ def symbol : BinaryOp → Symbol
   | .notEqual => .notEqual
   | .logicalAnd => .logicalAnd
   | .logicalOr => .logicalOr
+  | .uncheckedAdd => .plus
+  | .uncheckedSubtract => .minus
+  | .uncheckedMultiply => .star
 
 /-- `<<` and `>>` repeat their symbol in a second, adjacent token. -/
 def secondSymbol? : BinaryOp → Option Symbol
@@ -106,6 +114,11 @@ inductive ValueAssignOp where
   | bitOr
   | shiftLeft
   | shiftRight
+  /-- `+=`, `-=` and `*=` written in an `unchecked` block, produced by
+  `Syntax.Unchecked.mark` only. -/
+  | uncheckedAdd
+  | uncheckedSubtract
+  | uncheckedMultiply
   deriving Repr, BEq, DecidableEq
 
 namespace ValueAssignOp
@@ -123,6 +136,9 @@ def symbol : ValueAssignOp → Symbol
   | .bitOr => .pipeEqual
   | .shiftLeft => .less
   | .shiftRight => .greater
+  | .uncheckedAdd => .plusEqual
+  | .uncheckedSubtract => .minusEqual
+  | .uncheckedMultiply => .starEqual
 
 /-- `<<=` and `>>=` are `<` before an adjacent `<=`, and `>` before an
 adjacent `>=`. -/
@@ -135,9 +151,10 @@ def secondSymbol? : ValueAssignOp → Option Symbol
 def tokenCount (operator : ValueAssignOp) : Nat :=
   if operator.secondSymbol?.isSome then 2 else 1
 
-/-- The compound shifts `<<=` and `>>=`. -/
-def isShift : ValueAssignOp → Bool
-  | .shiftLeft | .shiftRight => true
+/-- The compound assignments that take Words only: `<<=`, `>>=` and the
+arithmetic of an `unchecked` block. -/
+def wordOnly : ValueAssignOp → Bool
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => true
   | _ => false
 
 end ValueAssignOp

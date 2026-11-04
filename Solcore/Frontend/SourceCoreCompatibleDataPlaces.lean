@@ -298,9 +298,13 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Core.Binar
   | .bitAnd => some (if integer then .integerAnd else .wordAnd)
   | .bitOr => some (if integer then .integerOr else .wordOr)
   | .bitXor => some (if integer then .integerXor else .wordXor)
-  -- Shifts take Words only; `lower` rejects them at Integer leaves.
+  -- Shifts and unchecked arithmetic take Words only; `lower` rejects them at
+  -- Integer leaves.
   | .shiftLeft => some .wordShl
   | .shiftRight => some .wordShr
+  | .uncheckedAdd => some .wordAdd
+  | .uncheckedSubtract => some .wordSub
+  | .uncheckedMultiply => some .wordMul
 
 def modified (type : Core.Ty) (operator : Option Core.BinaryOp) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
@@ -345,7 +349,7 @@ def lower (context : Context) (signatures : ProgramSignatures) (expression : Exp
     pure key
   let bitNot := rhs.isNone
   if operator ≠ .equal || bitNot then
-    unless route.leafType = .word || (route.leafType = .integer && !operator.isShift) do
+    unless route.leafType = .word || (route.leafType = .integer && !operator.wordOnly) do
       throw (.unsupportedAssignmentOperator operator)
   let rhs ← match rhs with
     | none => pure (Core.LanguageResult.success .unit)

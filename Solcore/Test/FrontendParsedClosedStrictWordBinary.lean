@@ -54,7 +54,8 @@ private def primitive (op : Syntax.BinaryOp) (a b : Core.Word) :
   | .notEqual => some ⟨.bool (!(a==b)),.notEqual⟩
   | .lessEqual => some ⟨.bool (!(decide (a>b))),.lessEqual⟩
   | .greaterEqual => some ⟨.bool (!(decide (a<b))),.greaterEqual⟩
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => none
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => none
 private theorem original (f : Syntax.SourceFile) (op : Syntax.BinaryOp) (w : Nat)
     (a b : Core.Word) (value : Core.Value) (meaning : StrictWordBinaryDenotes op a b value)
     (p : RuntimeValue) (store : List RuntimeValue) :

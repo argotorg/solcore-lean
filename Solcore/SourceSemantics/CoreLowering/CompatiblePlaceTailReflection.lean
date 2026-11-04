@@ -80,7 +80,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)

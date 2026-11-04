@@ -113,7 +113,7 @@ theorem preserves_from_source {checked : SourceCoreDataCatalog.Checked} {signatu
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.isShift = false)
+    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
         OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))

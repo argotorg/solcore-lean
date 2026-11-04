@@ -249,6 +249,9 @@ inductive StrictBinaryOperator : Syntax.BinaryOp → Prop where
   | greaterEqual : StrictBinaryOperator .greaterEqual
   | equal : StrictBinaryOperator .equal
   | notEqual : StrictBinaryOperator .notEqual
+  | uncheckedAdd : StrictBinaryOperator .uncheckedAdd
+  | uncheckedSubtract : StrictBinaryOperator .uncheckedSubtract
+  | uncheckedMultiply : StrictBinaryOperator .uncheckedMultiply
 
 /-- Strict operators with a primitive meaning on `integer`: every strict
 operator but the shifts, which take Words only. -/
@@ -333,6 +336,15 @@ inductive BinaryPrimitiveApplies :
   | wordShiftRight (value amount : Core.Word) :
       BinaryPrimitiveApplies .shiftRight (.word value) (.word amount)
         (.word (value.shiftRight amount))
+  | wordUncheckedAdd (left right : Core.Word) :
+      BinaryPrimitiveApplies .uncheckedAdd (.word left) (.word right)
+        (.word (left.add right))
+  | wordUncheckedSubtract (left right : Core.Word) :
+      BinaryPrimitiveApplies .uncheckedSubtract (.word left) (.word right)
+        (.word (left.sub right))
+  | wordUncheckedMultiply (left right : Core.Word) :
+      BinaryPrimitiveApplies .uncheckedMultiply (.word left) (.word right)
+        (.word (left.mul right))
   | wordBitAnd (left right : Core.Word) :
       BinaryPrimitiveApplies .bitAnd (.word left) (.word right)
         (.word (left.bitAnd right))

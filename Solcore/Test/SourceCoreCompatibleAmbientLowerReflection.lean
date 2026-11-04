@@ -95,7 +95,7 @@ theorem checked_run_reflects {compilation : SourceCoreCompatibleDataPlaces.Conte
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value} {runtimeFuel : Nat}
     (environments : DataHeap.EnvRepresents (definitions := artifact.layouts.definitions) (storageCatalog compilation.checked.catalog)

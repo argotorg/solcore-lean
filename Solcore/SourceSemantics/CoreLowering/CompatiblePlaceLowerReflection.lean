@@ -43,7 +43,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -59,7 +59,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
   have same := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
   have leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type := by
     simpa only [same, nodeType] using rhsView
-  have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false := by
+  have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false := by
     simpa only [leafView] using operatorProfile
   have invalidEq : prepared.invalidProjection = invalid := by
     obtain ⟨route, _, preparedBy⟩ := actualPreparation

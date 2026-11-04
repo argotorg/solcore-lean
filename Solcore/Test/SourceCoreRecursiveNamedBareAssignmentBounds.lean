@@ -60,7 +60,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (rhsView : SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
   (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = .word ∨
-    SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = .integer ∧ operator.isShift = false)
+    SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
   (slot : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, targetPrepared.route.rootType))
   (rootTyped : WritableLocal context assignment.target.root targetPrepared.route.rootSourceType)
 

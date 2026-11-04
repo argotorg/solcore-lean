@@ -41,7 +41,7 @@ structure Head (values : ValuesContext) (source : TypedSource)
   right : certificate scope rhs lowered
   rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
   rightType : lowered.type = prepared.route.leafType
-  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.isShift = false
+  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
 
 namespace Head
 variable {values : ValuesContext} {source : TypedSource}

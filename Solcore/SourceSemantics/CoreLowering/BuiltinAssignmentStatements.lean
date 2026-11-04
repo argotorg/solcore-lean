@@ -35,7 +35,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ CompatibleExpressionBuiltins.Tree readFuel values source context solved reasonAt scope id lowered ∧
@@ -75,7 +75,7 @@ theorem Head.of_contextual_lower
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (children : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       SourceCoreGeneralFunctions.lowerContextualExpression program representation signatures locals parents assignments diagnostics compilation
         (some native) parent skipInitializer fuel source scope id reasonAt = .ok lowered →

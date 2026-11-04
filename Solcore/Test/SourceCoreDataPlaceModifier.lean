@@ -31,14 +31,14 @@ example (operator : Syntax.ValueAssignOp) (left right : Word) (store : Store) :
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) :=
   initialized_success (.inl rfl) (.word left) (.word right) (.var rfl) (.var rfl) store Word.zero
 
-example (operator : Syntax.ValueAssignOp) (notShift : operator.isShift = false) (left right : Int) (store : Store) :
+example (operator : Syntax.ValueAssignOp) (notWordOnly : operator.wordOnly = false) (left right : Int) (store : Store) :
     ∃ result value, ValueRep catalog signatures functions [] [] .integer result value .integer ∧
       Dynamic.AssignmentValueApplies operator (some (.integer left)) (.integer right) result ∧
       Evaluates [.inRight .unit (.integer left), .integer right] store
         (modified .integer (binaryOperator true operator) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.integer left)) (.integer right) :=
-  initialized_success (.inr ⟨rfl, notShift⟩) (.integer left) (.integer right) (.var rfl) (.var rfl) store Word.zero
+  initialized_success (.inr ⟨rfl, notWordOnly⟩) (.integer left) (.integer right) (.var rfl) (.var rfl) store Word.zero
 
 example (left : Int) (store : Store) :
     ∃ value, ValueRep catalog signatures functions [] [] .integer (.integer 0) value .integer ∧

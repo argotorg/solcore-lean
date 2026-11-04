@@ -189,5 +189,8 @@ theorem inferAssignedValueFuel_ledgerPreservation
       | bitOr => exact finishNonEqual success
       | shiftLeft => exact finishNonEqual success
       | shiftRight => exact finishNonEqual success
+      | uncheckedAdd => exact finishNonEqual success
+      | uncheckedSubtract => exact finishNonEqual success
+      | uncheckedMultiply => exact finishNonEqual success
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

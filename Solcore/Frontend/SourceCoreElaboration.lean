@@ -523,6 +523,9 @@ private def directBinary (operator : Syntax.BinaryOp)
   | .subtract => .binary .wordSub left right
   | .shiftLeft => .binary .wordShl left right
   | .shiftRight => .binary .wordShr left right
+  | .uncheckedAdd => .binary .wordAdd left right
+  | .uncheckedSubtract => .binary .wordSub left right
+  | .uncheckedMultiply => .binary .wordMul left right
   | .bitAnd => .binary .wordAnd left right
   | .bitXor => .binary .wordXor left right
   | .bitOr => .binary .wordOr left right
@@ -2609,6 +2612,9 @@ private def stagedCoreBinary? : Syntax.BinaryOp → Option Core.BinaryOp
   | .equal => some .wordEq
   | .shiftLeft
   | .shiftRight
+  | .uncheckedAdd
+  | .uncheckedSubtract
+  | .uncheckedMultiply
   | .less
   | .lessEqual
   | .greaterEqual

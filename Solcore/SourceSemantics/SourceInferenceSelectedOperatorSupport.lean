@@ -315,8 +315,47 @@ theorem inferBinaryOperator
     rw [typeEq]
     exact ⟨fun type supported => amountTransport type (valueTransport type supported),
       wordResolved result.state⟩
-  unfold Detail.inferBinaryOperator at success
-  rw [if_neg shift] at success
+  by_cases unchecked : Detail.isUncheckedOperator operator = true
+  · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
+      Detail.inferBinaryOperator_unchecked_result unchecked success
+    have unifyProgress := unify_inferenceProgress ready.solved leftBelow
+      rightBelow unifyResult
+    have transport := unify ready leftBelow rightBelow leftSupported rightSupported unifyResult
+    have unifiedReady := unify_preserves_inferenceReady ready leftBelow
+      rightBelow unifyResult
+    have leftAtUnified :
+        left.VariablesBelow unifiedState.inference.next :=
+      leftBelow.weaken unifyProgress.next_le
+    rcases prepare with preparedEq | wordResult
+    · rw [preparedEq] at tailSuccess
+      have tailProperties := finishBinaryOperator_supported
+        unifiedReady (transport left leftSupported)
+        (show finishBinaryOperator context operator left false unifiedState = .ok result
+          from tailSuccess)
+      exact ⟨transport.trans tailProperties.1, tailProperties.2⟩
+    · have wordResolved : ∀ any : State, Resolved cutoff roots any .word := by
+        intro any metavariable member
+        simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
+          TypeSystem.Ty.freeVariables] at member
+      have resolvedLeftBelow :
+          (unifiedState.resolve left).VariablesBelow
+            unifiedState.inference.next :=
+        unifiedReady.solved.variablesBelow_apply leftAtUnified
+      have secondTransport := unify unifiedReady resolvedLeftBelow
+        (TypeSystem.Ty.variablesBelow_constructor _ _)
+        (resolved_normalized unifiedReady (transport left leftSupported))
+        (wordResolved unifiedState) wordResult
+      have preparedReady := unify_preserves_inferenceReady
+        unifiedReady resolvedLeftBelow (TypeSystem.Ty.variablesBelow_constructor _ _) wordResult
+      have tailProperties :=
+        finishBinaryOperator_supported preparedReady
+          (secondTransport left (transport left leftSupported))
+          (show finishBinaryOperator context operator left false prepared = .ok result
+            from tailSuccess)
+      exact ⟨transport.trans (secondTransport.trans tailProperties.1),
+        tailProperties.2⟩
+  unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at success
+  rw [if_neg shift, if_neg unchecked] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

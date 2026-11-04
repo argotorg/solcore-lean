@@ -427,6 +427,9 @@ def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
   | .notEqual => .function "ne"
   | .logicalAnd => .function "and"
   | .logicalOr => .function "or"
+  | .uncheckedAdd => .traitMethod "UncheckedAdd" "add"
+  | .uncheckedSubtract => .traitMethod "UncheckedSub" "sub"
+  | .uncheckedMultiply => .traitMethod "UncheckedMul" "mul"
 
 def unaryOperatorDispatch : Syntax.UnaryOp → OperatorDispatch
   | .logicalNot => .function "not"
@@ -498,31 +501,16 @@ def isShiftOperator : Syntax.BinaryOp → Bool
   | .shiftLeft | .shiftRight => true
   | _ => false
 
-def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
-    (left right : Ty) (expected : Option Ty)
-    (integerLiterals : List IntegerLiteralOrigin) (state : State) :
+/-- The arithmetic operators of an `unchecked` block. -/
+def isUncheckedOperator : Syntax.BinaryOp → Bool
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => true
+  | _ => false
+
+/-- Select a binary operator's builtin, deferred or trait meaning once its
+operands share a type. -/
+def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : Ty)
+    (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult := do
-  if isShiftOperator operator then
-    -- A shift types its amount independently of its value, and its result
-    -- has the value's type; both are Words, so open literal operands are
-    -- Words at once. Upstream's `Shl` and `Shr` take two parameters, so
-    -- shifts never dispatch to a program's one-parameter traits.
-    let state ← unify state left .word
-    let state ← unify state right .word
-    return { type := .word, requirements := [], state }
-  let hasOpenLiteralOperand :=
-    isOpenIntegerLiteralTarget state integerLiterals left ||
-      isOpenIntegerLiteralTarget state integerLiterals right
-  let state ← unify state left right
-  let state ← match expected with
-    | some expected =>
-        let operand := state.resolve left
-        if binaryResultIsBool operator || operand.freeVariables.isEmpty ||
-            !hasOpenLiteralOperand then
-          pure state
-        else
-          unify state operand expected
-    | none => pure state
   let operand := state.resolve left
   let builtin := binaryBuiltinType operator
   if operand = builtin then
@@ -571,6 +559,45 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
               }
             else
               throw (.operatorNotSupported traitName operand)
+
+def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
+    (left right : Ty) (expected : Option Ty)
+    (integerLiterals : List IntegerLiteralOrigin) (state : State) :
+    Except Error OperatorInferenceResult := do
+  if isShiftOperator operator then
+    -- A shift types its amount independently of its value, and its result
+    -- has the value's type; both are Words, so open literal operands are
+    -- Words at once. Upstream's `Shl` and `Shr` take two parameters, so
+    -- shifts never dispatch to a program's one-parameter traits.
+    let state ← unify state left .word
+    let state ← unify state right .word
+    return { type := .word, requirements := [], state }
+  if isUncheckedOperator operator then
+    -- Upstream's `UncheckedAdd`, `UncheckedSub` and `UncheckedMul` traits
+    -- cover `word` and the declared types that implement them, never
+    -- `integer`. A literal operand can only be a Word, so it is one at once,
+    -- and the operator never waits for its operands' type as the checked ones
+    -- may.
+    let state ← unify state left right
+    let state ← if isOpenIntegerLiteralTarget state integerLiterals left then
+        unify state (state.resolve left) .word
+      else
+        pure state
+    return ← binaryOperatorTail context operator left false state
+  let hasOpenLiteralOperand :=
+    isOpenIntegerLiteralTarget state integerLiterals left ||
+      isOpenIntegerLiteralTarget state integerLiterals right
+  let state ← unify state left right
+  let state ← match expected with
+    | some expected =>
+        let operand := state.resolve left
+        if binaryResultIsBool operator || operand.freeVariables.isEmpty ||
+            !hasOpenLiteralOperand then
+          pure state
+        else
+          unify state operand expected
+    | none => pure state
+  binaryOperatorTail context operator left hasOpenLiteralOperand state
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
     (operandType : Ty) (expected : Option Ty)

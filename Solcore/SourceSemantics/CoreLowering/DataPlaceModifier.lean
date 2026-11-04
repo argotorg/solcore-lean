@@ -66,10 +66,13 @@ theorem word_success (operator : Syntax.ValueAssignOp) (left right : Word)
   | bitXor => exact ⟨_, .bitXor (.wordBitXor left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
   | shiftLeft => exact ⟨_, .shiftLeft (.wordShiftLeft left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
   | shiftRight => exact ⟨_, .shiftRight (.wordShiftRight left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
+  | uncheckedAdd => exact ⟨_, .uncheckedAdd (.wordUncheckedAdd left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
+  | uncheckedSubtract => exact ⟨_, .uncheckedSubtract (.wordUncheckedSubtract left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
+  | uncheckedMultiply => exact ⟨_, .uncheckedMultiply (.wordUncheckedMultiply left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
 
-/-- Every compound operator but the shifts, which take Words only, has an
-Integer form. -/
-theorem integer_success (operator : Syntax.ValueAssignOp) (notShift : operator.isShift = false) (left right : Int)
+/-- Every compound operator but the shifts and the unchecked arithmetic, which
+take Words only, has an Integer form. -/
+theorem integer_success (operator : Syntax.ValueAssignOp) (notWordOnly : operator.wordOnly = false) (left right : Int)
     {environment : Environment} {snapshot rhs : Expr}
     (snapshotSelected : Selects environment snapshot (.inRight .unit (.integer left)))
     (rightSelected : Selects environment rhs (.integer right)) (store : Store) (invalid : Word) :
@@ -86,14 +89,15 @@ theorem integer_success (operator : Syntax.ValueAssignOp) (notShift : operator.i
   | bitAnd => exact ⟨_, .bitAnd (IntegerPrimitives.bitAnd_source left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
   | bitOr => exact ⟨_, .bitOr (IntegerPrimitives.bitOr_source left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
   | bitXor => exact ⟨_, .bitXor (IntegerPrimitives.bitXor_source left right), binary_modified rfl snapshotSelected rightSelected store invalid⟩
-  | shiftLeft | shiftRight => simp [Syntax.ValueAssignOp.isShift] at notShift
+  | shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply =>
+    simp [Syntax.ValueAssignOp.wordOnly] at notWordOnly
 
 /-- Full authenticated payloads at Word/Integer type expose the matching
 primitive values. No source execution or Core modifier evaluation is assumed. -/
 theorem initialized_success {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
+    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
     (leftRep : ValueRep catalog signatures functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshot rhs : Expr}
@@ -103,7 +107,7 @@ theorem initialized_success {catalog : SourceCoreDataCatalog.Catalog} {signature
       Dynamic.AssignmentValueApplies operator (some left) right result ∧
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
         (.inRight .word value) store ∧ ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
-  rcases numeric with rfl | ⟨rfl, notShift⟩
+  rcases numeric with rfl | ⟨rfl, notWordOnly⟩
   · cases leftRep with
     | word left =>
       cases rightRep with
@@ -115,7 +119,7 @@ theorem initialized_success {catalog : SourceCoreDataCatalog.Catalog} {signature
     | integer left =>
       cases rightRep with
       | integer right =>
-        obtain ⟨result, source, core⟩ := integer_success operator notShift left right snapshotSelected rightSelected store invalid
+        obtain ⟨result, source, core⟩ := integer_success operator notWordOnly left right snapshotSelected rightSelected store invalid
         exact ⟨_, _, .integer result, source, core, assignment_excludes_invalid source⟩
     | constructed nominal => simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.integer] at nominal
 
@@ -124,7 +128,7 @@ with the total primitive result follows from the source rules themselves. -/
 theorem initialized_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
+    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
     (leftRep : ValueRep catalog signatures functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     (source : Dynamic.AssignmentValueApplies operator (some left) right result)

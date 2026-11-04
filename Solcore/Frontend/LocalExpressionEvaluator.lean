@@ -29,7 +29,8 @@ def evaluateLocalWordBinaryWithCost? (operator : Syntax.BinaryOp) (left right : 
   | .notEqual => some (.bool (!(left == right)), 5)
   | .lessEqual => some (.bool (!(decide (left > right))), 5)
   | .greaterEqual => some (.bool (!(decide (left < right))), 11)
-  | .shiftLeft | .shiftRight | .logicalAnd | .logicalOr => none
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .logicalAnd | .logicalOr => none
 
 /-- First-match actual lookup, strict primitives/right-associated tuples and selected-only control
 flow. No store, type context, alignment, uniqueness or spelling validity is needed.
@@ -223,7 +224,7 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
           · simp only [↓reduceIte, pure, Option.some.injEq, Prod.mk.injEq] at result
             obtain ⟨rfl, rfl⟩ := result
             exact .orTrue (evaluateLocalExpressionWithCost?_sound leftResult store)
-        case shiftLeft | shiftRight =>
+        case shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply =>
           simp only [evaluateLocalExpressionWithCost?, bind, Option.bind_eq_some_iff] at accepted
           obtain ⟨⟨actualLeft, leftCost⟩, leftResult, result⟩ := accepted
           cases actualLeft <;> simp only [reduceCtorEq, Option.bind_eq_some_iff] at result

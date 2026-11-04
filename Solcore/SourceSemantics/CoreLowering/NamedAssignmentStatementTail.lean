@@ -71,7 +71,7 @@ theorem Tree.of_assignment_lower {values : ValuesContext} {source : TypedSource}
       WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ child lowered, child ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope child reasonAt = .ok lowered → ∃ childNode,
       source.lookupExpression? child = some childNode ∧ certificate scope child lowered ∧

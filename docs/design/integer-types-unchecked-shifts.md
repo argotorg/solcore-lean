@@ -227,7 +227,9 @@ blocks has no Lean counterpart.
     `+ -` 8 and shifts 7, with the rest as before.
 - **Unary minus.** `UnaryOp` gains `negate` for a prefix `-`.
 - **Blocks.** `StatementValue` gains `unchecked`, parsed when the contextual
-  keyword `unchecked` is followed by `{`.
+  keyword `unchecked` is followed by `{`. (Implemented without the
+  constructor: see [unchecked blocks as
+  implemented](#unchecked-blocks-as-implemented-without-division).)
 - **Desugaring.** A pass between parsing and inference removes every
   `unchecked` statement:
   - It replaces the block with a plain block.
@@ -403,13 +405,47 @@ the operator and panic plumbing first.
 - **Legacy fragments.** The older strict-`word` evaluators leave the shifts
   out.
 
+### Unchecked blocks as implemented, without division
+
+- **No statement form.** Inference reads `Syntax.Statement` itself, and its
+  functional-induction proofs name 514 numbered cases in 25 files, so a
+  `StatementValue` constructor would reach them even though no typed program
+  keeps it. `Syntax.Unchecked` works around the parser instead:
+  - it records each `unchecked` at a statement start (after `{`, `}` or `;`)
+    that is followed by `{`;
+  - it replaces the keyword's bytes with spaces, so the parser reads a plain
+    block statement and every span stays the same;
+  - after parsing, `mark` gives each recorded block's arithmetic its unchecked
+    operators. `ProgramLoading` runs both steps.
+
+  A block written in another block, or a recorded `{` that starts no block
+  statement, is a load error.
+- **Operators.** `BinaryOp` and `ValueAssignOp` gain `uncheckedAdd`,
+  `uncheckedSubtract` and `uncheckedMultiply`, which only the pass produces.
+  - On `word` they type, run and lower as the checked operators.
+  - On a declared type they dispatch to `UncheckedAdd`, `UncheckedSub` and
+    `UncheckedMul`.
+  - On `integer` inference rejects them, since upstream defines no unchecked
+    instance for it.
+  - A literal operand is a `word` at once rather than deferred: with `integer`
+    excluded, `word` is the only literal target left.
+- **Division and remainder.** `/`, `%`, `/=` and `%=` written in a block are a
+  load error (`Syntax.Unchecked.Error.division`). Upstream's unchecked division
+  and remainder panic with `0x12` on a zero divisor, and Lean has no panics
+  yet, so no typing rule, semantic rule or lowering theorem mentions them.
+- **Word-only compound assignment.** `ValueAssignOp.wordOnly` (the shifts and
+  the unchecked arithmetic) replaces row 3's `isShift`. The data-place lowering
+  refuses these operators at `integer` leaves, and the assignment profile its
+  theorems share reads `T = .integer ∧ operator.wordOnly = false`.
+
 **Out of scope:**
 
 - conversions between `word` and the integer types: upstream's are std
   functions, and none of these rows needs them;
 - conversions between two integer types;
 - `pragma solcore;` (row 5);
-- the uninitialized-local difference Q014.
+- reads of uninitialized locals, which Lean keeps faulting on by decision
+  ([closure capture by value](closure-capture-by-value.md)).
 
 ## Consequences for existing programs
 
@@ -423,3 +459,61 @@ Open literals that defaulted to `word` now default to `uint256`:
 
 The tests these changes affect are adjusted in the row-1 commit and listed in
 the hand-over note, with every theorem statement that each commit changes.
+
+## Resume point
+
+The unit is required, and it is paused after row 3 and part of row 2
+(2026-11-04).
+
+**Done.**
+- Row 3, shifts: [shifts as implemented](#shifts-as-implemented).
+- Row 2 without division and remainder:
+  [unchecked blocks as implemented](#unchecked-blocks-as-implemented-without-division).
+
+The public-API tests are `Solcore/Test/SourceCoreShiftExecution.lean` and
+`Solcore/Test/SourceCoreUncheckedExecution.lean`.
+
+**Remaining, in order.**
+
+1. **Panics**, designed once for every unit that needs them: unchecked `/` and
+   `%`, row 1's checked arithmetic, and row 4's array panics. They need:
+   - the fault reason `SemanticFault.panic code` and its fault rules;
+   - a Core failure reason per panic site, with a `RuntimeError.panic`
+     diagnostic;
+   - upstream's 36 bytes of revert data.
+
+   Then the load error on unchecked `/` and `%` is lifted: they become
+   `BinaryOp` and `ValueAssignOp` constructors with their typing, semantics and
+   lowering.
+2. **Row 1**: the twelve types, their literals and the `uint256` default,
+   unary minus, checked arithmetic, the integer types' shifts, unchecked and
+   bitwise operators and comparisons, and the API's canonical-argument check.
+
+**Measured costs.**
+
+- **Panics.** The lowering proofs relate each expression fault to its Core
+  failure token through hypotheses such as `uninitialized : ∀ id location,
+  faults (.uninitializedLocation location) (reasonAt id)`. That hypothesis
+  appears about 300 times as a premise or field (405 occurrences counting the
+  places it is supplied), in some of the 543 files under
+  `Solcore/SourceSemantics/CoreLowering` that mention it. A panic needs the
+  same for `.panic code`.
+- **Row 1's values.** A new exact `Dynamic.Value` constructor reaches every
+  proof that matches on values. 62 files under `Solcore/SourceSemantics` name
+  the `integer` value constructor in a case, and the lowering's value
+  representation would gain a matching case.
+
+**Decide first when resuming.**
+
+1. **Panic threading.** Thread `.panic` the way `uninitialized` is threaded,
+   or generalize the fault-to-token hypothesis once, so that later fault
+   reasons and panic codes need no new threading. Pick whichever is cheaper
+   over unchecked division, row 1 and row 4.
+2. **Row 1's values.** Compare an exact `Value` constructor with
+   integer-typed values held as `.word`, where typed operations do the range
+   checks, as upstream's Hull and lane E's Core reference do. Core needs no
+   change either way. If both give upstream's results, prefer the one that
+   touches fewer proofs, and record the choice and the reason here.
+
+Theorem statements that change keep being listed in the lane's hand-over
+note.

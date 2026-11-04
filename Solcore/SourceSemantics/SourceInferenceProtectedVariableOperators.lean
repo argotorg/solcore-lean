@@ -141,8 +141,27 @@ theorem inferBinaryOperator_fixes_protected {protectedVars : List TypeVarId}
     have valuedPrivacy := ProtectedVariables.unify leftSafe (wordSafe state) valueResult
     exact unify_fixes_protected valuedFixed (valuedPrivacy _ rightSafe) (wordSafe valued)
       amountResult
-  unfold Detail.inferBinaryOperator at accepted
-  rw [if_neg shift] at accepted
+  by_cases unchecked : Detail.isUncheckedOperator operator = true
+  · obtain ⟨unifiedState, prepared, unified, prepare, tailSuccess⟩ :=
+      Detail.inferBinaryOperator_unchecked_result unchecked accepted
+    have unifiedReady := Detail.unify_preserves_inferenceReady ready leftBelow rightBelow unified
+    have unifiedPrivacy := ProtectedVariables.unify leftSafe rightSafe unified
+    have operandSafe := unifiedPrivacy _ leftSafe
+    have unifiedFixed := unify_fixes_protected fixed leftSafe rightSafe unified
+    rcases prepare with preparedEq | wordResult
+    · rw [preparedEq] at tailSuccess
+      exact finishOperator_fixes_protected unifiedFixed
+        (show finishBinary context operator left false unifiedState = .ok result from tailSuccess)
+    · have wordSafe : Safe protectedVars unifiedState .word := by
+        intro metavariable member
+        simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
+          TypeSystem.Ty.freeVariables] at member
+      have preparedFixed := unify_fixes_protected unifiedFixed (safe_resolved unifiedReady operandSafe)
+        wordSafe wordResult
+      exact finishOperator_fixes_protected preparedFixed
+        (show finishBinary context operator left false prepared = .ok result from tailSuccess)
+  unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at accepted
+  rw [if_neg shift, if_neg unchecked] at accepted
   cases unified : Detail.unify state left right with
   | error error => simp [unified, bind, Except.bind] at accepted
   | ok unifiedState =>

@@ -141,7 +141,7 @@ theorem source_facts (unique : NodeOccurrencesUnique source)
           generalize targetEq : node.type = target at path
           cases path
           cases operatorTyped with
-          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordComparison _ | integerComparison _ | booleanAnd | booleanOr =>
+          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordUnchecked _ | wordComparison _ | integerComparison _ | booleanAnd | booleanOr =>
             exact False.elim (receipt.nonempty ownedEq)
           | trait staticDispatch operatorProfile proves =>
             obtain ⟨rfl, rfl⟩ := binary_dispatch_unique dispatch staticDispatch

@@ -1586,6 +1586,7 @@ import Solcore.Test.SourceCoreIndexedSessionInvocation
 import Solcore.Test.SourceCoreRootDiscovery
 import Solcore.Test.SourceCoreExecution
 import Solcore.Test.SourceCoreShiftExecution
+import Solcore.Test.SourceCoreUncheckedExecution
 import Solcore.Test.SourceCoreClosedLambdaPublicExecution
 import Solcore.Test.SourceCoreCapturedLambdaPublicExecution
 import Solcore.Test.SourceCoreCapturedReusePublicExecution
@@ -3892,6 +3893,7 @@ def run : IO Unit := do
   SourceCoreRootDiscovery.run
   SourceCoreExecution.run
   SourceCoreShiftExecution.run
+  SourceCoreUncheckedExecution.run
   SourceCoreClosedLambdaPublicExecution.run
   SourceCoreCapturedLambdaPublicExecution.run
   capturedClosureSessionTests

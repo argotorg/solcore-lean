@@ -52,6 +52,7 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   | wordArithmetic kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordComparison kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordShift kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
+  | wordUnchecked kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | integerArithmetic kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | integerComparison kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | booleanAnd => exact ⟨_, .logicalAnd⟩

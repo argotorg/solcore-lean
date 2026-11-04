@@ -16,7 +16,7 @@ theorem modifier_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right result : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false)
+    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     (applied : Dynamic.AssignmentValueApplies operator snapshot right result)
@@ -31,7 +31,7 @@ theorem modifier_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures
   · subst operator
     cases applied
     exact ⟨rightCore, rightRep, DataPlaceModifier.equal_modified rightSelected store invalid⟩
-  · have numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.isShift = false := profile.resolve_left equal
+  · have numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false := profile.resolve_left equal
     cases snapshotRep with
     | absent => cases applied; exact (equal rfl).elim
     | present represented =>
@@ -59,7 +59,7 @@ theorem preserves {checked : SourceCoreDataCatalog.Checked} {signatures : Progra
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.isShift = false)
+    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
         OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))

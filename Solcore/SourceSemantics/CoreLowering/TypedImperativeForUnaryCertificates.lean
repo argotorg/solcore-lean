@@ -80,7 +80,7 @@ inductive UnarySyntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : UnarySyntax source context (.statements mode rest) expected) : UnarySyntax source context (.statements mode (id :: rest)) expected
 
 
@@ -125,7 +125,7 @@ inductive UnarySyntax (source : TypedSource) :
         WritableLocal context assignment.target.root binder.scheme.body)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false)
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : UnarySyntax source context (.initializers rest condition post statements) expected) : UnarySyntax source context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected
   | bitNot {context mode id node assignment rest expected}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)

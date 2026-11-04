@@ -29,7 +29,7 @@ theorem prepared_operands {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false) :
+    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false) :
     AssignmentOperandDiagnostics.OperandsLaw (OperandRep table) operator
       (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
   apply AssignmentOperandDiagnostics.of_not_equal
@@ -50,7 +50,7 @@ theorem prepared_operands_included {source : TypedSource} {first : Nat} {table :
     (included : ∀ reason word, OperandRep table reason word → faults reason word)
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false) :
+    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false) :
     AssignmentOperandDiagnostics.OperandsLaw faults operator
       (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
   intro previous right invalid
@@ -91,7 +91,7 @@ theorem Head.reachable_of_token
     (prepared : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
     (member : Node.statement node ∈ source.nodes)
     (occurs : SourceCoreAssignmentFaultSites.Certificates.OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false)
+    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (missing : ∀ {root resolved reason word count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason word count → faults reason word)
     (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
@@ -116,7 +116,7 @@ theorem Head.of_prepared_policy
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : ExpressionHasType source context rhs assignment.target.type)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.isShift = false)
+    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ child,
       source.lookupExpression? id = some child ∧ certificate scope id lowered ∧
@@ -135,11 +135,11 @@ theorem Head.of_prepared_policy
       AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid := by
   rw [policy_assignment] at accepted
   have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false := by
-    rcases rawProfile with equal | word | ⟨integer, notShift⟩
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false := by
+    rcases rawProfile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
     · exact .inr (.inl (by rw [word]; rfl))
-    · exact .inr (.inr ⟨by rw [integer]; rfl, notShift⟩)
+    · exact .inr (.inr ⟨by rw [integer]; rfl, notWordOnly⟩)
   obtain ⟨head, emitted, same⟩ := Head.of_lower_with_token unique signatures sourceTyped writable rightTyped profile extract accepted typed
   exact ⟨head, emitted, same, same.symm ▸ prepared_operands_included included prepared member occurs rawProfile⟩
 

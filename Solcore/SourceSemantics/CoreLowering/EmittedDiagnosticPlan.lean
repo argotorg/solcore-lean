@@ -28,7 +28,7 @@ inductive Plan (factory : AssignmentDiagnosticOrigins.Factory tracked diagnostic
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (rightTyped : ExpressionHasType source context rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false) : Plan factory
+        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) : Plan factory
   | unary {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {assignment : AssignmentResolution}
       (head : CompatibleBitNotStatements.Head context scope assignment)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
@@ -65,7 +65,7 @@ structure LocalReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Fu
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (_rightTyped : ExpressionHasType source context rhs assignment.target.type)
     (_profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.isShift = false), factory.residual head registry faults
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false), factory.residual head registry faults
   unary : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment)
     (_writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)

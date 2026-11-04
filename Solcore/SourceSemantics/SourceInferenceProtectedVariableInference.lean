@@ -1495,6 +1495,9 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
       | bitOr => exact finishNonEqual (valueIH place) success
       | shiftLeft => exact finishNonEqual (valueIH place) success
       | shiftRight => exact finishNonEqual (valueIH place) success
+      | uncheckedAdd => exact finishNonEqual (valueIH place) success
+      | uncheckedSubtract => exact finishNonEqual (valueIH place) success
+      | uncheckedMultiply => exact finishNonEqual (valueIH place) success
   case case39 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition thenBody elseBody statementEq

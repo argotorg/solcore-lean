@@ -33,6 +33,13 @@ inductive ShiftBinaryOperator : Syntax.BinaryOp → Prop where
   | shiftLeft : ShiftBinaryOperator .shiftLeft
   | shiftRight : ShiftBinaryOperator .shiftRight
 
+/-- `+`, `-` and `*` of an `unchecked` block. On `word` they wrap like the
+checked operators. -/
+inductive UncheckedBinaryOperator : Syntax.BinaryOp → Prop where
+  | uncheckedAdd : UncheckedBinaryOperator .uncheckedAdd
+  | uncheckedSubtract : UncheckedBinaryOperator .uncheckedSubtract
+  | uncheckedMultiply : UncheckedBinaryOperator .uncheckedMultiply
+
 /-- Comparison spellings whose primitive result is Boolean. -/
 inductive ComparisonBinaryOperator : Syntax.BinaryOp → Prop where
   | less : ComparisonBinaryOperator .less
@@ -55,6 +62,9 @@ inductive BinaryTraitDispatch : Syntax.BinaryOp → String → String → Prop w
   | bitOr : BinaryTraitDispatch .bitOr "BitOr" "bor"
   | greater : BinaryTraitDispatch .greater "Ord" "gt"
   | equal : BinaryTraitDispatch .equal "Eq" "eq"
+  | uncheckedAdd : BinaryTraitDispatch .uncheckedAdd "UncheckedAdd" "add"
+  | uncheckedSubtract : BinaryTraitDispatch .uncheckedSubtract "UncheckedSub" "sub"
+  | uncheckedMultiply : BinaryTraitDispatch .uncheckedMultiply "UncheckedMul" "mul"
 
 /-- Unary operator forms with trait dispatch. -/
 inductive UnaryTraitDispatch : Syntax.UnaryOp → String → String → Prop where
@@ -122,6 +132,9 @@ inductive BinaryOperatorHasType (context : Context) :
   | wordShift {operator : Syntax.BinaryOp}
       (kind : ShiftBinaryOperator operator) :
       BinaryOperatorHasType context operator .word .word .word []
+  | wordUnchecked {operator : Syntax.BinaryOp}
+      (kind : UncheckedBinaryOperator operator) :
+      BinaryOperatorHasType context operator .word .word .word []
   | wordComparison {operator : Syntax.BinaryOp}
       (kind : ComparisonBinaryOperator operator) :
       BinaryOperatorHasType context operator .word .word .bool []
@@ -165,7 +178,7 @@ theorem requirements_valid
     (typing : BinaryOperatorHasType context operator left right result requirements) :
     RequirementIdsValid context requirements := by
   cases typing with
-  | wordArithmetic | integerArithmetic | wordShift | wordComparison |
+  | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
       integerComparison | booleanAnd | booleanOr => simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
