@@ -1,3 +1,11 @@
+
+/-!
+# Emitted source syntax
+
+The abstract syntax of the fragment the renderers print. Main declarations: `Expr`, `Stmt`,
+`FunctionDecl`, `BinaryOp`, `UnaryOp`, `LocalType`.
+-/
+
 /-! Abstract syntax of the Rust-dialect source fragment printed by the source
 renderers and their wrappers: the closed (`run()`), runtime-input,
 named-helper and aggregate (`run(uint256)`) contracts. This is the source side

@@ -1,5 +1,12 @@
-import Solcore.Synthesis.Core.GeneratorV2
+import Solcore.Synthesis.Core.Generator
 import Solcore.Core.Wire.Codec.Program
+
+/-!
+# Enum plans
+
+User enum declarations, closed instances and values, as plans for the original Core reference. Main
+declarations: `Enums.Decl`, `Enums.Ty`, `Enums.Value`, `Enums.Form`.
+-/
 
 /-! User-defined enum declarations, their closed instances and values, as
 plans for the original Core reference. An enum is a right-nested Core sum of

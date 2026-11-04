@@ -1,6 +1,13 @@
 import Std
 
 /-!
+# Seeds
+
+The deterministic stream every generator draws from. Main declarations: `Seed`, `Seed.ofNat`,
+`Seed.draw`.
+-/
+
+/-!
 A small source of deterministic choices for Core synthesis.
 
 The algorithm is intentionally part of the public replay contract. Changing its

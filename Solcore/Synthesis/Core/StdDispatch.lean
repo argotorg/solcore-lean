@@ -1,6 +1,13 @@
 import Solcore.Core.Primitive
 import Solcore.Core.Wire.Codec.Program
 
+/-!
+# The std dispatcher
+
+The Core reference of the pinned std dispatcher that stateful profiles sit behind. Main
+declarations: `StdDispatch.host`, `StdDispatch.readAt`.
+-/
+
 /-! Core expressions for the pinned std's dispatcher and calldata decoder,
 shared by the std-modeling wrappers of malformed calldata. Calldata is read
 through the exact input host functions: `inputDataSize`, `inputDataByte?` and

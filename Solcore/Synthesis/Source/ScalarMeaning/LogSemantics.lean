@@ -1,4 +1,12 @@
-import Solcore.Synthesis.Source.ScalarMeaning.RollbackSemantics
+import Solcore.Synthesis.Source.ScalarMeaning.FragmentSemantics
+
+/-!
+# Meaning of log programs
+
+Rollback programs that may also write memory and emit logs. This file stays apart from
+`FragmentSemantics`, whose `loadMeaning` would lend its matcher to `memoryLoadMeaning` and rename
+the binder of its equations. Main declarations: `LogStmt`, `LogOutcome`.
+-/
 
 /-! Log programs: rollback programs that may also write memory and emit logs,
 as a separate grammar and meaning, so the rollback fragment and every result

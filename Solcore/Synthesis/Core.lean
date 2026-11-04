@@ -1,34 +1,20 @@
 import Solcore.Synthesis.Core.Seed
 import Solcore.Synthesis.Core.Fragment
-import Solcore.Synthesis.Core.WordFunction
-import Solcore.Synthesis.Core.WordFunctionDAG
-import Solcore.Synthesis.Core.LocalMutationDAG
-import Solcore.Synthesis.Core.AggregateDAG
-import Solcore.Synthesis.Core.BoundedLoop
-import Solcore.Synthesis.Core.NestedLoop
-import Solcore.Synthesis.Core.Recursion
-import Solcore.Synthesis.Core.RecursiveLoop
-import Solcore.Synthesis.Core.LoopClosure
-import Solcore.Synthesis.Core.GenericPlan
-import Solcore.Synthesis.Core.ClosurePlan
-import Solcore.Synthesis.Core.ComptimePlan
-import Solcore.Synthesis.Core.ModulePlan
-import Solcore.Synthesis.Core.StorageContract
-import Solcore.Synthesis.Core.StorageRollback
-import Solcore.Synthesis.Core.KeyedStorage
-import Solcore.Synthesis.Core.DynamicArray
-import Solcore.Synthesis.Core.EventLog
-import Solcore.Synthesis.Core.CallValue
-import Solcore.Synthesis.Core.DynamicBytes
-import Solcore.Synthesis.Core.ForwardedCall
-import Solcore.Synthesis.Core.StorageMapping
-import Solcore.Synthesis.Core.StorageLedger
-import Solcore.Synthesis.Core.LongBytes
-import Solcore.Synthesis.Core.NestedArray
-import Solcore.Synthesis.Core.NestedCall
-import Solcore.Synthesis.Core.FeatureMask
-import Solcore.Synthesis.Core.GeneratorV2
+import Solcore.Synthesis.Internal.Functions
+import Solcore.Synthesis.Internal.Aggregates
+import Solcore.Synthesis.Internal.Loops
+import Solcore.Synthesis.Internal.LanguageFeatures
+import Solcore.Synthesis.Internal.Storage
+import Solcore.Synthesis.Internal.AbiValues
+import Solcore.Synthesis.Internal.AdtStorage
+import Solcore.Synthesis.Internal.Calls
 import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink
+
+/-!
+# Core synthesis
+
+Imports the checked Core side of case synthesis.
+-/
 
 /-! Public umbrella for reproducible, checked Semantic Core case synthesis. -/

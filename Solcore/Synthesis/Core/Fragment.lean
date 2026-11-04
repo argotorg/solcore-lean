@@ -1,5 +1,13 @@
 import Solcore.Core.Wire.Host
 
+/-!
+# The checked fragment
+
+The checker-sealed Word fragment. `CheckedWordProgram.wellTyped` gives Core typing of an admitted
+program, and says nothing about a source emitter. Main declarations: `CheckedWordProgram`, `Target`,
+`Feature`, `acceptsAt`.
+-/
+
 /-! The checker-sealed, syntax-independent Word fragment used for synthesis. -/
 
 set_option autoImplicit false

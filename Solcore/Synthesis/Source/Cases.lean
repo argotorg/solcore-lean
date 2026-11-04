@@ -4,6 +4,14 @@ import Solcore.Synthesis.Core.Generator
 import Solcore.Synthesis.Core.Shrink
 import Solcore.Synthesis.Source.Emitter
 
+/-!
+# Case shapes
+
+Replayable cases and corpora keep the original checked Core computation. Observations use the Core
+machine. Main declarations: `caseSchema`, `corpusSchema`, `observe`, `generateCases`, `replayCase`,
+`savedMask`, `savedRevision`.
+-/
+
 /-! Replayable source cases retain the original checked Core computation.
 Observations use the existing Core machine. Source emission is independently
 checked by the Rust compiler in the external comparison runner. -/

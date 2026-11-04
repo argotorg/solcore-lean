@@ -2,6 +2,13 @@ import Solcore.Core.Primitive
 import Solcore.Core.Wire.Codec.Program
 import Solcore.Synthesis.Core.Fragment
 
+/-!
+# Shrinking
+
+Candidates stay in the checked fragment and strictly reduce a declared measure. Main declarations:
+`Complexity`, `complexity`, `ShrinkCandidate`.
+-/
+
 /-! Deterministic, checker-sealed shrinking for the pure G0 Core fragment. -/
 
 set_option autoImplicit false
