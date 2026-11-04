@@ -2,9 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateScopeReturn
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
 
 /-!

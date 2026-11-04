@@ -16,7 +16,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 
 /-!
 # Cell-aware scopes: expressions

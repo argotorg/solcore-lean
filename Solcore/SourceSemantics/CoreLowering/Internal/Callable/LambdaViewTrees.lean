@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinTree
 import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchStructuralElimination
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 import Solcore.SourceSemantics.CoreLowering.BuiltinBodySemanticReceipt
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 

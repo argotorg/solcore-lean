@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedScopedStatementMeaning
 

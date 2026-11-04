@@ -1,5 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
-import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTailReflection
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceRhsReflection

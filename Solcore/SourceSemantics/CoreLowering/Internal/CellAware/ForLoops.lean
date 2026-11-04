@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHea
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries

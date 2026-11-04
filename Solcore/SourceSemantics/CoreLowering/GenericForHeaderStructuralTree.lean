@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderStructuralElimination
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 
 /-! The actual structural receipt supplies the same-code success-prefix Tree.
 Assignment and unary payloads are retained by the receipt and are consumed

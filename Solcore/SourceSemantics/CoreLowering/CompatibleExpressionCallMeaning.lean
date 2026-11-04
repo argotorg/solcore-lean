@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
 

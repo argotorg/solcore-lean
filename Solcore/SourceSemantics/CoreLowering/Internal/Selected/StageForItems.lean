@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
-import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageWhileMatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation

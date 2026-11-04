@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeCatalogPayloadContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState

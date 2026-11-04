@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 
 /-! Fault posts remain beside each actual ready tuple. These interfaces neither

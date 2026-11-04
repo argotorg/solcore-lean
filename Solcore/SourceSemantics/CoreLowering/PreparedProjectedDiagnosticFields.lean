@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 
 /-! Project a reached diagnostic packet at its actual prepared shape before
 specializing the ambient definitions of the mixed caller. -/

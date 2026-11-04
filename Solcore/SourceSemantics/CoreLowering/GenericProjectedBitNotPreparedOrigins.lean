@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
-import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 
 /-! The unary head's preparation is tied to its exact layout site. Diagnostic
 laws refer only to genuine reached missing/default and uninitialized phases. -/

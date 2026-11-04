@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionSource
-import Solcore.SourceSemantics.CoreLowering.ProtectedExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! Ordinary named call heads retain actual selection, static concrete bodies
 and real protected installed globals. Canonical administrative observations are

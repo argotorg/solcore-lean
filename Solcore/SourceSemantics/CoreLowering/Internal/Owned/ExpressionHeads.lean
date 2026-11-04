@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 
 /-! Actual ordered arguments hand their reached pool to the selected named
 invocation. The original canonical global slot is a separate caller receipt;

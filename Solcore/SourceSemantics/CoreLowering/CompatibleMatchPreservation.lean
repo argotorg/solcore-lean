@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 
 /-! Finite forward correspondence for the actual compatible match head.
 Independent source allocation determines the selected lexical environment;

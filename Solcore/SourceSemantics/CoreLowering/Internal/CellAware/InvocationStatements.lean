@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationExpressions
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.SourceLetDeclarationFacts
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions

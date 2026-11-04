@@ -1,16 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
-import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderLegacyPreservation
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeCatalogPayloadContracts
-import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeCatalogReady
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeHead
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeForPreservation
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeCatalogGoals
 
 /-!
 # Recursive named rows: for loops

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupledExtraction
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchStructuralElimination
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 
 /-! Static elimination is assembled with the actual chosen constructor fields.
 The original extraction keeps its exact Tree, Plan and diagnostic receipts.

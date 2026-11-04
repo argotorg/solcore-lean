@@ -28,8 +28,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormatio
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocation
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateScopeReturn
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 

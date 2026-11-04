@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! The lexical tree uses one fixed physical frame and stable native token.
 Every allocation consumes its actual reached-state witness and a real live

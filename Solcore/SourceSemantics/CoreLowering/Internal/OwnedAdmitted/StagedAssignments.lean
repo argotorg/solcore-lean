@@ -2,14 +2,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBound
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyMeaning
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.ProtectedStagedProjectedTail
-import Solcore.SourceSemantics.CoreLowering.ProtectedStagedProjectedCommit
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementHead
-import Solcore.SourceSemantics.CoreLowering.ProtectedStagedProjectedFaults
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedStagedBareAssignment
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 
 /-!
 # Admitted staged profile: assignments

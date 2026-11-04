@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.Core.LocalLoop
 import Solcore.Core.OptionalCell
 import Solcore.Core.LanguageResult
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeapOperations
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation

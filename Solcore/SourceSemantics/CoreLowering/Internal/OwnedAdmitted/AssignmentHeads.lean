@@ -1,14 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateBareAssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderSourceSites
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderStructuralTree
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateForReady
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
-import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 
 /-!

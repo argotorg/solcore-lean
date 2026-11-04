@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
 
 /-! One concrete named expression family closes every statement child, including

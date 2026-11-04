@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ForLoops
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.FaultingBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
@@ -21,7 +21,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SourceForLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SourceFlowLifting

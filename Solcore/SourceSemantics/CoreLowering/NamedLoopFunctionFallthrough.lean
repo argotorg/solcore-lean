@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 
 /-! Function-mode fallthrough fixes the raw result annotation in the same
 recursive guarded grammar. This follows from independent source control and

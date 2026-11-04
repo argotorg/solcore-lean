@@ -2,18 +2,18 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoop
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
-import Solcore.SourceSemantics.CoreLowering.ProtectedCellStagedBareAssignment
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.CellStagedBareAssignment
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementHead
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.PreparedProjectedDiagnosticFields
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 
 /-!
 # Cell-aware scopes: assignments

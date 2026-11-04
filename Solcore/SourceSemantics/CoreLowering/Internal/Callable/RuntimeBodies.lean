@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateFunctionFinishReady
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 
 /-!
 # Callable runtime: bodies

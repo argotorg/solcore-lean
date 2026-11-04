@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlTree
 import Solcore.SourceSemantics.CoreLowering.LoopStatementLayout
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! Mode-aware source let inversion and actual marked allocation. The helpers
 retain the snapshot, marker, and source payload cells and live frame lookup. -/

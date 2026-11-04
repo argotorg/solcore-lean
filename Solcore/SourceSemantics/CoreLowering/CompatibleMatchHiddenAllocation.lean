@@ -1,7 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmPrefix
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMarkedAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! The hidden scrutinee is an internal scope reference, never a source lexical
 binder. Its independent source cell retains the complete scrutinee type even

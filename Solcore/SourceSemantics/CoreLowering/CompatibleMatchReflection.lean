@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 
 /-! Completed actual compatible match evaluation constructs the independent
 source scrutinee, ordered selection, selected body and restored control. The

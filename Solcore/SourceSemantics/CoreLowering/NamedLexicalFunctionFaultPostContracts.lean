@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalFlowFaultPostContracts
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeControl
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
 
 /-! The lexical post embeds into the actual five-way flow tuple and remains

@@ -1,7 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchHiddenPrefix
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! The actual hidden-cell prefix derives runtime typing for both surviving
 scrutinee temporaries and its new payload reference. Raw source type and erased

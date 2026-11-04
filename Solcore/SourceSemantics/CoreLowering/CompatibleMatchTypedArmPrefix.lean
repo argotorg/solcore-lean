@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedArmAllocation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmPrefix
 

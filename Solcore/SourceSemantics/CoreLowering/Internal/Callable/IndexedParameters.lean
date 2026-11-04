@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.FunctionArguments
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMarkedAllocation
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-!
 # Indexed callables: parameters

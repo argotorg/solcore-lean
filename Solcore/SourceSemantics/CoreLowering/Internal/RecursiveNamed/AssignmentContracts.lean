@@ -1,13 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.ProtectedExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTailReflection
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceSuccess
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNotNative
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotMeaning
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionReady
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 
 /-!
 # Recursive named rows: assignment contracts

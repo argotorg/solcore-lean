@@ -1,8 +1,8 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocationOrdinary
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-! Two-way finite continuation agreement for the actual marked compatible
 match arm prefix. Only a completely matched arm allocates source binders. The

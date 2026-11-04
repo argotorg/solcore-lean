@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForReflection
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForEndpoint
 

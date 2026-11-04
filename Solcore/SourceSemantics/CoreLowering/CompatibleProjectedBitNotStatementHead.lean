@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
-import Solcore.SourceSemantics.CoreLowering.ProtectedStagedProjectedBitNotTail
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjectedBitNot
 
 /-! A projected unary head retains only the actual key children. The compiler's
 Unit slot has no corresponding Source expression. -/

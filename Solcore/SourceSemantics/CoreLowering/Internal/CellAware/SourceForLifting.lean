@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SourceFlowLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageAssignments
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageWhileMatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.Loops

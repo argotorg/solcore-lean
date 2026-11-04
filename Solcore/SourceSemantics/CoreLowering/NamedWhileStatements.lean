@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedWhileEndpoint
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.WhileLoops
 import Solcore.SourceSemantics.CoreLowering.NamedWhileEdges
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileCertificates
 

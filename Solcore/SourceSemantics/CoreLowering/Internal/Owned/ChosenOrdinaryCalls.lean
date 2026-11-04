@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderCoupledReadyBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 
 /-!
 # Owned callables: chosen ordinary calls

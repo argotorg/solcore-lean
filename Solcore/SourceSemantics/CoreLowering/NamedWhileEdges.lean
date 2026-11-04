@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedWhileBodyEdges
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignments
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalAssignments
 
 /-! Concrete named expression and lexical/assignment Trees close both while

@@ -3,9 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalSourceSites
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 
 /-!

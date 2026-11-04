@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatementReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
 
 /-! Concrete recursive named-call expression trees close lexical initializer,

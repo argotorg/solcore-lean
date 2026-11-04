@@ -10,10 +10,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateMarkedAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateCellAllocation
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionCallsHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 
 /-!
 # Owned callables: canonical and physical caller state
