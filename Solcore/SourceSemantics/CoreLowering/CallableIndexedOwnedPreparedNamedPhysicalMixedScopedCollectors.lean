@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPhysicalMixedScopedRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedStaticSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
 
 /-! The accepted named scoped compiler action issues physical mixed roots at
 each reached lexical context. Exact header slots cover reached declarations;

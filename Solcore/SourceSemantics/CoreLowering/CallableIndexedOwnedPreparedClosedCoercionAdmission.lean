@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosedCoercionSelection
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
 
 /-! Finite checks on original implementation heads, predicates and actual
 selected method shapes construct the closed coercion catalog. Full Source

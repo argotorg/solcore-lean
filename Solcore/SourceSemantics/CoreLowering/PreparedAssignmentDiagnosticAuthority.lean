@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceReachedDiagnostics
 
 /-! Assignment tokens retain their exact specialized Source and compiler

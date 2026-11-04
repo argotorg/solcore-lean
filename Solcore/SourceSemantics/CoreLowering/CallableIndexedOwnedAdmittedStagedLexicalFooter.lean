@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLexicalPreservation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 
 /-! The actual function footer consumes lexical flow without changing its
 heap, returned value, or nested failure. Only an accepted unit fallthrough

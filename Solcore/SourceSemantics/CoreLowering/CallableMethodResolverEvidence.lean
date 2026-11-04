@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 
 /-! A retained method dictionary is accepted only when the actual method
 materializer and the method caller's resolver produce the same complete list.

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeadContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedConditionalHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForSourceTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedForItemsTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 
 /-! The same compiler tree contains statement sequences and for initializer

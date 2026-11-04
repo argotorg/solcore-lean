@@ -1,12 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPayloadReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedArgumentRows
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 
 /-! A direct named handle keeps its genuine Header, Source dictionary and full
 stored native capture. Packed inputs use that Header's actual parameter row;

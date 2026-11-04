@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedConditionalHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedConditionalSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 /-! Conditional heads use the actual staged condition and selected arm. The
 outer statement fold owns fallthrough sequencing and restores its original

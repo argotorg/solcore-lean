@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrimitiveSourceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSourceAdmissionTransport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPrimitiveMethodTerminalSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 
 /-! A finite check of the actual cache supplies terminal primitive method
 packets. Original method selection, Source typing and the full dictionary come

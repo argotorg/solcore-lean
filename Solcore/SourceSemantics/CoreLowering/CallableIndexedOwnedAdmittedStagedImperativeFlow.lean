@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLexicalFlow
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareAssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentShapeFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 
 /-! Straight-line compiler statements include bare plain assignment, lexical
 allocation, discard and return. Strict child bounds run the original recursive

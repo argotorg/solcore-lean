@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLe
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyRestorationAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions

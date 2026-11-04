@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyBranchingTree
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Lean
 

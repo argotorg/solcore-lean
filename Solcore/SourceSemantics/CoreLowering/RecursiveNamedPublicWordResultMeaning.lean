@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.Frontend.SourceCoreIndexedSession
 

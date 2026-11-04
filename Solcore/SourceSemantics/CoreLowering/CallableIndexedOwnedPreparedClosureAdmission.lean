@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodTerminalSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinaryMethodRoots
 
 /-! Finite original-source lambda checks cover ordinary terminal roots and the
 existing constrained coerced terminal roots. Catalog capability controls the

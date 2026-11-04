@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicCurrentFactoryValues
 
 /-! Actual declaration frames supply the callable type and independent Source

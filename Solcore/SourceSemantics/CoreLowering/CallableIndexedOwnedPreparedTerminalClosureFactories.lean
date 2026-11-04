@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectStageScopeReceipts
 

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedReadDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 
 /-! Original lambda formation retains actual diagnostic issuer tokens on used
 body expressions. The current public receiving table decodes that same issuer;

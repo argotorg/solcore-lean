@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLexicalFlow
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 
 /-! Straight-line lexical statements retain their actual Source contexts and
 marked native allocations. Child bounds are strict numeric hypotheses; the

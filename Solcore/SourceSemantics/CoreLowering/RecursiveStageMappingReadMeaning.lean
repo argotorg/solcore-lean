@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCompletion
 

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicContinuations
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicFailures
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.InitializedPublicBounds
 
 /-! An accepted public start selects its original native checkpoint, complete
 Source header and original input encoding. Current history fixes the starting

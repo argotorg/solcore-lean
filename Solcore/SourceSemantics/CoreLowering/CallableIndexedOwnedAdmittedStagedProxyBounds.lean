@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLiteralGroupBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyMeaning
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 

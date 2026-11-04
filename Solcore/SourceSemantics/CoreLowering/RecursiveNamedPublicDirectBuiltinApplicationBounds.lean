@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinArgumentRows
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 
 /-! The authentic builtin identity supplies its ordered parameter row. The
 primitive application proof keeps the caller, heap and store unchanged while

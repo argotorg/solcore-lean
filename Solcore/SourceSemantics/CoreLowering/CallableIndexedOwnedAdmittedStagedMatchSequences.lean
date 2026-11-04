@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedMatchHeads
 import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedMatchSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 /-! Match heads restore the selected lexical scope before the actual suffix.
 Returning and failing bypass that suffix; a genuine default-stopping receipt

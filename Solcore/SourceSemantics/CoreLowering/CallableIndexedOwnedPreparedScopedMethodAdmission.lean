@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedScopedAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSourceAdmissionTransport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodEvidenceScopedRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots
 
 /-! Actual cached method sources are checked for scoped declaration calls.
 Selected principals retain their full evidence and exact SourceAt context. -/

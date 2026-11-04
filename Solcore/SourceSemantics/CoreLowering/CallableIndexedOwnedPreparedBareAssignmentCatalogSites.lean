@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentShapeFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 
 /-! Bare plain assignments have no reachable place or operand diagnostic.

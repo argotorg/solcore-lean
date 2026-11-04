@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedConditionalHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBlockSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 /-! Scoped blocks restore their original lexical bindings before the suffix,
 while retaining the reached heap and owned caller. Returning or failing bypasses

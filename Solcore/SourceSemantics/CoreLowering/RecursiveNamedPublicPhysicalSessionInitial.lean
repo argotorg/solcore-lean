@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalProgramSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 
 /-! A genuine fresh bootstrap, its finite resume history and the actual public
 start construct the first Source heap and returned physical function history.

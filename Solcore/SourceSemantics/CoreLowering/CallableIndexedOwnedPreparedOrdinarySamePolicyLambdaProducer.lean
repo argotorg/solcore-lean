@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSamePolicyLambdaProducer
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGeneralBodyViewReadPolicy
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 
 /-! A nested ordinary lambda retains the exact policy, compiler view and child
 budget of the closure being invoked. Its Site is derived from that accepted

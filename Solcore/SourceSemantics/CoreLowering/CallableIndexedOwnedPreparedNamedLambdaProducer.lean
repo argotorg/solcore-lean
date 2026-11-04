@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProducerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 
 /-! The actual named terminal callback retains one literal lambda Site, its
 original compiler view and complete policy. Bootstrap acceptance removes only

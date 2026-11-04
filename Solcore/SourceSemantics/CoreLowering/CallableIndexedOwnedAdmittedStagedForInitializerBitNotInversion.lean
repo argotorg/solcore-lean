@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeadContracts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 set_option autoImplicit false
 set_option Elab.async false

@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormatio
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaScopeDeclarations
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalBodyTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 
 /-!
 # Generalized locals: reads

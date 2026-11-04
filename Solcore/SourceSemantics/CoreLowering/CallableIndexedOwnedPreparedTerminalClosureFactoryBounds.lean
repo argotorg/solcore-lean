@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureFactories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalClosureParentPreservation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 
 /-! Actual body certificates feed strict staged children and the original
 closure application producers. The accepted compiler Tree supplies TerminalFor

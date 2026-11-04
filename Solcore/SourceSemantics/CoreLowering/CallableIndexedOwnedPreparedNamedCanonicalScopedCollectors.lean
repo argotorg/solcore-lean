@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedCanonicalScopedRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 
 /-! Authentic named compiler trees retain canonical or legacy static children.
 The general-expression convenience derives every child from its original

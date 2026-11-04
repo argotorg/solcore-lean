@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparation
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationErasedStageCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalCallsReady
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagnosticSources
 
 /-!

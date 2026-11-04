@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodTerminalSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 
 /-! Exact cached compilation authenticates assignment inventories at the full
 original method source, retaining its own selector rather than an ordinary header. -/

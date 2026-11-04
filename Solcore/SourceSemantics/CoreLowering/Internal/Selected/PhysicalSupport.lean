@@ -1,12 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PreparedMethodRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalCellOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedReturnLambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedScopedRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
@@ -17,7 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstrapRootState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinArgumentRows
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 
 /-!
 # Selected compilations: physical support

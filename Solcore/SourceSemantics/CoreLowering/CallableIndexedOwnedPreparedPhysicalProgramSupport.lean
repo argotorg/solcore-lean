@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
 import Solcore.SourceSemantics.CoreLowering.CompatibleRegistryDiagnosticExtension
 
 /-! Static coverage of the actual named, closure and method bodies supplies both

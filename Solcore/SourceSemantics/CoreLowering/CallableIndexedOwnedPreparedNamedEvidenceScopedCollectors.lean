@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedEvidenceScopedRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 
 /-! Actual scoped compiler trees issue evidence-aware expression support.
 Local initialization, assignment and control flow retain the full caller

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 
 /-! Bare assignment diagnostics retain their actual fixed fault interpretation.

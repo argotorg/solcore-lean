@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureFactories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalClosureParentPreservation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 
 /-! The accepted same-Code compiler factory exposes its exact used body child.
 A singleton certificate keeps that scope, expression and lowered child through

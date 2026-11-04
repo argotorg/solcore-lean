@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicCheckpointReceiver
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions

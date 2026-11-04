@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinarySequenceCallers
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicApplicationResult
 
 /-! Direct packed application reuses the established numeric body family.

@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicSessionSteps
 import Solcore.SourceSemantics.CoreLowering.PublicSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageCalls
 import Solcore.SourceSemantics.Staging.RecursiveCallableErasure

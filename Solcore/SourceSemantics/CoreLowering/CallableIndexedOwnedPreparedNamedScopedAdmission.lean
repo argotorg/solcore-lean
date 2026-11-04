@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
 
 /-! Finite original-source statement admission supplies scoped named bodies.
 Independent Header typing recovers lexical contexts and loop typing through

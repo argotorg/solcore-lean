@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinaryMethodRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
 
 /-! Compiler-derived scoped body certificates use the existing branching closure

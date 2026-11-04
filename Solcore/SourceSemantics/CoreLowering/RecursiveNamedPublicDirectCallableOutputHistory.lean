@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallablePublicHistory
 
 /-! Direct successful output collection reuses the actual export and full

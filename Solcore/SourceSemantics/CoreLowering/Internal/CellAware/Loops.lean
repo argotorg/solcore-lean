@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.LoopCoreInversion
 import Solcore.SourceSemantics.CoreLowering.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileSequences
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedWhileSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 /-!
 # Cell-aware while loops

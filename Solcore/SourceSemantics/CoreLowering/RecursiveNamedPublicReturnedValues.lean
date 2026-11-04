@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 
 /-! A successful public payload retains the actual semantic result and the

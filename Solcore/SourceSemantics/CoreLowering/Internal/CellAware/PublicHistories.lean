@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.Dynamic.Preservation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeap
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicApplicationResult
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicNestedOutputCollection
