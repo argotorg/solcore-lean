@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotNative
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 
 /-! Exact syntax transport of the absent-RHS bare assignment. Its helper
 closures are created in the actual environment; no existing captured closure

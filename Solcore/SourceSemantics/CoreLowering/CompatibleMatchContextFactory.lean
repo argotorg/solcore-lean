@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternRuntime
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity

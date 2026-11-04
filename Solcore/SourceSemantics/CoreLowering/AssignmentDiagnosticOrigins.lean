@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeForTrees
 
 /-! Static provenance of operand diagnostics. Header items retain the owning
 for statement and their suffix position. Raw scalar eligibility is obtained

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 
 /-!

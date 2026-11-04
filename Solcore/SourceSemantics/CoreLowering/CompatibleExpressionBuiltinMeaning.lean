@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyMeaning

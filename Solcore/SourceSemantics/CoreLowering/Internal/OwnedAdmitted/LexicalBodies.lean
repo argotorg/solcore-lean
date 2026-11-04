@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions

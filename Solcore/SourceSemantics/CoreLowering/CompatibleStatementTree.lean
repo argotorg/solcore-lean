@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualConstructors
 import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 
 /-! A fixed-scope function sequence with ordinary compatible expressions.
 The static source spine retains raw result types and independent expression

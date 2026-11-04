@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericMatchAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
 import Solcore.Frontend.SourceCoreFunctions
 
 /-! The actual parameter wrapper allocates source and Core cells in the same

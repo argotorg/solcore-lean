@@ -4,9 +4,9 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaw
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForMeaning
 import Solcore.SourceSemantics.CoreLowering.NativeExpressionRenamingSupport
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 
 /-!
 # Recursive named rows: catalog expressions

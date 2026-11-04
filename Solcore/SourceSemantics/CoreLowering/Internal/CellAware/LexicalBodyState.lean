@@ -1,15 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 
 /-!
 # Cell-aware lexical body state

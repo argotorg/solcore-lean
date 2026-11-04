@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementInitializedCertificates
-import Solcore.SourceSemantics.CoreLowering.LoopStatementLayout
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 
 /-! Initialization runs in the old scope before any binder allocation. Its
 failure keeps that context and its exact heap effects. Success creates the real

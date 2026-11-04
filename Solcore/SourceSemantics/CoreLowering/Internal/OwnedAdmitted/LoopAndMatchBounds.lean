@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFo
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.WhileLoops
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralNativeTyping
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
 
 /-! Contracted builtins share the existing recursive data/control grammar at

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 

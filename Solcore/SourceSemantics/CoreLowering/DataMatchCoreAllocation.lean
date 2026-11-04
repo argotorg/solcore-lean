@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.DataMatchAllocation
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
-import Solcore.SourceSemantics.CoreLowering.LoopStatementLayout
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 
 /-! Exact continuation correspondence for the binder-allocation prefix emitted
 by bindArm. The proof constructs source allocation and follows the actual Core

@@ -2,8 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.Loops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
-import Solcore.SourceSemantics.CoreLowering.LoopCoreInversion
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationForLoops

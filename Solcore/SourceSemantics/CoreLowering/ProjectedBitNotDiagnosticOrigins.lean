@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationCoverage
 
 /-! Projected unary sites reuse the actual unary occurrence grammar. Their

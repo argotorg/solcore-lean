@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallTypedCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize

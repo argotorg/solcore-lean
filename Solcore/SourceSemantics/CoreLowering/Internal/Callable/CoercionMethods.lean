@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
-import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 
 /-!
 # Coercions: methods and paths

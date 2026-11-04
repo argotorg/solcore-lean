@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeWhileComposition
-import Solcore.SourceSemantics.CoreLowering.NamedLexicalFlowFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedLexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries

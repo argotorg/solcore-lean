@@ -1,0 +1,1552 @@
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
+import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ReachableContinuations
+import Solcore.SourceSemantics.Dynamic.Control
+import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
+import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
+
+/-!
+# Generic lexical statements
+
+Lexical statement trees and meaning, and reachable match continuations.
+-/
+
+section
+-- leanmerge: from Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
+/-! A single lexical statement algebra parameterized by static expression
+certificates. Context changes are kept at each binding; scoped control restores
+the lexical environment while retaining source and administrative allocations.
+No execution or semantic induction hypothesis is stored in the tree. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements
+open Core Frontend SourceInference
+abbrev Scope := SourceCoreLocalCell.Scope
+abbrev ValuesContext := SourceCoreCompatibleValues.Context
+abbrev absentRequest := TypedLexicalControl.absentRequest
+abbrev initializedRequest := TypedLexicalControl.initializedRequest
+abbrev sequence := TypedLexicalControl.sequence
+
+/-- The source which issued a stopped suffix remains separate from a local
+metadata view. Statement lookups and binding provenance are unchanged. -/
+structure StatementSourceIdentity (origin source : TypedSource) : Prop where
+  owner : origin.owner = source.owner
+  inputs : origin.inputs = source.inputs
+  roots : origin.roots = source.roots
+  lookup : ∀ id, origin.lookupStatement? id = source.lookupStatement? id
+
+theorem StatementSourceIdentity.refl (source : TypedSource) : StatementSourceIdentity source source :=
+  ⟨rfl, rfl, rfl, fun _ => rfl⟩
+
+theorem StatementSourceIdentity.trans {origin middle source : TypedSource}
+    (first : StatementSourceIdentity origin middle) (second : StatementSourceIdentity middle source) :
+    StatementSourceIdentity origin source :=
+  ⟨first.owner.trans second.owner, first.inputs.trans second.inputs, first.roots.trans second.roots,
+    fun id => (first.lookup id).trans (second.lookup id)⟩
+
+/-- Static stopping retains the original source and its independent control
+summary. Prefix typing stays at its original source context. -/
+def Stopped (source : TypedSource) (statements : List StatementId) : Prop :=
+  ∃ origin summary, StatementSourceIdentity origin source ∧
+    ReachableStatementContinuations.StoppingStatements origin statements summary
+
+theorem Stopped.of_source {source : TypedSource} {statements : List StatementId} {summary : ControlSummary}
+    (stops : ReachableStatementContinuations.StoppingStatements source statements summary) : Stopped source statements :=
+  ⟨source, summary, .refl source, stops⟩
+
+theorem Stopped.transport {origin source : TypedSource} {statements : List StatementId}
+    (identity : StatementSourceIdentity origin source) (stops : Stopped origin statements) : Stopped source statements := by
+  obtain ⟨issuing, summary, original, stopped⟩ := stops
+  exact ⟨issuing, summary, original.trans identity, stopped⟩
+
+/-- The dead code is the actual compiler suffix at its original issuing source.
+A view transports provenance only; it does not assert callback reacceptance. -/
+def IssuedSuffix (source : TypedSource) (scope : Scope) (mode : Bool) (statements : List StatementId)
+    (type : Ty) (code : Expr) : Prop :=
+  ∃ origin policy fuel reasonAt escaped, StatementSourceIdentity origin source ∧
+    ReachableStatementContinuations.Issued policy fuel origin scope statements type reasonAt mode escaped code
+
+theorem IssuedSuffix.of_accepted {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : Scope} {mode : Bool} {statements : List StatementId} {type : Ty} {code : Expr}
+    {reasonAt : ExpressionId → Word} {escaped : Word}
+    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt mode escaped = .ok code) :
+    IssuedSuffix source scope mode statements type code :=
+  ⟨source, policy, fuel, reasonAt, escaped, .refl source, ⟨accepted⟩⟩
+
+theorem IssuedSuffix.transport {origin source : TypedSource} {scope : Scope} {mode : Bool}
+    {statements : List StatementId} {type : Ty} {code : Expr}
+    (identity : StatementSourceIdentity origin source) (issued : IssuedSuffix origin scope mode statements type code) :
+    IssuedSuffix source scope mode statements type code := by
+  obtain ⟨issuing, policy, fuel, reasonAt, escaped, original, accepted⟩ := issued
+  exact ⟨issuing, policy, fuel, reasonAt, escaped, original.trans identity, accepted⟩
+
+inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Prop) :
+    SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop where
+  | nil {context mode expected} (allowed : mode = false ∨ expected = .unit) : Syntax source expressionSyntax context mode [] expected
+  | returnUnit {context mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt none)
+      (sourceType : node.type = .unit) : Syntax source expressionSyntax context mode (id :: rest) .unit
+  | returnValue {context mode id node expression expressionNode expected} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt (some expression))
+      (sourceType : node.type = expected) (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (valueType : expressionNode.type = expected)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (value : expressionSyntax expression) : Syntax source expressionSyntax context mode (id :: rest) expected
+  | tail {context id node expression expressionNode expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false)
+      (sourceType : node.type = expected) (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (valueType : expressionNode.type = expected)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (value : expressionSyntax expression) : Syntax source expressionSyntax context true [id] expected
+  | uninitialized {context nextContext mode id node binder rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder none)
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (remaining : Syntax source expressionSyntax nextContext mode rest expected) :
+      Syntax source expressionSyntax context mode (id :: rest) expected
+
+  | initialized {context nextContext mode id node binder initializer initializerNode rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
+      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initializerTyped : ExpressionHasType source context initializer initializerNode.type)
+      (initializerSyntax : expressionSyntax initializer)
+      (remaining : Syntax source expressionSyntax nextContext mode rest expected) :
+      Syntax source expressionSyntax context mode (id :: rest) expected
+  | discard {context mode id node expression expressionNode semicolon rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression semicolon)
+      (notTail : (!semicolon && mode && rest.isEmpty) = false)
+      (sourceType : node.type = if semicolon then .unit else expressionNode.type)
+      (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (typed : ExpressionHasType source context expression expressionNode.type)
+      (value : expressionSyntax expression)
+      (remaining : Syntax source expressionSyntax context mode rest expected) : Syntax source expressionSyntax context mode (id :: rest) expected
+  | block {context mode id node statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = .unit)
+      (inner : Syntax source expressionSyntax context false statements expected)
+      (remaining : Syntax source expressionSyntax context mode rest expected) : Syntax source expressionSyntax context mode (id :: rest) expected
+  | ifThen {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+      (sourceType : node.type = .unit)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : Syntax source expressionSyntax context false thenBody expected)
+      (elseSyntax : Syntax source expressionSyntax context false (elseBody.getD []) expected)
+      (remaining : Syntax source expressionSyntax context mode rest expected) : Syntax source expressionSyntax context mode (id :: rest) expected
+
+  | terminalBlock {context mode id node statements rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = expected)
+      (inner : Syntax source expressionSyntax context false statements expected)
+      (stops : Stopped source statements) : Syntax source expressionSyntax context mode (id :: rest) expected
+  | terminalIf {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (sourceType : node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : Syntax source expressionSyntax context false thenBody expected)
+      (elseSyntax : Syntax source expressionSyntax context false elseBody expected)
+      (thenStops : Stopped source thenBody) (elseStops : Stopped source elseBody) :
+      Syntax source expressionSyntax context mode (id :: rest) expected
+
+
+inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
+    (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
+    (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (values : ValuesContext) (source : TypedSource)
+    (expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate) :
+    SourceSemantics.Context → Scope → Bool → List StatementId → TypeSystem.Ty → Ty → Expr → Prop where
+  | nil {context scope mode expected type} (allowed : mode = false ∨ expected = .unit) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode [] expected type (LocalLoop.fallthrough type)
+  | returnUnit {context scope mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt none) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) .unit .unit (LocalLoop.returned .unit)
+  | returnValue {context scope mode id node expression expressionNode expected lowered} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt (some expression))
+      (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (valueType : expressionNode.type = expected)
+      (value : expressions context scope expression lowered) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected lowered.type
+        (LocalLoop.returnValue lowered.type lowered.expression)
+  | tail {context scope id node expression expressionNode expected lowered}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false)
+      (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (valueType : expressionNode.type = expected)
+      (value : expressions context scope expression lowered) :
+      Tree layouts owner active frame globals onError values source expressions context scope true [id] expected lowered.type
+        (LocalLoop.returnValue lowered.type lowered.expression)
+  | uninitialized {context nextContext scope mode id node binder rest expected type body payload}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder none)
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (projected : values.checked.catalog.project binder.scheme.body = .ok payload)
+      (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (absentRequest source scope binder payload))
+      (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (absentRequest source scope binder payload))
+      (same : annotation.original = allocation.expression)
+      (remaining : Tree layouts owner active frame globals onError values source expressions
+        nextContext ((binder.id, payload) :: scope) mode rest expected type body) :
+      Tree layouts owner active frame globals onError values source expressions
+        context scope mode (id :: rest) expected type (.letE annotation.expression body)
+  | initialized {context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type}
+      (found : source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initial : expressions context scope initializer lowered)
+      (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (initializedRequest source scope binder lowered.type))
+      (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (initializedRequest source scope binder lowered.type))
+      (same : annotation.original = allocation.expression)
+      (remaining : Tree layouts owner active frame globals onError values source expressions nextContext ((binder.id, lowered.type) :: scope) mode rest expected type body) :
+      Tree layouts owner active frame globals onError values source expressions
+        context scope mode (id :: rest) expected type (sequence type lowered.expression annotation.expression body)
+
+  | discard {context scope mode id node expression expressionNode semicolon rest expected lowered type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression semicolon)
+      (notTail : (!semicolon && mode && rest.isEmpty) = false)
+      (expressionFound : source.lookupExpression? expression = some expressionNode)
+      (value : expressions context scope expression lowered)
+      (remaining : Tree layouts owner active frame globals onError values source expressions context scope mode rest expected type body) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalSequence.discard (LocalLoop.controlType type) lowered.expression body)
+  | block {context scope mode id node statements rest expected type innerCode body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : Tree layouts owner active frame globals onError values source expressions context scope false statements expected type innerCode)
+      (remaining : Tree layouts owner active frame globals onError values source expressions context scope mode rest expected type body) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type innerCode body)
+  | ifThen {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree layouts owner active frame globals onError values source expressions context scope false thenBody expected type thenCode)
+      (elseTree : Tree layouts owner active frame globals onError values source expressions context scope false (elseBody.getD []) expected type elseCode)
+      (remaining : Tree layouts owner active frame globals onError values source expressions context scope mode rest expected type body) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) body)
+
+  | terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : Tree layouts owner active frame globals onError values source expressions context scope false statements expected type innerCode)
+      (stops : Stopped source statements)
+      (issued : IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type innerCode suffix)
+  | terminalIf {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree layouts owner active frame globals onError values source expressions context scope false thenBody expected type thenCode)
+      (elseTree : Tree layouts owner active frame globals onError values source expressions context scope false elseBody expected type elseCode)
+      (thenStops : Stopped source thenBody) (elseStops : Stopped source elseBody)
+      (issued : IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) suffix)
+
+
+/-- The existing reached-context relation is shared by all profiles. -/
+abbrev Reached := CompatibleStatementMixed.Reached
+
+end Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements
+end
+
+section
+-- leanmerge: from Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+/-! Generic lexical composition consumes expression meaning only inside this
+module. Concrete profiles supply it from their static expression trees; the
+public builtin consumer does not require a runtime child induction hypothesis.
+Allocation, renaming, frame protection and scoped restore use the existing
+compiler helper laws. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedHistory CallableIndexedAllocationCompletion
+open TypedScopedStatements (Executes FlowRep not_tail head_fault terminal_intro prepend source_view)
+open TypedLexicalControl (LexicalResult source_view_absent source_view_initialized sequence_rename allocate_absent allocate_initialized valid_extend
+  Preserves Reflects HeadPreserves HeadReflects block_preserves block_reflects sequence_preserves sequence_reflects
+  restore_rep restored selected_intro)
+open CompatibleExpressionPrimitives (bool_fields)
+
+private theorem stopped_restore_terminal {outcome : Dynamic.ControlOutcome}
+    (outer : Dynamic.Environment) (terminal : Dynamic.TerminalControl outcome) :
+    Dynamic.TerminalControl (Dynamic.restoreControl outer outcome) := by
+  cases terminal with
+  | returned value => exact .returned value
+  | breaking _ => exact .breaking outer
+  | continuing _ => exact .continuing outer
+  | fault reason => exact .fault reason
+
+theorem Stopped.list_terminates {origin source : TypedSource} {statements : List StatementId} {summary : ControlSummary}
+    (unique : NodeOccurrencesUnique source) (identity : StatementSourceIdentity origin source)
+    (stops : ReachableStatementContinuations.StoppingStatements origin statements summary) :
+    ReachableStatementContinuations.ListTerminates source statements := by
+  refine @ReachableStatementContinuations.StoppingStatements.rec origin
+    (fun id _ _ => ReachableStatementContinuations.StatementTerminates source id)
+    (fun statements _ _ => ReachableStatementContinuations.ListTerminates source statements)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.returnUnit unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .returned .unit
+  · intro _ _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, value, same, _⟩ := ScalarStatementViews.returnValue unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .returned value
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.breaking unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .breaking _
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.continuing unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .continuing _
+  · intro _ _ _ _ found form _ bodyIH
+    intro _ _ _ _ environment _ _ _ trace
+    obtain ⟨_, _, _, same, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ stopped_restore_terminal environment (bodyIH false body)
+  · intro _ _ _ _ _ _ _ found form _ _ leftIH rightIH
+    intro _ _ _ _ environment _ _ _ trace
+    obtain ⟨_, boolean, _, _, _, _, same, body⟩ :=
+        ScalarStatementViews.ifThen unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    cases boolean with
+    | false => exact same ▸ stopped_restore_terminal environment (rightIH false body)
+    | true => exact same ▸ stopped_restore_terminal environment (leftIH false body)
+  · intro _ _ _ _ _ _ _ _ _ _ _ found form present casesTyped _ _ _ _ armsIH defaultIH
+    exact ReachableStatementContinuations.source_match_terminal unique
+      ((identity.lookup _).symm.trans found) form present casesTyped armsIH defaultIH
+  · intro _ _ _ head headIH
+    intro _ _ _ _ _ _ _ _ mode trace
+    obtain ⟨_, found, notTail⟩ := head.not_tail
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound ((identity.lookup _).symm.trans found))
+        (by intro _ _; exact notTail) trace with ⟨_, _, _, first, _⟩ | ⟨_, terminal⟩
+    · cases headIH first
+    · exact terminal
+  · intro _ _ _ _ _ _ _ _ found _ tail tailIH
+    intro _ _ _ _ _ _ _ _ mode trace
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound ((identity.lookup _).symm.trans found))
+        (by intro _ empty; exact False.elim (tail.nonempty empty)) trace with ⟨_, _, _, _, rest⟩ | ⟨_, terminal⟩
+    · exact tailIH mode rest
+    · exact terminal
+
+/-- A terminal head retains its own complete execution; no suffix trace is
+required or extracted. This also covers a nonempty, compiled dead suffix. -/
+theorem Stopped.terminates {source : TypedSource} {statements : List StatementId}
+    (unique : NodeOccurrencesUnique source) (stopped : Stopped source statements) :
+    ReachableStatementContinuations.ListTerminates source statements := by
+  obtain ⟨origin, summary, identity, stops⟩ := stopped
+  exact Stopped.list_terminates unique identity stops
+
+theorem block_terminates {source : TypedSource} {id : StatementId} {node : StatementNode} {statements : List StatementId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .block statements) (stops : Stopped source statements) :
+    ReachableStatementContinuations.StatementTerminates source id := by
+  intro program context finalContext evidence environment before after outcome trace
+  obtain ⟨_, _, _, same, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound found) form trace
+  exact same ▸ stopped_restore_terminal environment (stops.terminates unique false body)
+
+theorem conditional_terminates {source : TypedSource} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {left right : List StatementId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .ifThen condition left (some right)) (leftStops : Stopped source left) (rightStops : Stopped source right) :
+    ReachableStatementContinuations.StatementTerminates source id := by
+  intro program context finalContext evidence environment before after outcome trace
+  obtain ⟨_, boolean, _, _, _, _, same, body⟩ := ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form trace
+  cases boolean with
+  | false => exact same ▸ stopped_restore_terminal environment (rightStops.terminates unique false body)
+  | true => exact same ▸ stopped_restore_terminal environment (leftStops.terminates unique false body)
+
+inductive ControlShape (mode : Bool) (expected : TypeSystem.Ty) : Dynamic.ControlOutcome → Prop where
+  | fallthrough (environment : Dynamic.Environment) (allowed : mode = false ∨ expected = .unit) :
+      ControlShape mode expected (.fallthrough environment)
+  | returned (value : Dynamic.Value) : ControlShape mode expected (.returned value)
+
+private theorem restored_terminal {mode : Bool} {expected : TypeSystem.Ty}
+    {environment : Dynamic.Environment} {outcome : Dynamic.ControlOutcome}
+    (shape : ControlShape false expected outcome)
+    (terminal : Dynamic.TerminalControl (Dynamic.restoreControl environment outcome)) :
+    ControlShape mode expected (Dynamic.restoreControl environment outcome) := by
+  cases shape with
+  | fallthrough => cases terminal
+  | returned value => exact .returned value
+
+/-- This is a syntax inversion over the independent successful source judgment,
+not a semantic assumption supplied by a caller. It also handles false-mode
+scoped children whose enclosing result type may be non-Unit. -/
+theorem syntax_control_shape {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {mode : Bool} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source expressionSyntax context mode statements expected)
+    (unique : NodeOccurrencesUnique source)
+    {program : Program} {actualContext finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (executed : ScalarStatementViews.ListExecutes mode program actualContext evidence source environment before
+      statements finalContext outcome after) : ControlShape mode expected outcome := by
+  induction syntaxTree generalizing actualContext finalContext environment before after outcome with
+  | nil allowed =>
+    obtain ⟨_, rfl, _⟩ := ScalarStatementViews.nil_view _ executed
+    exact .fallthrough _ allowed
+  | @returnUnit context mode id node rest found form sourceType =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, _⟩
+    · obtain ⟨_, impossible, _⟩ := ScalarStatementViews.returnUnit unique contains form head
+      cases impossible
+    · obtain ⟨_, rfl, _⟩ := ScalarStatementViews.returnUnit unique contains form head
+      exact .returned _
+  | @returnValue context mode id node expression expressionNode expected rest found form sourceType expressionFound valueType typed value =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ other; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, _⟩
+    · obtain ⟨_, _, impossible, _⟩ := ScalarStatementViews.returnValue unique contains form head
+      cases impossible
+    · obtain ⟨_, value, rfl, _⟩ := ScalarStatementViews.returnValue unique contains form head
+      exact .returned value
+  | tail found form sourceType expressionFound valueType typed value =>
+    cases executed with
+    | tailExpression => exact .returned _
+    | singleton contains notTail head =>
+      have same := Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
+      subst_vars
+      exact False.elim (notTail _ form)
+  | @uninitialized context nextContext mode id node binder rest expected found form declaration mono extended ordinary remaining ih =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
+    · exact ih tail
+    · obtain ⟨_, _, rfl, _⟩ := ScalarStatementViews.letUninitialized unique contains form head
+      cases terminal
+  | @initialized context nextContext mode id node binder initializer initializerNode rest expected found form declaration mono extended ordinary initialFound sourceType typed initial remaining ih =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
+    · exact ih tail
+    · obtain ⟨_, _, _, _, rfl, _, _⟩ := ScalarStatementViews.letInitialized unique contains form mono head
+      cases terminal
+  | @discard context mode id node expression expressionNode semicolon rest expected found form guard sourceType expressionFound typed value remaining ih =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (TypedScopedStatements.not_tail form guard) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
+    · exact ih tail
+    · obtain ⟨_, rfl, _, _⟩ := ScalarStatementViews.expression unique contains form head
+      cases terminal
+  | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
+    · exact restIH tail
+    · obtain ⟨_, _, innerOutcome, rfl, innerTrace⟩ := ScalarStatementViews.block unique contains form head
+      exact restored_terminal (innerIH innerTrace) terminal
+  | @ifThen context mode id node condition conditionNode thenBody elseBody rest expected found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax remaining thenIH elseIH restIH =>
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
+    · exact restIH tail
+    · obtain ⟨_, boolean, _, _, innerOutcome, _, rfl, branchTrace⟩ := ScalarStatementViews.ifThen unique contains form head
+      cases boolean with
+      | false => exact restored_terminal (elseIH branchTrace) terminal
+      | true => exact restored_terminal (thenIH branchTrace) terminal
+
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases block_terminates exactUnique found form stops head
+    · obtain ⟨_, _, _, rfl, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound found) form head
+      exact restored_terminal (innerIH body) terminal
+  | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases conditional_terminates exactUnique found form thenStops elseStops head
+    · obtain ⟨_, boolean, _, _, _, _, rfl, body⟩ := ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form head
+      cases boolean with
+      | false => exact restored_terminal (elseIH body) terminal
+      | true => exact restored_terminal (thenIH body) terminal
+
+/-- The actual function-mode source fallthrough fixes the raw result annotation.
+The separate original projection receipt subsequently fixes its native type. -/
+theorem true_fallthrough_unit {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source expressionSyntax context true statements expected)
+    (unique : NodeOccurrencesUnique source)
+    {program : Program} {actualContext finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment nextEnvironment : Dynamic.Environment} {before after : Dynamic.Heap}
+    (trace : Executes true program actualContext evidence source environment before
+      statements finalContext (.fallthrough nextEnvironment) after) : expected = .unit := by
+  cases source_view trace with
+  | control executed =>
+    cases syntax_control_shape syntaxTree unique executed with
+    | fallthrough _ allowed => exact allowed.resolve_left (by decide)
+
+/-- A successful ordinary source-control derivation cannot masquerade as its
+separate language-fault judgment, including through nested lexical scopes. -/
+theorem control_not_fault {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {mode : Bool} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source expressionSyntax context mode statements expected)
+    (unique : NodeOccurrencesUnique source)
+    {program : Program} {actualContext finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (executed : ScalarStatementViews.ListExecutes mode program actualContext evidence source environment before
+      statements finalContext (.fault reason) after) : False := by
+  cases syntax_control_shape syntaxTree unique executed
+
+
+section Source
+variable {program : Program} {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+  {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+  {mode : Bool} {id : StatementId} {node : StatementNode} {rest : List StatementId} {outcome : Dynamic.ControlOutcome}
+
+private theorem nil_executes (mode : Bool) (program : Program) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource)
+    (environment : Dynamic.Environment) (heap : Dynamic.Heap) :
+    Executes mode program context evidence source environment heap [] context (.fallthrough environment) heap := by
+  cases mode <;> exact .control .nil
+
+private theorem return_unit_view
+    (unique : NodeOccurrencesUnique source) (contains : ContainsStatement source id node)
+    (form : node.form = .returnStmt none)
+    (trace : Executes mode program context evidence source environment before (id :: rest) finalContext outcome after) :
+    finalContext = context ∧ outcome = .returned .unit ∧ after = before := by
+  have notTail : mode = true → rest = [] → ∀ expression, node.form ≠ .expression expression false := by
+    intro _ _ expression; simp [form]
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique contains notTail executed with ⟨_, _, _, head, _⟩ | ⟨head, _⟩
+    · obtain ⟨_, impossible, _⟩ := ScalarStatementViews.returnUnit unique contains form head; cases impossible
+    · exact ScalarStatementViews.returnUnit unique contains form head
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique contains notTail failed with ⟨_, head⟩ | ⟨_, _, _, head, _⟩
+    · exact False.elim (ScalarStatementViews.returnUnit_cannot_fault unique contains form head)
+    · obtain ⟨_, impossible, _⟩ := ScalarStatementViews.returnUnit unique contains form head; cases impossible
+
+private theorem return_value_view {expression : ExpressionId}
+    (unique : NodeOccurrencesUnique source) (contains : ContainsStatement source id node)
+    (form : node.form = .returnStmt (some expression))
+    (trace : Executes mode program context evidence source environment before (id :: rest) finalContext outcome after) :
+    finalContext = context ∧ ∃ expressionOutcome,
+      Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before expression expressionOutcome after ∧
+      outcome = (match expressionOutcome with | .value value => .returned value | .fault reason => .fault reason) := by
+  have notTail : mode = true → rest = [] → ∀ expression, node.form ≠ .expression expression false := by
+    intro _ _ expression; simp [form]
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique contains notTail executed with ⟨_, _, _, head, _⟩ | ⟨head, _⟩
+    · obtain ⟨_, _, impossible, _⟩ := ScalarStatementViews.returnValue unique contains form head; cases impossible
+    · obtain ⟨same, value, rfl, child⟩ := ScalarStatementViews.returnValue unique contains form head
+      exact ⟨same, _, .value child, rfl⟩
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique contains notTail failed with ⟨same, head⟩ | ⟨_, _, _, head, _⟩
+    · exact ⟨same, _, .fault (ScalarStatementViews.returnValue_fault unique contains form head), rfl⟩
+    · obtain ⟨_, _, impossible, _⟩ := ScalarStatementViews.returnValue unique contains form head; cases impossible
+
+private theorem tail_view {expression : ExpressionId}
+    (unique : NodeOccurrencesUnique source) (contains : ContainsStatement source id node)
+    (form : node.form = .expression expression false)
+    (trace : Dynamic.FunctionStatementsExecuteOutcome program context evidence source environment before [id] finalContext outcome after) :
+    finalContext = context ∧ ∃ expressionOutcome,
+      Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before expression expressionOutcome after ∧
+      outcome = (match expressionOutcome with | .value value => .returned value | .fault reason => .fault reason) := by
+  have shape : ∀ other, ContainsStatement source id other → other = node := by
+    intro other present
+    exact Option.some.inj ((lookupStatement?_complete unique present).symm.trans (lookupStatement?_complete unique contains))
+  cases trace with
+  | control executed => cases executed with
+    | tailExpression present same child =>
+      rw [shape _ present, form] at same
+      cases same
+      exact ⟨rfl, _, .value child, rfl⟩
+    | singleton present notTail _ =>
+      have eq := shape _ present; subst_vars
+      exact False.elim (notTail expression form)
+  | fault failed => cases failed with
+    | tailExpression present same child =>
+      rw [shape _ present, form] at same
+      cases same
+      exact ⟨rfl, _, .fault child, rfl⟩
+    | singleton head =>
+      exact ⟨rfl, _, .fault (ScalarStatementViews.expression_fault unique contains form head), rfl⟩
+
+end Source
+
+variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep}
+  (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
+  (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((reasonAt id).add tag))
+
+theorem conditional_preserves (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : Preserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : Preserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadPreserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped trace
+  have selected {boolean : Bool} {middle : Dynamic.Heap} {innerContext : SourceSemantics.Context} {innerOutcome : Dynamic.ControlOutcome}
+      (conditionTrace : Dynamic.ExpressionEvaluates program context evidence source environment before condition (.bool boolean) middle)
+      (branchTrace : Executes false program context evidence source environment middle
+        (if boolean then thenBody else elseBody.getD []) innerContext innerOutcome after) :
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates actual store ((LocalLoop.conditional type conditionCode thenCode elseCode).rename ξ) value finalStore ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type
+          (Dynamic.restoreControl environment innerOutcome) value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+    obtain ⟨_, middleStore, middleMap, middleWorld, conditionEval, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+      expressionPreserves context valid conditionTree conditionFound
+        environments heaps locals agrees actualTyped (.value conditionTrace)
+    cases represented with
+    | value payload =>
+      obtain ⟨actualBoolean, sourceEq, coreEq⟩ := bool_fields payload
+      cases sourceEq
+      subst coreEq
+      have branchCorrect : Preserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+          (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
+        cases boolean <;> assumption
+      obtain ⟨value, finalStore, finalMap, finalWorld, branchEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
+        branchCorrect valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+          (GenericExpressionMeaning.agree_prefix agrees (.bool boolean)) (.cons .bool (actualTyped.weaken worlds)) reference
+          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 branchTrace
+      refine ⟨value, finalStore, finalMap, finalWorld, ?_, restore_rep represented environment, finalHeaps,
+        maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata⟩
+      rw [LoopRenaming.conditional]
+      rw [GenericExpressionMeaning.rename_prefix] at branchEval
+      cases boolean with
+      | false => exact LocalControl.choose_false _ conditionEval branchEval
+      | true => exact LocalControl.choose_true _ conditionEval branchEval
+  cases trace with
+  | control trace =>
+    obtain ⟨rfl, boolean, middle, innerContext, innerOutcome, conditionTrace, rfl, branchTrace⟩ :=
+      ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form trace
+    exact ⟨rfl, restored environment innerOutcome, selected conditionTrace (.control branchTrace)⟩
+  | fault failed =>
+    rcases ScalarStatementViews.ifThen_fault unique (lookupStatement?_sound found) form failed with
+      failed | ⟨value, actualType, conditionTrace, notBoolean, _, _⟩ | ⟨boolean, middle, innerContext, conditionTrace, failed⟩
+    · obtain ⟨_, finalStore, finalMap, finalWorld, conditionEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionPreserves context valid conditionTree conditionFound
+          environments heaps locals agrees actualTyped (.fault failed)
+      cases represented with
+      | fault matched =>
+        refine ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld, ?_,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
+        rw [LoopRenaming.conditional]
+        exact LocalControl.choose_failure _ conditionEval
+    · obtain ⟨_, _, _, _, _, represented, _⟩ :=
+        expressionPreserves context valid conditionTree conditionFound
+          environments heaps locals agrees actualTyped (.value conditionTrace)
+      cases represented with
+      | value payload =>
+        obtain ⟨_, rfl, _⟩ := bool_fields payload
+        exact False.elim (notBoolean trivial)
+    · exact ⟨rfl, (by intro next impossible; cases impossible), selected conditionTrace (.fault failed)⟩
+
+theorem conditional_reflects
+    (expressionReflects : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : Reflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : Reflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadReflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped evaluated
+  rw [LoopRenaming.conditional] at evaluated
+  have input : ∃ value middleStore, Evaluates actual store (conditionCode.rename ξ) value middleStore := by
+    cases evaluated with
+    | caseLeft child _ | caseRight child _ => exact ⟨_, _, child⟩
+  obtain ⟨conditionValue, middleStore, conditionEval⟩ := input
+  obtain ⟨conditionOutcome, middle, middleMap, middleWorld, conditionTrace, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+    expressionReflects context valid conditionTree conditionFound
+      environments heaps locals agrees actualTyped conditionEval
+  cases represented with
+  | fault matched =>
+    cases conditionTrace with
+    | fault failed =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalControl.choose_failure _ conditionEval)
+      exact ⟨_, middle, middleMap, middleWorld, .fault (.ifCondition (lookupStatement?_sound found) form failed),
+        (by intro next impossible; cases impossible), .fault matched, middleHeaps, maps, worlds, frame, metadata⟩
+  | value payload =>
+    cases conditionTrace with
+    | value conditionTrace =>
+      obtain ⟨boolean, sourceEq, coreEq⟩ := bool_fields payload
+      subst sourceEq
+      subst coreEq
+
+      have branchCorrect : Reflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+          (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
+        cases boolean <;> assumption
+      obtain ⟨_, sized⟩ := evaluation_has_size evaluated
+      have branchEval : Evaluates (.bool boolean :: actual) middleStore ((if boolean then thenCode else elseCode).rename ξ |>.weakenAt 0) value finalStore := by
+        cases boolean with
+        | false => obtain ⟨_, _, branch⟩ := sized.choose_false conditionEval; exact branch.sound
+        | true => obtain ⟨_, _, branch⟩ := sized.choose_true conditionEval; exact branch.sound
+      obtain ⟨innerContext, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
+        branchCorrect valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+          (GenericExpressionMeaning.agree_prefix agrees (.bool boolean)) (.cons .bool (actualTyped.weaken worlds)) reference
+          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+          (by simpa only [GenericExpressionMeaning.rename_prefix] using branchEval)
+      exact ⟨Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
+        selected_intro program evidence found form conditionTrace branchTrace, restored environment outcome,
+        restore_rep represented environment, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds,
+        frame.trans lastFrame, metadata.trans lastMetadata⟩
+
+section StoppedControl
+variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext}
+  {source : TypedSource} {context : SourceSemantics.Context} {solved : List SolvedRequirement}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment) (unique : NodeOccurrencesUnique source)
+  {faults : FunctionCalls.FaultRep}
+
+include unique in
+private theorem stopped_sequence_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadPreserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Preserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped trace
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) executed with
+      ⟨_, _, _, headTrace, tailTrace⟩ | ⟨headTrace, terminal⟩
+    · cases stops headTrace
+    · obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped (.control headTrace)
+      cases represented with
+      | fallthrough _ => cases terminal
+      | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
+          .returned payload, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) failed with
+      ⟨rfl, headTrace⟩ | ⟨_, _, _, headTrace, tailTrace⟩
+    · obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped (.fault headTrace)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · cases stops headTrace
+
+private theorem stopped_sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Reflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped evaluated
+  obtain ⟨wholeSize, original⟩ := evaluation_has_size evaluated
+  rw [LoopRenaming.sequence] at evaluated original
+  obtain ⟨headSize, middleStore, headValue, headSmaller, headSized⟩ := original.bind_computation
+  have headEval := headSized.sound
+  obtain ⟨outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+    first valid environments heaps locals agrees actualTyped reference read unmapped headEval
+  cases represented with
+  | fallthrough next =>
+    cases headTrace with
+    | control headTrace => cases stops headTrace
+  | returned payload =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_returned _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.returned _),
+      .returned payload, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault matched =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_failure _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.fault _),
+      .fault matched, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+
+end StoppedControl
+
+variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+  {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+  {values : ValuesContext} {source : TypedSource}
+  {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
+  {registry : SourceCoreRawMetadata.Registry}
+
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment) {faults : FunctionCalls.FaultRep}
+
+include definitions registered in
+theorem Tree.preserves
+    (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressions
+      context scope mode statements expected type code)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    {outcome : Dynamic.ControlOutcome} {resultContext : SourceSemantics.Context}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (trace : Executes mode program context evidence source environment before statements resultContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  induction tree generalizing mapping world administrative environment canonical actual before after store ξ actualContext contextLocation native outcome resultContext with
+  | @nil context scope mode expected type allowed =>
+    cases source_view trace with
+    | control executed =>
+      obtain ⟨rfl, rfl, rfl⟩ := ScalarStatementViews.nil_view mode executed
+      exact ⟨_, store, mapping, world, LocalLoop.fallthrough_evaluates _ _ _, .fallthrough environment,
+        heaps, .refl _, .refl _, .refl _ _, .refl _, _, _, _, .here, environments, locals⟩
+    | fault failed => exact False.elim (ScalarStatementViews.nil_cannot_fault mode failed)
+  | @returnUnit context scope mode id node rest found form =>
+    obtain ⟨rfl, rfl, rfl⟩ := return_unit_view unique (lookupStatement?_sound found) form trace
+    exact ⟨_, store, mapping, world, LocalLoop.returned_evaluates .unit, .returned .unit,
+      heaps, .refl _, .refl _, .refl _ _, .refl _, _, _, _, .here, environments, locals⟩
+  | @returnValue context scope mode id node expression expressionNode expected lowered rest found form expressionFound valueType child =>
+    obtain ⟨rfl, expressionOutcome, childTrace, rfl⟩ := return_value_view unique (lookupStatement?_sound found) form trace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+      expressionPreserves _ contextValid child expressionFound
+        environments heaps locals agrees actualTyped childTrace
+    cases represented with
+    | value payload =>
+      exact ⟨_, finalStore, finalMap, finalWorld, by rw [LoopRenaming.returnValue]; exact LocalLoop.returnValue_success _ evaluated,
+        .returned (valueType ▸ payload), finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | fault matched =>
+      exact ⟨_, finalStore, finalMap, finalWorld, by rw [LoopRenaming.returnValue]; exact LocalLoop.returnValue_failure _ evaluated,
+        .fault matched, finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | @tail context scope id node expression expressionNode expected lowered found form expressionFound valueType child =>
+    obtain ⟨rfl, expressionOutcome, childTrace, rfl⟩ := tail_view unique (lookupStatement?_sound found) form trace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+      expressionPreserves _ contextValid child expressionFound
+        environments heaps locals agrees actualTyped childTrace
+    cases represented with
+    | value payload =>
+      exact ⟨_, finalStore, finalMap, finalWorld, by rw [LoopRenaming.returnValue]; exact LocalLoop.returnValue_success _ evaluated,
+        .returned (valueType ▸ payload), finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | fault matched =>
+      exact ⟨_, finalStore, finalMap, finalWorld, by rw [LoopRenaming.returnValue]; exact LocalLoop.returnValue_failure _ evaluated,
+        .fault matched, finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocation annotation same tail ih =>
+    obtain ⟨location, middle, allocated, tailTrace⟩ := source_view_absent unique found form mono extended trace
+    obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation⟩ :=
+      allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
+        environments heaps locals agrees actualTyped reference read allocated
+    obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, maps, worlds, finalFrame, metadata, lexical⟩ :=
+      ih (valid_extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 tailTrace
+    exact ⟨value, finalStore, finalMap, finalWorld, .letE allocationEval completed, represented, finalHeaps,
+      (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩).trans maps,
+      (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩).trans worlds,
+      preservation.trans finalFrame, (Dynamic.HeapMetadataExtend.of_allocation allocated).trans metadata, lexical.bind extended⟩
+  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initialFound sourceType initial allocation annotation same remaining ih =>
+    rw [sequence_rename]
+    rcases source_view_initialized unique found form mono extended trace with ⟨reason, rfl, rfl, failed⟩ |
+        ⟨sourceValue, location, middle, allocatedHeap, initialTrace, allocated, tailTrace⟩
+    · obtain ⟨value, finalStore, finalMap, finalWorld, initialEval, represented, finalHeaps, maps, worlds, preservation, metadata⟩ :=
+        expressionPreserves _ contextValid initial initialFound
+          environments heaps locals agrees actualTyped (.fault failed)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, LanguageResult.bind_failure _ initialEval,
+          .fault matched, finalHeaps, maps, worlds, preservation, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · obtain ⟨value, middleStore, middleMap, middleWorld, initialEval, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
+        expressionPreserves _ contextValid initial initialFound
+          environments heaps locals agrees actualTyped (.value initialTrace)
+      cases represented with
+      | value payload =>
+        have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
+        obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame⟩ :=
+          allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
+            (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated
+        obtain ⟨result, finalStore, finalMap, finalWorld, completed, related, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, lexical⟩ :=
+          ih (valid_extend contextValid extended)
+            nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+              (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+                (List.getElem?_eq_some_iff.mp frameRead).1).1 tailTrace
+        exact ⟨result, finalStore, finalMap, finalWorld,
+          LanguageResult.bind_success _ initialEval (.letE allocationEval completed), related, finalHeaps,
+          maps.trans ((show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩).trans finalMaps),
+          worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
+          preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata), lexical.bind extended⟩
+  | @discard context scope mode id node expression expressionNode semi rest expected lowered type body found form guard expressionFound child remaining ih =>
+    rcases TypedScopedStatements.discard_view unique (lookupStatement?_sound found) form guard trace with ⟨reason, rfl, rfl, failed⟩ | ⟨sourceValue, middle, childTrace, tail⟩
+    · obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionPreserves _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped (.fault failed)
+      cases represented with
+      | fault matched =>
+        exact ⟨_, finalStore, finalMap, finalWorld, by rw [LoopRenaming.discard]; exact LocalSequence.discard_failure _ evaluated,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+        expressionPreserves _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped (.value childTrace)
+      cases represented with
+      | @value _ coreValue payload =>
+        obtain ⟨value, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
+          ih contextValid (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+            (GenericExpressionMeaning.agree_prefix agrees coreValue)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) reference
+            ((firstFrame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (firstFrame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 tail
+        refine ⟨value, finalStore, finalMap, finalWorld, ?_, represented, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata, lexical⟩
+        rw [LoopRenaming.discard]
+        rw [GenericExpressionMeaning.rename_prefix] at second
+        exact LocalSequence.discard_success _ first second
+
+  | block found form inner remaining innerIH remainingIH =>
+    exact sequence_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
+      (block_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found form innerIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+  | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
+    exact sequence_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
+      (conditional_preserves unique expressionPreserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact stopped_sequence_preserves functions program evidence exactUnique found (by intro expression; simp [form])
+      (block_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) found form innerIH)
+      (block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact stopped_sequence_preserves functions program evidence exactUnique found (by intro expression; simp [form])
+      (conditional_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) (expressionPreserves := expressionPreserves) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (conditional_terminates exactUnique found form thenStops elseStops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+
+include definitions registered in
+theorem Tree.reflects
+    (expressionReflects : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressions
+      context scope mode statements expected type code)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ resultContext outcome after finalMap finalWorld,
+      Executes mode program context evidence source environment before statements resultContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  induction tree generalizing mapping world administrative environment canonical actual before store ξ actualContext contextLocation native finalStore value with
+  | @nil context scope mode expected type allowed =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.fallthrough_evaluates type actual store)
+    exact ⟨context, _, before, mapping, world, nil_executes mode program context evidence source environment before, .fallthrough environment, heaps,
+      .refl _, .refl _, .refl _ _, .refl _, _, _, _, .here, environments, locals⟩
+  | @returnUnit context scope mode id node rest found form =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.returned_evaluates (.unit : Evaluates actual store .unit .unit store))
+    exact ⟨context, _, before, mapping, world,
+      terminal_intro mode rest (lookupStatement?_sound found) (by intro expression; simp [form]) (.returnUnit (lookupStatement?_sound found) form) (.returned _),
+      .returned .unit, heaps, .refl _, .refl _, .refl _ _, .refl _, _, _, _, .here, environments, locals⟩
+  | @returnValue context scope mode id node expression expressionNode expected lowered rest found form expressionFound valueType child =>
+    rw [LoopRenaming.returnValue] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft childEvaluation branch =>
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | fault matched =>
+        cases trace with
+        | fault failed =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalLoop.returnValue_failure _ childEvaluation)
+          exact ⟨context, _, after, finalMap, finalWorld, head_fault mode rest (.returnValue (lookupStatement?_sound found) form failed),
+            .fault matched, finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | caseRight childEvaluation branch =>
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | value payload =>
+        cases trace with
+        | value childTrace =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalLoop.returnValue_success _ childEvaluation)
+          exact ⟨context, _, after, finalMap, finalWorld,
+            terminal_intro mode rest (lookupStatement?_sound found) (by intro expression; simp [form]) (.returnValue (lookupStatement?_sound found) form childTrace) (.returned _),
+            .returned (valueType ▸ payload), finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | @tail context scope id node expression expressionNode expected lowered found form expressionFound valueType child =>
+    rw [LoopRenaming.returnValue] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft childEvaluation branch =>
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | fault matched =>
+        cases trace with
+        | fault failed =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalLoop.returnValue_failure _ childEvaluation)
+          exact ⟨context, _, after, finalMap, finalWorld, .fault (.tailExpression (lookupStatement?_sound found) form failed),
+            .fault matched, finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | caseRight childEvaluation branch =>
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | value payload =>
+        cases trace with
+        | value childTrace =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalLoop.returnValue_success _ childEvaluation)
+          exact ⟨context, _, after, finalMap, finalWorld, .control (.tailExpression (lookupStatement?_sound found) form childTrace),
+            .returned (valueType ▸ payload), finalHeaps, maps, worlds, frame, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocation annotation same tail ih =>
+    obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation⟩ :=
+      allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
+        environments heaps locals agrees actualTyped reference read Dynamic.Heap.Allocates.append
+    have continuation := (ContinuationAgreement.letE allocationEval).unwrap evaluated
+    obtain ⟨resultContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, finalFrame, metadata, lexical⟩ :=
+      ih (valid_extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 continuation
+    exact ⟨resultContext, outcome, after, finalMap, finalWorld,
+      TypedScopedStatements.prepend (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) (.letUninitialized (lookupStatement?_sound found) form mono extended .append) trace,
+      represented, finalHeaps,
+      (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩).trans maps,
+      (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩).trans worlds,
+      preservation.trans finalFrame, (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append).trans metadata, lexical.bind extended⟩
+  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initialFound sourceType initial allocation annotation same remaining ih =>
+    rw [sequence_rename] at evaluated
+    have input : ∃ input middle, Evaluates actual store (lowered.expression.rename ξ) input middle := by
+      cases evaluated with
+      | caseLeft initial branch | caseRight initial branch => exact ⟨_, _, initial⟩
+    obtain ⟨input, middleStore, initialEval⟩ := input
+    obtain ⟨sourceOutcome, middle, middleMap, middleWorld, initialTrace, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
+      expressionReflects _ contextValid initial initialFound
+        environments heaps locals agrees actualTyped initialEval
+    cases represented with
+    | fault matched =>
+      cases initialTrace with | fault failed =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LanguageResult.bind_failure _ initialEval)
+        exact ⟨context, _, middle, middleMap, middleWorld, TypedScopedStatements.head_fault mode rest (.letInitializer (lookupStatement?_sound found) form mono failed),
+          .fault matched, middleHeaps, maps, worlds, preservation, metadata, _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | value payload =>
+      cases initialTrace with | value initialTrace =>
+        have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
+        obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame⟩ :=
+          allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
+            (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead .append
+        have tailEval := (ContinuationAgreement.letE allocationEval).unwrap ((ContinuationAgreement.bind initialEval).unwrap evaluated)
+        obtain ⟨resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, lexical⟩ :=
+          ih (valid_extend contextValid extended)
+            nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+              (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+                (List.getElem?_eq_some_iff.mp frameRead).1).1 tailEval
+        exact ⟨resultContext, outcome, after, finalMap, finalWorld,
+          TypedScopedStatements.prepend (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) (.letInitialized (lookupStatement?_sound found) form initialTrace mono extended .append) trace,
+          related, finalHeaps,
+          maps.trans ((show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩).trans finalMaps),
+          worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
+          preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append).trans finalMetadata), lexical.bind extended⟩
+  | @discard context scope mode id node expression expressionNode semi rest expected lowered type body found form guard expressionFound child remaining ih =>
+    rw [LoopRenaming.discard] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft childEvaluation branch =>
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | fault matched =>
+        cases trace with
+        | fault failed =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalSequence.discard_failure _ childEvaluation)
+          exact ⟨context, _, after, finalMap, finalWorld, TypedScopedStatements.head_fault mode rest (.expression (lookupStatement?_sound found) form failed),
+            .fault matched, finalHeaps, maps, worlds, frame, metadata,
+            _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    | caseRight childEvaluation branch =>
+      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+        expressionReflects _ contextValid child expressionFound
+          environments heaps locals agrees actualTyped childEvaluation
+      cases represented with
+      | @value _ coreValue payload =>
+        cases trace with
+        | value childTrace =>
+          obtain ⟨resultContext, outcome, after, finalMap, finalWorld, tail, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
+            ih contextValid (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (GenericExpressionMeaning.agree_prefix agrees _)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) reference
+              ((firstFrame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (firstFrame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              (by simpa only [GenericExpressionMeaning.rename_prefix] using branch)
+          exact ⟨resultContext, outcome, after, finalMap, finalWorld,
+            TypedScopedStatements.prepend (lookupStatement?_sound found) (TypedScopedStatements.not_tail form guard) (.expression (lookupStatement?_sound found) form childTrace) tail,
+            represented, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata, lexical⟩
+
+  | block found form inner remaining innerIH remainingIH =>
+    exact sequence_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (block_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form innerIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
+    exact sequence_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (conditional_reflects expressionReflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact stopped_sequence_reflects functions program evidence found (by intro expression; simp [form])
+      (block_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form innerIH)
+      (block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact stopped_sequence_reflects functions program evidence found (by intro expression; simp [form])
+      (conditional_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (expressionReflects := expressionReflects) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (conditional_terminates exactUnique found form thenStops elseStops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+end Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements
+end
+
+section
+-- leanmerge: from Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+/-! Static stopping receipts for match continuations. A present default and
+stopped branch bodies justify universal source stopping. Without a default,
+exhaustiveness only excludes no-branch selection at a well-typed scrutinee.
+The two boundaries stay separate. Actual suffix lowering is retained in its
+original source; no execution law is stored in these receipts. -/
+
+set_option autoImplicit false
+
+namespace Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+
+open Frontend Frontend.SourceInference GenericLexicalStatements
+
+structure BranchStops (source : TypedSource) (resolution : MatchResolution) : Prop where
+  arms : ∀ arm, arm ∈ resolution.cases → Stopped source arm.body
+  fallback : ∀ body, resolution.defaultBody = some body → Stopped source body
+
+/-- The issuing source and full statement identity survive metadata views.
+The default is required for this universal stopping receipt. -/
+def DefaultStopped (source : TypedSource) (id : StatementId)
+    (resolution : MatchResolution) : Prop :=
+  ∃ origin node fallback, StatementSourceIdentity origin source ∧
+    origin.lookupStatement? id = some node ∧ node.form = .matchWith resolution ∧
+    resolution.defaultBody = some fallback ∧ BranchStops origin resolution
+
+theorem DefaultStopped.of_source {source : TypedSource} {id : StatementId}
+    {node : StatementNode} {resolution : MatchResolution} {fallback : List StatementId}
+    (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+    (present : resolution.defaultBody = some fallback) (branches : BranchStops source resolution) :
+    DefaultStopped source id resolution :=
+  ⟨source, node, fallback, .refl source, found, form, present, branches⟩
+
+theorem DefaultStopped.transport {origin source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} (identity : StatementSourceIdentity origin source)
+    (stops : DefaultStopped origin id resolution) : DefaultStopped source id resolution := by
+  obtain ⟨issuing, node, fallback, original, found, form, present, branches⟩ := stops
+  exact ⟨issuing, node, fallback, original.trans identity, found, form, present, branches⟩
+
+theorem DefaultStopped.lookup {source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} (stops : DefaultStopped source id resolution) :
+    ∃ node, source.lookupStatement? id = some node ∧ node.form = .matchWith resolution := by
+  obtain ⟨origin, node, _, identity, found, form, _, _⟩ := stops
+  exact ⟨node, (identity.lookup id).symm.trans found, form⟩
+
+theorem DefaultStopped.current_branches {source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} (stops : DefaultStopped source id resolution) :
+    BranchStops source resolution := by
+  obtain ⟨origin, _, _, identity, _, _, _, branches⟩ := stops
+  exact ⟨fun arm member => (branches.arms arm member).transport identity,
+    fun body same => (branches.fallback body same).transport identity⟩
+
+theorem DefaultStopped.default_present {source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} (stops : DefaultStopped source id resolution) :
+    ∃ fallback, resolution.defaultBody = some fallback := by
+  obtain ⟨_, _, fallback, _, _, _, present, _⟩ := stops
+  exact ⟨fallback, present⟩
+
+/-- Static control stopping does not imply an untyped, universal execution law.
+Its source meaning consumer requires the actual source typing environment. -/
+structure MatchControlStopped (source : TypedSource) (control : ControlContext)
+    (context : Context) (id : StatementId) (node : StatementNode)
+    (resolution : MatchResolution) (facts : StatementFacts) : Prop where
+  found : source.lookupStatement? id = some node
+  form : node.form = .matchWith resolution
+  typed : StatementHasType source control context id context facts
+  no_fallthrough : facts.control.fallthrough = none
+
+private theorem singleton_erased_stops {expected : TypeSystem.Ty} {facts : StatementFacts}
+    {summary : ControlSummary} (erased : facts.control = summary.eraseValue)
+    (complete : BodyCompletes expected (BodyFacts.singleton facts)) (nonunit : expected ≠ .unit) :
+    facts.control.fallthrough = none := by
+  rcases complete.2.2 with stopped | ordinary
+  · exact stopped.1
+  · rw [BodyFacts.singleton, erased] at ordinary
+    cases summary with
+    | mk fallthrough mayReturn mayBreak mayContinue =>
+      cases fallthrough <;> simp_all [ControlSummary.eraseValue]
+
+/-- The match's actual merged summary erases an ordinary value to Unit.
+Consequently non-Unit singleton completion must use its no-fallthrough branch.
+This conclusion is specific to the actual typed match, not BodyCompletes alone. -/
+theorem MatchControlStopped.of_singleton_completes {source : TypedSource}
+    {control : ControlContext} {context : Context} {id : StatementId} {node : StatementNode}
+    {resolution : MatchResolution} {facts : StatementFacts} {expected : TypeSystem.Ty}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .matchWith resolution)
+    (typed : StatementHasType source control context id context facts)
+    (complete : BodyCompletes expected (BodyFacts.singleton facts)) (nonunit : expected ≠ .unit) :
+    MatchControlStopped source control context id node resolution facts := by
+  refine ⟨found, form, typed, ?_⟩
+  have shape : ∀ other, ContainsStatement source id other → other.form = .matchWith resolution := by
+    intro other contains
+    have same : other = node := Option.some.inj
+      ((lookupStatement?_complete unique contains).symm.trans found)
+    exact same ▸ form
+  cases typed <;> have actualForm := shape _ (by assumption) <;> simp_all
+  all_goals exact singleton_erased_stops rfl complete nonunit
+
+theorem merged_arm_stops {cases : List BodyFacts} {fallback : Option BodyFacts}
+    {summary : ControlSummary} {facts : BodyFacts}
+    (merged : mergeBodyControls cases fallback = some summary)
+    (stops : summary.fallthrough = none) (member : facts ∈ cases) :
+    facts.control.fallthrough = none := by
+  cases actual : facts.control.fallthrough with
+  | none => rfl
+  | some type =>
+    have falls := Dynamic.MergeBodyControls.canFallthrough_of_mem merged member
+      (by simp [ControlSummary.canFallthrough, actual])
+    simp [ControlSummary.canFallthrough, stops] at falls
+
+theorem merged_default_stops {cases : List BodyFacts} {summary : ControlSummary} {facts : BodyFacts}
+    (merged : mergeBodyControls cases (some facts) = some summary)
+    (stops : summary.fallthrough = none) : facts.control.fallthrough = none := by
+  cases actual : facts.control.fallthrough with
+  | none => rfl
+  | some type =>
+    have falls := Dynamic.MergeBodyControls.canFallthrough_of_fallback merged
+      (by simp [ControlSummary.canFallthrough, actual])
+    simp [ControlSummary.canFallthrough, stops] at falls
+
+/-- Exhaustive no-default selection retains the actual static cases and
+scrutinee type. Its dynamic consumer separately supplies ValueHasType. -/
+structure TypedNoDefault (source : TypedSource) (control : ControlContext) (context : Context)
+    (resolution : MatchResolution) (scrutineeType : TypeSystem.Ty)
+    (caseFacts : List BodyFacts) : Prop where
+  absent : resolution.defaultBody = none
+  cases_typed : MatchCasesHaveType source control context scrutineeType resolution.cases caseFacts
+  exhaustive : MatchExhaustive context scrutineeType resolution.cases none
+
+private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {value : β}
+    (accepted : action >>= next = .ok value) : ∃ input, action = .ok input ∧ next input = .ok value := by
+  cases action with
+  | error reason => cases accepted
+  | ok input => exact ⟨input, rfl, accepted⟩
+
+/-- The actual match callback and the whole accepted dead suffix are recovered
+from the original lowering equation, including the callback's child lowerer. -/
+theorem match_issued {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : SourceCoreLoops.Scope} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {resolution : MatchResolution} {type readType : Core.Ty}
+    {reasonAt : ExpressionId → Core.Word} {mode : Bool} {escaped : Core.Word} {code : Core.Expr}
+    (read : policy.readStatement source id = .ok (node, readType))
+    (form : node.form = .matchWith resolution)
+    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
+      (id :: rest) type reasonAt mode escaped = .ok code) :
+    ∃ callback matched suffix,
+      policy.lowerMatch = some callback ∧
+      callback policy.lowerExpression
+        (fun _ childSource childScope statements resultType childReasonAt childSelfReason =>
+          SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel childSource childScope statements
+            resultType childReasonAt false childSelfReason)
+        fuel source scope id resolution type reasonAt escaped = .ok matched ∧
+      ReachableStatementContinuations.Issued policy fuel source scope rest type reasonAt mode escaped suffix ∧
+      code = Core.LocalLoop.sequence type matched suffix := by
+  simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, bind, Except.bind, form] at accepted
+  cases callbackEq : policy.lowerMatch with
+  | none => simp [callbackEq] at accepted
+  | some callback =>
+    simp only [callbackEq] at accepted
+    obtain ⟨matched, matchedEq, accepted⟩ := bind_ok accepted
+    obtain ⟨suffix, suffixEq, accepted⟩ := bind_ok accepted
+    cases accepted
+    exact ⟨callback, matched, suffix, rfl, matchedEq, ⟨suffixEq⟩, rfl⟩
+
+end Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+end
+
+section
+-- leanmerge: from Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
+/-! Match stopping uses original source traces and original native head
+subderivations. A present default closes universal source control from static
+branch stopping. No-default exhaustiveness is consumed only with the actual
+typed scrutinee; typed control soundness has its full source runtime premises.
+None of these pointwise laws is cast into the old universal statement Tree.
+Suffix lowering provenance is retained, but suffix execution is never assumed. -/
+
+set_option autoImplicit false
+
+namespace Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+
+open Frontend Frontend.SourceInference GenericLexicalStatements CoreProof
+
+theorem selected_arm_body {context : Context} {value : Dynamic.Value}
+    {cases : List TypedMatchCase} {fallback : Option (List StatementId)}
+    {body : List StatementId} {bindings : List (TypedBinder × Dynamic.Value)}
+    (selected : Dynamic.MatchCasesSelect context value cases fallback (.arm body bindings)) :
+    ∃ arm ∈ cases, body = arm.body := by
+  cases selected with
+  | head => exact ⟨_, List.mem_cons_self, rfl⟩
+  | tail _ next =>
+    obtain ⟨arm, member, same⟩ := selected_arm_body next
+    exact ⟨arm, List.mem_cons_of_mem _ member, same⟩
+termination_by cases.length
+
+private theorem restore_terminal {outcome : Dynamic.ControlOutcome}
+    (outer : Dynamic.Environment) (terminal : Dynamic.TerminalControl outcome) :
+    Dynamic.TerminalControl (Dynamic.restoreControl outer outcome) := by
+  cases terminal with
+  | returned value => exact .returned value
+  | breaking _ => exact .breaking outer
+  | continuing _ => exact .continuing outer
+  | fault reason => exact .fault reason
+
+theorem DefaultStopped.trace_terminal {source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} {program : Program} {context : Context}
+    {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (unique : NodeOccurrencesUnique source) (stops : DefaultStopped source id resolution)
+    (trace : DataMatchSourceTrace.Trace program context evidence source environment before resolution outcome after) :
+    Dynamic.TerminalControl outcome := by
+  have branches := stops.current_branches
+  cases trace with
+  | scrutineeFault _ | patternFault _ _ _ _ => exact .fault _
+  | arm _ _ _ selected _ _ body =>
+    obtain ⟨arm, member, same⟩ := selected_arm_body selected
+    cases same
+    cases body with
+    | control executed => exact restore_terminal environment ((branches.arms arm member).terminates unique false executed)
+    | fault _ => exact .fault _
+  | default _ _ _ selected body =>
+    have same := selected.defaultBody_eq
+    cases body with
+    | control executed => exact restore_terminal environment ((branches.fallback _ same).terminates unique false executed)
+    | fault _ => exact .fault _
+  | noBranch _ _ _ selected =>
+    obtain ⟨fallback, present⟩ := stops.default_present
+    have absent := selected.noBranch_defaultBody_eq
+    rw [present] at absent
+    cases absent
+
+theorem DefaultStopped.terminates {source : TypedSource} {id : StatementId}
+    {resolution : MatchResolution} (unique : NodeOccurrencesUnique source)
+    (stops : DefaultStopped source id resolution) :
+    ReachableStatementContinuations.StatementTerminates source id := by
+  intro program context finalContext evidence environment before after outcome executed
+  obtain ⟨node, found, form⟩ := stops.lookup
+  obtain ⟨_, trace⟩ := DataMatchSourceTrace.of_outcome unique (lookupStatement?_sound found) form (.control executed)
+  exact stops.trace_terminal unique trace
+
+/-- Source sequence inversion keeps the actual stopped match execution and
+its complete heap, including pattern binders and hidden match allocation. -/
+theorem source_stopped_head {source : TypedSource} {id : StatementId} {rest : List StatementId}
+    {resolution : MatchResolution} {program : Program} {context finalContext : Context}
+    {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (mode : Bool) (unique : NodeOccurrencesUnique source) (stops : DefaultStopped source id resolution)
+    (trace : ScalarStatementViews.ListExecutes mode program context evidence source environment before
+      (id :: rest) finalContext outcome after) :
+    Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after ∧
+      Dynamic.TerminalControl outcome := by
+  obtain ⟨node, found, form⟩ := stops.lookup
+  rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found)
+    (by intro _ _; simp [form]) trace with ⟨_, _, _, first, _⟩ | terminal
+  · cases stops.terminates unique first
+  · exact terminal
+
+theorem source_stopped_fault {source : TypedSource} {id : StatementId} {rest : List StatementId}
+    {resolution : MatchResolution} {program : Program} {context finalContext : Context}
+    {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (mode : Bool) (unique : NodeOccurrencesUnique source) (stops : DefaultStopped source id resolution)
+    (trace : ScalarStatementViews.ListFaults mode program context evidence source environment before
+      (id :: rest) finalContext reason after) :
+    finalContext = context ∧ Dynamic.StatementFaults program context evidence source environment before id reason after := by
+  obtain ⟨node, found, form⟩ := stops.lookup
+  rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found)
+    (by intro _ _; simp [form]) trace with terminal | ⟨_, _, _, first, _⟩
+  · exact terminal
+  · cases stops.terminates unique first
+
+theorem TypedNoDefault.no_branch {source : TypedSource} {control : ControlContext} {context : Context}
+    {resolution : MatchResolution} {scrutineeType : TypeSystem.Ty} {caseFacts : List BodyFacts}
+    {heap : Dynamic.Heap} {value : Dynamic.Value}
+    (typed : TypedNoDefault source control context resolution scrutineeType caseFacts)
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (valueTyped : Dynamic.ValueHasType context heap value scrutineeType)
+    (selected : Dynamic.MatchCasesSelect context value resolution.cases resolution.defaultBody .noBranch) : False := by
+  rw [typed.absent] at selected
+  exact selected.noBranch_impossible_of_exhaustive catalog typed.cases_typed valueTyped typed.exhaustive
+
+/-- The actual selected arm is typed at its actual body context and has no
+ordinary continuation. Heap typing of the scrutinee remains independent. -/
+theorem TypedNoDefault.arm_control {source : TypedSource} {control : ControlContext} {context : Context}
+    {resolution : MatchResolution} {scrutineeType : TypeSystem.Ty} {caseFacts : List BodyFacts}
+    {value : Dynamic.Value} {body : List StatementId} {bindings : List (TypedBinder × Dynamic.Value)}
+    {summary : ControlSummary}
+    (typed : TypedNoDefault source control context resolution scrutineeType caseFacts)
+    (merged : mergeBodyControls caseFacts none = some summary) (stops : summary.fallthrough = none)
+    (selected : Dynamic.MatchCasesSelect context value resolution.cases resolution.defaultBody (.arm body bindings)) :
+    ∃ facts armContext finalContext,
+      StatementsHaveType source control armContext body finalContext facts ∧ facts.control.fallthrough = none := by
+  obtain ⟨facts, armContext, finalContext, member, bodyTyped⟩ := Dynamic.MatchCasesSelect.arm_body_typed typed.cases_typed selected
+  exact ⟨facts, armContext, finalContext, bodyTyped, merged_arm_stops merged stops member⟩
+
+/-- Typed stopping is pointwise at this actual source environment and heap.
+It does not upgrade no-default matching to the universal old Tree interface. -/
+theorem MatchControlStopped.terminal_at {source : TypedSource} {control : ControlContext} {context : Context}
+    {id : StatementId} {node : StatementNode} {resolution : MatchResolution} {facts : StatementFacts}
+    {program : Program} {finalContext : Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (stops : MatchControlStopped source control context id node resolution facts)
+    (programWF : ProgramWellFormed program) (runtime : Dynamic.SourceRuntimeValid program context source)
+    (covers : evidence.Covers context) (agrees : Dynamic.EnvironmentAgrees before context.locals environment)
+    (heapTyped : Dynamic.HeapWellTyped context before)
+    (executed : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    Dynamic.TerminalControl outcome := by
+  cases outcome with
+  | fallthrough next =>
+    have falls := executed.controlCanFallthrough programWF runtime covers agrees heapTyped stops.typed (.intro next)
+    simp [ControlSummary.canFallthrough, stops.no_fallthrough] at falls
+  | returned value => exact .returned value
+  | breaking next => exact .breaking next
+  | continuing next => exact .continuing next
+  | fault reason => exact .fault reason
+
+theorem source_typed_stopped_head {source : TypedSource} {control : ControlContext} {context : Context}
+    {id : StatementId} {node : StatementNode} {resolution : MatchResolution} {facts : StatementFacts}
+    {rest : List StatementId} {program : Program} {finalContext : Context}
+    {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (mode : Bool) (unique : NodeOccurrencesUnique source)
+    (stops : MatchControlStopped source control context id node resolution facts)
+    (programWF : ProgramWellFormed program) (runtime : Dynamic.SourceRuntimeValid program context source)
+    (covers : evidence.Covers context) (agrees : Dynamic.EnvironmentAgrees before context.locals environment)
+    (heapTyped : Dynamic.HeapWellTyped context before)
+    (trace : ScalarStatementViews.ListExecutes mode program context evidence source environment before
+      (id :: rest) finalContext outcome after) :
+    Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after ∧
+      Dynamic.TerminalControl outcome := by
+  rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound stops.found)
+    (by intro _ _; simp [stops.form]) trace with ⟨_, _, _, first, _⟩ | terminal
+  · cases stops.terminal_at programWF runtime covers agrees heapTyped first
+  · exact terminal
+
+theorem source_typed_stopped_fault {source : TypedSource} {control : ControlContext} {context : Context}
+    {id : StatementId} {node : StatementNode} {resolution : MatchResolution} {facts : StatementFacts}
+    {rest : List StatementId} {program : Program} {finalContext : Context}
+    {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (mode : Bool) (unique : NodeOccurrencesUnique source)
+    (stops : MatchControlStopped source control context id node resolution facts)
+    (programWF : ProgramWellFormed program) (runtime : Dynamic.SourceRuntimeValid program context source)
+    (covers : evidence.Covers context) (agrees : Dynamic.EnvironmentAgrees before context.locals environment)
+    (heapTyped : Dynamic.HeapWellTyped context before)
+    (trace : ScalarStatementViews.ListFaults mode program context evidence source environment before
+      (id :: rest) finalContext reason after) :
+    finalContext = context ∧ Dynamic.StatementFaults program context evidence source environment before id reason after := by
+  rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound stops.found)
+    (by intro _ _; simp [stops.form]) trace with terminal | ⟨_, _, _, first, _⟩
+  · exact terminal
+  · cases stops.terminal_at programWF runtime covers agrees heapTyped first
+
+/-- Native stopping uses the original sequence's strict match child. The
+pointwise head obligation is a theorem argument, separate from IssuedSuffix. -/
+theorem native_issued_stopped {size : Nat} {type : Core.Ty} {native : Core.Environment}
+    {before after : Core.Store} {code matched suffix : Core.Expr} {value : Core.Value}
+    (equation : code = Core.LocalLoop.sequence type matched suffix)
+    (original : EvaluationSize size native before code value after)
+    (headStops : ∀ {child middle result}, child < size →
+      EvaluationSize child native before matched result middle →
+        ReachableStatementContinuations.NativeTerminal type result) :
+    ∃ child, child < size ∧ EvaluationSize child native before matched value after ∧
+      ReachableStatementContinuations.NativeTerminal type value := by
+  subst code
+  exact ReachableStatementContinuations.native_sequence_stopped original headStops
+
+end Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+end

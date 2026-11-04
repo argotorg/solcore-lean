@@ -1,7 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.NamedLexicalFunctionFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedLexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 
 /-! The flow path is produced at the original lexical joins. A body packet
 retains that same flow fault and native body completion at the body store. -/

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CaptureCopyTyping
 import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarkedSupport
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames
 
 /-! Typing of the copies a closure makes through the indexed marked

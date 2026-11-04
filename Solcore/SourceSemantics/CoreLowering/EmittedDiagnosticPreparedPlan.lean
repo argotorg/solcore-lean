@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentPreparedOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-! Static preparation facets belong to the same retained emitted plan. Each
 assignment atom keeps its chosen head and actual owning site and preparation

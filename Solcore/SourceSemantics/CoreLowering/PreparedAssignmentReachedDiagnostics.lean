@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
-import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-! Compiler origins and preparation equations are interpreted at the actual
 receiving table and reached caller. This internal port is filled from the

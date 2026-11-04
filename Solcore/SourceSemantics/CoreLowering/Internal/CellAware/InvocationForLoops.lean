@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationExpress
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
@@ -18,7 +18,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.Loops
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-!

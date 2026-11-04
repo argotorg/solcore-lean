@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNotLowering
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeAssignmentMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative
 
 /-! A bare unary assignment has no source RHS or key child. Its head retains
 only actual place layout, lexical lookup, numeric source profile and token. -/

@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.OrdinaryCallsReady
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
-import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters

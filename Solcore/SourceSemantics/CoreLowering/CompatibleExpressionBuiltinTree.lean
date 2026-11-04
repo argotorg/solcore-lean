@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallTypedCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualIndices
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates

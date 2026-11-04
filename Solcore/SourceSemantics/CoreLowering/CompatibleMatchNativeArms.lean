@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchCertificates
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
 
 /-! Native child typing follows the actual marked compatible arm prefix.

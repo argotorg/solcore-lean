@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryWorklists
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderDiagnosticExtraction
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchPreparedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchReady
 namespace Solcore.SourceSemantics.CoreLowering.GenericImperativeMatch
 open Core Frontend SourceInference
 open EmittedDiagnosticPlan

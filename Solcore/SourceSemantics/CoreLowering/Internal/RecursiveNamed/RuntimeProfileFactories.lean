@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence

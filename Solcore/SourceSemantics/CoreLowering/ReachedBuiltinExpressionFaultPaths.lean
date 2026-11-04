@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.ReachedScalarExpressionFaultPaths
 
 /-! A builtin path carries the same primitive packet through authentic parent

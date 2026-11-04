@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
 import Solcore.SourceSemantics.CoreLowering.FunctionArguments
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalContext
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
 import Solcore.SourceSemantics.CoreLowering.CaptureCopies
 
 /-! Ordinary closure invocation uses the independent source call rules. This

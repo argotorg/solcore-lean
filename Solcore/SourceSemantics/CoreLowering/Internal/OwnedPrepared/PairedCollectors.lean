@@ -1,7 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.EligibleSelected
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical

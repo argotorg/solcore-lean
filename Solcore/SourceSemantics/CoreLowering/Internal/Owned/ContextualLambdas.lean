@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTypingOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders

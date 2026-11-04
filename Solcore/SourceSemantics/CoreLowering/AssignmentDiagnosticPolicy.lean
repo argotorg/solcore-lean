@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-! One static policy selects the original unconditional operand receipt or its
 reachable form. Both preserve missing/default and uninitialized laws. The policy

@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.SourceStageAnalysisSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
-import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
 
 /-!

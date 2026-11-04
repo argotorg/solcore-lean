@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.NamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked

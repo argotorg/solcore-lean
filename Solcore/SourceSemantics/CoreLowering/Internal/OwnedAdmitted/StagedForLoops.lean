@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
-import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
@@ -23,7 +23,7 @@ import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.GenericForHeaderPost
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaders
 
 /-!
 # Admitted staged profile: for loops

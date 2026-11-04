@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 
 /-!
 # Prepared callables: terminal origins

@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCallExpressions
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForTree
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
@@ -12,11 +11,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTypin
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchFallthrough
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.NamedLexicalFunctionFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedLexicalStatements
 
 /-!
 # Recursive named rows: catalog entries

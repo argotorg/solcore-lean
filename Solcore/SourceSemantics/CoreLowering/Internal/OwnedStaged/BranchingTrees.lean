@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
-import Solcore.SourceSemantics.CoreLowering.TypedMixedNamedBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 
 /-!
 # Staged bounds: statement trees

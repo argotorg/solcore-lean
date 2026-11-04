@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceFaults
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentPreservation
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-! Static ordinary assignment heads and lexical continuations. Bare and
 projected destinations retain their distinct source rules. Each head contains

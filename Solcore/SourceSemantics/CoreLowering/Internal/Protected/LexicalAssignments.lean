@@ -1,10 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileIteration
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments
 

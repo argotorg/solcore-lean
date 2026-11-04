@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTarget
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize

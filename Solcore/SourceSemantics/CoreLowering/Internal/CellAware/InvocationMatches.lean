@@ -6,10 +6,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
-import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedLiteralSites
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchReady
 
 /-!
 # Cell-aware invocations: matches

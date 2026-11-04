@@ -17,7 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.Ownership
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds

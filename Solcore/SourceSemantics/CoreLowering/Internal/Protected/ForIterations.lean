@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.WhileLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForEndpoint
-import Solcore.SourceSemantics.CoreLowering.ForSourceInduction
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
-import Solcore.SourceSemantics.CoreLowering.GenericForHeaderReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupling

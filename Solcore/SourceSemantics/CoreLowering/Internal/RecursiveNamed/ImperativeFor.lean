@@ -4,9 +4,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchReady
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 
 /-!
 # Recursive named rows: for loops

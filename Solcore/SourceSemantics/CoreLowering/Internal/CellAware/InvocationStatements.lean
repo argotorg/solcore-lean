@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInv
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.Staging.RecursiveControlViews
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary

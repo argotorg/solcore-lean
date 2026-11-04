@@ -2,9 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignment
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForEndpoint
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 
 /-!
 # Protected contracts: statements on the state

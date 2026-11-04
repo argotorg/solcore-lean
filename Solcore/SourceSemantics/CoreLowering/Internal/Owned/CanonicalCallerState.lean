@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
-import Solcore.SourceSemantics.CoreLowering.TypedMixedNamedBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies

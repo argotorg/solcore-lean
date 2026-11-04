@@ -4,13 +4,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
-import Solcore.SourceSemantics.CoreLowering.GenericForHeaderContinuationMap
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
-import Solcore.SourceSemantics.CoreLowering.ForSourceViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
-import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 
 /-!

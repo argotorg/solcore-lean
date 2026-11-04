@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
-import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
-import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingCertificates
-import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCallExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 
 /-!

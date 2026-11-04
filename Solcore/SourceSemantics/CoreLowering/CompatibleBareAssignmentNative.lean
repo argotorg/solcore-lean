@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentCertificates
 import Solcore.SourceSemantics.CoreLowering.DataPlaceExecution
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 
 /-! Syntax transport and finite native phases for bare assignments. Only the
 pure virtual-root quote is invariant under renaming. RHS/continuation code and

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericForHeaderDiagnosticExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticPlan
 
 /-! The original extraction constructors retain their actual diagnostic plans.

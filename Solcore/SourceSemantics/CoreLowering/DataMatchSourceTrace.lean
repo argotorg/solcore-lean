@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GenericMatchSelectedPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
 
 /-! Views of finite independent match execution. They retain the actual source
 scrutinee and body derivations, hidden-cell allocation and lexical scope. The

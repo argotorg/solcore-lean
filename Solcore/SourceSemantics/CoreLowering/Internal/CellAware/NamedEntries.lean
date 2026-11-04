@@ -23,7 +23,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPr
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
-import Solcore.SourceSemantics.CoreLowering.NamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception

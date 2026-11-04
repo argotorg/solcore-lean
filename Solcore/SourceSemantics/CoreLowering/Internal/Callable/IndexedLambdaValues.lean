@@ -1,15 +1,14 @@
-import Solcore.SourceSemantics.CoreLowering.NamedCallCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode
 import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallProtocol
 import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityPayload
 import Solcore.SourceSemantics.CoreLowering.CompatiblePayloadRuntimeTypes
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.NamedCallMeaning
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates
@@ -9,9 +9,8 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionRecursiveTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinTree
-import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
-import Solcore.SourceSemantics.CoreLowering.BuiltinBodySemanticReceipt
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 
 /-!

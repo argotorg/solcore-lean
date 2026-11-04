@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementHead
-import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-! Diagnostic plans retain the genuine local heads and scoped child indices
 selected by the original static compiler traversals. Their requirements contain

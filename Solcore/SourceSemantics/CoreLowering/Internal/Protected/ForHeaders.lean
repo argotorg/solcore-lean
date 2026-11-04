@@ -7,10 +7,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.ForHeaderNativeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ForFinite
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForPost
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 
 /-!

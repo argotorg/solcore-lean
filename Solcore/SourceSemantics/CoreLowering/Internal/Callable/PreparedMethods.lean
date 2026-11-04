@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpression
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
-import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime

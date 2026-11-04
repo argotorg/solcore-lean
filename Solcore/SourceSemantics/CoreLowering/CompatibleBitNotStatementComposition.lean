@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementMeaning
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 
 /-! Bare unary heads compose with transfer-aware continuations.
 The continuation contracts are intermediate induction hypotheses; the public

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-! The actual function finish helper preserves returned values, Unit
 fallthrough, source faults and escaped loop control with their distinct source

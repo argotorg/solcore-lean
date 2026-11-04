@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.CellStagedBareAssignment
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.PreparedProjectedDiagnosticFields

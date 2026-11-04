@@ -9,9 +9,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 
 /-!
 # Prepared callables: ordinary lambdas

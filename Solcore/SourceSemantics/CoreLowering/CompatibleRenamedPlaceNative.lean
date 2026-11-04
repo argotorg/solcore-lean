@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePreparedPath
 import Solcore.SourceSemantics.CoreLowering.CompatibleMappingVirtualRoot
 import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.DataPlaceChildExpressions
 import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
 

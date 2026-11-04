@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.PublicSupport

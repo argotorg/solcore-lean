@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambd
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 

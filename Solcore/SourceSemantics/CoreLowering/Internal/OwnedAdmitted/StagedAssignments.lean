@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 
 /-!

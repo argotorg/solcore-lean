@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingCertificates
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementInitializedTree
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
@@ -10,17 +10,17 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAl
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ProgramCompletion
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
-import Solcore.SourceSemantics.CoreLowering.LoopRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationForLoops
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeNative
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationMatches
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeChildrenExtension
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationLoops
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
-import Solcore.SourceSemantics.CoreLowering.TypedImperativeForNative
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationAssignments
 
 /-!

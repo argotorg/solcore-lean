@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 import Solcore.SourceSemantics.CoreLowering.ProgramAssignmentDiagnosticInclusion
 import Solcore.SourceSemantics.CoreLowering.CompatibleProgramAssignmentPreparation
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
-import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-!
 # Owned callables: decoded call faults

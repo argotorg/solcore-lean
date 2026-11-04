@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 
 /-!
 # Protected contracts: while loops

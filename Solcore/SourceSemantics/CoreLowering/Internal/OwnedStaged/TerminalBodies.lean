@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries

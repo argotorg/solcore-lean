@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 
 /-!
 # Protected contracts: lexical statements

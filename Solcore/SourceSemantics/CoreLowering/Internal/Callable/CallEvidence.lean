@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.NamedCallCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.TraitResolutionSoundness
 import Solcore.SourceSemantics.Dynamic.Evidence

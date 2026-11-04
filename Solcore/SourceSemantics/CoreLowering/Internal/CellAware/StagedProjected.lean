@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyReads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementInitializedTree

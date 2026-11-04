@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchScrutineeReflection
-import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
 
 /-! Selected compatible match bodies receive the actual native frame and typed

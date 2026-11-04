@@ -4,10 +4,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
-import Solcore.SourceSemantics.CoreLowering.GenericForHeaderStructuralTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 
 /-!
 # Admitted profile: assignments and for headers

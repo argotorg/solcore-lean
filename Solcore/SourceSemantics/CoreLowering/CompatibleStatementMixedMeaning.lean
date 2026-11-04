@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMixedCertificates
-import Solcore.SourceSemantics.CoreLowering.LoopStatementLayout
+import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 
 /-! Mixed ordinary lexical prefixes preserve the actual stopping context.
 Every child expression and terminal statement body is interpreted by its
