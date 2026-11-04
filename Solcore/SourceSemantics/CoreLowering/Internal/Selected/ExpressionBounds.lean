@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedCoercedDirectExpressionReceipt
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
 import Solcore.SourceSemantics.SourceExecutableCoercionInterfaces
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation

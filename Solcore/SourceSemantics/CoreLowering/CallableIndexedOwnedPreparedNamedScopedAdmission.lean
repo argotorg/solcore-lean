@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport
 
 /-! Finite original-source statement admission supplies scoped named bodies.

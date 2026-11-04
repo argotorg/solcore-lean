@@ -1,8 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
-import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
-import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
-import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerExpressionProfile
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.CompilerProfiles
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch

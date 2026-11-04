@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalApplicationMeaning
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedArgumentRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments

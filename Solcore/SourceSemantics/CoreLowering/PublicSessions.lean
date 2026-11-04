@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNa
 import Solcore.SourceSemantics.SourceCompiledCachedActualBody
 import Solcore.SourceSemantics.SourceCompiledCachedMethodValidity
 import Solcore.SourceSemantics.SourceCompiledActualInitializerBarriers
-import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
 
 /-!
 # Public sessions from actual compilation

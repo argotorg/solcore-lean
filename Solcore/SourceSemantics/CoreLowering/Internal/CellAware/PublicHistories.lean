@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalLocatedRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeap
@@ -11,7 +11,6 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogNativeContexts
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInstanceFrames
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
@@ -20,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedInpu
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNamedOutputPreservation
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalDescriptorHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 
 /-!

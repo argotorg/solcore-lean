@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocati
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedSourceFrames
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 
 /-!
 # Accepted bodies: the first expression closure

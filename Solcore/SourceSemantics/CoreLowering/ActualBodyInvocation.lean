@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedBodyCompiler
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedCall
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalCallPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.CallableBodyMetadataViews
 
 /-!

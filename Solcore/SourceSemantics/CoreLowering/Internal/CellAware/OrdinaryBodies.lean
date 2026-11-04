@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.Core.LocalLoop
 import Solcore.Core.OptionalCell
 import Solcore.Core.LanguageResult

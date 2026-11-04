@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedViewSelection
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalReadReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.CallableAncestryComposition
 import Solcore.SourceSemantics.CoreLowering.SourceAuthenticatedReferenceForm
 

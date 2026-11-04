@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogSites
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedLocatedRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedPrefixes
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
@@ -8,8 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedSnapshotPrefix
-import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationAllocationAttachment
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 

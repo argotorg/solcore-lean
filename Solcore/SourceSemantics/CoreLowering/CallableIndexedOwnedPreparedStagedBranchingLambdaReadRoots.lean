@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogTransport
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers

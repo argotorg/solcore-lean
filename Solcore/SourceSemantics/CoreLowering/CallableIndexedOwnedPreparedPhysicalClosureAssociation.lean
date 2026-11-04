@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalClosureAssociation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaValues
-import Solcore.SourceSemantics.CoreLowering.PreparedLambdaBodySupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 
 /-! A physical closure retains either its original legacy association or the
 actual prepared body and all captured slots. The representation projection

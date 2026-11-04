@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingCatalogTransport
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog

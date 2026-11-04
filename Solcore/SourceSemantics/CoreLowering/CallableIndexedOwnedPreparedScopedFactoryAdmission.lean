@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingBareUnarySyntax
-import Solcore.SourceSemantics.CoreLowering.PreparedBranchingLegacySyntax
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSourceAdmissionTransport
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalNamedFormationCollectors
 
 /-! The original returned lambda retains its scoped statement certificate.

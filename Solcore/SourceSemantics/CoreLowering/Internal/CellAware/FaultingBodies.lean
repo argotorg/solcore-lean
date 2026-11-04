@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInitializerPackets
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodies

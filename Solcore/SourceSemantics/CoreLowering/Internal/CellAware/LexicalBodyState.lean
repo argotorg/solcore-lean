@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedFl
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInitializerPackets
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeCertificates

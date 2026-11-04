@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalNamedRecipeCompilation
-import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedAssociation
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
