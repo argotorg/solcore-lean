@@ -95,5 +95,15 @@ import Solcore.Syntax.Parser.WildcardImportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
 import Solcore.Syntax.Parser.YulBodyPublicSoundnessProperties
+import Solcore.Syntax.Parser.File
+import Solcore.Syntax.Parser.DiagnosticFilter
+import Solcore.Syntax.Parser.DeriveCarrierProperties
+import Solcore.Syntax.Parser.DeclarationCanonicalProperties
+import Solcore.Syntax.Parser.Preflight
+import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.LiteralProperties
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.State
+import Solcore.Syntax.Parser.Yul.LeafProperties
 
 /-! Public Lean boundary for the canonical Solcore source syntax. -/

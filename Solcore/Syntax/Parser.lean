@@ -1,13 +1,16 @@
-import Solcore.Syntax.Parser.File
-import Solcore.Syntax.Parser.DiagnosticFilter
-import Solcore.Syntax.Parser.DeriveCarrierProperties
-import Solcore.Syntax.Parser.DeclarationCanonicalProperties
-import Solcore.Syntax.Parser.Preflight
-import Solcore.Syntax.Parser.Validity
-import Solcore.Syntax.Parser.LiteralProperties
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.State
-import Solcore.Syntax.Parser.Yul.LeafProperties
+import Solcore.Syntax.Lexer
+import Solcore.Syntax.Parser.SourceFiles
+
+/-!
+The parser's public entry points.
+
+`parse` lexes a source file and runs `parseLexed`, which validates the lexer's carriers,
+checks nesting and then parses. Both are total: only an executor invariant is an error.
+
+The productions are in the other front files, in dependency order: `Parser/Tokens`,
+`Parser/Types`, `Parser/Signatures`, `Parser/Blocks`, `Parser/Yul`, `Parser/Terms`,
+`Parser/Declarations`, `Parser/Modules` and `Parser/SourceFiles`.
+-/
 
 set_option autoImplicit false
 

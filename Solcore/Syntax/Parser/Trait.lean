@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.DeclarativeTraitMethodOutcomeGrammar
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
@@ -24,86 +25,6 @@ import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax.Parser
-
-namespace TraitInternals
-
-/-- Parse one signature-only trait method. -/
-def traitMethod : Parser TraitMethod := do
-  let signature ← functionSignature .module
-  let semicolon ← symbol .semicolon .topItem
-  pure {
-    span := SourceSpan.cover signature.span semicolon.span
-    value := {
-      leadingComments := []
-      signature
-      semicolon := semicolon.span
-    }
-  }
-
-structure TraitBody where
-  span : SourceSpan
-  methods : List TraitMethod
-
-def closeTraitBody (opening : Token)
-    (methodsRev : List TraitMethod) : Parser TraitBody := do
-  let closing ← symbol .rightBrace .topItem
-  pure {
-    span := SourceSpan.cover opening.span closing.span
-    methods := methodsRev.reverse
-  }
-
-def traitMethods (opening : Token) :
-    Nat → List TraitMethod → State → Reply TraitBody
-  | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
-  | fuel + 1, methodsRev, state =>
-      if isSymbol state .rightBrace then
-        closeTraitBody opening methodsRev state
-      else if isKeyword state .functionKw then
-        let before := state.cursor
-        match traitMethod state with
-        | .ok value next =>
-            if next.cursor > before then
-              traitMethods opening fuel (value :: methodsRev) next
-            else
-              .invariant (.noProgress .topLevel next.currentSpan)
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
-      else
-        rejectAt state {
-          head := .keyword .functionKw
-          tail := [.symbol .rightBrace]
-        } .topItem
-
-def traitBody : Parser TraitBody := fun state =>
-  match symbol .leftBrace .topItem state with
-  | .ok opening next =>
-      traitMethods opening (next.remainingCount + 1) [] next
-  | .reject failure next => .reject failure next
-  | .invariant error => .invariant error
-
-end TraitInternals
-
-/-- Parse a canonical trait declaration and signature-only methods. -/
-def traitDecl : Parser TraitDecl := do
-  let marker ← contextual .trait .topItem
-  let name ← identifier .topItem
-  let genericParameters ← genericParameters
-  let whereClause ← whereClause
-  let body ← TraitInternals.traitBody
-  pure {
-    span := SourceSpan.cover marker.span body.span
-    value := {
-      name
-      genericParameters
-      whereClause
-      bodySpan := body.span
-      methods := body.methods
-    }
-  }
-
-end Solcore.Syntax.Parser
 
 /-!
 ## Consolidated module: `Solcore.Syntax.Parser.TraitMethodOrdinaryRejectionSoundnessProperties`
@@ -198,6 +119,7 @@ theorem traitMethod_success_ordinaryOutcome_sound
     (symbol_success_exactTokenParses .semicolon .topItem semicolonResult)
 
 end TraitInternals
+
 end Solcore.Syntax.Parser
 
 /-!

@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Tokens
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Module
@@ -6,71 +7,6 @@ import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
-
-/-- Exact operator-token subset accepted inside import/export parentheses. -/
-def operatorPart? : TokenKind → Option String
-  | .symbol .colonEqual => some ":="
-  | .symbol .arrow => some "->"
-  | .symbol .fatArrow => some "=>"
-  | .symbol .equalEqual => some "=="
-  | .symbol .notEqual => some "!="
-  | .symbol .greaterEqual => some ">="
-  | .symbol .lessEqual => some "<="
-  | .symbol .logicalAnd => some "&&"
-  | .symbol .logicalOr => some "||"
-  | .symbol .plusEqual => some "+="
-  | .symbol .minusEqual => some "-="
-  | .symbol .starEqual => some "*="
-  | .symbol .slashEqual => some "/="
-  | .symbol .caretEqual => some "^="
-  | .symbol .ampEqual => some "&="
-  | .symbol .pipeEqual => some "|="
-  | .symbol .percentEqual => some "%="
-  | .symbol .tildeEqual => some "~="
-  | .symbol .plus => some "+"
-  | .symbol .minus => some "-"
-  | .symbol .star => some "*"
-  | .symbol .slash => some "/"
-  | .symbol .percent => some "%"
-  | .symbol .bang => some "!"
-  | .symbol .tilde => some "~"
-  | .symbol .less => some "<"
-  | .symbol .greater => some ">"
-  | .symbol .equal => some "="
-  | .symbol .pipe => some "|"
-  | .symbol .amp => some "&"
-  | .symbol .caret => some "^"
-  | .symbol .colon => some ":"
-  | _ => none
-
-def isOperatorPart (kind : TokenKind) : Bool :=
-  (operatorPart? kind).isSome
-
-namespace OperatorInternals
-
-/-- Fuel-bounded token collector used by parenthesized operator selectors. -/
-def operatorParts (context : ParseContext) :
-    Nat → List String → State → Reply (List String)
-  | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
-  | fuel + 1, partsRev, state =>
-      match state.peek? with
-      | some token =>
-          match operatorPart? token.value with
-          | some spelling =>
-              operatorParts context fuel (spelling :: partsRev)
-                { state with cursor := state.cursor + 1 }
-          | none =>
-              if partsRev.isEmpty then
-                rejectAt state { head := .selectorName, tail := [] } context
-              else
-                .ok partsRev.reverse state
-      | none =>
-          if partsRev.isEmpty then
-            rejectAt state { head := .selectorName, tail := [] } context
-          else
-            .ok partsRev.reverse state
-
-end OperatorInternals
 
 open OperatorInternals
 
@@ -174,25 +110,6 @@ private theorem operatorParts_preservesTokenWindow
           split
           · exact rejectAt_preservesTokenWindow input _ _
           · exact ⟨rfl, rfl⟩
-
-/-- Parse a nonempty parenthesized operator selector. -/
-def operatorSelector (context : ParseContext) : Parser SelectorName := fun state =>
-  match symbol .leftParen context state with
-  | .ok opening afterOpening =>
-      match operatorParts context (afterOpening.remainingCount + 1) []
-          afterOpening with
-      | .ok parts afterParts =>
-          match symbol .rightParen context afterParts with
-          | .ok closing next => .ok {
-              span := SourceSpan.cover opening.span closing.span
-              value := .operator (String.join parts)
-            } next
-          | .reject failure next => .reject failure next
-          | .invariant error => .invariant error
-      | .reject failure next => .reject failure next
-      | .invariant error => .invariant error
-  | .reject failure next => .reject failure next
-  | .invariant error => .invariant error
 
 /-- Parenthesized operator selectors preserve their complete source range. -/
 theorem operatorSelector_validFor (context : ParseContext) :
@@ -385,19 +302,6 @@ theorem operatorSelector_startsAtCurrentTokenOnSuccess
               exact ⟨opening,
                 (symbol_ok_state_shape .leftParen context openingResult).1,
                 rfl⟩
-
-/-- Parse either an ordinary identifier or a parenthesized operator. -/
-def selectorName (context : ParseContext) : Parser SelectorName := fun state =>
-  if isSymbol state .leftParen then
-    operatorSelector context state
-  else
-    match identifier context state with
-    | .ok name next => .ok {
-        span := name.span
-        value := .identifier name
-      } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
 
 /-- Identifier and operator selector branches preserve every stored source span. -/
 theorem selectorName_validFor (context : ParseContext) :

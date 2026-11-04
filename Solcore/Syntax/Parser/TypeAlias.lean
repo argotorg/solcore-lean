@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Type
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.DeclarativeTypeAliasParametersExactnessProperties
@@ -17,86 +18,6 @@ import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
 import Solcore.Syntax.DeclarativeTypeAliasDeclarationExactnessProperties
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax.Parser
-
-namespace TypeAliasInternals
-
-def finishRecoveredType (span : SourceSpan)
-    (state : State) : Reply TypeExpr :=
-  .ok { span, value := .error } (state.emit {
-    span
-    kind := .recovered .typeAliasValue
-  })
-
-def recoverTypeAliasValueAux (first last : SourceSpan) :
-    Nat → State → Reply TypeExpr
-  | 0, state => .invariant (.fuelExhausted .typeAlias state.currentSpan)
-  | fuel + 1, state =>
-      if state.atEnd || isSymbol state .semicolon then
-        finishRecoveredType (SourceSpan.cover first last) state
-      else
-        match state.advance? with
-        | some (token, next) =>
-            recoverTypeAliasValueAux first token.span fuel next
-        | none => finishRecoveredType (SourceSpan.cover first last) state
-
-/-- Consume the nonempty malformed RHS prefix before the first semicolon. -/
-def recoverTypeAliasValue (state : State) : Reply TypeExpr :=
-  if state.atEnd || isSymbol state .semicolon then
-    rejectAt state { head := .typeExpr, tail := [] } .typeAlias
-  else
-    match state.advance? with
-    | some (token, next) =>
-        recoverTypeAliasValueAux token.span token.span
-          (next.remainingCount + 1) next
-    | none => rejectAt state { head := .typeExpr, tail := [] } .typeAlias
-
-def parseAliasValue : Parser TypeExpr := fun state =>
-  match typeExpr state with
-  | .ok value next => .ok value next
-  | .reject failure failedState =>
-      let rewound := {
-        failedState with
-        cursor := state.cursor
-      }
-      if rewound.atEnd || isSymbol rewound .semicolon then
-        .reject failure rewound
-      else
-        recoverTypeAliasValue
-          (rewound.emit failure.toDiagnostic)
-  | .invariant error => .invariant error
-
-end TypeAliasInternals
-
-/-- Parse the optional parenthesized parameter list of a type alias. -/
-def parseTypeAliasParameters : Parser (Option (DelimitedList Identifier)) := do
-  let state ← getState
-  if isSymbol state .leftParen then
-    let values ← delimited .leftParen .rightParen true
-      (identifier .parameter) .typeAlias .typeAlias
-    pure (some values)
-  else
-    pure none
-
-/-- Parse one canonical transparent type-alias declaration. -/
-def typeAlias : Parser TypeAliasDecl := do
-  let typeKeyword ← keyword .typeKw .typeAlias
-  let name ← identifier .typeAlias
-  let parameters ← parseTypeAliasParameters
-  let _ ← symbol .equal .typeAlias
-  let value ← TypeAliasInternals.parseAliasValue
-  let semicolon ← symbol .semicolon .typeAlias
-  pure {
-    span := SourceSpan.cover typeKeyword.span semicolon.span
-    value := {
-      name
-      parameters
-      value
-    }
-  }
-
-end Solcore.Syntax.Parser
 
 /-!
 ## Consolidated module: `Solcore.Syntax.Parser.TypeAliasParameterSoundnessProperties`
@@ -259,7 +180,9 @@ end Solcore.Syntax.Parser
 
 /-! Recovery and declaration contracts for transparent type aliases. -/
 set_option autoImplicit false
+
 namespace Solcore.Syntax.Parser
+
 namespace TypeAliasInternals
 
 private theorem typeAlias_advance_state_shape {input next : State} {token : Token}
@@ -273,12 +196,14 @@ private theorem typeAlias_advance_state_shape {input next : State} {token : Toke
       simp only [found, Option.map_some] at advanced
       cases advanced
       exact ⟨rfl, rfl⟩
+
 /-- Finishing alias recovery retains one source-valid error range. -/
 theorem finishRecoveredType_validFor (span : SourceSpan) (state : State)
     (stateValid : state.ValidFor) (spanValid : span.ValidFor state.file) :
     (finishRecoveredType span state).ValidFor state TypeExpr.ValidFor := by
   unfold finishRecoveredType Reply.ValidFor
   exact ⟨.error spanValid, stateValid.emit_validFor _ spanValid, rfl⟩
+
 /-- Alias recovery preserves provenance while consuming malformed tokens. -/
 theorem recoverTypeAliasValueAux_validFor (first : SourceSpan) :
     ∀ fuel last state lastIndex lastToken,
@@ -321,6 +246,7 @@ theorem recoverTypeAliasValueAux_validFor (first : SourceSpan) :
               (by simpa [shape.2] using currentFound) rfl (by
                 simp [shape.2])
             exact recursive.of_file_eq (by simp [shape.2])
+
 /-- The complete recovering RHS parser preserves recursive type provenance. -/
 theorem recoverTypeAliasValue_validFor (state : State)
     (stateValid : state.ValidFor) :
@@ -345,6 +271,7 @@ theorem recoverTypeAliasValue_validFor (state : State)
           (by simpa [shape.2] using tokenValid) tokenValid.2.1
           (by simpa [shape.2] using tokenFound) rfl (by
             simp [shape.2])).of_file_eq (by simp [shape.2])
+
 /-- Parsing or recovering an alias RHS retains source-valid type syntax. -/
 theorem parseAliasValue_validFor :
     parseAliasValue.ValidFor TypeExpr.ValidFor := by
@@ -386,6 +313,7 @@ theorem parseAliasValue_validFor :
         exact (recoverTypeAliasValue_validFor
           (rewound.emit failure.toDiagnostic) emittedValid).of_file_eq
             (by simpa [State.emit] using rewoundFile)
+
 /-- Recovery preserves the complete immutable token window. -/
 theorem recoverTypeAliasValueAux_preservesTokenWindow
     (first last : SourceSpan) (fuel : Nat) :
@@ -407,6 +335,7 @@ theorem recoverTypeAliasValueAux_preservesTokenWindow
             rcases pair with ⟨token, next⟩
             exact (inductionHypothesis token.span next).trans (by
               simp [(typeAlias_advance_state_shape advanced).2])
+
 /-- The recovering RHS entry point preserves every ordinary token window. -/
 theorem recoverTypeAliasValue_preservesTokenWindow :
     Parser.PreservesTokenWindow recoverTypeAliasValue := by
@@ -421,6 +350,7 @@ theorem recoverTypeAliasValue_preservesTokenWindow :
         exact (recoverTypeAliasValueAux_preservesTokenWindow token.span
           token.span (next.remainingCount + 1) next).trans (by
             simp [(typeAlias_advance_state_shape advanced).2])
+
 /-- Alias RHS parsing and recovery preserve every ordinary token window. -/
 theorem parseAliasValue_preservesTokenWindow :
     Parser.PreservesTokenWindow parseAliasValue := by
@@ -1536,6 +1466,7 @@ theorem recoverTypeAliasValue_reject_output_unique
     (recoverTypeAliasValue_reject_ordinary_sound rightResult)
 
 end TypeAliasInternals
+
 end Solcore.Syntax.Parser
 
 /-!
@@ -1768,6 +1699,7 @@ theorem parseAliasValue_reject_output_unique
     (parseAliasValue_reject_ordinaryOutcome_sound rightResult)
 
 end TypeAliasInternals
+
 end Solcore.Syntax.Parser
 
 /-!

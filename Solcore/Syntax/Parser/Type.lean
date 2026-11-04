@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Types
 import Solcore.Syntax.Parser.Delimited
 import Solcore.Syntax.Parser.Name
 import Solcore.Syntax.TypeValidity
@@ -26,73 +27,6 @@ private theorem bind_ok_components {α β : Type} {first : Parser α}
   | invariant error =>
       rw [firstResult] at parsed
       contradiction
-
-/-- Convert a successfully parsed list to its required nonempty carrier. -/
-def requireNonempty {α : Type} (parsed : DelimitedList α)
-    (phase : ParserPhase) : Parser (NonemptyDelimitedList α) :=
-  match parsed.elements with
-  | head :: tail => pure {
-      span := parsed.span
-      elements := { head, tail }
-    }
-  | [] => fun _ => .invariant (.noProgress phase parsed.span)
-
-/-- Parse the optional, structurally nonempty arguments of a named type. -/
-def parseNamedTypeArguments (nested : Parser TypeExpr) :
-    Parser (Option (NonemptyDelimitedList TypeExpr)) := do
-  let state ← getState
-  if isSymbol state .less then
-    let parsed ← delimited .less .greater false nested
-      .typeExpr .typeExpr
-    let nonempty ← requireNonempty parsed .typeExpr
-    pure (some nonempty)
-  else
-    pure none
-
-/-- Build the source-shaped syntax value retained by named-type parsing. -/
-def makeNamedType (name : QualifiedName)
-    (arguments : Option (NonemptyDelimitedList TypeExpr)) : TypeExpr :=
-  let span := match arguments with
-    | some values => SourceSpan.cover name.span values.span
-    | none => name.span
-  {
-    span
-    value := .named name arguments
-  }
-
-/-- Build a named type and emit the canonical-spelling diagnostic if needed. -/
-def finishNamedType (name : QualifiedName)
-    (arguments : Option (NonemptyDelimitedList TypeExpr)) : Parser TypeExpr := do
-  let ty := makeNamedType name arguments
-  if name.value.components.tail.isEmpty &&
-      name.value.components.head.value == "mapping" then
-    emitDiagnostic {
-      span := ty.span
-      kind := .constraintViolation .mappingRequiresCanonicalForm
-    }
-  else
-    pure ()
-  pure ty
-
-/-- Parse an ordinary named type and its optional generic arguments. -/
-def parseNamedType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let name ← qualifiedName .typeExpr .typeExpr
-  let arguments ← parseNamedTypeArguments nested
-  finishNamedType name arguments
-
-/-- Parse the canonical `mapping(key => value)` type form. -/
-def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let mapping ← contextual .mapping .typeExpr
-  let opening ← symbol .leftParen .typeExpr
-  let key ← nested
-  let _ ← symbol .fatArrow .typeExpr
-  let value ← nested
-  let closing ← symbol .rightParen .typeExpr
-  pure {
-    span := SourceSpan.cover mapping.span closing.span
-    value := .mapping mapping.span
-      (SourceSpan.cover opening.span closing.span) key value
-  }
 
 private theorem nested_start_le_following_end
     {nested : Parser TypeExpr}
@@ -352,18 +286,6 @@ theorem parseMappingType_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
-/-- Parse a `comptime<...>` type using the supplied recursive parser. -/
-def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let comptime ← contextual .comptime .typeExpr
-  let opening ← symbol .less .typeExpr
-  let inner ← nested
-  let closing ← symbol .greater .typeExpr
-  pure {
-    span := SourceSpan.cover comptime.span closing.span
-    value := .comptime comptime.span
-      (SourceSpan.cover opening.span closing.span) inner
-  }
-
 /-- Comptime parsing retains valid outer, delimiter, and inner provenance. -/
 theorem parseComptimeType_validFor (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
@@ -578,20 +500,6 @@ theorem parseComptimeType_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
-/-- Parse a proxy type whose outer range begins at its `@` marker. -/
-def parseProxyType (nested : Parser TypeExpr) : Parser TypeExpr := fun input =>
-  match symbol .at .typeExpr input with
-  | .ok marker afterMarker =>
-      match nested afterMarker with
-      | .ok inner next => .ok {
-          span := SourceSpan.cover marker.span inner.span
-          value := .proxy marker.span inner
-        } next
-      | .reject failure next => .reject failure next
-      | .invariant error => .invariant error
-  | .reject failure next => .reject failure next
-  | .invariant error => .invariant error
-
 /-- Proxy parsing preserves its marker, inner type, and covering provenance. -/
 theorem parseProxyType_validFor (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
@@ -747,15 +655,6 @@ theorem parseProxyType_startsAtCurrentTokenOnSuccess
             ⟨token, found, start⟩
           exact ⟨token, found, start⟩
 
-/-- Parse a parenthesized tuple type using the supplied recursive parser. -/
-def parseTupleType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let tuple ← delimited .leftParen .rightParen true nested
-    .typeExpr .typeExpr
-  pure {
-    span := tuple.span
-    value := .tuple tuple.elements
-  }
-
 /-- Tuple parsing preserves delimiter and recursive element provenance. -/
 theorem parseTupleType_validFor (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
@@ -812,21 +711,6 @@ theorem parseTupleType_startsAtCurrentTokenOnSuccess
   · intro tuple input value final parsed
     cases parsed
     rfl
-
-namespace TypeFunctionInternals
-
-/-- Parse the optional return list of a function type. -/
-def parseFunctionReturns (nested : Parser TypeExpr) :
-    Parser (Option (DelimitedList TypeExpr)) := do
-  let state ← getState
-  if isContextual state .returns then
-    let _ ← contextual .returns .typeExpr
-    let values ← delimited .leftParen .rightParen true nested .typeExpr .typeExpr
-    pure (some values)
-  else
-    pure none
-
-end TypeFunctionInternals
 
 open TypeFunctionInternals
 
@@ -904,19 +788,6 @@ private theorem parseFunctionReturns_validFor (nested : Parser TypeExpr)
       inputValid, rfl⟩
   · simp only [hasReturns]
     exact Parser.pure_validFor none (Option.ValidFor (DelimitedList.ValidFor TypeExpr.ValidFor)) (fun _ => trivial)
-
-/-- Parse a function type, including its optional `returns` type list. -/
-def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let functionKeyword ← keyword .functionKw .typeExpr
-  let parameters ← delimited .leftParen .rightParen true nested .typeExpr .typeExpr
-  let returns ← parseFunctionReturns nested
-  let endSpan := match returns with
-    | some values => values.span
-    | none => parameters.span
-  pure {
-    span := SourceSpan.cover functionKeyword.span endSpan
-    value := .function functionKeyword.span parameters returns
-  }
 
 /-- Function-type parsing retains valid keyword, parameter, and result ranges. -/
 theorem parseFunctionType_validFor (nested : Parser TypeExpr)
@@ -1141,40 +1012,5 @@ theorem parseFunctionType_startsAtCurrentTokenOnSuccess (nested : Parser TypeExp
   rcases bind_ok_components rest with ⟨returns, afterReturns, _, finished⟩
   cases finished
   rfl
-
-private def hasFollowingSymbol (state : State) (value : Symbol) : Bool :=
-  state.peekOffsetKind? 1 == some (.symbol value)
-
-/-- Whether the current token can begin a canonical Core type. -/
-def startsTypeExpr (state : State) : Bool :=
-  isKeyword state .functionKw || isSymbol state .at ||
-    isSymbol state .leftParen || isIdentifier state
-
-/-- Recursive Core type parser, parameterized by remaining nesting depth. -/
-def typeExprWithFuel : Nat → Parser TypeExpr
-  | 0 => fun state =>
-      .invariant (.fuelExhausted .typeExpr state.currentSpan)
-  | fuel + 1 => fun state =>
-      let nested := typeExprWithFuel fuel
-      if isKeyword state .functionKw then
-        parseFunctionType nested state
-      else if isContextual state .comptime &&
-          hasFollowingSymbol state .less then
-        parseComptimeType nested state
-      else if isContextual state .mapping &&
-          hasFollowingSymbol state .leftParen then
-        parseMappingType nested state
-      else if isSymbol state .at then
-        parseProxyType nested state
-      else if isSymbol state .leftParen then
-        parseTupleType nested state
-      else if isIdentifier state then
-        parseNamedType nested state
-      else
-        rejectAt state { head := .typeExpr, tail := [] } .typeExpr
-
-/-- Parse one complete canonical Core type expression. -/
-def typeExpr : Parser TypeExpr := fun state =>
-  typeExprWithFuel (state.remainingCount + 1) state
 
 end Solcore.Syntax.Parser

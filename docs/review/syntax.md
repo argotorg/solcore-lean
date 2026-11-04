@@ -28,7 +28,10 @@ the executable parser does not depend on its proofs.
 | Lexer | `Lexer`, `Lexer/{Core,Character,Scan,State,Step,Result}`, `Unicode/*` |
 | Parser machine | `Parser/{Diagnostic,Result,State,Primitive}` |
 | Parser entry points | `Parser` (`parse`, `parseLexed`) |
-| Parser productions | `Parser/*` and its `Statement/`, `Expression/` and `Yul/` subdirectories. Many of these files also hold proofs; see "Open decision". |
+| Parser productions | `Parser/{Tokens,Types,Signatures,Blocks,Yul,Terms,Declarations,Modules,SourceFiles}` |
+
+`Parser/Signatures` and `Parser/Blocks` also hold proofs. Theorems that name a private
+helper must stay in the helper's file, and so must what they use from it.
 
 ### Specification
 
@@ -98,15 +101,3 @@ Two constraints keep these files apart:
   In one file, the statements of `parseFunctionReturns_eq_of_present` and
   `parseNamedTypeArguments_eq_of_present` would share a matcher whose bound names
   differ, and the snapshot would report a changed type.
-
-## Open decision
-
-*Proposed:* move the proofs out of the mixed parser files into `Parser/Internal/`,
-and leave the executable definitions at their current paths.
-
-- **Why.** The 43 parser modules that hold executable declarations have 31,808
-  lines. Only 4,546 of those lines are executable declarations.
-- **Feasibility.** 1,297 of their 1,366 theorems can leave. The other 69 reference
-  a private executable helper, so they stay beside it.
-- **Effect on importers.** Of the 3,139 outside modules that reference this area, 12
-  would lose a declaration they use, and at most eight of those need an import kept.

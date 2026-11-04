@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Modules
 import Solcore.Syntax.Parser.Name
 import Solcore.Syntax.Module
 import Solcore.Syntax.DeclarativeModulePathOutcomeGrammar
@@ -12,35 +13,6 @@ import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
-
-/-- Parse a dotted module path with its optional external-package marker. -/
-def modulePath (context : ParseContext) : Parser ModulePath := fun state =>
-  if isSymbol state .at then
-    match symbol .at context state with
-    | .ok marker afterMarker =>
-        match qualifiedName context .topLevel afterMarker with
-        | .ok name next => .ok {
-            span := SourceSpan.cover marker.span name.span
-            value := {
-              externalMarker := some marker.span
-              components := name.value.components
-            }
-          } next
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
-  else
-    match qualifiedName context .topLevel state with
-    | .ok name next => .ok {
-        span := name.span
-        value := {
-          externalMarker := none
-          components := name.value.components
-        }
-      } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
 
 /-- Module-path parsing preserves its cover, marker, and component ranges. -/
 theorem modulePath_validFor (context : ParseContext) :
@@ -408,7 +380,6 @@ theorem modulePath_ordinaryOutcomeSpec :
       DeclarativeGrammar.ModulePathOrdinaryParses
       DeclarativeGrammar.ModulePathRejects :=
   DeclarativeGrammar.modulePathDeterministicOutcomeSpec
-
 
 /-- Exact values and endpoints for the independent modulePath grammar. -/
 theorem modulePath_exactOutcomeSpec  :

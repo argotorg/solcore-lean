@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.Tokens
 import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.State
@@ -5,18 +6,6 @@ import Solcore.Syntax.Parser.State
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
-
-/-- Proof-visible closing step for generic delimited parser laws. -/
-def closeDelimited {α : Type} (opening : Token)
-    (closing : Symbol) (context : ParseContext)
-    (elementsRev : List α) : Parser (DelimitedList α) := fun state =>
-  match symbol closing context state with
-  | .ok token next => .ok {
-      span := SourceSpan.cover opening.span token.span
-      elements := elementsRev.reverse
-    } next
-  | .reject failure next => .reject failure next
-  | .invariant error => .invariant error
 
 private theorem closeDelimited_validFor {α : Type}
     (elementValid : SourceFile → α → Prop)
@@ -58,41 +47,6 @@ private theorem closeDelimited_validFor {α : Type}
       refine ⟨⟨coverValid, ?_⟩, closingValid.2.1, closingValid.2.2⟩
       intro element member
       exact elementsValid element (by simpa using member)
-
-/-- Proof-visible fuel loop for generic delimited parser laws. -/
-def afterDelimitedElement {α : Type}
-    (element : Parser α) (closing : Symbol)
-    (allowTrailing : Bool)
-    (context : ParseContext) (phase : ParserPhase)
-    (opening : Token) :
-    Nat → List α → State → Reply (DelimitedList α)
-  | 0, _, state => .invariant (.fuelExhausted phase state.currentSpan)
-  | fuel + 1, elementsRev, state =>
-      if isSymbol state .comma then
-        match symbol .comma context state with
-        | .ok _ afterComma =>
-            if allowTrailing && isSymbol afterComma closing then
-              closeDelimited opening closing context elementsRev afterComma
-            else
-              let before := afterComma.cursor
-              match element afterComma with
-              | .ok value next =>
-                  if next.cursor > before then
-                    afterDelimitedElement element closing allowTrailing context phase opening
-                      fuel (value :: elementsRev) next
-                  else
-                    .invariant (.noProgress phase next.currentSpan)
-              | .reject failure next => .reject failure next
-              | .invariant error => .invariant error
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
-      else if isSymbol state closing then
-        closeDelimited opening closing context elementsRev state
-      else
-        rejectAt state {
-          head := .symbol .comma
-          tail := [.symbol closing]
-        } context
 
 private theorem afterDelimitedElement_validFor {α : Type}
     (elementValid : SourceFile → α → Prop) (element : Parser α)
@@ -194,32 +148,6 @@ private theorem afterDelimitedElement_validFor {α : Type}
         · unfold rejectAt Reply.ValidFor
           exact ⟨stateValid.currentSpan_validFor, stateValid, rfl⟩
 
-/--
-Parse a comma-separated delimited sequence. Empty and trailing-comma policy is
-selected by the caller; every accepted element must advance the cursor.
--/
-def delimitedWithPolicy {α : Type} (opening closing : Symbol)
-    (allowEmpty allowTrailing : Bool)
-    (element : Parser α) (context : ParseContext)
-    (phase : ParserPhase) : Parser (DelimitedList α) := fun state =>
-  match symbol opening context state with
-  | .ok openingToken afterOpening =>
-      if allowEmpty && isSymbol afterOpening closing then
-        closeDelimited openingToken closing context [] afterOpening
-      else
-        let before := afterOpening.cursor
-        match element afterOpening with
-        | .ok value next =>
-            if next.cursor > before then
-              afterDelimitedElement element closing allowTrailing context phase openingToken
-                (afterOpening.remainingCount + 1) [value] next
-            else
-              .invariant (.noProgress phase next.currentSpan)
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
-  | .reject failure next => .reject failure next
-  | .invariant error => .invariant error
-
 /-- A valid, token-preserving element parser lifts through delimiter policy. -/
 theorem delimitedWithPolicy_validFor {α : Type}
     (elementValid : SourceFile → α → Prop)
@@ -296,12 +224,6 @@ theorem delimitedWithPolicy_validFor {α : Type}
                 (valueValid.2.2.trans openingValid.2.2)
             · simp only [Reply.ValidFor]
 
-/-- Parse a delimited list whose final comma is accepted. -/
-def delimited {α : Type} (opening closing : Symbol) (allowEmpty : Bool)
-    (element : Parser α) (context : ParseContext)
-    (phase : ParserPhase) : Parser (DelimitedList α) :=
-  delimitedWithPolicy opening closing allowEmpty true element context phase
-
 /-- Trailing-comma lists preserve delimiter and element provenance. -/
 theorem delimited_validFor {α : Type}
     (elementValid : SourceFile → α → Prop)
@@ -313,12 +235,6 @@ theorem delimited_validFor {α : Type}
       (DelimitedList.ValidFor elementValid) := by
   exact delimitedWithPolicy_validFor elementValid opening closing allowEmpty
     true element context phase elementContract elementShape
-
-/-- Parse a delimited list whose final comma is rejected. -/
-def delimitedNoTrailing {α : Type} (opening closing : Symbol)
-    (allowEmpty : Bool) (element : Parser α) (context : ParseContext)
-    (phase : ParserPhase) : Parser (DelimitedList α) :=
-  delimitedWithPolicy opening closing allowEmpty false element context phase
 
 /-- Non-trailing-comma lists preserve delimiter and element provenance. -/
 theorem delimitedNoTrailing_validFor {α : Type}

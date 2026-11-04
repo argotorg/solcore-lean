@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Parser.Result
 import Solcore.Syntax.Trivia
 import Solcore.Syntax.FileValidity
@@ -13,49 +14,6 @@ without importing parser state or replies.
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
-
-abbrev isRustWhitespace := Solcore.Syntax.Trivia.isRustWhitespace
-
-abbrev utf8Slice? := Solcore.Syntax.Trivia.utf8Slice?
-
-abbrev lineBreakCount := Solcore.Syntax.Trivia.lineBreakCount
-
-abbrev commentsDirectlyBefore :=
-  Solcore.Syntax.Trivia.commentsDirectlyBefore
-
-namespace TriviaInternals
-
-abbrev attachEnumConstructorComments :=
-  Solcore.Syntax.Trivia.Internals.attachEnumConstructorComments
-
-abbrev attachEnumConstructors :=
-  Solcore.Syntax.Trivia.Internals.attachEnumConstructors
-
-abbrev attachEnumComments :=
-  Solcore.Syntax.Trivia.Internals.attachEnumComments
-
-abbrev attachTraitMethodComments :=
-  Solcore.Syntax.Trivia.Internals.attachTraitMethodComments
-
-abbrev attachTraitComments :=
-  Solcore.Syntax.Trivia.Internals.attachTraitComments
-
-abbrev attachImplMethodComments :=
-  Solcore.Syntax.Trivia.Internals.attachImplMethodComments
-
-abbrev attachImplComments :=
-  Solcore.Syntax.Trivia.Internals.attachImplComments
-
-abbrev attachContractMemberComments :=
-  Solcore.Syntax.Trivia.Internals.attachContractMemberComments
-
-abbrev attachContractComments :=
-  Solcore.Syntax.Trivia.Internals.attachContractComments
-
-end TriviaInternals
-
-abbrev attachTopItemComments :=
-  Solcore.Syntax.Trivia.attachTopItemComments
 
 theorem commentsDirectlyBefore_mem (source : String)
     (comments : List Comment) (declarationStart : Nat)
