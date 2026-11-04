@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
-import Solcore.SourceSemantics.CoreLowering.DataPatternExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 
 /-! Static receipts extracted from the actual finite codebook traversal.
 This module enumerates proof targets only; it contains no source evaluator,

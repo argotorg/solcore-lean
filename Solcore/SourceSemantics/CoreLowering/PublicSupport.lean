@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmiss
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission

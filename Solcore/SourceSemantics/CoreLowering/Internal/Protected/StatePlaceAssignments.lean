@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
-import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionMethods
 
 /-!

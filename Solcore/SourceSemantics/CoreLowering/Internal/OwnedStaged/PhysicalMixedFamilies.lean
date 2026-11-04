@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
@@ -16,7 +16,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DirectCallers
 

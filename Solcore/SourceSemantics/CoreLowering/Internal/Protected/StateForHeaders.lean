@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations

@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads

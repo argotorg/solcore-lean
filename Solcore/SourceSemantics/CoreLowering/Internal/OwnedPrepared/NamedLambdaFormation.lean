@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts

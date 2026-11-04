@@ -1,11 +1,11 @@
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatchCatalog
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
-import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Lean
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.Frontend.SourceCoreLocalPolymorphism

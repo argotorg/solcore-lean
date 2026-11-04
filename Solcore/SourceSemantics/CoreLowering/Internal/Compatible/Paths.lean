@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.GenericHeap
-import Solcore.SourceSemantics.CoreLowering.DataMappingHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.Instantiation
 import Solcore.Frontend.SourceCoreDataCatalog
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 import Solcore.SourceSemantics.CoreLowering.AmbientDefinitions
 

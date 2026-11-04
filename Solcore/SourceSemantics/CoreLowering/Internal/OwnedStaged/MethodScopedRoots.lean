@@ -9,11 +9,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardSequence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts

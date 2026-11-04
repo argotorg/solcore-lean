@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
-import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues

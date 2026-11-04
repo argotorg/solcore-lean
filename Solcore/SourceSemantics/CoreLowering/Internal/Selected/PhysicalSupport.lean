@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedScopedRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.DirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap

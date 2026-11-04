@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndStat
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.Frontend.SourceSpecializationAcceptance
-import Solcore.SourceSemantics.CoreLowering.ReachedNamedConditionalBodyFaultPaths
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedNamedFaultPaths
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 

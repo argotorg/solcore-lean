@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
-import Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection

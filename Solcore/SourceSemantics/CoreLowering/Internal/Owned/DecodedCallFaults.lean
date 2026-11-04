@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
-import Solcore.SourceSemantics.CoreLowering.ProgramAssignmentDiagnosticInclusion
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments

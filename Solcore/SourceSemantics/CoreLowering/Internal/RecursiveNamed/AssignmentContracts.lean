@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
-import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 
 /-!

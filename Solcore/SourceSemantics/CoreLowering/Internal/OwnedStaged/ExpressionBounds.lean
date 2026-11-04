@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies

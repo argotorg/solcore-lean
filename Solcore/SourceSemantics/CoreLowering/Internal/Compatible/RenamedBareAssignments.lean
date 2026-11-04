@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignm
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
-import Solcore.SourceSemantics.CoreLowering.DataPlaceSourceOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.TypedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments

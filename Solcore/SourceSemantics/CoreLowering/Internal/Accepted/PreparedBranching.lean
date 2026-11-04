@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.ProjectedBitNotDiagnosticOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Lean

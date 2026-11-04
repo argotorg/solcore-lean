@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.SourceSemantics.CoreLowering.DataMappingHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning

@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGenera
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
-import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries

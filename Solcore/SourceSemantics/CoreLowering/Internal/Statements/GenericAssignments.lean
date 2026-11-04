@@ -1,14 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
-import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
-import Solcore.SourceSemantics.CoreLowering.AssignmentFaultTableCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.Frontend.SourceCoreCompatibleDataMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PatternsAndArms
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 
 /-!
 # Generic assignments and match children

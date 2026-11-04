@@ -5,10 +5,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupledExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchTokenExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatchCatalog
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchReady
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeForTrees
 

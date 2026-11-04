@@ -2,11 +2,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PatternsAndArms
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 import Solcore.Core.DefinitionExtension
 
 /-!

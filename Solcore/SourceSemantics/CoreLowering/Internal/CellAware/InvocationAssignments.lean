@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
-import Solcore.SourceSemantics.CoreLowering.PreparedProjectedDiagnosticFields
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements

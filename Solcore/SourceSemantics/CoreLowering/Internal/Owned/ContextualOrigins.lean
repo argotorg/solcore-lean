@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectApplication
-import Solcore.SourceSemantics.CoreLowering.ReachedLoweredReadOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 
 /-!

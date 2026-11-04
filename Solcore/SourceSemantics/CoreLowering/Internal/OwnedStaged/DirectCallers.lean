@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCaller
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport

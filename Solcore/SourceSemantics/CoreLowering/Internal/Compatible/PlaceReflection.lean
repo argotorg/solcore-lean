@@ -1,8 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
-import Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
-import Solcore.SourceSemantics.CoreLowering.DataPlaceSourceOrder
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive

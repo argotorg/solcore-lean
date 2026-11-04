@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatchCatalog
 
 /-!
 # Protected contracts: imperative matches

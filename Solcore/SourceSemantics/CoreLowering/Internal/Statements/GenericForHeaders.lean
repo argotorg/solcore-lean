@@ -1,7 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupledExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderTokenExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderPreparedExtraction
-import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderDiagnosticExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedForHeaders

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignment
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.WhileLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedLexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
-import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupling
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 
 /-!

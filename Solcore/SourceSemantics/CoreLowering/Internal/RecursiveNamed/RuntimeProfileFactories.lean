@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
-import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions

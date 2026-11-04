@@ -5,7 +5,7 @@ import Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
 import Solcore.Core.Derived
 import Solcore.Frontend.SourceCoreAllocationLayouts
-import Solcore.SourceSemantics.CoreLowering.DataEnvironment
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
 import Solcore.SourceSemantics.CoreLowering.GenericHeap
 import Solcore.Frontend.SourceCoreCallableIndexedAncestry

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.AmbientDefinitions
 import Solcore.Frontend.SourceCoreCompatibleCatalog
 import Solcore.SourceSemantics.CoreLowering.GeneralHeap
-import Solcore.SourceSemantics.CoreLowering.DataPatternValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.Frontend.SourceRuntimeValues
 import Solcore.Core.DefinitionExtension

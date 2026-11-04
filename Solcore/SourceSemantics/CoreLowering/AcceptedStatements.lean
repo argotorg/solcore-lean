@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStateme
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation

@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfi
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.Instantiation
-import Solcore.SourceSemantics.CoreLowering.ReachedNamedSequentialBodyFaultPaths
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedNamedFaultPaths
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 

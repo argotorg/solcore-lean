@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinFragmentOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedNamedFaultPaths
 
 /-!
 # Admitted staged profile: expressions and terminals

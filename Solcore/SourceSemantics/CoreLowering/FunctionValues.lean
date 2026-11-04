@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.FunctionCodeCertificates
 import Solcore.SourceSemantics.CoreLowering.FunctionCaptures
-import Solcore.SourceSemantics.CoreLowering.DataEqualityValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.CoreLowering.CaptureCopies
 
 /-! Authenticated ordinary lambda leaves for the generic payload model.

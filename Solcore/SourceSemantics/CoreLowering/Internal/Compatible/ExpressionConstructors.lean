@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.NativeExpressionContextSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 

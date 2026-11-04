@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping

@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignmen
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTermina
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates

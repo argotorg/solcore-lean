@@ -2,11 +2,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.DataPlaceChildExpressions
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
-import Solcore.SourceSemantics.CoreLowering.TypedDataPlaceKeyOrder
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments

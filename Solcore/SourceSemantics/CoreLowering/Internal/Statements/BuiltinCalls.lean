@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors

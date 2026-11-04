@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
-import Solcore.SourceSemantics.CoreLowering.DataMatchBranchPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedMatches

@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 import Solcore.SourceSemantics.Staging.RecursiveTraceProperties
 import Solcore.SourceSemantics.CoreLowering.CallStageBoundary
 import Solcore.SourceSemantics.CoreLowering.ContractedFunctionCalls
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 
 /-!
 # The recursive staged profile: calls

@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
-import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceBitNot
 
 /-!

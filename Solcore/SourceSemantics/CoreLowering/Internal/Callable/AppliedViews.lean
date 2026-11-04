@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceCoreCallableContextFrames
-import Solcore.SourceSemantics.CoreLowering.DataEquality
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
 import Solcore.Core.FuelResumptionProperties
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.CallEntryCertificates

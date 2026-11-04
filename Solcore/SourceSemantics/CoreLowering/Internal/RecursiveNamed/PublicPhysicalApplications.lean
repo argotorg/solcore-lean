@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRo
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectApplications
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectClosureApplications
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins

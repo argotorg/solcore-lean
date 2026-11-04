@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
-import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.Core.DefinitionExtension

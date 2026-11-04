@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Full original body typing and genuine table reachability supply raw typing

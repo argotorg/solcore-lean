@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.DataEnvironment
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 
 /-! An interface for authenticated ordinary cell payload relations. Models may
 refer to the finite location map and runtime typing world, so a captured source

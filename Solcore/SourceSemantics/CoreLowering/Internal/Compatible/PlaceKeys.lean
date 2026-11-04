@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.SubstitutionProperties
-import Solcore.SourceSemantics.CoreLowering.DataPlaceChildExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
 import Solcore.SourceSemantics.Dynamic.Initialization
-import Solcore.SourceSemantics.CoreLowering.DataPlaceModifier
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
 

@@ -3,9 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeF
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
 
 /-!
 # Generic imperative loops

@@ -7,18 +7,18 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentCo
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeap
-import Solcore.SourceSemantics.CoreLowering.DataMappingComparison
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
-import Solcore.SourceSemantics.CoreLowering.DataPlaceChildExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
 import Solcore.SourceSemantics.Dynamic.Initialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
-import Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 
 /-!
 # Compatible profile: cell places

@@ -6,8 +6,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
-import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupling
-import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedForHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 
 /-!
 # Protected contracts: for iterations

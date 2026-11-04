@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 
 /-!

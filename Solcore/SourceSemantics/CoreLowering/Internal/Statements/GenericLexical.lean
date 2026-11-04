@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalCont
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ReachableContinuations
 import Solcore.SourceSemantics.Dynamic.Control
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 

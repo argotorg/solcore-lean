@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ReachedLoweredReadOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
 
 /-! The original index fold consumes only genuine fragment, finite terminal
 and static Source join receipts. The actual returned fields remain indexed. -/

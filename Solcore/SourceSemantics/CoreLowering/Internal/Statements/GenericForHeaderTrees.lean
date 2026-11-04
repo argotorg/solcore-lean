@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
+import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedPlans
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
 
 /-!
 # Generic for header trees
