@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryStoredMembers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryReadMembers
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 
 /-! An initialized read and its already-produced callee post keep the positive
 chosen factory at the same known index. Reported occurrence runtime views and

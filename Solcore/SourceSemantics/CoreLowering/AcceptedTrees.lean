@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentRoute
 import Solcore.SourceSemantics.CoreLowering.GenericMatchChildren
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchAmbientLowering
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 
 /-!
 # Accepted compiler trees

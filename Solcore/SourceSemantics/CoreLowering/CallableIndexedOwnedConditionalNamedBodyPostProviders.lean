@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedConditionalNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 
 /-! Actual successful arguments construct the same parameter receipt. The
 conditional producer runs internally and the original outer call core retains

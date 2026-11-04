@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMixedLexicalNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 
 /-! Successful arguments construct the original typed parameter receipt.
 The strict mixed expression family supplies lexical body children at that

@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ExpressionReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedMethodAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinarySyntaxTable
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatalog
 
 /-!
 # Accepted named expressions

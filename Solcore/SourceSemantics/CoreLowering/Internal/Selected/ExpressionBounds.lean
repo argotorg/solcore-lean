@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedExpressions
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
 import Solcore.SourceSemantics.SourceExecutableCoercionInterfaces
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaw
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedFiniteNamedBootstrapReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
 

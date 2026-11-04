@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryStoredMembers
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 
 /-! Actual initialized writes and allocations retain the chosen receiving model
 and the same positive stored member. The generic producers run once; forward

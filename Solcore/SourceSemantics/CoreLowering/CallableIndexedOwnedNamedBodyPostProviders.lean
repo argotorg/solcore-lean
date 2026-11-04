@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedParameterReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrimitiveNamedBodyFaultBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSequentialNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
 
 /-! The actual successful argument and parameter receipts supply concrete
 singleton/sequential body posts. The outer named/direct core consumes them

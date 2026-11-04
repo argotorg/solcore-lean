@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedAssignmentFaults
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedSecondCallGateRejection
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 
 /-! A concrete receiving-table view for assignment and physical call-arity
 errors. Existing assignment diagnostics retain their raw types and operators;

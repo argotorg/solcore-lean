@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLe
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocation

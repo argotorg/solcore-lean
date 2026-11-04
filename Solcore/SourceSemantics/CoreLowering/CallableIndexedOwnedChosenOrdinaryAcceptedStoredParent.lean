@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinarySelectedCallReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStoredIndirectApplication
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 
 /-! Accepted stored parents consume the actual chosen callee and current
 argument tuple. The body continuation is built internally; the original

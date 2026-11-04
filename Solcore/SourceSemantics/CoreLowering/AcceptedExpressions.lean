@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationExpressions
 import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.PublicSupport

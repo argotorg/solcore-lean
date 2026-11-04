@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryReadMembers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStoredIndirectApplication
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCompilerReceipts
 
 /-! The known chosen callee stays at one actual post and selected row.

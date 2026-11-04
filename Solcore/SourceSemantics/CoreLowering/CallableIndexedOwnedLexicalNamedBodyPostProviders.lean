@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAbsentAllocationNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 
 /-! Supported static lexical bodies supply concrete causal posts at the real
 successful argument and parameter state. The existing outer named/direct

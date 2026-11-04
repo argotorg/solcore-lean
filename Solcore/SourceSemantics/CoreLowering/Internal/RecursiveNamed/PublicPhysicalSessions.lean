@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.InitializedPublicBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalProgramSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories

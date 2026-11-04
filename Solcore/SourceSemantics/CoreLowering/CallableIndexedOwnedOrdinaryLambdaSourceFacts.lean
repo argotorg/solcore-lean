@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
 
 /-! The actual Source lambda judgment supplies the raw function type and body
 receipt at the same occurrence. Authentic Source runtime fields and evidence

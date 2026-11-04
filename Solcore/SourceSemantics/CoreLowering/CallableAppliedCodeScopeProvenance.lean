@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectStageScopeReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableAppliedViewProvenance
 
 /-! An actual applied read retains the full owner key of its lexical Code.

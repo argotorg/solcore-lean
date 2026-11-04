@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedCallFaults
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingFirstCallGateRejection
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 
 /-! One literal public diagnostic table interprets semantic assignment/arity
 failures and scoped first-call-gate failures. The failure constructor chooses

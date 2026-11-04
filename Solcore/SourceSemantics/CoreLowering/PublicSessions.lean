@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActual
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PreparedMethodRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogPublicAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.EligibleSelected
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CertifiedPublicSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalSessions

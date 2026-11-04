@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedSourceSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedAssignmentReadiness
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogProducers
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchCoupledReadyBounds
 
 /-! The actual public extraction supplies its own Tree, diagnostic plan and

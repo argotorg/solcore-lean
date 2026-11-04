@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralLambdaBodyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaInvocation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
 
 /-! A genuine chosen singleton-return Support supplies its literal continuation
 internally. The original invocation installs parameters and restores the caller

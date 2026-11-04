@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLe
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories

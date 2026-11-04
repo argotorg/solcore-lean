@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedBodyBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
 
 /-! Actual public named parameter receipts close through the existing measured

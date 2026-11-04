@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalR
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedParameterReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
 
 /-! Static builtin receipts populate the original lexical Tree factors at each

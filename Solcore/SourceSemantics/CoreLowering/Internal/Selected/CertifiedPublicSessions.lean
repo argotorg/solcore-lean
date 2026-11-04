@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogPublicAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.EligibleSelected
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
