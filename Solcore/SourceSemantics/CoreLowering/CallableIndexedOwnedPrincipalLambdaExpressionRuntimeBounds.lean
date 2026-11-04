@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrincipalLambdaExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaExpressionRuntimeBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 
 /-! The original expression support fold consumes authentic principal-lambda
 formation and selected-call heads. Formed closures retain their actual globals

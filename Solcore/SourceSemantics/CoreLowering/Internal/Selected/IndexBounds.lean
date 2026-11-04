@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexTerminal
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-!
 # Selected compilations: index bounds

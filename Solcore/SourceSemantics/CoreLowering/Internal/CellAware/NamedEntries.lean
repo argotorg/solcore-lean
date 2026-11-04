@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
@@ -20,7 +20,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameters
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCellAllocationProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness

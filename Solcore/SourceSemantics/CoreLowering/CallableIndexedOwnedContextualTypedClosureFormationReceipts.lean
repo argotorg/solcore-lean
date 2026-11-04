@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPrincipalLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 
 /-! Genuine ordinary and principal formation heads create a positive closure
 leaf directly from the retained static receipt. Each direction invokes the

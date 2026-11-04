@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredMemberCallBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualPrincipalLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 
 /-! Actual contextual principal formation supplies the positive member used by
 the shared stored-call adapters. Method authority, Source origin, leading

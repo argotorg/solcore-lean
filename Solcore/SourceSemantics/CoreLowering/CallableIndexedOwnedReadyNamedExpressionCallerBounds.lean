@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedReadyFamilyReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionCallsHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! The existing expression support fold carries a genuine caller protocol
 through ordinary/direct named calls. Its real global-slot carrier and

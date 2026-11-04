@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! Model-generic admitted expression children already retain their result,
 heap and actual reached state. Under the positive receiving model those first

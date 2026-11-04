@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedReadyFamilyReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionCallsHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! The original expression support fold consumes strict ready-family named
 callee proofs at actual canonical parameter receipts. Arbitrary authentic

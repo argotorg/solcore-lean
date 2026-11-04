@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralMethodMixedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpressionRuntimeBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 
 /-! Original mixed named/method certificates run with complete principal
 lambda provenance under one supplied function model. The same expression Tree

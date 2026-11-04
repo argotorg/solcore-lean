@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedNestedReadyFamilyReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionCallsHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! Genuine named parameter entries retain their original principal packet
 when supplying strict body children. The unchanged expression support fold

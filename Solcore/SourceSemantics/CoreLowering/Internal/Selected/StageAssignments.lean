@@ -1,9 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProjectedAssignmentPreservation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareAssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerProjectedSource
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 
 /-!
 # Lifting to staged Source: assignments

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedDataHeadBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 
 /-! The original constructor/member/index head preserves and reflects finite
 execution with a fault policy selected only at its actual index header and

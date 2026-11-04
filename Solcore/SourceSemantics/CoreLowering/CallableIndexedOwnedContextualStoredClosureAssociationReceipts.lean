@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualOrdinaryLambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualPrincipalLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureAssociation
 
 /-! Positive contextual ordinary and principal members retain the actual formed code,

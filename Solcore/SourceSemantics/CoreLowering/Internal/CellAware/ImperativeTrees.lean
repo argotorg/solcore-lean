@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInv
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedFlowOutcomes
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SourceForLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SourceFlowLifting
 

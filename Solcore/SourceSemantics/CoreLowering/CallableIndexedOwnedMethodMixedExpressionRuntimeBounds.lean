@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 
 /-! Genuine named/direct named calls and accepted method-lambda formation/calls
 share the same principal packet and supplied function model. The existing

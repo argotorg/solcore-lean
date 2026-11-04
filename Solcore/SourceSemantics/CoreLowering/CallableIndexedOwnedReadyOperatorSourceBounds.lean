@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOperatorSourceAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! Prepared unary and binary method operators with an empty output coercion
 suffix retain their original compiler selection and Source operand/body grades.

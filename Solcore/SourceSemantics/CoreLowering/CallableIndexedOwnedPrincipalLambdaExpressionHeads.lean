@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaSelectedCallWithFunctions
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPrincipalLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaExpressionHeads
 
 /-! Authentic method lambda certificates construct principal closures whose

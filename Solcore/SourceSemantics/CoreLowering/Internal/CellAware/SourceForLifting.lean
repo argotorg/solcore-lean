@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedFlowOutcomes
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 
 /-!
 # Lifting Source traces over cell-aware loops

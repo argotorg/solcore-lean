@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceOrigin
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedCatalogProducers
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyReadyInputs
 
 /-! Genuine body Source receipts choose the finite readiness catalog at the

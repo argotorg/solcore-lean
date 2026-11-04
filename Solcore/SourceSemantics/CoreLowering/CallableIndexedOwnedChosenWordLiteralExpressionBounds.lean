@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralReturnSiteShells
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! A fixed approved Word literal has admitted meaning at the same chosen
 recaptured support. The original literal producer leaves its actual state

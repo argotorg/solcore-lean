@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyReadyBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceOrigin
 
 /-! Source runtime validity strengthens the compiler origin's visited domain.

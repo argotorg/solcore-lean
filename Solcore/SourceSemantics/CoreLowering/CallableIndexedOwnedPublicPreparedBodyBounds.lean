@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedCatalogBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! A genuine public parameter entry supplies the original Source receipt and

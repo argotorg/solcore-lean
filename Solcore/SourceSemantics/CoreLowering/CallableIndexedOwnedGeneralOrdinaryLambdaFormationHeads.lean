@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! An accepted ordinary Site retains unrestricted same-Code static body
 support. At each actual input its genuine nested Header packet and represented

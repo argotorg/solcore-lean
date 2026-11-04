@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLexicalFooter
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects

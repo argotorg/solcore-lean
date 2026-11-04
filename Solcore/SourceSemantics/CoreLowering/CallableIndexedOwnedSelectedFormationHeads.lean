@@ -1,5 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedOrdinaryLambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMethodLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 
 /-! Actual literal lambda receipts select one finite formation branch. An
 ordinary Header retains its nested packet; a genuine trait-generated lambda

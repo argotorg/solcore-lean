@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysica
 import Solcore.SourceSemantics.CoreLowering.DataMatchBranchPrefix
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedMatchHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedMatches
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMatchPrefixAdmission
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure

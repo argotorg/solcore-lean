@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySuppo
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedFlowBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedArgumentAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-!
 # Prepared callables: catalog and terminal closures

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyReadyOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyTypedFacts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! Genuine parameter Source receipts and every original row authenticate the
 same actual body entry. Independent compiler syntax supplies its static facts;

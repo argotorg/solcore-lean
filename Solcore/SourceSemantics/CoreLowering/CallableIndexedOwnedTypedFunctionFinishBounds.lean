@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 
 /-! Actual Source parameter typing closes direct function-body transfers.

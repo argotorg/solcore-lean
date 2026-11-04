@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeCatalogReady
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 
 /-! Original Source initializer syntax and item typing retain the pending
 condition, body, and post facts. Finite projections follow the same static

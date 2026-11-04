@@ -1,10 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerSource
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.Staging.RecursiveBareBitNotFacts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerBitNotSource
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareBitNotHeads
 
 /-!
 # Lifting to staged Source: for loops

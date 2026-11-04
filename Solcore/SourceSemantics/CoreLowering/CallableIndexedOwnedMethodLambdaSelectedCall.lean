@@ -1,7 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMethodLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedJointReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
 /-! Genuine method lambda formation supplies a Header-free selected call.
 The original compiler receipt, two accepted guards and ordered arguments stay

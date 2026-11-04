@@ -2,12 +2,11 @@ import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileAllocation
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeapOperations
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedWhileReadiness
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileEdges
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.LoopCoreInversion
 import Solcore.SourceSemantics.CoreLowering.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileSequences
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 
 /-!

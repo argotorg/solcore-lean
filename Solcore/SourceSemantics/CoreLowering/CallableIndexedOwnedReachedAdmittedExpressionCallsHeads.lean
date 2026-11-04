@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionCallsHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedCompositionsBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReachedAdmittedDataHeadBounds
 
 /-! Genuine parent Source typing and actual input admission select the existing

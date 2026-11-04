@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
 
 /-! The original parameter receipt supplies genuine Source body typing.

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedTerminalStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-!
 # Staged bounds: scoped Source inversion

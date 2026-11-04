@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMarkedAllocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCallerProtocol
 

@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentReflection
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareWordModifier
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! A bare assignment runs its RHS through the same staged relation.
 The native snapshot and seven-slot commit remain those emitted by the actual

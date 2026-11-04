@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 
 /-!

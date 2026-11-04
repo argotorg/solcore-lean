@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! Staged keys retain their original failure and reached heap. The native
 getter runs only after the complete ordered key row, and keeps the existing

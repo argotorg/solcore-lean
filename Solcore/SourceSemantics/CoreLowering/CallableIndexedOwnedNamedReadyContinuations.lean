@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedNamedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceBodyReadyBounds
 
 /-! A complete static origin association selects the actual strict callee

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.Staging.RecursiveScope
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.FiniteClosures
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
