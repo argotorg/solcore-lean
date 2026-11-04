@@ -3,6 +3,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
+/-!
+# Protected contracts: staged bare assignment on cells
+
+Staged bare assignment over cells.
+-/
+
 /-! A bare assignment runs its RHS through the same staged relation.
 The native snapshot and seven-slot commit remain those emitted by the actual
 compiler. Stage rejection stops before the write and retains the RHS heap. -/

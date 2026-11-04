@@ -2,6 +2,14 @@ import Solcore.Frontend.SourceCoreCallableViewWrappers
 import Solcore.Core.Safety
 import Solcore.Core.Correspondence
 
+/-!
+# Callable view wrappers
+
+Typing of the body, repack and lowering steps of callable view wrappers.
+
+This file stays on its own, below the module that defines the Source `Context`. `Context` here is the Core one, found through `open Core`, and once that module is imported the `Context` of the enclosing namespace would win.
+-/
+
 /-! Finite Core transparency of a callable view wrapper. The store and both
 the original closure environment and outer wrapper environment are arbitrary.
 Only the actual original closure body is executed; no heap is copied, no cell

@@ -6,6 +6,12 @@ import Solcore.Frontend.SourceCoreCallableContracts
 import Solcore.SourceSemantics.Staging.CallGuard
 import Solcore.Frontend.SourceCoreStageContracts
 
+/-!
+# Function values and calls
+
+Function values and arguments, capture copies, the shared call body and `FunctionCalls`, with the contracted forms of values and calls and the call stage guard.
+-/
+
 section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.FunctionArguments
 /-! The actual parameter wrapper allocates source and Core cells in the same
@@ -1400,12 +1406,6 @@ alone does not establish that an arbitrary callable hook preserves meaning.
 This relation proves formation, typing and world extension. It does not identify
 legacy staging guards with the independent source call rules, and does not
 import arbitrary external closure bodies or instantiate a full body theorem. -/
-
-/-!
-# Function values and calls
-
-Function values and arguments, capture copies, the shared call body and `FunctionCalls`, with the contracted forms of values and calls and the call stage guard.
--/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.ContractedFunctionValues

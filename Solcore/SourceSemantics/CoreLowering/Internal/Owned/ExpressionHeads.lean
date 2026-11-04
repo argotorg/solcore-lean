@@ -2,6 +2,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 
+/-!
+# Owned callables: expression heads
+
+Expression heads of owned callers.
+-/
+
 /-! Actual ordered arguments hand their reached pool to the selected named
 invocation. The original canonical global slot is a separate caller receipt;
 the pool supplies only its actual row authority and exact full live capture.

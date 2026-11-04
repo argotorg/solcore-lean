@@ -10,6 +10,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativ
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 
+/-!
+# Admitted staged profile: scoped preservation
+
+Preservation of scoped imperative statements.
+-/
+
 /-! Scoped compiler statements include control flow, projected writes and unary
 updates. Strict child bounds follow the original Source relation, and writes
 use the heap reached by their actual key and operand evaluations. -/

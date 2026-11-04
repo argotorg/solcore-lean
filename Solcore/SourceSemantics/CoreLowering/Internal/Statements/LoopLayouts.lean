@@ -1,6 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 
+/-!
+# Loop layouts
+
+Lexical layouts for generated loop code, and the `@[simp]` lemmas `rename_insert` and `rename_insert_lift`.
+
+This file is on its own so that `Statements/LoopRenaming` can stay below those lemmas.
+-/
+
 /-! Lexical layouts for generated loop code. Temporary binders change the
 actual closure environment and the generated code together; these relations
 only require agreement on source-visible lookup slots. -/

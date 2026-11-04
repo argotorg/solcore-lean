@@ -1,6 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 
+/-!
+# Emitted diagnostics of match catalogs
+
+Coupled extraction over a match catalog.
+-/
+
 /-! Static elimination is assembled with the actual chosen constructor fields.
 The original extraction keeps its exact Tree, Plan and diagnostic receipts.
 A genuine entry ledger supplies the complete solved-row equality; no raw

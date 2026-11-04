@@ -1,4 +1,10 @@
 import Solcore.SourceSemantics.Dynamic.Fault
+
+/-!
+# Sizes of Source executions
+
+Sizes of the finite Source derivations.
+-/
 /-! Sizes of the existing finite source derivations. Each rule contributes
 one plus the sum of all its immediate dynamic premises. The fault group counts
 successful prefixes as well as faulting children. Static dispatch, evidence,

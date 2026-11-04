@@ -4,6 +4,14 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRo
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinarySequenceCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults
 
+/-!
+# Recursive named public results: direct closure application
+
+Bounds of direct application through a closure handle.
+
+This file stays apart from `RecursiveNamed/PublicDirectApplications`: the two share a namespace and three local notations, and in one file Lean would generate other names for them.
+-/
+
 /-! Direct packed application reuses the established numeric body family.
 The retained callable, current captures and owned caller state supply the
 application boundary; no body execution law is an input. -/
