@@ -1,6 +1,13 @@
 import Solcore.Frontend.RustHull.Syntax
 import Solcore.Util.Json
 
+/-!
+# Hull transport
+
+Strict, bounded decoding of the exported Hull text into `Syntax`. Main declarations: `decode`,
+`decodeText`, `DecodeLimits`, `DecodeError`.
+-/
+
 /-! Strict, bounded decoding of the pinned Hull transport. No annotations are inferred here. -/
 set_option autoImplicit false
 namespace Solcore.Frontend.RustHull

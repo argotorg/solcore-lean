@@ -1,3 +1,11 @@
+
+/-!
+# Hull syntax
+
+The typed Hull program the pinned Rust compiler exports. Main declarations: `Ty`, `Expr`, `Stmt`,
+`Function`, `YulStmt`.
+-/
+
 /-!
 A lossless, typed transport of solcore-rs Hull at the pinned upstream revision.
 These nodes are compiler input, not evidence that upstream checking succeeded.

@@ -1,6 +1,15 @@
 import Solcore.Frontend.RustHull.Syntax
 import Solcore.Core.Primitive
 
+/-!
+# Independent Hull meaning
+
+The specification of Hull expressions, statements, functions and programs, with no reference to
+Core. Effects stay abstract here; `Semantics/` instantiates them. Main declarations:
+`Semantics.Value`, `Semantics.State`, `Semantics.Result`, `Semantics.Control`,
+`Semantics.EvalFunction`.
+-/
+
 /-! Independent evaluation rules for Hull. Source values, names and locations
 are distinct from Core values and locations. Word arithmetic shares only the
 mathematical 256-bit operations. External effects are an explicit parameter;

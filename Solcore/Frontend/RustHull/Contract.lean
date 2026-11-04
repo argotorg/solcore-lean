@@ -1,5 +1,13 @@
 import Solcore.Frontend.RustHull.AccountRuntime
 
+/-!
+# Public contract boundary
+
+A selected Hull object executed on Core with calldata, shared state and an explicit account context.
+Main declarations: `Contract.compileObject`, `Contract.CompiledObject`, `Contract.Context`,
+`Contract.Receipt`, `Contract.Outcome`.
+-/
+
 /-! Execute a selected Hull object on Core with byte calldata, shared message
 state and explicit account context. The transaction caller supplies the entry
 balance after transferring call value; the receipt exports committed balances. -/

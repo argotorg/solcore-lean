@@ -1,5 +1,12 @@
 import Solcore.Frontend.RustHull.Contract
-import Solcore.Frontend.RustHull.ObjectLinking
+import Solcore.Frontend.RustHull.CodeImage
+
+/-!
+# Linked contracts
+
+Runtime and constructor objects with exact linked bytes. Main declarations:
+`LinkedContract.prepare`, `LinkedContract.prepareDeployment`, `LinkedContract.compileObject`.
+-/
 
 /-! Prepare runtime and constructor objects with exact linked backend bytes.
 Constructor arguments are appended to init code, while calldata is supplied

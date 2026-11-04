@@ -1,5 +1,12 @@
 import Solcore.Frontend.RustHull.Lowering
 
+/-!
+# Scalar execution
+
+Public execution of a checked scalar entry point. Main declarations: `ScalarExecution.prepare`,
+`ScalarExecution.run`, `ScalarExecution.resume`, `ScalarExecution.Prepared`.
+-/
+
 /-! Scalar entry preparation from command-line input strings. Parsing preserves
 the checked-Hull runner's Word, Bool, Unit and two-Unit Boolean layouts. -/
 set_option autoImplicit false
