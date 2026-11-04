@@ -59,6 +59,67 @@ Covers [`Solcore/Syntax`](../../Solcore/Syntax): lexer, parser, grammar correspo
 | [`Types`](../../Solcore/Test/Syntax/Types.lean) | Type syntax tests | 36 |
 | [`Yul`](../../Solcore/Test/Syntax/Yul.lean) | Yul syntax tests | 32 |
 
+### Core
+
+Covers [`Solcore/Core`](../../Solcore/Core): Core semantics, typing, cells and the wire format.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`DataAndCells`](../../Solcore/Test/Core/DataAndCells.lean) | Core data and cell tests | 13 |
+| [`HostMachine`](../../Solcore/Test/Core/HostMachine.lean) | Core host machine tests | 1 |
+| [`LocalFragments`](../../Solcore/Test/Core/LocalFragments.lean) | Core local fragment tests | 22 |
+| [`Primitives`](../../Solcore/Test/Core/Primitives.lean) | Core primitive tests | 25 |
+| [`Wire`](../../Solcore/Test/Core/Wire.lean) | Core wire format tests | 6 |
+
+### Abi
+
+Covers [`Solcore/Abi`](../../Solcore/Abi): ABI words and the Keccak helper.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`StaticWord`](../../Solcore/Test/Abi/StaticWord.lean) | Static Word ABI tests | 11 |
+
+### Resolved
+
+Covers [`Solcore/Resolved`](../../Solcore/Resolved): resolved syntax and its semantics.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Semantics`](../../Solcore/Test/Resolved/Semantics.lean) | Resolved syntax tests | 11 |
+
+### TypeSystem
+
+Covers [`Solcore/TypeSystem`](../../Solcore/TypeSystem): inference.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Inference`](../../Solcore/Test/TypeSystem/Inference.lean) | Type system tests | 2 |
+
+### ContractRuntime
+
+Covers [`Solcore/ContractRuntime`](../../Solcore/ContractRuntime): frames, worlds, hosts, calls, creation and logs.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`AddressSelectedHost`](../../Solcore/Test/ContractRuntime/AddressSelectedHost.lean) | Address-selected host tests | 12 |
+| [`ContractCalls`](../../Solcore/Test/ContractRuntime/ContractCalls.lean) | Contract call convention tests | 8 |
+| [`Creation`](../../Solcore/Test/ContractRuntime/Creation.lean) | Contract creation tests | 10 |
+| [`Frames`](../../Solcore/Test/ContractRuntime/Frames.lean) | Frame tests | 49 |
+| [`HostDriver`](../../Solcore/Test/ContractRuntime/HostDriver.lean) | Host driver tests | 9 |
+| [`Logs`](../../Solcore/Test/ContractRuntime/Logs.lean) | Log tests | 8 |
+| [`NestedExecution`](../../Solcore/Test/ContractRuntime/NestedExecution.lean) | Nested execution tests | 9 |
+| [`ParentIndexedFrames`](../../Solcore/Test/ContractRuntime/ParentIndexedFrames.lean) | Parent-indexed frame tests | 15 |
+| [`SelectedExecution`](../../Solcore/Test/ContractRuntime/SelectedExecution.lean) | Selected execution tests | 19 |
+| [`TopLevelExecution`](../../Solcore/Test/ContractRuntime/TopLevelExecution.lean) | Top-level execution tests | 15 |
+| [`ValueCalls`](../../Solcore/Test/ContractRuntime/ValueCalls.lean) | Value call boundary tests | 6 |
+| [`WorldState`](../../Solcore/Test/ContractRuntime/WorldState.lean) | World state tests | 19 |
+
+## A file that stays where it is
+
+[`Solcore/Test/SourceCallReturnGolden.lean`](../../Solcore/Test/SourceCallReturnGolden.lean) keeps its path
+and stays alone. `scripts/test-semantic-call-differential.py` reads it by path and scans it with a regex
+for its golden rows, so it can neither move nor share a file with other tuples of strings.
+
 ## Not merged yet
 
-2812 old modules are still flat in `Solcore/Test`.
+2542 old modules are still flat in `Solcore/Test`.

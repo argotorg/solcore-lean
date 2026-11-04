@@ -1,0 +1,628 @@
+import Solcore.TypeSystem.Inference
+import Solcore.TypeSystem
+
+/-!
+# Type system tests
+
+Inference and the public boundary of the type system.
+-/
+
+section
+-- leanmerge: from Solcore.Test.TypeSystemInference
+set_option autoImplicit false
+
+namespace Solcore.Test.TypeSystemInference
+
+open TypeSystem
+
+example : DecidableEq Ty := inferInstance
+example : DecidableEq Inference.Error := inferInstance
+
+private def identity : Expr :=
+  .lambda "x" (.variable "x")
+
+example : Inference.inferClosed identity =
+    .ok (.function (.variable ⟨0⟩) (.variable ⟨0⟩)) := by
+  rfl
+
+private def polymorphicIdentityPair : Expr :=
+  .letE "id" identity
+    (.pair
+      (.application (.variable "id") .unit)
+      (.application (.variable "id") (.bool true)))
+
+example : Inference.inferClosed polymorphicIdentityPair =
+    .ok (.product .unit .bool) := by
+  rfl
+
+private def selfApplication : Expr :=
+  .lambda "x" (.application (.variable "x") (.variable "x"))
+
+example : Inference.inferClosed selfApplication =
+    .error (.unification
+      (.occursCheck ⟨0⟩ (.function (.variable ⟨0⟩) (.variable ⟨1⟩)))) := by
+  rfl
+
+example : Inference.inferClosed (.variable "missing") =
+    .error (.unknownVariable "missing") := by
+  rfl
+
+private def variable0 : Ty := .variable ⟨0⟩
+private def box (argument : Ty) : Ty :=
+  .application (.constructor (.builtin .word)) argument
+
+example : Unification.unifyTypes (box variable0) (box .bool) =
+    .ok [(⟨0⟩, .bool)] := by
+  rfl
+
+private def rigidOwner : Resolved.DeclarationId :=
+  ⟨⟨.main, ⟨[⟨"rigid", by decide⟩], by decide⟩⟩, 0⟩
+
+example : Unification.unifyTypes
+    (.parameter { owner := rigidOwner, index := 0 })
+    (.parameter { owner := rigidOwner, index := 1 }) =
+    .error (.mismatch
+      (.parameter { owner := rigidOwner, index := 0 })
+      (.parameter { owner := rigidOwner, index := 1 })) := by
+  rfl
+
+private def rigidParameter : TypeParameterId :=
+  { owner := rigidOwner, index := 0 }
+
+example :
+    let scheme : DeclarationScheme :=
+      { parameters := [rigidParameter]
+        body := .function (.parameter rigidParameter) (.parameter rigidParameter) }
+    scheme.instantiate 20 =
+      (.function (.variable ⟨20⟩) (.variable ⟨20⟩), 21) := by
+  rfl
+
+example :
+    let scheme : Scheme :=
+      { quantified := [⟨7⟩], body := .function (.variable ⟨7⟩) (.variable ⟨7⟩) }
+    scheme.instantiate 10 =
+      (.function (.variable ⟨10⟩) (.variable ⟨10⟩), 11) := by
+  rfl
+
+example :
+    let scheme : Scheme :=
+      { quantified := [⟨7⟩, ⟨9⟩]
+        body := .function (.variable ⟨7⟩) (.variable ⟨9⟩) }
+    scheme.instantiateWithSubstitution 10 =
+      { substitution := [(⟨9⟩, .variable ⟨11⟩), (⟨7⟩, .variable ⟨10⟩)]
+        body := .function (.variable ⟨10⟩) (.variable ⟨11⟩)
+        next := 12 } := by
+  rfl
+
+private def matchedVariable : TypeVarId := ⟨7⟩
+private def openOccurrenceVariable : TypeVarId := ⟨42⟩
+
+private def repeatedVariableScheme : Scheme := {
+  quantified := [matchedVariable]
+  body := .function (.variable matchedVariable) (.variable matchedVariable)
+}
+
+/-- Open occurrence types are valid rank-1 scheme instances; closing them is
+a separate specialization policy. -/
+example : repeatedVariableScheme.matchInstance?
+    (.function (.variable openOccurrenceVariable)
+      (.variable openOccurrenceVariable)) =
+    some [(matchedVariable, .variable openOccurrenceVariable)] := by
+  rfl
+
+/-- Repeated occurrences of one quantified variable must select one type. -/
+example : repeatedVariableScheme.matchInstance? (.function .word .bool) =
+    none := by
+  rfl
+
+/-- Phantom quantified variables cannot produce a complete substitution. -/
+example : Scheme.matchInstance?
+    ({ quantified := [matchedVariable], body := Ty.word } : Scheme) .word =
+    none := by
+  rfl
+
+/-- Duplicate quantifier identities are rejected at the certificate boundary. -/
+example : ({
+      quantified := [matchedVariable, matchedVariable]
+      body := Ty.variable matchedVariable
+    } : Scheme).matchInstance? .word = none := by
+  rfl
+
+/-- Unquantified flexible variables remain rigid during scheme matching. -/
+example : (Scheme.mono (.variable matchedVariable)).matchInstance?
+    (.variable matchedVariable) = some [] := by
+  rfl
+
+example : (Scheme.mono (.variable matchedVariable)).matchInstance? .word =
+    none := by
+  rfl
+
+/-- The exported soundness projection exposes the exact open instantiation. -/
+example :
+    let substitution : Substitution :=
+      [(matchedVariable, .variable openOccurrenceVariable)]
+    repeatedVariableScheme.quantified.Nodup ∧
+      substitution.domain = repeatedVariableScheme.quantified ∧
+      substitution.apply repeatedVariableScheme.body =
+        .function (.variable openOccurrenceVariable)
+          (.variable openOccurrenceVariable) := by
+  exact Scheme.matchInstance?_sound (by rfl)
+
+end Solcore.Test.TypeSystemInference
+end
+
+section
+-- leanmerge: from Solcore.Test.TypeSystemPublicBoundary
+set_option autoImplicit false
+
+namespace Tests
+
+example := @Solcore.TypeSystem.Ty.mem_freeVariables_application_iff
+example := @Solcore.TypeSystem.Ty.mem_freeVariables_function_iff
+example := @Solcore.TypeSystem.Ty.mem_freeVariables_product_iff
+example := @Solcore.TypeSystem.Ty.mem_freeVariables_mapping_iff
+example := @Solcore.TypeSystem.Ty.VariablesBelow
+example := @Solcore.TypeSystem.Ty.VariablesBelow.weaken
+example := @Solcore.TypeSystem.Ty.variablesBelow_variable_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_application_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_function_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_product_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_mapping_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_applyMany_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_applyMany
+example := @Solcore.TypeSystem.Ty.variablesBelow_productMany
+example := @Solcore.TypeSystem.Ty.variablesBelow_nominal
+example := @Solcore.TypeSystem.Ty.containsVariable_eq_false_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_nextVariable
+example := @Solcore.TypeSystem.Substitution.lookup?_eq_none_iff_not_mem_domain
+example := @Solcore.TypeSystem.Substitution.lookup?_eq_some_mem
+example := @Solcore.TypeSystem.Substitution.lookup?_compose
+example := @Solcore.TypeSystem.Substitution.compose_apply
+example := @Solcore.TypeSystem.Substitution.apply_applyMany
+example := @Solcore.TypeSystem.Substitution.apply_productMany
+example := @Solcore.TypeSystem.Substitution.apply_variables_below_of_range
+example := @Solcore.TypeSystem.Substitution.mem_of_mem_erase
+example := @Solcore.TypeSystem.Substitution.mem_of_mem_without
+example := @Solcore.TypeSystem.Substitution.domain_compose
+example := @Solcore.TypeSystem.Substitution.mem_domain_compose_iff
+example := @Solcore.TypeSystem.Substitution.domain_compose_nodup
+example := @Solcore.TypeSystem.Substitution.mem_compose_iff
+example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain
+example := @Solcore.TypeSystem.Substitution.RangeAvoidsVariablesOn
+example := @Solcore.TypeSystem.Substitution.RangeAvoidsVariablesOn.mono
+example := @Solcore.TypeSystem.Substitution.SemanticallyExtends
+example := @Solcore.TypeSystem.Ty.apply_eq_self_of_domain_disjoint_freeVariables
+example := @Solcore.TypeSystem.Substitution.SolvedBelow
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.empty
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.weaken
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.mono
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.lookup_range_outside_domain
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_variables_below
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.variablesBelow_apply
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_variables_outside_domain
+example :=
+  @Solcore.TypeSystem.Substitution.RangeAvoidsDomain.apply_variables_outside_older_domain
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.range_fixed
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_idempotent
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.compose
+example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain.compose
+example :=
+  @Solcore.TypeSystem.Substitution.SemanticallyExtends.refl_of_solved
+example :=
+  @Solcore.TypeSystem.Substitution.SemanticallyExtends.compose_left
+example := @Solcore.TypeSystem.Substitution.SemanticallyExtends.trans
+example := @Solcore.TypeSystem.ParameterSubstitution.lookup?_eq_some_mem
+example := @Solcore.TypeSystem.ParameterSubstitution.apply_variables_below
+example := @Solcore.TypeSystem.Constraint.VariablesBelow
+example := @Solcore.TypeSystem.Constraint.VariablesBelow.apply
+example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain
+example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain.apply
+example := @Solcore.TypeSystem.Constraint.SatisfiedBy
+example := @Solcore.TypeSystem.Constraint.SatisfiedBy.of_normalized
+example := @Solcore.TypeSystem.ConstraintsBelow
+example := @Solcore.TypeSystem.ConstraintsOutsideDomain
+example := @Solcore.TypeSystem.ConstraintsSatisfiedBy
+example := @Solcore.TypeSystem.ConstraintsSatisfiedBy.cons
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_sound_of_below
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_sound
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_rangeAvoidsDomain
+example := @Solcore.TypeSystem.Unification.unify_solvedBelow
+example := @Solcore.TypeSystem.Unification.unify_sound_of_below
+example := @Solcore.TypeSystem.Unification.unify_sound
+example := @Solcore.TypeSystem.Unification.unify_rangeAvoidsDomain
+example := @Solcore.TypeSystem.Unification.unifyTypes_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyTypes_sound
+example := @Solcore.TypeSystem.Unification.unifyTypes_rangeAvoidsDomain
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_next_le
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_domain_permutation
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_fresh
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_variablesBelow
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_body_variablesBelow
+example := @Solcore.TypeSystem.Scheme.instantiate_next_le
+example := @Solcore.TypeSystem.Scheme.matchInstance?
+example := @Solcore.TypeSystem.Scheme.matchInstance?_sound
+example := @Solcore.TypeSystem.Scheme.FreeVariablesBelow
+example := @Solcore.TypeSystem.Scheme.body_variablesBelow_nextVariable
+example := @Solcore.TypeSystem.Scheme.FreeVariablesBelow.of_body
+example := @Solcore.TypeSystem.Scheme.apply_body_variablesBelow
+example := @Solcore.TypeSystem.Scheme.instantiate_variablesBelow
+example := @Solcore.TypeSystem.DeclarationScheme.instantiate_next_le
+example := @Solcore.TypeSystem.DeclarationScheme.instantiate_variablesBelow
+example := @Solcore.TypeSystem.Environment.BodiesBelow
+example := @Solcore.TypeSystem.Environment.BodiesBelow.weaken
+example := @Solcore.TypeSystem.Environment.BodiesBelow.cons
+example := @Solcore.TypeSystem.Environment.BodiesBelow.apply
+example := @Solcore.TypeSystem.Environment.lookup?_eq_some_mem
+example := @Solcore.TypeSystem.Environment.mem_freeVariables_iff
+example := @Solcore.TypeSystem.Environment.bodiesBelow_nextVariable
+example := @Solcore.TypeSystem.Expr.AnnotationsBelow
+example := @Solcore.TypeSystem.Expr.AnnotationsBelow.weaken
+
+/-- Aggregate application preserves a bound across a mixed flexible-variable
+and builtin argument row. -/
+example :
+    (Solcore.TypeSystem.Ty.applyMany Solcore.TypeSystem.Ty.bool
+      [.variable ⟨0⟩, Solcore.TypeSystem.Ty.word]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_applyMany
+  · simp [Solcore.TypeSystem.Ty.bool]
+  · intro type member
+    simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+    rcases member with rfl | rfl
+    · simp
+    · simp [Solcore.TypeSystem.Ty.word]
+
+/-- The reverse aggregate characterization still exposes an out-of-bound
+variable when the other argument is a closed builtin. -/
+example : ¬
+    (Solcore.TypeSystem.Ty.applyMany Solcore.TypeSystem.Ty.bool
+      [Solcore.TypeSystem.Ty.word, .variable ⟨1⟩]).VariablesBelow 1 := by
+  rw [Solcore.TypeSystem.Ty.variablesBelow_applyMany_iff]
+  simp [Solcore.TypeSystem.Ty.bool, Solcore.TypeSystem.Ty.word]
+
+/-- Aggregate products reuse the same member-wise allocator bound. -/
+example :
+    (Solcore.TypeSystem.Ty.productMany
+      [Solcore.TypeSystem.Ty.word, .variable ⟨0⟩,
+        Solcore.TypeSystem.Ty.bool]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_productMany
+  intro type member
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+  rcases member with rfl | rfl | rfl
+  · simp [Solcore.TypeSystem.Ty.word]
+  · simp
+  · simp [Solcore.TypeSystem.Ty.bool]
+
+/-- Nominal application needs no additional allocator premise beyond its
+mixed argument row. -/
+example (declaration : Solcore.Resolved.DeclarationId) :
+    (Solcore.TypeSystem.Ty.nominal declaration
+      [.variable ⟨0⟩, Solcore.TypeSystem.Ty.word]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_nominal
+  intro type member
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+  rcases member with rfl | rfl
+  · simp
+  · simp [Solcore.TypeSystem.Ty.word]
+
+private def solvedMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
+
+private def survivingMetavariable : Solcore.TypeSystem.TypeVarId := ⟨1⟩
+
+private def environmentOnlyMetavariable : Solcore.TypeSystem.TypeVarId := ⟨2⟩
+
+private def freeVariableEnvironment : Solcore.TypeSystem.Environment :=
+  [ ("generalized", {
+      quantified := [solvedMetavariable]
+      body := .product (.variable solvedMetavariable)
+        (.variable survivingMetavariable)
+    })
+  , ("monomorphic", Solcore.TypeSystem.Scheme.mono
+      (.variable environmentOnlyMetavariable))
+  ]
+
+/-- Environment membership exposes a witness scheme while respecting each
+scheme's quantified-variable boundary. -/
+example : environmentOnlyMetavariable ∈ freeVariableEnvironment.freeVariables := by
+  rw [Solcore.TypeSystem.Environment.mem_freeVariables_iff]
+  simp [freeVariableEnvironment, Solcore.TypeSystem.Scheme.mono,
+    Solcore.TypeSystem.Scheme.freeVariables,
+    Solcore.TypeSystem.Ty.freeVariables]
+
+/-- The stable environment ledger aggregates free variables from both schemes
+and removes the variable quantified by the first scheme. -/
+example : freeVariableEnvironment.freeVariables =
+    [survivingMetavariable, environmentOnlyMetavariable] := by
+  decide
+
+private def nonemptySolvedSubstitution : Solcore.TypeSystem.Substitution :=
+  [(solvedMetavariable, .variable survivingMetavariable)]
+
+private theorem nonemptySolvedSubstitution_solved :
+    Solcore.TypeSystem.Substitution.SolvedBelow
+      nonemptySolvedSubstitution 2 := by
+  apply Solcore.TypeSystem.Substitution.SolvedBelow.mono
+  · decide
+  · intro rangeVariable member
+    have same : rangeVariable = survivingMetavariable := by
+      simpa [Solcore.TypeSystem.Ty.freeVariables] using member
+    subst rangeVariable
+    decide
+  · simp [Solcore.TypeSystem.Ty.freeVariables, solvedMetavariable,
+      survivingMetavariable]
+
+/-- A nonempty solved substitution is observationally idempotent on a type
+containing both its replaced and surviving variables. -/
+example :
+    nonemptySolvedSubstitution.apply
+        (nonemptySolvedSubstitution.apply
+          (.product (.variable solvedMetavariable)
+            (.variable survivingMetavariable))) =
+      nonemptySolvedSubstitution.apply
+        (.product (.variable solvedMetavariable)
+          (.variable survivingMetavariable)) := by
+  exact nonemptySolvedSubstitution_solved.apply_idempotent _
+
+private def reverseSolvedSubstitution : Solcore.TypeSystem.Substitution :=
+  [(survivingMetavariable, .variable solvedMetavariable)]
+
+private theorem reverseSolvedSubstitution_solved :
+    Solcore.TypeSystem.Substitution.SolvedBelow
+      reverseSolvedSubstitution 2 := by
+  apply Solcore.TypeSystem.Substitution.SolvedBelow.mono
+  · decide
+  · intro rangeVariable member
+    have same : rangeVariable = solvedMetavariable := by
+      simpa [Solcore.TypeSystem.Ty.freeVariables] using member
+    subst rangeVariable
+    decide
+  · simp [Solcore.TypeSystem.Ty.freeVariables, solvedMetavariable,
+      survivingMetavariable]
+
+/-- Each side of the cyclic pair satisfies `SolvedBelow` independently. -/
+example :
+    Solcore.TypeSystem.Substitution.SolvedBelow reverseSolvedSubstitution 2 ∧
+      Solcore.TypeSystem.Substitution.SolvedBelow nonemptySolvedSubstitution 2 :=
+  ⟨reverseSolvedSubstitution_solved, nonemptySolvedSubstitution_solved⟩
+
+/-- Two individually solved substitutions can compose to a range which
+re-enters the combined domain when the cross invariant is absent. -/
+example : reverseSolvedSubstitution.compose nonemptySolvedSubstitution =
+    [(solvedMetavariable, .variable solvedMetavariable),
+      (survivingMetavariable, .variable solvedMetavariable)] := by
+  rfl
+
+/-- The cyclic pair is rejected precisely by the explicit cross invariant. -/
+example : ¬ Solcore.TypeSystem.Substitution.RangeAvoidsDomain
+    reverseSolvedSubstitution nonemptySolvedSubstitution := by
+  intro cross
+  have outside := cross
+    (metavariable := survivingMetavariable)
+    (replacement := .variable solvedMetavariable)
+    (by simp [reverseSolvedSubstitution]) solvedMetavariable
+    (by simp [Solcore.TypeSystem.Ty.freeVariables])
+  apply outside
+  simp [nonemptySolvedSubstitution, Solcore.TypeSystem.Substitution.domain]
+
+private def nestedConstraints : List Solcore.TypeSystem.Constraint := [{
+  left := .product (.variable solvedMetavariable)
+    (.variable survivingMetavariable)
+  right := .product (.variable survivingMetavariable) .word
+}]
+
+private def nestedSolvedSubstitution : Solcore.TypeSystem.Substitution :=
+  [(solvedMetavariable, .word), (survivingMetavariable, .word)]
+
+/-- Composite decomposition followed by an occurs-safe variable alias closes
+both ranges before the successful unifier returns. -/
+example : Solcore.TypeSystem.Unification.unify nestedConstraints =
+    .ok nestedSolvedSubstitution := by
+  rfl
+
+/-- The general soundness theorem closes the original decomposed constraint,
+not merely the normalized constraints seen by recursive calls. -/
+example : Solcore.TypeSystem.ConstraintsSatisfiedBy
+    nestedSolvedSubstitution nestedConstraints := by
+  exact Solcore.TypeSystem.Unification.unify_sound (by rfl)
+
+example : Solcore.TypeSystem.Substitution.SolvedBelow
+    nestedSolvedSubstitution 2 := by
+  apply Solcore.TypeSystem.Unification.unify_solvedBelow
+    (constraints := nestedConstraints)
+  · intro constraint member
+    have same : constraint = {
+        left := .product (.variable solvedMetavariable)
+          (.variable survivingMetavariable)
+        right := .product (.variable survivingMetavariable) .word
+      } := by
+      simpa [nestedConstraints] using member
+    subst constraint
+    constructor <;>
+      simp [Solcore.TypeSystem.Ty.VariablesBelow,
+        Solcore.TypeSystem.Ty.freeVariables] <;> decide
+  · rfl
+
+example := @Solcore.TypeSystem.InferState.fresh_substitution
+example := @Solcore.TypeSystem.InferState.fresh_next
+example := @Solcore.TypeSystem.InferState.instantiate_substitution
+example := @Solcore.TypeSystem.InferState.instantiate_next_le
+example := @Solcore.TypeSystem.InferState.instantiateDeclaration_substitution
+example := @Solcore.TypeSystem.InferState.instantiateDeclaration_next_le
+example := @Solcore.TypeSystem.InferState.unify_next
+example := @Solcore.TypeSystem.InferState.solve_next
+example := @Solcore.TypeSystem.InferState.unify_resolve_eq
+example := @Solcore.TypeSystem.InferState.apply_resolve_eq_apply
+example := @Solcore.TypeSystem.InferState.solve_satisfies
+example := @Solcore.TypeSystem.InferState.Solved
+example := @Solcore.TypeSystem.InferState.Solved.initial
+example := @Solcore.TypeSystem.InferState.Solved.fresh
+example := @Solcore.TypeSystem.InferState.Solved.instantiate
+example := @Solcore.TypeSystem.InferState.Solved.instantiateDeclaration
+example := @Solcore.TypeSystem.InferState.Solved.instantiate_type_variablesBelow
+example :=
+  @Solcore.TypeSystem.InferState.Solved.instantiateDeclaration_type_variablesBelow
+example := @Solcore.TypeSystem.InferState.Solved.unify
+example := @Solcore.TypeSystem.InferState.Solved.solve
+example := @Solcore.TypeSystem.InferState.Solved.unify_semanticallyExtends
+example := @Solcore.TypeSystem.InferState.Solved.solve_semanticallyExtends
+example := @Solcore.TypeSystem.Inference.infer_solved_variablesBelow
+
+private def incrementalState : Solcore.TypeSystem.InferState := {
+  next := 2
+  substitution := nonemptySolvedSubstitution
+}
+
+private def incrementalResult : Solcore.TypeSystem.InferState := {
+  next := 2
+  substitution := nestedSolvedSubstitution
+}
+
+/-- Incremental unification composes a new solution through an existing
+nonempty substitution and resolves the original inputs equally. -/
+example : incrementalResult.resolve (.variable solvedMetavariable) =
+    incrementalResult.resolve .word := by
+  apply Solcore.TypeSystem.InferState.unify_resolve_eq
+    (state := incrementalState)
+  rfl
+
+private def outOfBoundMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
+
+private def quantifiedOnlyScheme : Solcore.TypeSystem.Scheme :=
+  { quantified := [⟨7⟩]
+    body := .variable ⟨7⟩ }
+
+/-- Quantified source indices need not lie below the input allocator: they are
+replaced by genuinely fresh variables. -/
+example : quantifiedOnlyScheme.FreeVariablesBelow 0 := by
+  simp [Solcore.TypeSystem.Scheme.FreeVariablesBelow,
+    Solcore.TypeSystem.Scheme.freeVariables, quantifiedOnlyScheme,
+    Solcore.TypeSystem.Ty.freeVariables]
+
+example : quantifiedOnlyScheme.instantiate 0 = (.variable ⟨0⟩, 1) := by
+  rfl
+
+example : (quantifiedOnlyScheme.instantiate 0).1.VariablesBelow
+    (quantifiedOnlyScheme.instantiate 0).2 := by
+  exact Solcore.TypeSystem.Scheme.instantiate_variablesBelow
+    quantifiedOnlyScheme 0 (by
+      simp [Solcore.TypeSystem.Scheme.FreeVariablesBelow,
+        Solcore.TypeSystem.Scheme.freeVariables, quantifiedOnlyScheme,
+        Solcore.TypeSystem.Ty.freeVariables])
+
+private def quantifiedFreeScheme : Solcore.TypeSystem.Scheme :=
+  { quantified := [⟨7⟩]
+    body := .product (.variable ⟨7⟩) (.variable ⟨1⟩) }
+
+/-- Shared-substitution instantiation bounds its advanced allocator, mixed
+quantified/free body, and every generated replacement in one result. -/
+example :
+    let instantiated := quantifiedFreeScheme.instantiateWithSubstitution 2
+    2 ≤ instantiated.next ∧
+      instantiated.body.VariablesBelow instantiated.next ∧
+      ∀ {metavariable replacement},
+        (metavariable, replacement) ∈ instantiated.substitution →
+          replacement.VariablesBelow instantiated.next := by
+  dsimp only
+  have freeBelow : quantifiedFreeScheme.FreeVariablesBelow 2 := by
+    intro metavariable member
+    change metavariable ∈ quantifiedFreeScheme.body.freeVariables.filter
+      (fun candidate => !(candidate ∈ quantifiedFreeScheme.quantified)) at member
+    have bodyMember : metavariable ∈
+        quantifiedFreeScheme.body.freeVariables :=
+      (List.mem_filter.mp member).1
+    have notQuantified : metavariable ∉ quantifiedFreeScheme.quantified := by
+      simpa using (List.mem_filter.mp member).2
+    rw [show quantifiedFreeScheme.body =
+        (.product (.variable ⟨7⟩) (.variable ⟨1⟩) :
+          Solcore.TypeSystem.Ty) from rfl,
+      Solcore.TypeSystem.Ty.mem_freeVariables_product_iff] at bodyMember
+    have same : metavariable = ⟨1⟩ := by
+      rcases bodyMember with quantified | free
+      · have sameQuantified : metavariable = ⟨7⟩ := by
+          simpa [Solcore.TypeSystem.Ty.freeVariables] using quantified
+        subst metavariable
+        exfalso
+        exact notQuantified (by simp [quantifiedFreeScheme])
+      · simpa [Solcore.TypeSystem.Ty.freeVariables] using free
+    subst metavariable
+    decide
+  exact
+    ⟨Solcore.TypeSystem.Scheme.instantiateWithSubstitution_next_le
+        quantifiedFreeScheme 2,
+      Solcore.TypeSystem.Scheme.instantiateWithSubstitution_body_variablesBelow
+        quantifiedFreeScheme 2 freeBelow,
+      Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_variablesBelow
+        quantifiedFreeScheme 2⟩
+
+private def unboundedFreeScheme : Solcore.TypeSystem.Scheme :=
+  { quantified := []
+    body := .variable outOfBoundMetavariable }
+
+/-- An unquantified variable at the input allocator bound can survive
+instantiation, so the scheme-side condition cannot be dropped in general. -/
+example : unboundedFreeScheme.instantiate 0 =
+    (.variable outOfBoundMetavariable, 0) := by
+  rfl
+
+example : ¬ (unboundedFreeScheme.instantiate 0).1.VariablesBelow
+    (unboundedFreeScheme.instantiate 0).2 := by
+  change ¬ (.variable outOfBoundMetavariable :
+    Solcore.TypeSystem.Ty).VariablesBelow 0
+  simpa only [Solcore.TypeSystem.Ty.variablesBelow_variable_iff,
+    outOfBoundMetavariable] using (Nat.not_lt_zero 0)
+
+private def zeroBoundState : Solcore.TypeSystem.InferState :=
+  .initial 0
+
+private def zeroBoundSolvedResult : Solcore.TypeSystem.InferState :=
+  { next := 0
+    substitution := [(outOfBoundMetavariable, .word)] }
+
+/-- Without the resolved-input bound required by `InferState.Solved.unify`,
+unification may solve a variable which is not below the state's allocator. -/
+example : zeroBoundState.unify (.variable outOfBoundMetavariable) .word =
+    .ok zeroBoundSolvedResult := by
+  rfl
+
+example : ¬ zeroBoundSolvedResult.Solved := by
+  intro solved
+  have below := solved.domain_below outOfBoundMetavariable (by
+    simp [zeroBoundSolvedResult, Solcore.TypeSystem.Substitution.domain])
+  exact (Nat.not_lt_zero 0) below
+
+private def unboundedAnnotation : Solcore.TypeSystem.Expr :=
+  .annotation .unit (.variable outOfBoundMetavariable)
+
+private def unboundedAnnotationResult :
+    Solcore.TypeSystem.Inference.Result :=
+  { type := .unit
+    state :=
+      { next := 0
+        substitution := [(outOfBoundMetavariable, .unit)] } }
+
+/-- The annotation bound on whole-expression inference is essential.  An
+out-of-bound annotation can successfully create an out-of-bound solution. -/
+example : Solcore.TypeSystem.Inference.infer [] unboundedAnnotation =
+    .ok unboundedAnnotationResult := by
+  rfl
+
+example : ¬ unboundedAnnotation.AnnotationsBelow 0 := by
+  simp [Solcore.TypeSystem.Expr.AnnotationsBelow,
+    Solcore.TypeSystem.Ty.VariablesBelow,
+    Solcore.TypeSystem.Ty.freeVariables, unboundedAnnotation,
+    outOfBoundMetavariable]
+
+example : ¬ unboundedAnnotationResult.state.Solved := by
+  intro solved
+  have below := solved.domain_below outOfBoundMetavariable (by
+    simp [unboundedAnnotationResult,
+      Solcore.TypeSystem.Substitution.domain])
+  exact (Nat.not_lt_zero 0) below
+
+end Tests
+end
