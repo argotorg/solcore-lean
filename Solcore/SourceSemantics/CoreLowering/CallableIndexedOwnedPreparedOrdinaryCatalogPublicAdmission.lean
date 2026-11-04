@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogPublicRoots
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalFrontdoor
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
 
 /-! Independent Source entry admission supplies the eligible actual public row.
 The exact target equation and successful public start determine its first

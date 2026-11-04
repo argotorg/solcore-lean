@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedState
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! Five-way lexical flow carries its actual protected post-witness. The
 existing stopping lexical evidence remains intact; each result normalizes the

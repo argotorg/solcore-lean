@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceProducer
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedTupleHeadBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBuiltinHeadBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
 
 /-! Tuple and contracted builtin heads use admitted children through one whole

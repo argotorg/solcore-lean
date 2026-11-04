@@ -9,9 +9,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEn
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionValues
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedCallEvidence
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStagedCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
@@ -20,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedCanonicalState
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 
 /-!
 # Staged bounds: terminal named calls

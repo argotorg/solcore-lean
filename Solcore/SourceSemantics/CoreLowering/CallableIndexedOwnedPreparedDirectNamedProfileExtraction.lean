@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedDirectTypedNamed
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeImperativeCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Actual cached named compilation and a real ordinary parameter entry supply
 one enclosing native typing. The finite native-aware compiler induction derives

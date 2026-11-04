@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryStoredMembers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceAdapters
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedCallCodebookReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! The known chosen ordinary closure selects its actual source sidecar,
 lambda origin and parent codebook row. Original and contextual lambda origins

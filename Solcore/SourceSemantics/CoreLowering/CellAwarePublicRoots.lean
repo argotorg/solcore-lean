@@ -3,8 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.FaultingBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ImperativeBodies

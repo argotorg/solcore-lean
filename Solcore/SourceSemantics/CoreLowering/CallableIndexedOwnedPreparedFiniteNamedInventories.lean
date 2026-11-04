@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedNamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryNamedEvidenceReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedCallEvidence
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! Finite named inventories are built from actual prepared rows. Each Header
 uses the selected diagnostic issuer and keeps its full resolved dictionary and

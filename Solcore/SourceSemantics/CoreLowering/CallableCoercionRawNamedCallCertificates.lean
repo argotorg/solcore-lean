@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! One actual outer direct call selects an ordinary catalog header. Coverage
 is required only for this reached full record; coercion methods in the same

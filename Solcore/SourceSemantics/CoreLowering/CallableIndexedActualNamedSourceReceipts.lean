@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedParameterProjections
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalog
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedFormation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
 import Solcore.SourceSemantics.CoreLowering.LambdaSourceAlignment
 
 /-! Actual cached preparation and the accepted indexed hook select the same

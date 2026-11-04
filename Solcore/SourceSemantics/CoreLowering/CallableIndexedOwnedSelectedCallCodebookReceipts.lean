@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 
 /-! The exact selected decision keeps its original codebook request, argument
 count, ledger entry and guard provenance. Public preparation supplies the actual

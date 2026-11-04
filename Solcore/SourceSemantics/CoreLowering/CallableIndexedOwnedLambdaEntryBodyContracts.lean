@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionState
 import Solcore.SourceSemantics.CoreLowering.TypedMixedNamedBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! The original raw lambda parameter receipts determine every operational
 body field. The authentic ClosureFrame

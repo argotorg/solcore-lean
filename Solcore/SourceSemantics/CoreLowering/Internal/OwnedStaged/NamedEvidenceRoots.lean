@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies

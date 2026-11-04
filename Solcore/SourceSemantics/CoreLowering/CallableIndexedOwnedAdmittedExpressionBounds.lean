@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! Admitted expression children consume genuine deep Source heap typing and
 all-row stability at their actual input. A value returns admission at the same

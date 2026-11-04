@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCallerProtocol
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedArgumentTraceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 
 /-! A named call retains its actual argument route and selected body receipt.
 The body post stays at the body store; returning a caller wrapper retains the

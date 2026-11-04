@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalGate
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateScopeReturn
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition

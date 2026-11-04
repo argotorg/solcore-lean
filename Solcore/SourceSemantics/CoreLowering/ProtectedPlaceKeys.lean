@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignment
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceKeyContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
 
 /-! Protected ordered place keys reuse independent projection traces. Every

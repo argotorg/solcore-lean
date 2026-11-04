@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! Actual method prefixes retain a separately supplied finite catalog. The
 marked allocator supplies the exact added cells and packed argument slot; the

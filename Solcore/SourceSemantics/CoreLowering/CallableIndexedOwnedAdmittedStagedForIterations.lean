@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedCo
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateFor
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForEdges
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForPostEdges
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedForContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! Staged condition and body children run under the actual installed loop
 self cell. Hidden native arguments change only renamings; the reached Source

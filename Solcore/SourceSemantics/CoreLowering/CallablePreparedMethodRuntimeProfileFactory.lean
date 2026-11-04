@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodCatalogHookMeaning
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeProfileFactory
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderParameterProjections
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Static profiles retain the actual cached method, source-selected dictionary,
 ordered parameters and accepted body callback. The compiler extractor is used

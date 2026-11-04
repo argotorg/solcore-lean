@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 
 /-! Actual ordered child vectors and full reached nodes retain the same named
 call certificates across a local lambda compiler view. Dictionary indices,

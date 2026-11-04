@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedFiniteNamedInventories
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 
 /-! The finite Header factory retains its selected diagnostic issuer. Transport
 that actual preparation to the Header's literal owner and Source, then derive

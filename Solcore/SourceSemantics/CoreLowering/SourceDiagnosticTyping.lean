@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Full original body typing and genuine table reachability supply raw typing
 at every retained assignment and unary occurrence. Contexts come from the

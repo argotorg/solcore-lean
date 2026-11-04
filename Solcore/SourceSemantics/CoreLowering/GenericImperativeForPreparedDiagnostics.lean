@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfiles
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForTree
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderDiagnosticExtraction
 

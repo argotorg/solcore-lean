@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompilerPolicyProfiles
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
 
 /-! An aligned named Header exposes the literal contextual compiler action.

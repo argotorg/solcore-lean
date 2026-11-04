@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.CallableSpecializationEquality
 
 /-! Receipts from the actual numeric validator retain the exact selected row

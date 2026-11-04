@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 
 /-! Actual indexed function leaves retain source preparation alongside their
 same Code and History. The real stage table turns those static receipts into

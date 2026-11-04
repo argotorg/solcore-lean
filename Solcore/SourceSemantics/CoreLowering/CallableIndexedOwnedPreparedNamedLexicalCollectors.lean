@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalContextCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 
 /-! The original checked named body supplies native typing of every actual
 lexical child. Original Source syntax and binder context transport feed only

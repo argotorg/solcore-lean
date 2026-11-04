@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedAuthorityPool
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedStageOrigins
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedRetainedSubstitutionFacts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 
 /-! Function values carry immutable keys in one fixed ordered domain. Live
 catalogue authority remains in the reached pool. Named and lambda constructors

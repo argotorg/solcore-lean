@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeDirectCellOrigins
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! The real direct closure member selects an independent recursive staging
 scope. Its original sidecar comes from the actual descriptor's authenticated

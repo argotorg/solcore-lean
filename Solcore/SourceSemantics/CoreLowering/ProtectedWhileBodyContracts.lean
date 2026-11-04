@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileEdges
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! One guarded five-way body interface for finite loops. The actual environment
 and frame prefix are separate from the canonical protected entry. The old

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
 
 /-! Original source derivations at the indirect-call boundary. The retained

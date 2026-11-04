@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.NamedArgumentFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
 
 /-! The named parent adds one genuine direct-argument edge to the original

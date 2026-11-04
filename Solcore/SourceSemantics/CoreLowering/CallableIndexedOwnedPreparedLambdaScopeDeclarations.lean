@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaSourceAdmission
 import Solcore.SourceSemantics.Staging.RecursiveScope

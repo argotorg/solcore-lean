@@ -1,15 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyKernel
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentSource
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 
 /-! Actual prepared methods retain their independent trait-method source frame,
 full dictionary and installed code. The body profile is static and uses reached

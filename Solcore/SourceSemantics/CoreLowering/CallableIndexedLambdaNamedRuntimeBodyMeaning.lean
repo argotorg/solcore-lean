@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewNamedRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyKernel
 
 /-! The canonical lambda body retains the actual view's named emission and

@@ -2,9 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeBody
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNamedRuntimeBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedRuntimeBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 
 /-! Independent source closure calls complete the actual indexed application.
 The legacy builtin entry uses the shared finite body kernel with True entry.

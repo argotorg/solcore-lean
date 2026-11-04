@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedAssignmentHeadContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 
 /-! Sized assignment heads return the state of their actual fault or written
 prefix. Successful continuation values and their original native grade remain

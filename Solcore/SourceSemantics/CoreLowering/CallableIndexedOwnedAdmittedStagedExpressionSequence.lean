@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 
 /-! Ordered staged arguments are constructed from the actual compiler Tree
 and strictly smaller expression results. Each successful child passes its

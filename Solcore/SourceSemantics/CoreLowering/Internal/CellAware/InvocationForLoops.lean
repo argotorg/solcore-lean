@@ -29,7 +29,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedWhileRea
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.Loops
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileEdges
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForPost
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedForContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-!
 # Cell-aware invocations: for loops

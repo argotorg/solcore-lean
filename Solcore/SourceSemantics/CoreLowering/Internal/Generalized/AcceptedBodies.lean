@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.EmptySourceSubstitution
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation

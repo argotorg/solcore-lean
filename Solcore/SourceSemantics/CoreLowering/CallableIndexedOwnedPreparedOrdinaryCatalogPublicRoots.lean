@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 
 /-! An eligible actual public root selects a Header from the filtered ordinary
 catalog. The real factory and first-match equations retain the original root,

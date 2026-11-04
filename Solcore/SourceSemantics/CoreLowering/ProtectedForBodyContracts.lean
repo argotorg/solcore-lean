@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedWhileBodyContracts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedForContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForEndpoint
 
 /-! Guarded for edges retain the actual installed loop state and canonical

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedReadyContinuations
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeProfileFactory
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 
 /-! A genuine named compiler profile and its original Source syntax select a
 shared-family index. Real parameter receipts supply canonical slots beside the

@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.ReachedNamedPrimitiveBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBuiltinFaultBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! Actual singleton tail and return bodies obtain their primitive path from
 the existing admitted builtin producer. Finite returnValue and finish steps

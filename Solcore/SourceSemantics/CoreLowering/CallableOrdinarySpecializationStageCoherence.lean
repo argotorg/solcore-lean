@@ -3,8 +3,7 @@ import Solcore.Frontend.CorrelatedTypedSourceInstances
 import Solcore.Frontend.SourceSpecializationAcceptance
 import Solcore.Frontend.SourceStageAnalysisCongruence
 import Solcore.SourceSemantics.SourceAnnotationSummaryUniqueness
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationValidity
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationStageFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CallableLedger
 import Solcore.SourceSemantics.TraitSubstitutionProperties
 

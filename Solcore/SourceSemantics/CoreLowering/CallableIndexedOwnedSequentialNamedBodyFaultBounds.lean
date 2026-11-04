@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedSequentialBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrimitiveNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 
 /-! Actual discard and singleton suffix children run the admitted builtin
 producer once each. The reached middle State supplies the next admission. -/

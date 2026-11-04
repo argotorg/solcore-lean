@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewNamedRuntimeCertificates
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 
 /-! Literal lambda leaves retain their actual Code and a smaller static body.
 The compiler view is observed by a full node lookup; the accepted body and its

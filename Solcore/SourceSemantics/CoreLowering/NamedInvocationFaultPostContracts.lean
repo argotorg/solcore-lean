@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestoration
 
 /-! An actual named body post remains at its completed body store. The caller

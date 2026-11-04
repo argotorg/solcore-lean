@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.NamedCallSource
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.NamedCallCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalNamedParameterIndexed
 

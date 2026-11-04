@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
 
 /-! Prepared Catalog endpoints construct their structural eliminator from the

@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 
 /-! The original public fresh bootstrap and the public root startup share one
 actual native state, including sessions extended by handle issuance. Successful

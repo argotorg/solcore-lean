@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.NamedCallMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
-import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentSource
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentCertificates
 
 /-! Ordinary named calls compose concrete recursive argument trees with a

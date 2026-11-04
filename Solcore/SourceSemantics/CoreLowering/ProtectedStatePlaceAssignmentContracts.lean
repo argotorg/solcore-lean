@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignment
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 
 /-! Actual assignment phases retain source measurements and the original strict
 native continuation grades, together with each concrete reached state.

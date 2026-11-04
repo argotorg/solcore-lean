@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogNamedBodyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedValueInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralFunctionSelection
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
 
 /-! A global value keeps its actual selected Header, SourceFrame, dictionary

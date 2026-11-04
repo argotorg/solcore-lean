@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipal
 
 /-! The actual method cache row and authenticated codebook descriptor select

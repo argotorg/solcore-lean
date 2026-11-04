@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBod
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBodyRuntimeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaScalarNativeTyping
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Finite static facts for an actual ordinary lambda with a literal return.
 The existing Source typing and accepted compiler actions supply entry, syntax,

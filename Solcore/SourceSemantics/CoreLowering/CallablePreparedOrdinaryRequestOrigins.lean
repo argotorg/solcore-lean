@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSpecializationMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 
 /-!
 Ordinary requests keep their actual catalog provenance when the real worklist

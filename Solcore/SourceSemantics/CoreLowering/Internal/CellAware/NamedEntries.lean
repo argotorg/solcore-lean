@@ -19,9 +19,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameters
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCellAllocationProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
@@ -30,7 +29,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorityReception
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 
 /-!
 # Cell-aware named bodies: entries and calls

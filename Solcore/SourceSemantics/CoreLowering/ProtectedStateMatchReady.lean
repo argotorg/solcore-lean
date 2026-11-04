@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeControl
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
 

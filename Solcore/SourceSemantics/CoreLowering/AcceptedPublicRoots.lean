@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission

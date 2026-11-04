@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedCallBodyFaultPostContracts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! A selected ordinary/direct call keeps its original root Source trace and
 the low call route at the same returned tuple. Reflection's two Source grades

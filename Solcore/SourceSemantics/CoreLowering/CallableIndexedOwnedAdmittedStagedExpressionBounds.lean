@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 

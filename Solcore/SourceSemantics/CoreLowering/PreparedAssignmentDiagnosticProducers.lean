@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
 
 /-! The actual named and cached diagnostic producers authenticate projected

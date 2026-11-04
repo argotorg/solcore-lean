@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionState
 
 /-! The complete physical cache is independent of ordinary Source headers.

@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 
 /-! A static body has no named, method, or lambda origin. Its actual Tree, sites,
 finish code, and initial context feed the same finite flow and finish proofs.

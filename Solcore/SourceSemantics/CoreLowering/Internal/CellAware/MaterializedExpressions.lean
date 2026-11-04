@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicOutputSelections
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

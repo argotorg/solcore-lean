@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileReady
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderControl
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderControl
 
 /-! Header prefixes retain their real stopping scope and

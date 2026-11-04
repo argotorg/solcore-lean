@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeads
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! Protected finite match heads consume only smaller expression and selected
 body contracts. The original source and Core budgets remain independent. -/

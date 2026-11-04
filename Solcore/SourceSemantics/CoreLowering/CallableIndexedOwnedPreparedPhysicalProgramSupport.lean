@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
-import Solcore.SourceSemantics.CoreLowering.CompatibleRegistryDiagnosticExtension
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 
 /-! Static coverage of the actual named, closure and method bodies supplies both
 semantic directions at every reached public receiver. A successful compilation

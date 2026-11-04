@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission

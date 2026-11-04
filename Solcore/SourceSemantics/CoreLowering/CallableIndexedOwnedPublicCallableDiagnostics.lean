@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableFaultDiagnosticPreparation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 
 /-! The actual public compatible compiler retains the callable diagnostic
 factory beside its cached codebook. These finite receipts recover its original

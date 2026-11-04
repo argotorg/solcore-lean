@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceResolution
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceKeys
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceLayout

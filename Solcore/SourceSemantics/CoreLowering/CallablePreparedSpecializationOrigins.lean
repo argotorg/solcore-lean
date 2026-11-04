@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSpecializationMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparationSteps
 

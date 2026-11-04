@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedFamilyClosure
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedHeaderReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitialization
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! The original public named compiler supplies exact cached code and its native
 support at an actual ordinary parameter entry. Its existing static extraction

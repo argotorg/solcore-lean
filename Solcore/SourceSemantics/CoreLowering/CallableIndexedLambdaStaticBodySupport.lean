@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCatalogEntries
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 
 /-! Same-code static body receipts are independent of their expression grammar.
 The actual compiler view supplies flow acceptance and finish equality. Static

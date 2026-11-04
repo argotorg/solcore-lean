@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareBitNotContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 
 /-! A numeric bare snapshot creates a real mapped commit and an exact typed
 seven-slot continuation in the actual renamed environment. Its Unit RHS has

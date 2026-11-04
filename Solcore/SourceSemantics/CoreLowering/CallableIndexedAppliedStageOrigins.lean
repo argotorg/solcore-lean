@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLedger
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaValues
 
 /-! Applied-view stage origins retain the actual two-parent recipe and both

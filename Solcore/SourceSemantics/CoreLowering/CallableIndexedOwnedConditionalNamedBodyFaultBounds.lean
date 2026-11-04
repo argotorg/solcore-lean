@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedConditionalBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSequentialNamedBodyFaultBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeControlBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 
 /-! The genuine condition and selected explicit return each run the admitted
 builtin producer once. Their actual middle State retains admission and rows. -/

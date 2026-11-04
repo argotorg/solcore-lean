@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 
 /-! Actual bare-assignment prefix endpoints retain the expression-produced state
 and the real seven-slot continuation. Grades come from the existing Source and

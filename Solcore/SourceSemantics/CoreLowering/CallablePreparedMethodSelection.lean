@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodFrame
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedParameterProjections
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 
 /-! Actual operator selection retains the full synthetic method, ordered
 source evidence, and the compiler's chosen plan row. It does not reinterpret

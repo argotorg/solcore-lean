@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMarkedAllocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestoration

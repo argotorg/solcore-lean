@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedState
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBoundedContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 
 /-! Sized expression contracts return the actual reached protected state.
 Compatibility adapters retain existing execution and heap results. Ordinary

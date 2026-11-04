@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSamePolicyCompilerLeafReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSourceFacts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 
 /-! A finite static call head retains the genuine named, prepared lambda or
 indirect compiler receipt at one root policy and its actual child positions. -/

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallScalarArguments
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceSignatureFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Actual ordered argument lowering supplies recursive builtin argument Trees and
 native type vector. The original caller context and parent metadata are kept.

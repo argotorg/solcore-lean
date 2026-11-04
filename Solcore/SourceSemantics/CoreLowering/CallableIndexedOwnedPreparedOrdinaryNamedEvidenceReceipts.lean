@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionValues
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallSelectionCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! Ordinary selection fixes an empty actual specialization dictionary. The
 same Header retains its resolved Row and complete Source dictionary, so these

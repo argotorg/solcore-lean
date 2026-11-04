@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderParameterProjections
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSelectedExpressionFactory
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 
 /-! Actual selected Headers supply the raw Source parameter/result vectors and
 native projections at each receiving Source context. Dictionaries stay intact;

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexical
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
 

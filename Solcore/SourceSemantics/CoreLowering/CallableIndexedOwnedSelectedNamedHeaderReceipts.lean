@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedReadIndexDiagnosticPolicies
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! A named Header is constructed with the actual selected diagnostic issuer.
 The public specialization retains its original Source, resolved dictionary and

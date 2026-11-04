@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchPrefixContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternRuntime
 
 /-! Ordered match selection and actual marked prefixes retain their original

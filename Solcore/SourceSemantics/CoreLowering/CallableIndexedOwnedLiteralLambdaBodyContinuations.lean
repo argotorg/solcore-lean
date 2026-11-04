@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenWordLiteralExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenNestedLambdaBodyContinuations
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! A genuine singleton return consumes the admitted Word literal at the same
 chosen Support. The actual Source and native children retain their independent

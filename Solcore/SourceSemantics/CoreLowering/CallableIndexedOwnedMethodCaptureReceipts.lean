@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedHeaderReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 
 /-! An actual fresh bootstrap supplies complete method captures and canonical
 named slots. Source attribution comes from the genuine method selector; cached

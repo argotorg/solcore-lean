@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
-import Solcore.SourceSemantics.CoreLowering.NamedCallSource
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 
 /-! A selected source method has an exact body, ordered evidence and empty
 lexical entry. A closure-shaped proof view relates its body trace to the

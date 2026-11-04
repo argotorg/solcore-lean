@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceS
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCallerProtocol
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Named calls retain their original Header, compiler profile and canonical
 global slots. Actual parameter allocations establish independent Source typing.

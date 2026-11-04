@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalReadiness
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 
 /-! The existing lexical Tree folds consume authentic Source syntax and
 admission at actual inputs. Real child posts and allocations supply each next

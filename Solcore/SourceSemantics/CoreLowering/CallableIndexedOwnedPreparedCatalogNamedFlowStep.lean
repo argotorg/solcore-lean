@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogNamedBodyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedFlowBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCanonicalFlowBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Named F selects the exact Prepared/HeaderAt and coupled collector retained
 by the actual entry profile. Its original structural head/loop producer runs

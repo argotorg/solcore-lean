@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionValues
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! Ordinary closure formation retains the actual named preparation and its
 complete dictionary. Lexical changes retain runtime context fields; native

@@ -1,11 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCatalogEntries
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeBody
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNamedRuntimeBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedRuntimeBodyMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 
 /-! The reached lambda prefix keeps the actual installed catalog. Its source
 allocation and native canonical spine transport the original global slots;

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 
 /-! Runtime context conditions retain the complete solved ledger and its actual
 covering dictionary. Lexical changes transport these fields without removing

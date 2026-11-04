@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 
 /-! Actual callable origins at compatible function leaves supply the retained

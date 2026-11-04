@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedDataExpressionHeadBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceProducer
 
 /-! Constructor, member and index heads consume genuine Source typing at their

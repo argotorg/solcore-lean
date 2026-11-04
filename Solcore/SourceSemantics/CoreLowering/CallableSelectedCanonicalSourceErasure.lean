@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.CallableAncestryPairedWorklist
 
 /-!

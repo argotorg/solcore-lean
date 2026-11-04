@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitialization
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedAllocationCompletion
 
 /-! Ordered, state-indexed catalogue authorities. Registered snapshots are

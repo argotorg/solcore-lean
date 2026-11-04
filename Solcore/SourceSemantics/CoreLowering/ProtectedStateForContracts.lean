@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateFor
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedForContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 
 /-! Measured post-header edges consume the actual body state. Their real
 six-slot native prefix, source trace, and independent native grade remain the

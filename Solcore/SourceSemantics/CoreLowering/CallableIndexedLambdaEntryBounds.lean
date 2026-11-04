@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
 

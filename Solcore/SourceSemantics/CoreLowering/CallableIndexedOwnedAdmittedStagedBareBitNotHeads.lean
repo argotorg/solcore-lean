@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
 import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedFiniteNamedInventories
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedFinalPlanOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalCatalogOrigins
 
 /-! Actual final cached ordinary rows supply their retained target and unique

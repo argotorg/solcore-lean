@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 

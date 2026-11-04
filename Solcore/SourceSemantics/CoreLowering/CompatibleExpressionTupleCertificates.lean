@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductCertificates
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorNativeTyping
 
 /-! Static receipts for the actual ordered tuple packer. The independent source

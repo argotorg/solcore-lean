@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 
 /-! Actual lambda prefixes transport a separately observed finite catalog.
 The unsized allocator receipt and the original sized completion use the same

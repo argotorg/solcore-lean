@@ -6,10 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
 import Solcore.SourceSemantics.CoreLowering.PublicSessionOutcomes
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNamedOutputPreservation
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicScalarResults
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryStart
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 
 /-!

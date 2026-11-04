@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCallerPr
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedCallerProtocol
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 
 /-! A named body starts at its complete actual parameter entry. The real
 hook authenticates its full named Source seed, and the parameter catalog

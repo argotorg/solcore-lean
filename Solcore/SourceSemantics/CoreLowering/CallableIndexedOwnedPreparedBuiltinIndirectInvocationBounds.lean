@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedBuiltinValues
 import Solcore.SourceSemantics.CoreLowering.CompatibleBuiltinMeaning
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
 
 /-! The builtin alternative of the accepted indirect payload invocation uses

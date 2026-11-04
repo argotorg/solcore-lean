@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ForHeaderNativeBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderPreservation
 
 /-! Completed native headers reconstruct their independent source prefix or

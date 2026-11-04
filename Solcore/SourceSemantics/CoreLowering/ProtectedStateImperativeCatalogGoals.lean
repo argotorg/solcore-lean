@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderContinuationMap
 import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 
 /-! One static CatalogSites goal family. Statement goals carry the actual
 reached state; initializer goals retain the same ordered header tree with an

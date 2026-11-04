@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipalCaptures
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitialization
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterNativeInversion
 
 /-! The actual selected method cache and prepared bootstrap bound one emitted

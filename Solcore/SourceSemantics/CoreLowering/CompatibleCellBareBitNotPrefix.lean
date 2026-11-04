@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNotNative
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellBareAssignmentCommit
 
 /-! A numeric bare snapshot creates a real mapped commit and an exact typed

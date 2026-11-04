@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionSourceBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls

@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedHeaderReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeInitializerSourceSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeaderBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 
 /-! The original initializer and loop inversion receipts compose the exact
 admitted header tail with its actual loop post. Restoration retains that same

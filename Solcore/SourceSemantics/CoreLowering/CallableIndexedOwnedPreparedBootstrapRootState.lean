@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedFiniteNamedBootstrapReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitializationReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
 
 /-! The actual bootstrap constructs the owned state used by the public root.

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient
 
 /-! The existing compositional call-head proofs consume one actual protocol

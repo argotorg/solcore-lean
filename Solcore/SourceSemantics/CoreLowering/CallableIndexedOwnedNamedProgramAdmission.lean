@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramEntrySource
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.Dynamic.ProgramOutcome
 
 /-! Actual named program outcomes supply successful Source value and heap

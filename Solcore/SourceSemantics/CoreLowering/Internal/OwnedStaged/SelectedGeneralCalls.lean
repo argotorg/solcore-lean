@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCaller
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedProxyBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 

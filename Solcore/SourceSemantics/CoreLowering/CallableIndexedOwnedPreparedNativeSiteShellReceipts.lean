@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeCo
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeSitePolicies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedDiagnosticIssuerReceipts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeMatchSyntaxFactory
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults
 
 /-! One selected compilation, its positive issuer, and the actual lambda Site
 construct the native child collector's static shell. Finite Source body receipts,

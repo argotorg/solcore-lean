@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateFor
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForContracts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedForContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileReady
 
 /-! Measured post-header edges consume the actual body state. Their real

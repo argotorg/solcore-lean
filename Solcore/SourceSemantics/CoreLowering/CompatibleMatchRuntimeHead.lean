@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeads
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeSelection
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeControlBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeControl
 
 /-! Actual accepted ordered match heads use the complete runtime ledger.
 The same arm certificates produce numeric literal support internally. Expression

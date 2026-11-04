@@ -1,3 +1,5 @@
+import Solcore.Frontend.SourceCoreCallableViews
+import Solcore.SourceSemantics.CoreLowering.CallableCallRequirementLayouts
 import Solcore.SourceSemantics.CoreLowering.CallableMethodResolverEvidence
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
 

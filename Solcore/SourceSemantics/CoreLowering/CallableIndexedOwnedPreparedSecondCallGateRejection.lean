@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureAri
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalArityReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCalleeStageReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicCallableDiagnostics
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 
 /-! After-arguments rejection ports. The existing recursive staged
 grammar already has physical closure, named and builtin arity failures. These

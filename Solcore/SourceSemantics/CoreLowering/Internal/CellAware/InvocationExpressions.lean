@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
@@ -10,13 +10,13 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellIndexTerminal
-import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 
 /-!
 # Cell-aware invocations: expressions

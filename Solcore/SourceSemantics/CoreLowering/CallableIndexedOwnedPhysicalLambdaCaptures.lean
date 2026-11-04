@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
 
 /-! Actual captured slot references determine the complete administrative prefix,
