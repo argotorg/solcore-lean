@@ -1,9 +1,8 @@
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceGrammar
+import Solcore.Syntax.Internal.ExpressionTrace
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Internal.DelimitedOutcomes
-import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceProperties
 import Solcore.Syntax.Internal.TraceBasics
 
 /-!

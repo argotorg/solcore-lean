@@ -1,2 +1,2 @@
-import Solcore.Syntax.Parser.Internal.FunctionReturnsTrace
+import Solcore.Syntax.Parser.Internal.TypeTrace
 -- refactor shim

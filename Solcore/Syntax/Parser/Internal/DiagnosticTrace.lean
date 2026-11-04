@@ -1,12 +1,10 @@
-import Solcore.Syntax.DeclarativeIsolatedBlockTraceGrammar
+import Solcore.Syntax.Internal.BlockTrace
 import Solcore.Syntax.Parser.Internal.BlockSoundness
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.Primitive
-import Solcore.Syntax.DeclarativeCoreBlockTraceGrammar
-import Solcore.Syntax.DeclarativeCoreBlockRejectionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-!
