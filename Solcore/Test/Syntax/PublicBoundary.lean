@@ -1,0 +1,4090 @@
+import Solcore.Syntax.Parser.PublicContractFieldTotalityProperties
+import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
+import Solcore.Syntax.Parser.PublicDiagnosticValidityProperties
+import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
+import Solcore.Syntax.Parser.PublicSourceFileGrammarProperties
+import Solcore.Syntax.Parser.PublicPatternTotalityProperties
+import Solcore.Syntax.Parser.PublicSingleRecoveryOutputProperties
+import Solcore.Syntax.Lexer
+import Solcore.Syntax.Parser.PublicStatementFuelTotalityProperties
+import Solcore.Syntax.Parser.PublicTotalityProperties
+import Solcore.Syntax.Parser.PublicValidityProperties
+import Solcore
+
+/-!
+# Public parser boundary tests
+
+The public parser entry points: `SyntaxPublicBoundary`, public totality and validity, and the
+public examples of empty inputs and single recovery.
+-/
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicContractFieldTotalityProperties
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicContractFieldTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @contractField_invariantFreeOnValid
+example := @contractField_ne_invariant
+example := @contractField_cursor_lt_onSuccess
+example := @contractField_elementTotalityContract
+example :=
+  @ContractInternals.contractMemberTotalityContract_of_remainingBranches
+
+end Solcore.Test.SyntaxParserPublicContractFieldTotalityProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicCoreTermTotalityProperties
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicCoreTermTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @expression_invariantFreeOnValid
+example := @expression_ne_invariant
+example := @expression_elementTotalityContract
+example := @pattern_invariantFreeOnValid
+example := @pattern_ne_invariant
+example := @pattern_elementTotalityContract
+example := @block_invariantFreeOnValid
+example := @block_ne_invariant
+example := @block_elementTotalityContract
+
+end Solcore.Test.SyntaxParserPublicCoreTermTotalityProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicDiagnosticValidityProperties
+/-! External consumers for public parse-diagnostic validity. -/
+
+namespace Tests
+
+open Solcore.Syntax.Parser
+
+example := @parseLexed_ok_parseDiagnostics_validFor
+example := @parse_ok_parseDiagnostics_validFor
+
+end Tests
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicEmptyTokensExamples
+/-! Empty, whitespace-only, comment-only, and diagnosed tokenless source outputs.
+The kernel evaluates only lexical fixtures; public parsing uses the exact law. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicEmptyTokensExamples
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+private def sourceId : SourceId := { origin := .main, path := "empty-tokens.sol" }
+
+private def exampleFile (content : String) : SourceFile := { id := sourceId, content }
+
+private def byteSpan (startByte endByte : Nat) : SourceSpan := {
+  source := sourceId, startByte, endByte
+}
+
+private def carrier (comments : List Comment) (diagnostics : List LexicalDiagnostic) : LexedFile := {
+  source := sourceId, tokens := [], comments, diagnostics
+}
+
+private def expectedOutput (content : String) (comments : List Comment)
+    (lexical : List LexicalDiagnostic) : ParseOutput := {
+  parsed := {
+    source := sourceId
+    span := SourceSpan.fullFile (exampleFile content)
+    items := []
+    comments
+  }
+  tokens := []
+  lexicalDiagnostics := lexical
+  parseDiagnostics := []
+}
+
+private theorem complete (content : String) (comments : List Comment)
+    (lexical : List LexicalDiagnostic)
+    (checked : (Lexer.lex (exampleFile content)).toOption = some (carrier comments lexical)) :
+    parse (exampleFile content) = .ok (expectedOutput content comments lexical) := by
+  have lexing : Lexer.lex (exampleFile content) = .ok (carrier comments lexical) := by
+    cases result : Lexer.lex (exampleFile content) with
+    | error error => simp only [result, Except.toOption] at checked; contradiction
+    | ok actual => simp only [result, Except.toOption] at checked; cases checked; rfl
+  exact parse_eq_ok_of_emptyTokens lexing rfl
+
+set_option maxRecDepth 4096 in
+/-- Empty text produces the exact empty normal output. -/
+theorem empty_parse_eq_output :
+    parse (exampleFile "") = .ok (expectedOutput "" [] []) := by
+  apply complete
+  decide +kernel
+
+set_option maxRecDepth 4096 in
+/-- Whitespace changes the full-file byte span but produces no token or report. -/
+theorem whitespace_parse_eq_output :
+    parse (exampleFile " \r\n") = .ok (expectedOutput " \r\n" [] []) := by
+  apply complete
+  decide +kernel
+
+set_option maxRecDepth 4096 in
+/-- The comment's original text and delimiter-inclusive span remain in the file. -/
+theorem commentOnly_parse_eq_output :
+    parse (exampleFile "/*note*/") = .ok (expectedOutput "/*note*/"
+      [{ kind := .block, text := "note", span := byteSpan 0 8 }] []) := by
+  apply complete
+  decide +kernel
+
+set_option maxRecDepth 4096 in
+/-- A lexical error can survive in a tokenless normal output without inventing
+a parser recovery or unexpected-token diagnostic. -/
+theorem invalidTokenOnly_parse_eq_output :
+    parse (exampleFile "§") = .ok (expectedOutput "§" []
+      [{ span := byteSpan 0 2, kind := .invalidToken }]) := by
+  apply complete
+  decide +kernel
+
+end Solcore.Test.SyntaxParserPublicEmptyTokensExamples
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicGrammarProperties
+/-! Independent grammar consumers, deliberately assuming no parser reply. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicGrammarProperties
+
+open Solcore.Syntax
+open Solcore.Syntax.DeclarativeGrammar
+
+example (file : SourceFile) (lexed : LexedFile)
+    (accepted : LexedFileValidationAccepts file lexed) :
+    ∃ parsed,
+      PublicSourceFileOrdinaryParses file lexed.tokens lexed.comments parsed ∧
+      ParsedFile.ValidFor CoreStatement.ValidFor CoreExpr.ValidFor file parsed ∧
+      ∀ other, PublicSourceFileOrdinaryParses file
+        lexed.tokens lexed.comments other → other = parsed := by
+  rcases publicSourceFileOrdinary_exists_unique_of_validation file lexed accepted with
+    ⟨parsed, derivation, unique⟩
+  exact ⟨parsed, derivation, derivation.validFor_of_validation accepted, unique⟩
+
+example {file : SourceFile} {lexed : LexedFile} {parsed : ParsedFile}
+    (lexing : Lexer.lex file = .ok lexed)
+    (derivation : PublicSourceFileOrdinaryParses file
+      lexed.tokens lexed.comments parsed) :
+    parsed.source = file.id ∧ parsed.span.ValidFor file := by
+  have valid := derivation.validFor_of_lexing lexing
+  exact ⟨valid.1, valid.2.1⟩
+
+example {file : SourceFile} {lexed : LexedFile} {parsed : ParsedFile}
+    (accepted : LexedFileValidationAccepts file lexed)
+    (derivation : PublicSourceFileOrdinaryParses file
+      lexed.tokens lexed.comments parsed) :
+    ∀ item ∈ parsed.items,
+      TopItem.ValidFor CoreStatement.ValidFor CoreExpr.ValidFor file item :=
+  (derivation.validFor_of_validation accepted).2.2.1
+
+example {file : SourceFile} {lexed : LexedFile} {parsed : ParsedFile}
+    (accepted : LexedFileValidationAccepts file lexed)
+    (derivation : PublicSourceFileOrdinaryParses file
+      lexed.tokens lexed.comments parsed) :
+    ∀ comment ∈ parsed.comments, comment.span.ValidFor file :=
+  (derivation.validFor_of_validation accepted).2.2.2
+
+end Solcore.Test.SyntaxParserPublicGrammarProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicPatternTotalityProperties
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicPatternTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @pattern_invariantFreeOnValid_of_coreExpressionTotality
+example := @pattern_ne_invariant_of_coreExpressionTotality
+example := @pattern_elementTotalityContract_of_coreExpression
+
+end Solcore.Test.SyntaxParserPublicPatternTotalityProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicSingleRecoveryExamples
+/-! Ground public-output examples derived through independent single-token
+recovery, nesting, validation, and lexical-cascade grammar. Parser results are
+proved using the public correspondence theorems, not by evaluating the parser. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicSingleRecoveryExamples
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+open Solcore.Syntax.Parser.FileInternals
+open Solcore.Syntax.DeclarativeGrammar
+
+private def exampleSource : SourceId := {
+  origin := .main
+  path := "single-recovery-examples.sol"
+}
+
+private def exampleFile (content : String) : SourceFile := {
+  id := exampleSource
+  content
+}
+
+private def byteSpan (startByte endByte : Nat) : SourceSpan := {
+  source := exampleSource
+  startByte
+  endByte
+}
+
+private def semicolon (offset : Nat) : Token := {
+  span := byteSpan offset (offset + 1)
+  value := .symbol .semicolon
+}
+
+private def lexicalCarrier (offset : Nat)
+    (diagnostics : List LexicalDiagnostic) : LexedFile := {
+  source := exampleSource
+  tokens := [semicolon offset]
+  comments := []
+  diagnostics
+}
+
+private def errorItem (offset : Nat) : TopItem := {
+  span := byteSpan offset (offset + 1)
+  leadingComments := []
+  value := .error
+}
+
+private def expectedOutput (content : String) (offset : Nat)
+    (lexical : List LexicalDiagnostic) (parsed : List ParseDiagnostic) : ParseOutput := {
+  parsed := {
+    source := exampleSource
+    span := SourceSpan.fullFile (exampleFile content)
+    items := [errorItem offset]
+    comments := []
+  }
+  tokens := [semicolon offset]
+  lexicalDiagnostics := lexical
+  parseDiagnostics := parsed
+}
+
+private theorem semicolonStartsAbsent (offset : Nat)
+    (lexical : List LexicalDiagnostic) :
+    TopItemKindsAbsentAt
+      (sourceFileRootRemainder (lexicalCarrier offset lexical).tokens)
+      ImportTerminatorTopItemStartKinds := by
+  simp [TopItemKindsAbsentAt, ImportTerminatorTopItemStartKinds,
+    TokenKindAbsentAt, sourceFileRootRemainder, lexicalCarrier, semicolon, TokenAt]
+
+private theorem semicolonRecovers (offset : Nat)
+    (lexical : List LexicalDiagnostic) :
+    TopItemRecoveryParses
+      (sourceFileRootRemainder (lexicalCarrier offset lexical).tokens)
+      (errorItem offset)
+      { sourceFileRootRemainder (lexicalCarrier offset lexical).tokens with cursor := 1 } := by
+  apply TopItemRecoveryParses.recovered (token := semicolon offset)
+  · simp [TokenAt, sourceFileRootRemainder, lexicalCarrier]
+  · exact .stop (.windowEnd (by simp [sourceFileRootRemainder, lexicalCarrier]))
+
+private theorem semicolonNestingClears (offset : Nat)
+    (lexical : List LexicalDiagnostic) :
+    NestingClears (lexicalCarrier offset lexical).tokens :=
+  .reset rfl .done
+
+private theorem completeOutputs (content : String) (offset : Nat)
+    (lexical : List LexicalDiagnostic) (kept : List SourceSpan)
+    (lexing : Lexer.lex (exampleFile content) = .ok (lexicalCarrier offset lexical))
+    (filtered : LexicalCascadeFilters content (lexical.map (·.span))
+      [(errorItem offset).span] kept) :
+    parseLexed (exampleFile content) (lexicalCarrier offset lexical) =
+        .ok (expectedOutput content offset lexical (topItemRecoveryDiagnostics kept)) ∧
+      parse (exampleFile content) =
+        .ok (expectedOutput content offset lexical (topItemRecoveryDiagnostics kept)) := by
+  have accepted : LexedFileValidationAccepts (exampleFile content)
+      (lexicalCarrier offset lexical) :=
+    (lexedFileValidationAccepts_iff_validFor _ _).mpr
+      (Lexer.lex_ok_validFor _ _ lexing)
+  have tokenized := parseLexed_eq_ok_of_singleRecoveryToEnd accepted
+    (semicolonNestingClears offset lexical) (semicolonStartsAbsent offset lexical)
+    (semicolonRecovers offset lexical) rfl filtered
+  have sourced := parse_eq_ok_of_singleRecoveryToEnd lexing
+    (semicolonNestingClears offset lexical) (semicolonStartsAbsent offset lexical)
+    (semicolonRecovers offset lexical) rfl filtered
+  exact ⟨tokenized, sourced⟩
+
+private def invalidToken : LexicalDiagnostic := {
+  span := byteSpan 0 2
+  kind := .invalidToken
+}
+
+private theorem lex_ok_of_toOption {file : SourceFile} {lexed : LexedFile}
+    (checked : (Lexer.lex file).toOption = some lexed) :
+    Lexer.lex file = .ok lexed := by
+  cases result : Lexer.lex file with
+  | error error => simp only [result, Except.toOption] at checked; contradiction
+  | ok actual =>
+      simp only [result, Except.toOption] at checked
+      cases checked
+      rfl
+
+set_option maxRecDepth 4096 in
+private theorem semicolonLexes :
+    Lexer.lex (exampleFile ";") = .ok (lexicalCarrier 0 []) := by
+  apply lex_ok_of_toOption
+  decide +kernel
+
+set_option maxRecDepth 4096 in
+private theorem sameLineLexes :
+    Lexer.lex (exampleFile "§ ;") = .ok (lexicalCarrier 3 [invalidToken]) := by
+  apply lex_ok_of_toOption
+  decide +kernel
+
+set_option maxRecDepth 4096 in
+private theorem nextLineLexes :
+    Lexer.lex (exampleFile "§\n;") = .ok (lexicalCarrier 3 [invalidToken]) := by
+  apply lex_ok_of_toOption
+  decide +kernel
+
+/-- A bare semicolon is one error AST with exactly one top-item recovery event. -/
+theorem semicolon_parse_eq_output :
+    parse (exampleFile ";") = .ok (expectedOutput ";" 0 []
+      [{ span := byteSpan 0 1, kind := .recovered .topItem }]) :=
+  (completeOutputs ";" 0 [] [byteSpan 0 1] semicolonLexes
+    (lexicalCascadeFilters_nil_lexical ";" [byteSpan 0 1])).2
+
+private theorem sameLineSuppressed :
+    LexicalCascadeSuppresses "§ ;" [invalidToken.span] (byteSpan 3 4) := by
+  refine ⟨invalidToken.span, by simp, rfl, Or.inl ?_⟩
+  decide
+
+/-- The invalid character's two UTF-8 bytes remain a lexical diagnostic, while
+same-line cascade suppression removes only the semicolon's recovery event. -/
+theorem sameLine_parse_eq_output :
+    parse (exampleFile "§ ;") =
+      .ok (expectedOutput "§ ;" 3 [invalidToken] []) :=
+  (completeOutputs "§ ;" 3 [invalidToken] [] sameLineLexes
+    (.drop sameLineSuppressed .nil)).2
+
+private theorem nextLineRetained :
+    ¬ LexicalCascadeSuppresses "§\n;" [invalidToken.span] (byteSpan 3 4) := by
+  rintro ⟨span, member, _sourceEq, suppressed⟩
+  have spanEq : span = invalidToken.span := by simpa using member
+  subst span
+  rcases suppressed with sameLine | overlap | covered | adjacent
+  · exact (by decide : cascadeLineIndex "§\n;" invalidToken.span.startByte ≠
+      cascadeLineIndex "§\n;" (byteSpan 3 4).startByte) sameLine
+  · exact (by decide : ¬ (byteSpan 3 4).startByte < invalidToken.span.endByte) overlap.2
+  · exact (by decide : ¬ (byteSpan 3 4).startByte ≤ invalidToken.span.endByte) covered.2
+  · rcases adjacent with ⟨_ordered, gap, sliced, whitespace⟩
+    have exactGap : Trivia.utf8Slice? "§\n;" invalidToken.span.endByte
+        (byteSpan 3 4).startByte = some "\n" := by decide
+    have gapEq : gap = "\n" := Option.some.inj (sliced.symm.trans exactGap)
+    subst gap
+    contradiction
+
+/-- LF separates the lexical error from the recovery event, so both distinct
+diagnostics survive at their exact UTF-8 byte ranges. -/
+theorem nextLine_parse_eq_output :
+    parse (exampleFile "§\n;") = .ok (expectedOutput "§\n;" 3 [invalidToken]
+      [{ span := byteSpan 3 4, kind := .recovered .topItem }]) :=
+  (completeOutputs "§\n;" 3 [invalidToken] [byteSpan 3 4] nextLineLexes
+    (.keep nextLineRetained .nil)).2
+
+/-- The already-tokenized public entry point exposes the same fully determined
+output, using the independently certified canonical lexical carrier. -/
+theorem sameLine_parseLexed_eq_output :
+    parseLexed (exampleFile "§ ;") (lexicalCarrier 3 [invalidToken]) =
+      .ok (expectedOutput "§ ;" 3 [invalidToken] []) :=
+  (completeOutputs "§ ;" 3 [invalidToken] [] sameLineLexes
+    (.drop sameLineSuppressed .nil)).1
+
+end Solcore.Test.SyntaxParserPublicSingleRecoveryExamples
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicSingleRecoveryOutputProperties
+/-! Independent root-recovery and cascade derivations determine all fields of
+public parse outputs. Both retained and suppressed recovery events are checked. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicSingleRecoveryOutputProperties
+
+open Solcore
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+variable {file : SourceFile} {lexed : LexedFile} {item : TopItem}
+  {after : DeclarativeGrammar.Remainder} {kept : List SourceSpan}
+  (accepted : DeclarativeGrammar.LexedFileValidationAccepts file lexed)
+  (clears : DeclarativeGrammar.NestingClears lexed.tokens)
+  (startsAbsent : DeclarativeGrammar.TopItemKindsAbsentAt
+    (DeclarativeGrammar.sourceFileRootRemainder lexed.tokens)
+    DeclarativeGrammar.ImportTerminatorTopItemStartKinds)
+  (recovered : DeclarativeGrammar.TopItemRecoveryParses
+    (DeclarativeGrammar.sourceFileRootRemainder lexed.tokens) item after)
+  (atEnd : after.cursor = lexed.tokens.length)
+
+example (filtered : DeclarativeGrammar.LexicalCascadeFilters file.content
+    (lexed.diagnostics.map (·.span)) [item.span] kept) :
+    parseLexed file lexed = .ok {
+      parsed := {
+        source := file.id
+        span := SourceSpan.fullFile file
+        items := [Trivia.attachTopItemComments file lexed.comments item]
+        comments := lexed.comments
+      }
+      tokens := lexed.tokens
+      lexicalDiagnostics := lexed.diagnostics
+      parseDiagnostics := FileInternals.topItemRecoveryDiagnostics kept
+    } :=
+  parseLexed_eq_ok_of_singleRecoveryToEnd accepted clears startsAbsent
+    recovered atEnd filtered
+
+example (result : parseLexed file lexed =
+    .ok (singleRecoveryParseOutput file lexed item kept)) :
+    DeclarativeGrammar.LexedFileValidationAccepts file lexed ∧
+      DeclarativeGrammar.LexicalCascadeFilters file.content
+        (lexed.diagnostics.map (·.span)) [item.span] kept :=
+  (parseLexed_eq_ok_singleRecovery_iff clears startsAbsent recovered atEnd).mp
+    result
+
+example (suppressed : DeclarativeGrammar.LexicalCascadeSuppresses file.content
+    (lexed.diagnostics.map (·.span)) item.span) :
+    parseLexed file lexed = .ok (singleRecoveryParseOutput file lexed item []) :=
+  parseLexed_eq_ok_of_singleRecoveryToEnd accepted clears startsAbsent
+    recovered atEnd (.drop suppressed .nil)
+
+example (retained : ¬ DeclarativeGrammar.LexicalCascadeSuppresses file.content
+    (lexed.diagnostics.map (·.span)) item.span) :
+    parseLexed file lexed =
+      .ok (singleRecoveryParseOutput file lexed item [item.span]) :=
+  parseLexed_eq_ok_of_singleRecoveryToEnd accepted clears startsAbsent
+    recovered atEnd (.keep retained .nil)
+
+example (lexing : Lexer.lex file = .ok lexed)
+    (filtered : DeclarativeGrammar.LexicalCascadeFilters file.content
+      (lexed.diagnostics.map (·.span)) [item.span] kept) :
+    parse file = .ok (singleRecoveryParseOutput file lexed item kept) :=
+  parse_eq_ok_of_singleRecoveryToEnd lexing clears startsAbsent
+    recovered atEnd filtered
+
+example (lexing : Lexer.lex file = .ok lexed)
+    (result : parse file = .ok (singleRecoveryParseOutput file lexed item kept)) :
+    DeclarativeGrammar.LexicalCascadeFilters file.content
+      (lexed.diagnostics.map (·.span)) [item.span] kept :=
+  (parse_eq_ok_singleRecovery_iff lexing clears startsAbsent recovered atEnd).mp
+    result
+
+end Solcore.Test.SyntaxParserPublicSingleRecoveryOutputProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+example := @TermInternals.coreStatementTotalityFuel_add_two
+example := @statement_invariantFreeOnValid
+example := @statement_totalityContract
+example := @statement_ne_invariant
+
+private def sourceId : SourceId := {
+  origin := .main
+  path := "public-statement-fuel.sol"
+}
+
+private def assertMalformedOrdinary (content : String) : IO Unit := do
+  let file : SourceFile := { id := sourceId, content }
+  let lexed ← match Lexer.lex file with
+    | .ok value => pure value
+    | .error error => throw (IO.userError s!"lexer invariant: {repr error}")
+  match statement (State.initial file lexed) with
+  | .ok .. | .reject .. => pure ()
+  | .invariant error => throw (IO.userError
+      s!"statement invariant for {repr content}: {repr error}")
+
+def run : IO Unit := do
+  for content in ["(", "[", "lam(", "match ("] do
+    assertMalformedOrdinary content
+
+end Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicTotalityProperties
+/-! External consumers for conditional public parser totality. -/
+
+namespace Tests
+
+open Solcore.Syntax.Parser
+
+example := @parseLexed_exists_ok_of_validFor
+example := @parseLexed_ne_error_of_validFor
+example := @parse_exists_ok
+example := @parse_ne_error
+
+end Tests
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserPublicValidityProperties
+/-! External consumers for public parsed-file validity. -/
+
+namespace Tests
+
+open Solcore.Syntax.Parser
+
+example := @CanonicalParsedFileValid
+example := @parseLexed_ok_parsed_validFor
+example := @parse_ok_parsed_validFor
+
+end Tests
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxParserValidityProperties
+/-! External compile consumers for compositional parser validity contracts. -/
+
+namespace Tests
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+example := @Reply.ValidFor
+example := @Parser.ValidFor
+example := @Parser.PreservesTokensOnSuccess
+example := @Parser.CursorMonotoneOnSuccess
+example := @Parser.pure_preservesTokensOnSuccess
+example := @Parser.pure_cursorMonotoneOnSuccess
+example := @Parser.bind_preservesTokensOnSuccess
+example := @Parser.bind_cursorMonotoneOnSuccess
+example := @Parser.orElse_preservesTokensOnSuccess
+example := @Parser.orElse_cursorMonotoneOnSuccess
+example := @Parser.validFor_of_ok_reject
+example := @Parser.pure_validFor
+example := @Parser.bind_validFor
+example := @Parser.bind_validFor_of_value
+example := @Parser.orElse_validFor
+example := @Parser.ValidFor.mono
+example := @getState_validFor
+example := @getState_preservesTokenWindow
+example := @getState_preservesTokensOnSuccess
+example := @getState_cursorMonotoneOnSuccess
+example := @modifyState_validFor
+example := @modifyState_preservesTokenWindow
+example := @modifyState_preservesTokensOnSuccess
+example := @modifyState_cursorMonotoneOnSuccess
+example := @emitDiagnostic_reply_validFor
+example := @emitDiagnostic_validFor
+example := @emitDiagnostic_preservesTokenWindow
+example := @emitDiagnostic_preservesTokensOnSuccess
+example := @emitDiagnostic_cursorMonotoneOnSuccess
+example := @emitFailure_validFor
+example := @acceptToken_validFor
+example := @keyword_validFor
+example := @symbol_validFor
+example := @contextual_validFor
+example := @rawIdentifier_validFor
+example := @identifier_validFor
+example := @yulIdentifier_validFor
+example := coreLiteral_validFor
+example := booleanIdentifier_validFor
+
+end Tests
+end
+
+section
+-- leanmerge: from Solcore.Test.SyntaxPublicBoundary
+/-! Smoke test for the canonical syntax API exposed by `import Solcore`. -/
+
+set_option autoImplicit false
+
+namespace Tests
+
+open Solcore
+open Solcore.Syntax
+
+private def publicSyntaxSource : SourceFile := {
+  id := {
+    origin := .main
+    path := "public-syntax.sol"
+  }
+  content := "type PublicWord = word;"
+}
+
+private def malformedPublicSyntaxSource : SourceFile := {
+  id := {
+    origin := .main
+    path := "public-syntax-malformed.sol"
+  }
+  content := "function bad(x: ) {}"
+}
+
+private def assertTrue (condition : Bool) (label : String) : IO Unit := do
+  unless condition do
+    throw (IO.userError s!"{label}: expected true")
+
+/-- Exercise the canonical source-to-AST API through the repository umbrella. -/
+def testSyntaxPublicBoundary : IO Unit := do
+  assertTrue (Syntax.isValidIdentifier "PublicWord")
+    "public identifier validator"
+  match Syntax.Parser.parse publicSyntaxSource with
+  | .error error => throw (IO.userError
+      s!"public parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertTrue output.isDiagnosticFree "public diagnostic-free result"
+      unless output.lexicalDiagnostics.isEmpty do
+        throw (IO.userError
+          s!"unexpected lexical diagnostics: {reprStr output.lexicalDiagnostics}")
+      unless output.parseDiagnostics.isEmpty do
+        throw (IO.userError
+          s!"unexpected parse diagnostics: {reprStr output.parseDiagnostics}")
+      match output.parsed.items with
+      | [{ value := .typeAlias declaration, .. }] =>
+          let astWitness : TypeAliasDecl := declaration
+          assertTrue (astWitness.value.name.value == "PublicWord")
+            "public canonical AST"
+      | items => throw (IO.userError
+          s!"unexpected public AST: {reprStr items}")
+  match Syntax.Parser.parse malformedPublicSyntaxSource with
+  | .error error => throw (IO.userError
+      s!"malformed public parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertTrue (!output.isDiagnosticFree)
+        "malformed public diagnostic result"
+
+example (output : ParseOutput) :
+    output.isDiagnosticFree = true ↔ output.DiagnosticFree :=
+  output.isDiagnosticFree_eq_true_iff
+
+example := @Syntax.DeclarativeGrammar.CoreSourceFileOrdinaryParsesFromStart
+example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound
+example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound_and_validFor
+example := @Syntax.Parser.parse_ok_coreOrdinary_sound
+example := @Syntax.Parser.parse_ok_coreOrdinary_sound_and_validFor
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses
+example := @Syntax.Parser.parseLexed_ok_publicSourceFileOrdinary_sound
+example := @Syntax.Parser.parse_ok_publicSourceFileOrdinary_sound
+example := @Syntax.Parser.parseLexed_eq_ok_of_nestingExceeds
+example := @Syntax.Parser.parseLexed_ok_parseDiagnostics_eq_of_nestingExceeds
+example := @Syntax.Parser.parseLexed_ok_sourceFile_executionWitness_of_nestingClears
+example := @Syntax.Parser.parseLexed_ok_parseDiagnostics_executionWitness_of_nestingClears
+example := @Syntax.Parser.parse_ok_sourceFile_executionWitness_of_nestingClears
+example := @Syntax.Parser.productionParseLexed_exists_ok_publicSourceFileOrdinary
+example := @Syntax.Parser.productionParse_exists_ok_publicSourceFileOrdinary
+example := @Syntax.DeclarativeGrammar.LexedFileValidationOutcome
+example := @Syntax.DeclarativeGrammar.LexedFileValidationRejects
+example := @Syntax.DeclarativeGrammar.DelimitedTailRejects.output_unique
+example := @Syntax.DeclarativeGrammar.DelimitedListRejects.output_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailParses.result_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListParses.value_unique
+example := @Syntax.DeclarativeGrammar.nonemptyNoTrailingDelimitedListExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.noTrailingDelimitedListExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailParses.result_unique
+example := @Syntax.DeclarativeGrammar.NonemptyTrailingDelimitedListParses.value_unique
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListParses.value_unique
+example := @Syntax.DeclarativeGrammar.nonemptyTrailingDelimitedListExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.trailingDelimitedListExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TransactionalFallbackOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.TransactionalFallbackOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TransactionalFallbackRejects.output_unique
+example := @Syntax.DeclarativeGrammar.transactionalFallbackExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TransactionalFallbackOrdinaryParses.value_unique_of_success
+example := @Syntax.DeclarativeGrammar.TransactionalFallbackOrdinaryParses.result_unique_of_success
+example := @Syntax.DeclarativeGrammar.transactionalFallbackExactOutcomeSpecOfSuccess
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailParses.value_unique
+example := @Syntax.DeclarativeGrammar.QualifiedNameParses.value_unique
+example := @Syntax.DeclarativeGrammar.QualifiedNameParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeQualifiedNameTailRejects.output_unique
+example := @Syntax.DeclarativeGrammar.TypeQualifiedNameRejects.output_unique
+example := @Syntax.DeclarativeGrammar.typeQualifiedNameExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionTypeReturnsRejects.output_unique
+example := @Syntax.DeclarativeGrammar.FunctionTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.ComptimeTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.MappingTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.ProxyTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.TupleTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsRejects.output_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeRejects.output_unique
+example := @Syntax.DeclarativeGrammar.TypeExprCoreRejects.output_unique
+example := @Syntax.DeclarativeGrammar.TypeExprParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeExprParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTrailingDelimitedTailParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTrailingDelimitedTailParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTrailingDelimitedListParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTrailingDelimitedListParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalNamedTypeArgumentsParses.value_unique
+example := @Syntax.DeclarativeGrammar.OptionalNamedTypeArgumentsParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalFunctionTypeReturnsParses.value_unique
+example := @Syntax.DeclarativeGrammar.OptionalFunctionTypeReturnsParses.result_unique
+example := @Syntax.DeclarativeGrammar.typeExprExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.TypeExprRejects.output_unique
+example := @Syntax.DeclarativeGrammar.typeExprExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.coreBlockExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.coreBlockPublicExactOutcomeSpecOfStatementFuel
+example := @Syntax.DeclarativeGrammar.isolatedCoreBlockExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedCoreBlockPublicExactOutcomeSpecOfStatementFuel
+example := @Syntax.Parser.typeExprWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.typeExprWithFuel_success_result_unique
+example := @Syntax.Parser.typeExprWithFuel_reject_output_unique
+example := @Syntax.Parser.typeExpr_exactOutcomeSpec
+example := @Syntax.Parser.block_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.block_success_result_unique_of_statementFuel
+example := @Syntax.Parser.block_reject_output_unique_of_statementFuel
+example := @Syntax.Parser.isolatedCoreBlockPublic_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.isolatedCoreBlockPublic_success_result_unique_of_statementFuel
+example := @Syntax.Parser.isolatedCoreBlockPublic_reject_output_unique_of_statementFuel
+example := @Syntax.DeclarativeGrammar.coreExpressionExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.coreExpressionPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.CoreExpressionPublicRejects.output_unique
+example := @Syntax.Parser.TermInternals.coreExpressionWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.TermInternals.coreExpressionWithFuel_success_result_unique
+example := @Syntax.Parser.TermInternals.coreExpressionWithFuel_reject_output_unique
+example := @Syntax.DeclarativeGrammar.corePatternExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.corePatternPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.CorePatternOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.CorePatternPublicRejects.output_unique
+example := @Syntax.Parser.TermInternals.corePatternWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.TermInternals.corePatternWithFuel_success_result_unique
+example := @Syntax.Parser.TermInternals.corePatternWithFuel_reject_output_unique
+example := @Syntax.DeclarativeGrammar.coreStatementExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.coreStatementPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.CoreStatementOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.CoreStatementPublicRejects.output_unique
+example := @Syntax.Parser.TermInternals.coreStatementWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.TermInternals.coreStatementWithFuel_success_result_unique
+example := @Syntax.Parser.TermInternals.coreStatementWithFuel_reject_output_unique
+example := @Syntax.Parser.expression_exactOutcomeSpec
+example := @Syntax.Parser.expression_success_result_unique
+example := @Syntax.Parser.expression_reject_output_unique
+example := @Syntax.Parser.pattern_exactOutcomeSpec
+example := @Syntax.Parser.pattern_success_result_unique
+example := @Syntax.Parser.pattern_reject_output_unique
+example := @Syntax.Parser.statement_exactOutcomeSpec
+example := @Syntax.Parser.statement_success_result_unique
+example := @Syntax.Parser.statement_reject_output_unique
+example := @Syntax.Parser.block_exactOutcomeSpec
+example := @Syntax.Parser.block_success_result_unique
+example := @Syntax.Parser.block_reject_output_unique
+example := @Syntax.Parser.isolatedCoreBlockPublic_exactOutcomeSpec
+example := @Syntax.Parser.isolatedCoreBlockPublic_success_result_unique
+example := @Syntax.Parser.isolatedCoreBlockPublic_reject_output_unique
+example := @Syntax.DeclarativeGrammar.coreBlockPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedCoreBlockPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.coreTermExactOutcomeSpecsWithFuel
+example := @Syntax.DeclarativeGrammar.lambdaParameterPublicExactOutcomeSpec
+example := @Syntax.Parser.lambdaParameter_exactOutcomeSpec
+example := @Syntax.Parser.lambdaParameter_success_result_unique
+example := @Syntax.Parser.lambdaParameter_reject_output_unique
+example := @Syntax.DeclarativeGrammar.plainTopItemExactOutcomeSpec
+example := @Syntax.Parser.constructorSelection_exactOutcomeSpec
+example := @Syntax.Parser.constructorSelection_success_result_unique
+example := @Syntax.Parser.constructorSelection_reject_output_unique
+example := @Syntax.Parser.exportName_exactOutcomeSpec
+example := @Syntax.Parser.exportName_success_result_unique
+example := @Syntax.Parser.exportName_reject_output_unique
+example := @Syntax.Parser.localExportItem_exactOutcomeSpec
+example := @Syntax.Parser.localExportItem_success_result_unique
+example := @Syntax.Parser.localExportItem_reject_output_unique
+example := @Syntax.Parser.exportSelection_exactOutcomeSpec
+example := @Syntax.Parser.exportSelection_success_result_unique
+example := @Syntax.Parser.exportSelection_reject_output_unique
+example := @Syntax.Parser.localExport_exactOutcomeSpec
+example := @Syntax.Parser.localExport_success_result_unique
+example := @Syntax.Parser.localExport_reject_output_unique
+example := @Syntax.Parser.pathExport_exactOutcomeSpec
+example := @Syntax.Parser.pathExport_success_result_unique
+example := @Syntax.Parser.pathExport_reject_output_unique
+example := @Syntax.Parser.exportDecl_exactOutcomeSpec
+example := @Syntax.Parser.exportDecl_success_result_unique
+example := @Syntax.Parser.exportDecl_reject_output_unique
+example := @Syntax.DeclarativeGrammar.ConstructorNamesParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalConstructorSelectionParses.result_unique
+example := @Syntax.DeclarativeGrammar.topItemExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.fileItemsExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.sourceFileExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PlainTopItemOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TopItemOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.PlainTopItemRejects.output_unique
+example := @Syntax.DeclarativeGrammar.TopItemRejects.output_unique
+example := @Syntax.DeclarativeGrammar.FileItemsOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.SourceFileOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses.validFor_of_validation
+example := @Syntax.DeclarativeGrammar.publicSourceFileOrdinary_exists_unique_of_validation
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses.validFor_of_lexing
+example := @Syntax.Parser.FileInternals.plainTopItem_exactOutcomeSpec
+example := @Syntax.Parser.FileInternals.plainTopItem_success_result_unique
+example := @Syntax.Parser.FileInternals.plainTopItem_reject_output_unique
+example := @Syntax.Parser.FileInternals.topItem_exactOutcomeSpec
+example := @Syntax.Parser.FileInternals.topItem_success_result_unique
+example := @Syntax.Parser.FileInternals.topItem_reject_output_unique
+example := @Syntax.Parser.FileInternals.parseItems_exactOutcomeSpec
+example := @Syntax.Parser.FileInternals.parseItems_success_result_unique
+example := @Syntax.Parser.FileInternals.sourceFile_exactOutcomeSpec
+example := @Syntax.Parser.FileInternals.sourceFile_success_result_unique
+example := @Syntax.Parser.parseLexed_ok_parsed_value_unique
+example := @Syntax.Parser.parse_ok_parsed_value_unique
+example := @Syntax.Parser.ordinary_success_iff_exists_ok
+example := @Syntax.Parser.functionDecl_ordinary_success_iff
+example := @Syntax.Parser.functionDecl_ordinary_reject_iff
+example := @Syntax.Parser.constructorDecl_ordinary_success_iff
+example := @Syntax.Parser.constructorDecl_ordinary_reject_iff
+example := @Syntax.Parser.fallbackDecl_ordinary_success_iff
+example := @Syntax.Parser.fallbackDecl_ordinary_reject_iff
+example := @Syntax.Parser.implDecl_ordinary_success_iff
+example := @Syntax.Parser.implDecl_ordinary_reject_iff
+example := @Syntax.Parser.contractDecl_ordinary_success_iff
+example := @Syntax.Parser.contractDecl_ordinary_reject_iff
+example := @Syntax.Parser.ContractInternals.contractFieldPublic_ordinary_success_iff
+example := @Syntax.Parser.ContractInternals.contractFieldPublic_ordinary_reject_iff
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinary_success_iff
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinary_reject_iff
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinary_success_iff
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinary_reject_iff
+example := @Syntax.Parser.ContractInternals.contractBody_ordinary_success_iff
+example := @Syntax.Parser.ContractInternals.contractBody_ordinary_reject_iff
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinary_success_iff
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinary_reject_iff
+example := @Syntax.Parser.typeAlias_ordinary_success_iff
+example := @Syntax.Parser.typeAlias_ordinary_reject_iff
+example := @Syntax.Parser.enumDecl_ordinary_success_iff
+example := @Syntax.Parser.enumDecl_ordinary_reject_iff
+example := @Syntax.Parser.traitDecl_ordinary_success_iff
+example := @Syntax.Parser.traitDecl_ordinary_reject_iff
+example := @Syntax.Parser.deriveTarget_ordinary_success_iff
+example := @Syntax.Parser.deriveTarget_ordinary_reject_iff
+example := @Syntax.Parser.deriveAttributeValid_ordinary_success_iff
+example := @Syntax.Parser.deriveAttributeValid_ordinary_reject_iff
+example := @Syntax.Parser.deriveAttributeRecovered_ordinary_success_iff
+example := @Syntax.Parser.deriveAttributeRecovered_ordinary_reject_iff
+example := @Syntax.Parser.deriveAttribute_ordinary_success_iff
+example := @Syntax.Parser.deriveAttribute_ordinary_reject_iff
+example := @Syntax.Parser.yulExpression_ordinary_success_iff
+example := @Syntax.Parser.yulExpression_ordinary_reject_iff
+example := @Syntax.Parser.yulStatement_ordinary_success_iff
+example := @Syntax.Parser.yulStatement_ordinary_reject_iff
+example := @Syntax.Parser.yulBody_ordinary_success_iff
+example := @Syntax.Parser.yulBody_ordinary_reject_iff
+example := @Syntax.Parser.yulExpression_boundary_reject_iff
+example := @Syntax.Parser.yulStatement_boundary_reject_iff
+example := @Syntax.Parser.ordinary_reject_iff_exists_reject
+example := @Syntax.Parser.expression_ordinary_success_iff
+example := @Syntax.Parser.expression_ordinary_reject_iff
+example := @Syntax.Parser.pattern_ordinary_success_iff
+example := @Syntax.Parser.pattern_ordinary_reject_iff
+example := @Syntax.Parser.statement_ordinary_success_iff
+example := @Syntax.Parser.statement_ordinary_reject_iff
+example := @Syntax.Parser.typeExpr_ordinary_success_iff
+example := @Syntax.Parser.typeExpr_ordinary_reject_iff
+example := @Syntax.Parser.lambdaParameter_ordinary_success_iff
+example := @Syntax.Parser.lambdaParameter_ordinary_reject_iff
+example := @Syntax.Parser.block_ordinary_success_iff
+example := @Syntax.Parser.block_ordinary_reject_iff
+example := @Syntax.Parser.isolatedCoreBlockPublic_ordinary_success_iff
+example := @Syntax.Parser.isolatedCoreBlockPublic_ordinary_reject_iff
+example := @Syntax.Parser.importDecl_ordinary_success_iff
+example := @Syntax.Parser.importDecl_ordinary_reject_iff
+example := @Syntax.Parser.exportDecl_ordinary_success_iff
+example := @Syntax.Parser.exportDecl_ordinary_reject_iff
+example := @Syntax.Parser.pragmaDecl_ordinary_success_iff
+example := @Syntax.Parser.pragmaDecl_ordinary_reject_iff
+example := @Syntax.Parser.FileInternals.plainTopItem_ordinary_success_iff
+example := @Syntax.Parser.FileInternals.plainTopItem_ordinary_reject_iff
+example := @Syntax.Parser.FileInternals.topItem_ordinary_success_iff
+example := @Syntax.Parser.FileInternals.topItem_ordinary_reject_iff
+example := @Syntax.Parser.FileInternals.sourceFile_ordinary_iff_exists_ok
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinary_success_iff
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinary_reject_iff
+example := @Syntax.Parser.FileInternals.parseItems_ordinary_success_iff_of_remainingCount_lt
+example := @Syntax.Parser.FileInternals.parseItems_production_ordinary_success_iff
+example := @Syntax.Parser.FileInternals.sourceFile_ordinary_iff_exists_ok_of_topItem
+example := @Syntax.Parser.parseLexed_exists_ok_iff_publicSourceFileOrdinary
+example := @Syntax.Parser.parseLexed_exists_ok_iff_publicSourceFileOrdinary_of_topItem
+example := @Syntax.Parser.parse_exists_ok_iff_publicSourceFileOrdinary
+example := @Syntax.Parser.parse_exists_ok_iff_publicSourceFileOrdinary_of_topItem
+example := @Syntax.DeclarativeGrammar.topItemRecoveryExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.topItemRecoveryTraceParses_iff
+example := @Syntax.DeclarativeGrammar.topItemRecoveryTraceRejects_iff
+example := @Syntax.DeclarativeGrammar.LexicalCascadeFilters.output_unique
+example := @Syntax.DeclarativeGrammar.lexicalCascadeFilters_total
+example := @Syntax.DeclarativeGrammar.lexicalCascadeFilters_nil_lexical
+example := @Syntax.DeclarativeGrammar.lexicalCascadeFilters_singleton_iff
+example := @Syntax.Parser.FileInternals.finishRecoveredTopItem_success_diagnosticsRev_eq
+example := @Syntax.Parser.FileInternals.recoverTopItemAux_success_diagnosticsRev_eq
+example := @Syntax.Parser.FileInternals.recoverTopItem_success_diagnosticsRev_eq
+example := @Syntax.Parser.FileInternals.finishRecoveredTopItem_success_diagnostics_eq
+example := @Syntax.Parser.FileInternals.recoverTopItemAux_success_diagnostics_eq
+example := @Syntax.Parser.FileInternals.recoverTopItem_success_diagnostics_eq
+example := @Syntax.Parser.FileInternals.recoverTopItem_reject_diagnosticsRev_eq
+example := @Syntax.Parser.FileInternals.recoverTopItem_reject_diagnostics_eq
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinary_success_iff_with_trace
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinary_reject_iff_with_trace
+example := @Syntax.Parser.FileInternals.topItemRecoveryDiagnostics_spans
+example := @Syntax.Parser.FileInternals.topItemRecoveryDiagnostics_injective
+example := @Syntax.Parser.FileInternals.recoverTopItem_trace_success_iff
+example := @Syntax.Parser.FileInternals.recoverTopItem_trace_reject_iff
+example := @Syntax.Parser.FileInternals.atTopItemStart_eq_false_of_topItemStartAbsent
+example := @Syntax.Parser.FileInternals.parseItemsItem_eq_rejectAt_of_topItemStartAbsent
+example := @Syntax.Parser.FileInternals.recoveredTopItem_eq_error
+example := @Syntax.Parser.FileInternals.parseItems_singleRecoveryToEnd_exact
+example := @Syntax.Parser.FileInternals.parseItems_production_singleRecoveryToEnd_exact
+example := @Syntax.Parser.FileInternals.sourceFile_singleRecoveryToEnd_exact
+example := @Syntax.Parser.filterParseDiagnostics_cons_recovered_of_suppressed
+example := @Syntax.Parser.filterParseDiagnostics_cons_recovered_of_retained
+example := @Syntax.Parser.filterParseDiagnostics_nil_parsed
+example := @Syntax.Parser.filterParseDiagnostics_recoveredTopItems_of_filters
+example := @Syntax.Parser.filterParseDiagnostics_recoveredTopItems_iff
+example := @Syntax.Parser.filterParseDiagnostics_cons_unexpected_of_suppressed
+example := @Syntax.Parser.filterParseDiagnostics_cons_unexpected_of_retained
+example := @Syntax.Parser.unexpectedDiagnostics_spans
+example := @Syntax.Parser.filterParseDiagnostics_unexpected_of_filters
+example := @Syntax.Parser.filterParseDiagnostics_unexpected_iff
+example := @Syntax.Parser.FileInternals.parseItems_boundaryStop_trace_exact
+example := @Syntax.Parser.FileInternals.sourceFile_boundaryStop_trace_exact
+example := @Syntax.Parser.parseLexed_eq_ok_singleRecovery_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_singleRecoveryToEnd
+example := @Syntax.Parser.parse_eq_ok_singleRecovery_iff
+example := @Syntax.Parser.parse_eq_ok_of_singleRecoveryToEnd
+example := @Syntax.DeclarativeGrammar.currentInputAt_total
+example := @Syntax.DeclarativeGrammar.CurrentInputAt.result_unique
+example := @Syntax.DeclarativeGrammar.rejectAtReports_total
+example := @Syntax.DeclarativeGrammar.RejectAtReports.diagnostic_unique
+example := @Syntax.Parser.currentInputAt_currentSpan_peekKind
+example := @Syntax.Parser.currentInputAt_iff_currentSpan_peekKind
+example := @Syntax.Parser.Failure.toDiagnostic_injective
+example := @Syntax.Parser.rejectAt_reports_iff
+example := @Syntax.Parser.rejectAt_reject_reports
+example := @Syntax.Parser.rawIdentifier_eq_rejectAt_of_identifierAbsent
+example := @Syntax.Parser.identifier_eq_rejectAt_of_identifierAbsent
+example := @Syntax.Parser.rawIdentifier_reject_reports_iff
+example := @Syntax.Parser.identifier_reject_reports_iff
+example := @Syntax.Parser.rawIdentifier_reject_diagnostics_eq
+example := @Syntax.Parser.identifier_reject_diagnostics_eq
+example := @Syntax.DeclarativeGrammar.PragmaNameMissingAt.rejects
+example := @Syntax.Parser.peekKind_eq_pragma_of_exactTokenParses
+example := @Syntax.Parser.pragmaKeyword_eq_ok_of_exactTokenParses
+example := @Syntax.Parser.FileInternals.atTopItemStart_eq_true_of_pragmaToken
+example := @Syntax.Parser.FileInternals.plainTopItem_eq_pragma_of_exactTokenParses
+example := @Syntax.Parser.FileInternals.topItem_eq_pragma_of_exactTokenParses
+example := @Syntax.Parser.pragmaDecl_nameMissing_exact
+example := @Syntax.Parser.pragmaDecl_nameMissingAt_exact
+example := @Syntax.Parser.FileInternals.plainTopItem_pragmaNameMissing_exact
+example := @Syntax.Parser.FileInternals.topItem_pragmaNameMissing_exact
+example := @Syntax.Parser.FileInternals.parseItemsItem_pragmaNameMissing_exact
+example := @Syntax.Parser.FileInternals.parseItemsItem_pragmaNameMissingAt_exact
+example := @Syntax.Parser.parseLexed_eq_ok_pragmaNameMissing_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_pragmaNameMissing
+example := @Syntax.Parser.parse_eq_ok_pragmaNameMissing_iff
+example := @Syntax.Parser.parse_eq_ok_of_pragmaNameMissing
+example := @Syntax.DeclarativeGrammar.ParseDiagnosticCascadeFilters.output_unique
+example := @Syntax.DeclarativeGrammar.parseDiagnosticCascadeFilters_total
+example := @Syntax.DeclarativeGrammar.parseDiagnosticCascadeFilters_protected_cons
+example := @Syntax.DeclarativeGrammar.ParseDiagnosticCascadeFilters.sublist
+example := @Syntax.DeclarativeGrammar.parseDiagnosticCascadeFilters_nil_lexical
+example := @Syntax.Parser.filterParseDiagnostics_cons_of_suppressed
+example := @Syntax.Parser.filterParseDiagnostics_cons_of_retained
+example := @Syntax.Parser.filterParseDiagnostics_eq_of_cascadeFilters
+example := @Syntax.Parser.filterParseDiagnostics_eq_iff_cascadeFilters
+example := @Syntax.DeclarativeGrammar.identifierHyphenSpelling_iff_contains
+example := @Syntax.DeclarativeGrammar.identifierDiagnosticTrace_total
+example := @Syntax.DeclarativeGrammar.IdentifierDiagnosticTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.rawIdentifierTraceParses_iff
+example := @Syntax.DeclarativeGrammar.identifierTraceParses_iff
+example := @Syntax.DeclarativeGrammar.RawIdentifierTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.IdentifierTraceParses.result_unique
+example := @Syntax.Parser.rawIdentifier_success_diagnostics_eq
+example := @Syntax.Parser.rawIdentifier_success_trace_sound
+example := @Syntax.Parser.identifier_success_diagnosticTrace
+example := @Syntax.Parser.identifier_success_diagnostics_eq_of_trace
+example := @Syntax.Parser.identifier_success_trace_sound
+example := @Syntax.Parser.rawIdentifier_trace_success_iff
+example := @Syntax.Parser.identifier_trace_success_iff
+example := @Syntax.Parser.acceptToken_eq_ok_of_exactTokenParses
+example := @Syntax.Parser.acceptToken_success_diagnostics_eq
+example := @Syntax.Parser.acceptToken_exactToken_success_iff
+example := @Syntax.Parser.keyword_eq_ok_of_exactTokenParses
+example := @Syntax.Parser.symbol_eq_ok_of_exactTokenParses
+example := @Syntax.Parser.contextual_eq_ok_of_exactTokenParses
+example := @Syntax.Parser.keyword_exactToken_success_iff
+example := @Syntax.Parser.symbol_exactToken_success_iff
+example := @Syntax.Parser.contextual_exactToken_success_iff
+example := @Syntax.Parser.keyword_eq_rejectAt_of_tokenKindAbsent
+example := @Syntax.Parser.symbol_eq_rejectAt_of_tokenKindAbsent
+example := @Syntax.Parser.contextual_eq_rejectAt_of_tokenKindAbsent
+example := @Syntax.Parser.keyword_reject_reports_iff
+example := @Syntax.Parser.symbol_reject_reports_iff
+example := @Syntax.Parser.contextual_reject_reports_iff
+example := @Syntax.Parser.acceptToken_reject_reports
+example := @Syntax.Parser.keyword_reject_diagnostics_eq
+example := @Syntax.Parser.symbol_reject_diagnostics_eq
+example := @Syntax.Parser.contextual_reject_diagnostics_eq
+example := @Syntax.Parser.FileInternals.parseItems_singleSuccessToEnd_exact
+example := @Syntax.Parser.FileInternals.parseItems_production_singleSuccessToEnd_exact
+example := @Syntax.Parser.FileInternals.sourceFile_singleSuccessToEnd_exact
+example := @Syntax.DeclarativeGrammar.ParseDiagnosticCascadeFilters.append
+example := @Syntax.DeclarativeGrammar.parseDiagnosticCascadeFilters_of_protected
+example := @Syntax.DeclarativeGrammar.IdentifierDiagnosticTrace.not_candidate
+example := @Syntax.DeclarativeGrammar.IdentifierDiagnosticTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.identifierListDiagnosticTrace_total
+example := @Syntax.DeclarativeGrammar.IdentifierListDiagnosticTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.IdentifierListDiagnosticTrace.append
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaItemsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.IdentifierListDiagnosticTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceParses.cascadeFilters
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_success_diagnosticTrace
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_success_trace_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItems_success_diagnosticTrace
+example := @Syntax.Parser.PragmaInternals.pragmaItems_success_diagnostics_eq_of_trace
+example := @Syntax.Parser.PragmaInternals.pragmaItems_success_trace_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_success_diagnostics_eq_of_trace
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_trace_success_iff
+example := @Syntax.Parser.PragmaInternals.pragmaItems_trace_success_iff
+example := @Syntax.Parser.pragmaDecl_success_diagnosticTrace
+example := @Syntax.Parser.pragmaDecl_success_diagnostics_eq_of_trace
+example := @Syntax.Parser.pragmaDecl_success_trace_sound
+example := @Syntax.Parser.pragmaDecl_trace_success_iff
+example := @Syntax.Parser.parseLexed_eq_ok_singlePragma_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_singlePragma
+example := @Syntax.Parser.parse_eq_ok_singlePragma_iff
+example := @Syntax.Parser.parse_eq_ok_of_singlePragma
+example := @Syntax.Parser.parseLexed_eq_ok_of_singlePragmaTrace
+example := @Syntax.Parser.parse_eq_ok_of_singlePragmaTrace
+example := @Syntax.Parser.emitDiagnostic_success_trace
+example := @Syntax.Parser.bind_success_trace
+example := @Syntax.Parser.bind_reject_right_trace
+example := @Syntax.Parser.bind_reject_left_trace
+example := @Syntax.Parser.map_success_trace
+example := @Syntax.Parser.map_reject_trace
+example := @Syntax.Parser.bind_invariant_left_exact
+example := @Syntax.Parser.orElse_eq_right_of_reject
+example := @Syntax.Parser.orElse_success_left_trace
+example := @Syntax.Parser.orElse_success_right_trace
+example := @Syntax.Parser.orElse_reject_right_trace
+example := @Syntax.Parser.orElse_invariant_left_exact
+example := @Syntax.Parser.orElse_invariant_right_exact
+example := @Syntax.Parser.sourceFile_atWindowEnd_exact
+example := @Syntax.Parser.parseLexed_eq_ok_emptyTokens_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_emptyTokens
+example := @Syntax.Parser.parse_eq_ok_of_emptyTokens
+example := @Syntax.DeclarativeGrammar.ParseDiagnosticCascadeFilters.retained_not_suppressed
+example := @Syntax.DeclarativeGrammar.parseDiagnosticCascadeFilters_of_retained
+example := @Syntax.DeclarativeGrammar.ParseDiagnosticCascadeFilters.stable
+example := @Syntax.Parser.filterParseDiagnostics_idempotent
+example := @Syntax.Parser.filterParseDiagnostics_append
+example := @Syntax.DeclarativeGrammar.PragmaDeclOrdinaryParses.startsInside
+example := @Syntax.DeclarativeGrammar.PragmaDeclOrdinaryParses.carrier_progress
+example := @Syntax.DeclarativeGrammar.PragmaDeclOrdinaryParses.toTopItem
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.carrier_atEnd
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.length_le_remaining
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.toFileItems
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.PragmaSequenceTraceParses.cascadeFilters_iff
+example := @Syntax.Parser.FileInternals.parseItems_pragmaSequence_trace_of_length_lt
+example := @Syntax.Parser.FileInternals.parseItems_pragmaSequence_trace_of_remainingCount_lt
+example := @Syntax.Parser.FileInternals.parseItems_production_pragmaSequence_trace
+example := @Syntax.Parser.FileInternals.sourceFile_pragmaSequence_trace
+example := @Syntax.Parser.parseLexed_eq_ok_of_pragmaSequence
+example := @Syntax.Parser.parseLexed_eq_ok_pragmaSequence_iff
+example := @Syntax.Parser.parse_eq_ok_of_pragmaSequence
+example := @Syntax.Parser.parse_eq_ok_pragmaSequence_iff
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailRejectedPrefix.ordinary
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailRejects.exists_prefix
+example := @Syntax.DeclarativeGrammar.PragmaItemsRejectedPrefix.ordinary
+example := @Syntax.DeclarativeGrammar.PragmaItemsRejects.exists_prefix
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailRejectedPrefix.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaItemsRejectedPrefix.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaItemsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.PragmaDeclRejects.exists_trace
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.result_unique
+example := @Syntax.Parser.identifier_success_context_eq
+example := @Syntax.Parser.identifier_reject_context_eq
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_success_context_eq
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_reject_context_eq
+example := @Syntax.Parser.PragmaInternals.pragmaItems_success_context_eq
+example := @Syntax.Parser.PragmaInternals.pragmaItems_reject_context_eq
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_reject_trace_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItems_reject_trace_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_trace_reject_iff
+example := @Syntax.Parser.PragmaInternals.pragmaItems_trace_reject_iff
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_trace_reject_failure_iff
+example := @Syntax.Parser.PragmaInternals.pragmaItems_trace_reject_failure_iff
+example := @Syntax.Parser.pragmaDecl_reject_trace_sound
+example := @Syntax.Parser.pragmaDecl_reject_exact_of_trace
+example := @Syntax.Parser.pragmaDecl_trace_reject_iff
+example := @Syntax.Parser.pragmaDecl_trace_reject_failure_iff
+example := @Syntax.Parser.parseLexed_eq_ok_pragmaRejection_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_pragmaRejection
+example := @Syntax.Parser.parse_eq_ok_pragmaRejection_iff
+example := @Syntax.Parser.parse_eq_ok_of_pragmaRejection
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.committedCascadeFilters_of_retained
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.committedCascadeFilters_of_suppressed
+example := @Syntax.DeclarativeGrammar.PragmaDeclTraceRejects.committedCascadeFilters_iff
+example := @Syntax.DeclarativeGrammar.PragmaPrefixBoundaryTraceParses.carrier_stop
+example := @Syntax.DeclarativeGrammar.PragmaPrefixBoundaryTraceParses.length_lt_remaining
+example := @Syntax.DeclarativeGrammar.PragmaPrefixBoundaryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PragmaPrefixBoundaryTraceParses.cascadeFilters
+example := @Syntax.Parser.pragmaDecl_success_context_eq
+example := @Syntax.Parser.pragmaDecl_reject_context_eq
+example := @Syntax.Parser.FileInternals.parseItems_pragmaPrefixBoundary_trace_of_length_lt
+example := @Syntax.Parser.FileInternals.parseItems_pragmaPrefixBoundary_trace_of_remainingCount_lt
+example := @Syntax.Parser.FileInternals.parseItems_production_pragmaPrefixBoundary_trace
+example := @Syntax.Parser.FileInternals.sourceFile_pragmaPrefixBoundary_trace
+example := @Syntax.Parser.parseLexed_eq_ok_pragmaPrefixBoundary_iff
+example := @Syntax.Parser.parseLexed_eq_ok_of_pragmaPrefixBoundary
+example := @Syntax.Parser.parse_eq_ok_pragmaPrefixBoundary_iff
+example := @Syntax.Parser.parse_eq_ok_of_pragmaPrefixBoundary
+example := @Syntax.DeclarativeGrammar.IsolatedBlockTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.IsolatedBlockTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.IsolatedBlockTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.IsolatedBlockTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.IsolatedBlockTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.isolatedBlockTraceExactOutcomeSpec
+example := @Syntax.Parser.State.enterWindow_diagnostics_eq_nil
+example := @Syntax.Parser.State.mergeDiagnostics_diagnostics_eq_append
+example := @Syntax.Parser.isolateBlock_eq_of_no_capture
+example := @Syntax.Parser.isolateBlock_captured_success_trace
+example := @Syntax.Parser.isolateBlock_captured_reject_trace
+example := @Syntax.Parser.isolateBlock_captured_invariant_iff
+example := @Syntax.Parser.isolateBlock_captured_success_iff
+example := @Syntax.Parser.isolateBlock_captured_success_frame
+example := @Syntax.Parser.isolateBlock_captured_success_trace_cases
+example := @Syntax.Parser.isolateBlock_captured_ne_reject
+example := @Syntax.Parser.BlockTraceSuccessSound
+example := @Syntax.Parser.BlockTraceRejectSound
+example := @Syntax.Parser.BlockTraceSuccessComplete
+example := @Syntax.Parser.BlockTraceRejectComplete
+example := @Syntax.Parser.isolateBlock_success_trace_sound
+example := @Syntax.Parser.isolateBlock_reject_trace_sound
+example := @Syntax.Parser.isolateBlock_success_trace_complete
+example := @Syntax.Parser.isolateBlock_reject_trace_complete
+example := @Syntax.Parser.isolateBlock_trace_success_iff
+example := @Syntax.Parser.isolateBlock_trace_reject_iff
+example := @Syntax.DeclarativeGrammar.CoreBlockStatementDiagnosticTrace.exists_trace
+example := @Syntax.DeclarativeGrammar.CoreBlockStatementDiagnosticTrace.output_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockStatementDiagnosticTrace.empty_iff
+example := @Syntax.DeclarativeGrammar.CoreBlockStatementDiagnosticTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.exists_trace
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.output_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.empty_iff
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.append_cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockTailsDiagnosticTrace.append_cascadeFilters_iff
+example := @Syntax.Parser.closeCoreBlock_success_trace_sound
+example := @Syntax.Parser.closeCoreBlock_success_diagnostics_eq_of_trace
+example := @Syntax.Parser.closeCoreBlock_trace_success_iff
+example := @Syntax.Parser.closeCoreBlock_reject_iff_symbol
+example := @Syntax.Parser.closeCoreBlock_reject_reports
+example := @Syntax.Parser.closeCoreBlock_reject_reports_iff
+example := @Syntax.Parser.closeCoreBlock_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.output_cursor_le_endIndex
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.length_lt_cursor_distance
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.output_cursor_le_endIndex
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.empty_trace_tailsValid
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceRejects.withPolicy
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.coreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedCoreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.split_at_validation
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.cascadeFilters_iff
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.normalized_validation_suffix
+example := @Syntax.Parser.StatementTraceSuccessSound
+example := @Syntax.Parser.StatementTraceSuccessComplete
+example := @Syntax.Parser.StatementSuccessContext
+example := @Syntax.Parser.StatementTraceRejectSound
+example := @Syntax.Parser.StatementTraceRejectComplete
+example := @Syntax.Parser.coreBlockItems_success_trace_sound
+example := @Syntax.Parser.coreBlock_success_trace_sound
+example := @Syntax.Parser.coreBlockItems_trace_success_complete
+example := @Syntax.Parser.coreBlockItems_production_trace_success_complete
+example := @Syntax.Parser.coreBlock_trace_success_complete
+example := @Syntax.Parser.coreBlock_trace_success_iff
+example := @Syntax.Parser.coreBlockItems_production_trace_success_iff
+example := @Syntax.Parser.coreBlockItems_reject_trace_sound
+example := @Syntax.Parser.coreBlock_reject_trace_sound
+example := @Syntax.Parser.coreBlockItems_trace_reject_complete
+example := @Syntax.Parser.coreBlockItems_production_trace_reject_complete
+example := @Syntax.Parser.coreBlock_trace_reject_complete
+example := @Syntax.Parser.coreBlock_trace_reject_iff
+example := @Syntax.Parser.coreBlock_trace_reject_failure_iff
+example := @Syntax.Parser.isolatedCoreBlock_success_trace_sound
+example := @Syntax.Parser.isolatedCoreBlock_reject_trace_sound
+example := @Syntax.Parser.isolatedCoreBlock_success_trace_complete
+example := @Syntax.Parser.isolatedCoreBlock_reject_trace_complete
+example := @Syntax.Parser.isolatedCoreBlock_trace_success_iff
+example := @Syntax.Parser.isolatedCoreBlock_trace_reject_iff
+example := @Syntax.DeclarativeGrammar.TerminatedControlStatementTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TerminatedControlStatementTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.TerminatedControlStatementTraceRejects.trace_eq_nil
+example := @Syntax.DeclarativeGrammar.TerminatedControlStatementTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TerminatedControlStatementTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.terminatedControlStatementTrace_exists_outcome
+example := @Syntax.DeclarativeGrammar.terminatedControlStatementTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.breakStatementTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.continueStatementTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.terminatedControlCoreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedTerminatedControlCoreBlockTraceExactOutcomeSpec
+example := @Syntax.Parser.ControlInternals.terminatedControl_success_state_shape
+example := @Syntax.Parser.ControlInternals.terminatedControl_eq_ok_of_ordinary
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_success_sound
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_success_complete
+example := @Syntax.Parser.ControlInternals.terminatedControl_success_context
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_success_iff
+example := @Syntax.Parser.ControlInternals.terminatedControl_reject_reports
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_reject_sound
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_reject_complete
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_reject_iff
+example := @Syntax.Parser.ControlInternals.terminatedControl_trace_reject_failure_iff
+example := @Syntax.Parser.breakStatement_trace_success_sound
+example := @Syntax.Parser.breakStatement_trace_success_complete
+example := @Syntax.Parser.breakStatement_success_context
+example := @Syntax.Parser.breakStatement_trace_reject_sound
+example := @Syntax.Parser.breakStatement_trace_reject_complete
+example := @Syntax.Parser.continueStatement_trace_success_sound
+example := @Syntax.Parser.continueStatement_trace_success_complete
+example := @Syntax.Parser.continueStatement_success_context
+example := @Syntax.Parser.continueStatement_trace_reject_sound
+example := @Syntax.Parser.continueStatement_trace_reject_complete
+example := @Syntax.Parser.breakStatement_trace_success_iff
+example := @Syntax.Parser.continueStatement_trace_success_iff
+example := @Syntax.Parser.breakStatement_trace_reject_iff
+example := @Syntax.Parser.continueStatement_trace_reject_iff
+example := @Syntax.Parser.breakStatement_trace_reject_failure_iff
+example := @Syntax.Parser.continueStatement_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.ExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExpressionTraceOutcomeExists
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.returnStatementTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.returnCoreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedReturnCoreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.optionalReturnValueTrace_exists_outcome
+example := @Syntax.DeclarativeGrammar.returnStatementTrace_exists_outcome
+example := @Syntax.Parser.ExpressionTraceSuccessSound
+example := @Syntax.Parser.ExpressionTraceSuccessComplete
+example := @Syntax.Parser.ExpressionSuccessContext
+example := @Syntax.Parser.ExpressionTraceRejectSound
+example := @Syntax.Parser.ExpressionTraceRejectComplete
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_eq_ok_none_of_tokenAt
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_eq_of_semicolonAbsent
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_success_trace_sound
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_trace_success_complete
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_success_context_eq
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_trace_success_iff
+example := @Syntax.Parser.returnStatement_eq_ok_none_of_exactTokens
+example := @Syntax.Parser.returnStatement_trace_success_sound
+example := @Syntax.Parser.returnStatement_trace_success_complete
+example := @Syntax.Parser.returnStatement_success_context
+example := @Syntax.Parser.returnStatement_trace_success_iff
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_reject_trace_sound
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_trace_reject_complete
+example := @Syntax.Parser.StatementSimpleInternals.optionalReturnValue_trace_reject_iff
+example := @Syntax.Parser.returnStatement_reject_trace_sound
+example := @Syntax.Parser.returnStatement_trace_reject_complete
+example := @Syntax.Parser.returnStatement_trace_reject_iff
+example := @Syntax.Parser.returnStatement_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.CoreLiteralTraceParses
+example := @Syntax.DeclarativeGrammar.BooleanIdentifierTraceParses
+example := @Syntax.DeclarativeGrammar.CoreLiteralTraceRejects
+example := @Syntax.DeclarativeGrammar.BooleanIdentifierTraceRejects
+example := @Syntax.DeclarativeGrammar.LiteralExpressionTraceParses
+example := @Syntax.DeclarativeGrammar.CoreLiteralTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.BooleanIdentifierTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.LiteralExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.CoreLiteralTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.BooleanIdentifierTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.CoreLiteralTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.BooleanIdentifierTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.coreLiteralTrace_outcome_total
+example := @Syntax.DeclarativeGrammar.booleanIdentifierTrace_outcome_total
+example := @Syntax.DeclarativeGrammar.LiteralExpressionTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.literalExpressionTrace_outcome_total
+example := @Syntax.DeclarativeGrammar.literalExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.literalExpressionTraceOutcomeExists
+example := @Syntax.DeclarativeGrammar.literalReturnStatementTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.literalReturnStatementTrace_exists_outcome
+example := @Syntax.DeclarativeGrammar.literalReturnCoreBlockTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.isolatedLiteralReturnCoreBlockTraceExactOutcomeSpec
+example := @Syntax.Parser.coreLiteral_eq_ok_of_ordinary
+example := @Syntax.Parser.booleanIdentifier_eq_ok_of_ordinary
+example := @Syntax.Parser.coreLiteral_success_diagnostics_eq
+example := @Syntax.Parser.booleanIdentifier_success_diagnostics_eq
+example := @Syntax.Parser.coreLiteral_trace_success_iff
+example := @Syntax.Parser.booleanIdentifier_trace_success_iff
+example := @Syntax.Parser.coreLiteral_eq_rejectAt_of_absence
+example := @Syntax.Parser.coreLiteral_reject_trace_sound
+example := @Syntax.Parser.coreLiteral_trace_reject_iff
+example := @Syntax.Parser.coreLiteral_trace_reject_failure_iff
+example := @Syntax.Parser.booleanIdentifier_eq_rejectAt_of_absence
+example := @Syntax.Parser.booleanIdentifier_reject_absent
+example := @Syntax.Parser.booleanIdentifier_reject_state_eq
+example := @Syntax.Parser.booleanIdentifier_reject_trace_sound
+example := @Syntax.Parser.booleanIdentifier_trace_reject_iff
+example := @Syntax.Parser.booleanIdentifier_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_eq_ok_of_ordinary
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_success_state_shape
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_reject_iff_coreLiteral
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_reject_sound
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_trace_reject_failure_iff
+example := @Syntax.Parser.closeCoreBlock_success_context_eq
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.output_cursor_le_endIndex
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.blockStatementTraceExactOutcomeSpec
+example := @Syntax.Parser.coreBlockItems_success_context_eq
+example := @Syntax.Parser.coreBlock_success_context_eq
+example := @Syntax.Parser.blockStatement_success_iff_raw
+example := @Syntax.Parser.blockStatement_reject_iff_raw
+example := @Syntax.Parser.blockStatement_trace_success_sound
+example := @Syntax.Parser.blockStatement_trace_reject_sound
+example := @Syntax.Parser.blockStatement_trace_success_complete
+example := @Syntax.Parser.blockStatement_trace_reject_complete
+example := @Syntax.Parser.blockStatement_success_context
+example := @Syntax.Parser.blockStatement_trace_success_iff
+example := @Syntax.Parser.blockStatement_trace_reject_iff
+example := @Syntax.Parser.blockStatement_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceParses.output_eq
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionNameTrace_outcome_total
+example := @Syntax.DeclarativeGrammar.IdentifierExpressionTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.IdentifierExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.identifierExpressionTrace_exactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.identifierExpressionTrace_outcomeExists
+example := @Syntax.Parser.ExpressionAtomInternals.isBooleanValue_true_of_booleanParses
+example := @Syntax.Parser.ExpressionAtomInternals.isBooleanValue_false_of_absent
+example := @Syntax.Parser.ExpressionAtomInternals.booleanAbsent_of_isBooleanValue_false
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_eq_identifier_of_booleanAbsent
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_success_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_success_context_eq
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_success_state_eq_of_trace
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_eq_ok_of_trace
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionName_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_eq_ok_of_trace
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_success_state_eq_of_trace
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_reject_iff_expressionName
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_reject_sound
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.IdentifierTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.IdentifierExpressionTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ExpressionNameTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalReturnValueTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ReturnStatementTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockItemsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CoreBlockTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.BlockStatementTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.fileItemsExactOutcomeSpecOfTopItemValues
+example := @Syntax.DeclarativeGrammar.fileItemsExactOutcomeSpecOfTopItem
+example := @Syntax.DeclarativeGrammar.sourceFileExactOutcomeSpecOfFileItems
+example := @Syntax.DeclarativeGrammar.sourceFileExactOutcomeSpecOfTopItemValues
+example := @Syntax.DeclarativeGrammar.sourceFileExactOutcomeSpecOfTopItem
+example := @Syntax.DeclarativeGrammar.FileItemsRejects.output_unique
+example := @Syntax.DeclarativeGrammar.SourceFileRejects.output_unique
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses.value_unique_of_topItem
+example := @Syntax.DeclarativeGrammar.PublicSourceFileOrdinaryParses.value_unique_of_exact_topItem
+example := @Syntax.Parser.FileInternals.recoverTopItem_exactOutcomeSpec
+example := @Syntax.Parser.FileInternals.recoverTopItem_success_result_unique
+example := @Syntax.Parser.FileInternals.recoverTopItem_reject_output_unique
+example := @Syntax.Parser.FileInternals.parseItems_exactOutcomeSpec_of_topItemValues
+example := @Syntax.Parser.FileInternals.parseItems_exactOutcomeSpec_of_topItem
+example := @Syntax.Parser.FileInternals.parseItems_success_result_unique_of_topItemValues
+example := @Syntax.Parser.FileInternals.parseItems_success_result_unique_of_topItem
+example := @Syntax.Parser.FileInternals.parseItems_reject_output_unique
+example := @Syntax.Parser.FileInternals.sourceFile_exactOutcomeSpec_of_topItemValues
+example := @Syntax.Parser.FileInternals.sourceFile_exactOutcomeSpec_of_topItem
+example := @Syntax.Parser.FileInternals.sourceFile_success_result_unique_of_topItemValues
+example := @Syntax.Parser.FileInternals.sourceFile_success_result_unique_of_topItem
+example := @Syntax.Parser.FileInternals.sourceFile_reject_output_unique
+example := @Syntax.Parser.parseLexed_ok_parsed_value_unique_of_topItemValues
+example := @Syntax.Parser.parseLexed_ok_parsed_value_unique_of_topItem
+example := @Syntax.Parser.parse_ok_parsed_value_unique_of_topItemValues
+example := @Syntax.Parser.parse_ok_parsed_value_unique_of_topItem
+example := @Syntax.DeclarativeGrammar.selectedAliasExactOutcomeSpec
+example := @Syntax.Parser.selectedAlias_exactOutcomeSpec
+example := @Syntax.Parser.selectedAlias_success_result_unique
+example := @Syntax.Parser.selectedAlias_reject_output_unique
+example := @Syntax.DeclarativeGrammar.selectedImportExactOutcomeSpec
+example := @Syntax.Parser.selectedImport_exactOutcomeSpec
+example := @Syntax.Parser.selectedImport_success_result_unique
+example := @Syntax.Parser.selectedImport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.selectedImportsExactOutcomeSpec
+example := @Syntax.Parser.selectedImports_exactOutcomeSpec
+example := @Syntax.Parser.selectedImports_success_result_unique
+example := @Syntax.Parser.selectedImports_reject_output_unique
+example := @Syntax.DeclarativeGrammar.hidingClauseExactOutcomeSpec
+example := @Syntax.Parser.hidingClause_exactOutcomeSpec
+example := @Syntax.Parser.hidingClause_success_result_unique
+example := @Syntax.Parser.hidingClause_reject_output_unique
+example := @Syntax.DeclarativeGrammar.optionalHidingExactOutcomeSpec
+example := @Syntax.Parser.optionalHiding_exactOutcomeSpec
+example := @Syntax.Parser.optionalHiding_success_result_unique
+example := @Syntax.Parser.optionalHiding_reject_output_unique
+example := @Syntax.DeclarativeGrammar.plainImportExactOutcomeSpec
+example := @Syntax.Parser.plainImport_exactOutcomeSpec
+example := @Syntax.Parser.plainImport_success_result_unique
+example := @Syntax.Parser.plainImport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.namespaceImportExactOutcomeSpec
+example := @Syntax.Parser.namespaceImport_exactOutcomeSpec
+example := @Syntax.Parser.namespaceImport_success_result_unique
+example := @Syntax.Parser.namespaceImport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.wildcardImportExactOutcomeSpec
+example := @Syntax.Parser.wildcardImport_exactOutcomeSpec
+example := @Syntax.Parser.wildcardImport_success_result_unique
+example := @Syntax.Parser.wildcardImport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.selectiveImportExactOutcomeSpec
+example := @Syntax.Parser.selectiveImport_exactOutcomeSpec
+example := @Syntax.Parser.selectiveImport_success_result_unique
+example := @Syntax.Parser.selectiveImport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.importDeclExactOutcomeSpec
+example := @Syntax.Parser.importDecl_exactOutcomeSpec
+example := @Syntax.Parser.importDecl_success_result_unique
+example := @Syntax.Parser.importDecl_reject_output_unique
+example := @Syntax.DeclarativeGrammar.pragmaItemsTailExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.pragmaItemsExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.pragmaDeclExactOutcomeSpec
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_exactOutcomeSpec
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_success_result_unique
+example := @Syntax.Parser.PragmaInternals.pragmaItemsTail_production_reject_output_unique
+example := @Syntax.Parser.PragmaInternals.pragmaItems_exactOutcomeSpec
+example := @Syntax.Parser.PragmaInternals.pragmaItems_success_result_unique
+example := @Syntax.Parser.PragmaInternals.pragmaItems_reject_output_unique
+example := @Syntax.Parser.pragmaDecl_exactOutcomeSpec
+example := @Syntax.Parser.pragmaDecl_success_result_unique
+example := @Syntax.Parser.pragmaDecl_reject_output_unique
+example := @Syntax.DeclarativeGrammar.selectorNameExactOutcomeSpec
+example := @Syntax.Parser.selectorName_exactOutcomeSpec
+example := @Syntax.Parser.selectorName_success_result_unique
+example := @Syntax.Parser.selectorName_reject_output_unique
+example := @Syntax.DeclarativeGrammar.modulePathExactOutcomeSpec
+example := @Syntax.Parser.modulePath_exactOutcomeSpec
+example := @Syntax.Parser.modulePath_success_result_unique
+example := @Syntax.Parser.modulePath_reject_output_unique
+example := @Syntax.DeclarativeGrammar.exportPathExactOutcomeSpec
+example := @Syntax.Parser.exportPath_exactOutcomeSpec
+example := @Syntax.Parser.exportPath_success_result_unique
+example := @Syntax.Parser.exportPath_reject_output_unique
+example := @Syntax.DeclarativeGrammar.importTerminatorExactOutcomeSpec
+example := @Syntax.Parser.importTerminator_exactOutcomeSpec
+example := @Syntax.Parser.importTerminator_success_result_unique
+example := @Syntax.Parser.importTerminator_reject_output_unique
+example := @Syntax.DeclarativeGrammar.finishExportExactOutcomeSpec
+example := @Syntax.Parser.finishExport_exactOutcomeSpec
+example := @Syntax.Parser.finishExport_success_result_unique
+example := @Syntax.Parser.finishExport_reject_output_unique
+example := @Syntax.DeclarativeGrammar.functionDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.constructorDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.fallbackDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.implMethodExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.implBodyExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.implDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractMemberExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractBodyExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractFieldPublicExactOutcomeSpec
+example := @Syntax.Parser.functionDecl_exactOutcomeSpec
+example := @Syntax.Parser.functionDecl_success_result_unique
+example := @Syntax.Parser.functionDecl_reject_output_unique
+example := @Syntax.Parser.constructorDecl_exactOutcomeSpec
+example := @Syntax.Parser.constructorDecl_success_result_unique
+example := @Syntax.Parser.constructorDecl_reject_output_unique
+example := @Syntax.Parser.fallbackDecl_exactOutcomeSpec
+example := @Syntax.Parser.fallbackDecl_success_result_unique
+example := @Syntax.Parser.fallbackDecl_reject_output_unique
+example := @Syntax.Parser.implDecl_exactOutcomeSpec
+example := @Syntax.Parser.implDecl_success_result_unique
+example := @Syntax.Parser.implDecl_reject_output_unique
+example := @Syntax.Parser.contractDecl_exactOutcomeSpec
+example := @Syntax.Parser.contractDecl_success_result_unique
+example := @Syntax.Parser.contractDecl_reject_output_unique
+example := @Syntax.Parser.ImplInternals.implMethod_exactOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implMethod_success_result_unique
+example := @Syntax.Parser.ImplInternals.implMethod_reject_output_unique
+example := @Syntax.Parser.ImplInternals.implBody_exactOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implBody_success_result_unique
+example := @Syntax.Parser.ImplInternals.implBody_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractFieldPublic_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractFieldPublic_success_result_unique
+example := @Syntax.Parser.ContractInternals.contractFieldPublic_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractMemberCore_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractMemberCore_success_result_unique_unconditional
+example := @Syntax.Parser.ContractInternals.contractMemberCore_reject_output_unique_unconditional
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_success_result_unique
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractBody_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractBody_success_result_unique
+example := @Syntax.Parser.ContractInternals.contractBody_reject_output_unique
+
+example := @Syntax.Parser.typeExpr_success_result_unique
+example := @Syntax.Parser.typeExpr_reject_output_unique
+example := @Syntax.Parser.validateLexed_reflects_outcome
+example := @Syntax.Parser.productionParseLexed_error_iff_validationRejects
+example := @Syntax.Parser.productionParseLexed_certifiedOutcome
+example := @Syntax.DeclarativeGrammar.PredicateRejects
+example := @Syntax.DeclarativeGrammar.predicateDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceRejects
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceUnavailable
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceRejects.no_parse
+example := @Syntax.DeclarativeGrammar.BarePredicateSequenceRejects
+example := @Syntax.DeclarativeGrammar.barePredicateSequenceDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PredicateSequenceRejects
+example := @Syntax.DeclarativeGrammar.predicateSequenceDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalWhereClauseRejects
+example := @Syntax.DeclarativeGrammar.optionalWhereClauseDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalReturnClauseRejects
+example := @Syntax.DeclarativeGrammar.optionalReturnClauseDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.GenericParametersRejects
+example := @Syntax.DeclarativeGrammar.genericParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalGenericParametersRejects
+example := @Syntax.DeclarativeGrammar.optionalGenericParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionParameterCoreOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionParameterCoreRejects
+example := @Syntax.DeclarativeGrammar.FunctionParameterOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionParameterRejects
+example := @Syntax.DeclarativeGrammar.functionParameterDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionParameterRecoveryExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionParameterExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionParametersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionParametersRejects
+example := @Syntax.DeclarativeGrammar.functionParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionParametersExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionSignatureOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionSignatureRejects
+example := @Syntax.DeclarativeGrammar.functionSignatureDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionSignatureExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionDeclRejects
+example := @Syntax.DeclarativeGrammar.functionDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplMethodOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImplMethodRejects
+example := @Syntax.DeclarativeGrammar.implMethodDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerRejects
+example := @Syntax.DeclarativeGrammar.optionalImplDefaultMarkerDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerRejects.output_unique
+example := @Syntax.DeclarativeGrammar.optionalImplDefaultMarkerExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsRejects
+example := @Syntax.DeclarativeGrammar.implHeadArgumentsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsRejects.output_unique
+example := @Syntax.DeclarativeGrammar.implHeadArgumentsExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplMethodTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ImplMethodTailRejects
+example := @Syntax.DeclarativeGrammar.implMethodTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplMethodTailOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.ImplMethodTailOrdinaryOutcomeParses.value_unique
+example := @Syntax.DeclarativeGrammar.ImplMethodTailRejects.output_unique
+example := @Syntax.DeclarativeGrammar.implMethodTailExactOutcomeSpecOfMethod
+example := @Syntax.DeclarativeGrammar.ImplBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ImplBodyRejects
+example := @Syntax.DeclarativeGrammar.implBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplBodyOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.ImplBodyOrdinaryOutcomeParses.value_unique
+example := @Syntax.DeclarativeGrammar.ImplBodyRejects.output_unique
+example := @Syntax.DeclarativeGrammar.implBodyExactOutcomeSpecOfMethod
+example := @Syntax.DeclarativeGrammar.implBodyExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.implBodyExactOutcomeSpecOfStatementFuel
+example := @Syntax.DeclarativeGrammar.ImplDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImplDeclRejects
+example := @Syntax.DeclarativeGrammar.implDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplDeclOrdinaryParses.result_unique_of_impl_body
+example := @Syntax.DeclarativeGrammar.ImplDeclRejects.output_unique_of_impl_body
+example := @Syntax.DeclarativeGrammar.implDeclExactOutcomeSpecOfImplBody
+example := @Syntax.DeclarativeGrammar.implDeclExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.implDeclExactOutcomeSpecOfStatementFuel
+example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalFunctionModifierParses.value_unique
+example := @Syntax.DeclarativeGrammar.OptionalFunctionModifierParses.result_unique
+example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects
+example := @Syntax.DeclarativeGrammar.constructorDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses.value_unique_of_exact_children
+example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses.result_unique_of_exact_children
+example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects.output_unique_of_exact_children
+example := @Syntax.DeclarativeGrammar.constructorDeclExactOutcomeSpecOfChildren
+example := @Syntax.DeclarativeGrammar.constructorDeclExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.constructorDeclExactOutcomeSpecOfStatementFuel
+example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses.result_unique_of_exact_body
+example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects.output_unique_of_exact_body
+example := @Syntax.DeclarativeGrammar.FallbackParameterValidationOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FallbackDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FallbackDeclRejects
+example := @Syntax.DeclarativeGrammar.fallbackDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalContractFieldInitializerOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalContractFieldInitializerRejects
+example := @Syntax.DeclarativeGrammar.optionalContractFieldInitializerDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractFieldRejects
+example := @Syntax.DeclarativeGrammar.contractFieldDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreTokenPresentAt
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreRejects
+example := @Syntax.DeclarativeGrammar.contractMemberCoreDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractDeriveAttaches
+example := @Syntax.DeclarativeGrammar.ContractMemberOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberRejects
+example := @Syntax.DeclarativeGrammar.contractMemberDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberOrdinaryParses.value_unique_of_core
+example := @Syntax.DeclarativeGrammar.ContractMemberOrdinaryParses.result_unique_of_core
+example := @Syntax.DeclarativeGrammar.ContractMemberRejects.output_unique_of_core
+example := @Syntax.DeclarativeGrammar.contractMemberExactOutcomeSpecOfCore
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryBoundaryStartsAt
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryStops
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryScanParses
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryRejects
+example := @Syntax.DeclarativeGrammar.contractMemberRecoveryDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryScanParses.value_unique
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryScanParses.result_unique
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryParses.value_unique
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryParses.result_unique
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryRejects.output_unique
+example := @Syntax.DeclarativeGrammar.contractMemberRecoveryExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberRejectsWithPreservedWindow
+example := @Syntax.DeclarativeGrammar.ContractMemberTailOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ContractMemberTailRejects
+example := @Syntax.DeclarativeGrammar.contractMemberTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ContractBodyRejects
+example := @Syntax.DeclarativeGrammar.contractBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractDeclRejects
+example := @Syntax.DeclarativeGrammar.contractDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PlainTopItemTokenPresentAt
+example := @Syntax.DeclarativeGrammar.PlainTopItemBranch
+example := @Syntax.DeclarativeGrammar.PlainTopItemBranchSelected
+example := @Syntax.DeclarativeGrammar.PlainTopItemOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PlainTopItemRejects
+example := @Syntax.DeclarativeGrammar.plainTopItemDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TopItemDeriveAttaches
+example := @Syntax.DeclarativeGrammar.TopItemOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TopItemRejects
+example := @Syntax.DeclarativeGrammar.topItemDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TopItemRecoveryStops
+example := @Syntax.DeclarativeGrammar.TopItemRecoveryScanParses
+example := @Syntax.DeclarativeGrammar.TopItemRecoveryParses
+example := @Syntax.DeclarativeGrammar.TopItemRecoveryRejects
+example := @Syntax.DeclarativeGrammar.topItemRecoveryDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TopItemRejectsWithPreservedWindow
+example := @Syntax.DeclarativeGrammar.FileItemsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FileItemsRejects
+example := @Syntax.DeclarativeGrammar.fileItemsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SourceFileOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SourceFileRejects
+example := @Syntax.DeclarativeGrammar.sourceFileDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasParametersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasParametersRejects
+example := @Syntax.DeclarativeGrammar.typeAliasParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.typeAliasParametersExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersRejects
+example := @Syntax.DeclarativeGrammar.optionalTypeAliasParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersRejects.output_unique
+example := @Syntax.DeclarativeGrammar.optionalTypeAliasParametersExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueBoundaryStops
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryStops
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryScanParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryRejects
+example := @Syntax.DeclarativeGrammar.typeAliasValueRecoveryDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryScanParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryScanParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryRejects.output_unique
+example := @Syntax.DeclarativeGrammar.typeAliasValueRecoveryExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueCoreRejectsWithPreservedWindow
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRejects
+example := @Syntax.DeclarativeGrammar.typeAliasValueDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses.value_unique_of_typeExpr
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses.result_unique_of_typeExpr
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRejects.output_unique
+example := @Syntax.DeclarativeGrammar.typeAliasValueExactOutcomeSpecOfTypeExpr
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.typeAliasValueExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclRejects
+example := @Syntax.DeclarativeGrammar.typeAliasDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses.value_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclRejects.output_unique
+example := @Syntax.DeclarativeGrammar.typeAliasDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveReservedComponentAbsentAt
+example := @Syntax.DeclarativeGrammar.DeriveComponentRejects
+example := @Syntax.DeclarativeGrammar.deriveComponentDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExactDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.identifierExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.deriveComponentExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.deriveTargetTailExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.deriveTargetExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveTargetTailRejects
+example := @Syntax.DeclarativeGrammar.deriveTargetTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveTargetRejects
+example := @Syntax.DeclarativeGrammar.deriveTargetDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveAttributeValidRejects
+example := @Syntax.DeclarativeGrammar.deriveAttributeValidDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRecoveryDeclarationStartsAt
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRecoveryStops
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRecoveryTailParses
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRecoveredParses
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRecoveredRejects
+example := @Syntax.DeclarativeGrammar.deriveAttributeRecoveredDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DeriveAttributeOrdinaryParses
+example := @Syntax.DeclarativeGrammar.DeriveAttributeRejects
+example := @Syntax.DeclarativeGrammar.deriveAttributeDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalEnumConstructorFieldsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalEnumConstructorFieldsRejects
+example := @Syntax.DeclarativeGrammar.optionalEnumConstructorFieldsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumConstructorOrdinaryParses
+example := @Syntax.DeclarativeGrammar.EnumConstructorRejects
+example := @Syntax.DeclarativeGrammar.enumConstructorDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.EnumBodyRejects
+example := @Syntax.DeclarativeGrammar.enumBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.EnumDeclRejects
+example := @Syntax.DeclarativeGrammar.enumDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.enumConstructorFieldListExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.optionalEnumConstructorFieldsExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.enumConstructorExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.enumBodyExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.enumDeclExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitMethodOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TraitMethodRejects
+example := @Syntax.DeclarativeGrammar.traitMethodDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitMethodTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.TraitMethodTailRejects
+example := @Syntax.DeclarativeGrammar.traitMethodTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.TraitBodyRejects
+example := @Syntax.DeclarativeGrammar.traitBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TraitDeclRejects
+example := @Syntax.DeclarativeGrammar.traitDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectorNameOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectorNameRejects
+example := @Syntax.DeclarativeGrammar.selectorNameDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ModulePathOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ModulePathRejects
+example := @Syntax.DeclarativeGrammar.modulePathDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedAliasOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedAliasRejects
+example := @Syntax.DeclarativeGrammar.selectedAliasDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedImportRejects
+example := @Syntax.DeclarativeGrammar.selectedImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedImportsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedImportsRejects
+example := @Syntax.DeclarativeGrammar.selectedImportsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.HidingClauseOrdinaryParses
+example := @Syntax.DeclarativeGrammar.HidingClauseRejects
+example := @Syntax.DeclarativeGrammar.OptionalHidingOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalHidingRejects
+example := @Syntax.DeclarativeGrammar.hidingClauseDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.optionalHidingDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImportTerminatorOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImportTerminatorRejects
+example := @Syntax.DeclarativeGrammar.importTerminatorDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PlainImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PlainImportRejects
+example := @Syntax.DeclarativeGrammar.plainImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NamespaceImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.NamespaceImportRejects
+example := @Syntax.DeclarativeGrammar.namespaceImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.WildcardImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.WildcardImportRejects
+example := @Syntax.DeclarativeGrammar.wildcardImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectiveImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectiveImportRejects
+example := @Syntax.DeclarativeGrammar.selectiveImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImportDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImportDeclRejects
+example := @Syntax.DeclarativeGrammar.importDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ConstructorSelectionOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ConstructorSelectionRejects
+example := @Syntax.DeclarativeGrammar.constructorSelectionDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExportNameOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ExportNameRejects
+example := @Syntax.DeclarativeGrammar.exportNameDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExportSelectionOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ExportSelectionRejects
+example := @Syntax.DeclarativeGrammar.exportSelectionDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.LocalExportItemQualifiedStartAt
+example := @Syntax.DeclarativeGrammar.LocalExportItemOrdinaryParses
+example := @Syntax.DeclarativeGrammar.LocalExportItemRejects
+example := @Syntax.DeclarativeGrammar.localExportItemDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.LocalExportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.LocalExportRejects
+example := @Syntax.DeclarativeGrammar.localExportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PathExportTokenPresentAt
+example := @Syntax.DeclarativeGrammar.PathExportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PathExportRejects
+example := @Syntax.DeclarativeGrammar.pathExportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExportDeclLeftBracePresentAt
+example := @Syntax.DeclarativeGrammar.ExportDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ExportDeclRejects
+example := @Syntax.DeclarativeGrammar.exportDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExportPathOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ExportPathRejects
+example := @Syntax.DeclarativeGrammar.exportPathDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FinishExportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FinishExportRejects
+example := @Syntax.DeclarativeGrammar.finishExportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaItemsTokenPresentAt
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailRejects
+example := @Syntax.DeclarativeGrammar.pragmaItemsTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaItemsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaItemsRejects
+example := @Syntax.DeclarativeGrammar.pragmaItemsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaDeclRejects
+example := @Syntax.DeclarativeGrammar.pragmaDeclDeterministicOutcomeSpec
+example := @Syntax.Parser.predicate_reject_sound
+example := @Syntax.Parser.predicate_ordinaryOutcome_sound
+example := @Syntax.Parser.predicate_exactOutcomeSpec
+example := @Syntax.Parser.predicate_success_result_unique
+example := @Syntax.Parser.predicate_reject_output_unique
+example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
+example := @Syntax.Parser.PredicateInternals.groupedPredicates_ordinaryOutcome_sound
+example := @Syntax.Parser.PredicateInternals.groupedPredicates_exactOutcomeSpec
+example := @Syntax.Parser.PredicateInternals.barePredicates_reject_sound
+example := @Syntax.Parser.PredicateInternals.barePredicates_ordinaryOutcome_sound
+example := @Syntax.Parser.PredicateInternals.barePredicates_exactOutcomeSpec
+example := @Syntax.Parser.PredicateInternals.predicateSequence_reject_sound
+example := @Syntax.Parser.PredicateInternals.predicateSequence_ordinaryOutcome_sound
+example := @Syntax.Parser.PredicateInternals.predicateSequence_exactOutcomeSpec
+example := @Syntax.Parser.whereClause_reject_sound
+example := @Syntax.Parser.whereClause_ordinaryOutcome_sound
+example := @Syntax.Parser.whereClause_exactOutcomeSpec
+example := @Syntax.Parser.whereClause_success_result_unique
+example := @Syntax.Parser.whereClause_reject_output_unique
+example := @Syntax.Parser.returnClause_reject_sound
+example := @Syntax.Parser.returnClause_ordinaryOutcome_sound
+example := @Syntax.Parser.returnClause_exactOutcomeSpec
+example := @Syntax.Parser.returnClause_success_result_unique
+example := @Syntax.Parser.returnClause_reject_output_unique
+example := @Syntax.Parser.genericParameters_reject_sound
+example := @Syntax.Parser.genericParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.genericParameters_exactOutcomeSpec
+example := @Syntax.Parser.optionalGenericParameters_exactOutcomeSpec
+example := @Syntax.Parser.optionalGenericParameters_reject_sound
+example := @Syntax.Parser.optionalGenericParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_success_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_ordinaryOutcomeSpec
+example := @Syntax.Parser.namedParameter_exactOutcomeSpec
+example := @Syntax.Parser.namedParameter_success_result_unique
+example := @Syntax.Parser.namedParameter_reject_output_unique
+example := @Syntax.Parser.functionParameters_success_ordinaryOutcome_sound
+example := @Syntax.Parser.functionParameters_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.functionParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.functionParameters_ordinaryOutcomeSpec
+example := @Syntax.Parser.functionParameters_exactOutcomeSpec
+example := @Syntax.Parser.functionParameters_success_result_unique
+example := @Syntax.Parser.functionParameters_reject_output_unique
+example := @Syntax.Parser.functionSignature_success_ordinaryOutcome_sound
+example := @Syntax.Parser.functionSignature_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.functionSignature_ordinaryOutcome_sound
+example := @Syntax.Parser.functionSignature_ordinaryOutcomeSpec
+example := @Syntax.Parser.functionSignature_exactOutcomeSpec
+example := @Syntax.Parser.functionSignature_success_result_unique
+example := @Syntax.Parser.functionSignature_reject_output_unique
+example := @Syntax.Parser.functionDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.functionDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.functionDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.functionDecl_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionDeclExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.functionDeclExactOutcomeSpecOfStatementFuel
+example := @Syntax.Parser.functionDecl_exactOutcomeSpec_of_body
+example := @Syntax.Parser.functionDecl_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.ImplInternals.implMethod_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implMethod_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.implMethodExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.implMethodExactOutcomeSpecOfStatementFuel
+example := @Syntax.Parser.ImplInternals.implMethod_exactOutcomeSpec_of_body
+example := @Syntax.Parser.ImplInternals.implMethod_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_exactOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_success_result_unique
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_reject_output_unique
+example := @Syntax.Parser.ImplInternals.implHeadArguments_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implHeadArguments_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implHeadArguments_exactOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implHeadArguments_success_result_unique
+example := @Syntax.Parser.ImplInternals.implHeadArguments_reject_output_unique
+example := @Syntax.Parser.ImplInternals.implBody_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implBody_exactOutcomeSpec_of_method
+example := @Syntax.Parser.ImplInternals.implBody_exactOutcomeSpec_of_body
+example := @Syntax.Parser.ImplInternals.implBody_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.ImplInternals.implBody_success_result_unique_of_method
+example := @Syntax.Parser.ImplInternals.implBody_reject_output_unique_of_method
+example := @Syntax.Parser.ImplInternals.implBody_success_result_unique_of_body
+example := @Syntax.Parser.ImplInternals.implBody_reject_output_unique_of_body
+example := @Syntax.Parser.ImplInternals.implBody_success_result_unique_of_statementFuel
+example := @Syntax.Parser.ImplInternals.implBody_reject_output_unique_of_statementFuel
+example := @Syntax.Parser.implDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.implDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.implDecl_exactOutcomeSpec_of_implBody
+example := @Syntax.Parser.implDecl_exactOutcomeSpec_of_body
+example := @Syntax.Parser.implDecl_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.implDecl_success_result_unique_of_implBody
+example := @Syntax.Parser.implDecl_reject_output_unique_of_implBody
+example := @Syntax.Parser.implDecl_success_result_unique_of_body
+example := @Syntax.Parser.implDecl_reject_output_unique_of_body
+example := @Syntax.Parser.implDecl_success_result_unique_of_statementFuel
+example := @Syntax.Parser.implDecl_reject_output_unique_of_statementFuel
+example := @Syntax.Parser.ContractEntryInternals.entryParameters_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.entryParameters_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.implicitPublicModifiers_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.implicitPublicModifiers_ne_reject
+example := @Syntax.Parser.constructorDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.constructorDecl_exactOutcomeSpec_of_children
+example := @Syntax.Parser.constructorDecl_exactOutcomeSpec_of_body
+example := @Syntax.Parser.constructorDecl_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.constructorDecl_success_result_unique_of_body
+example := @Syntax.Parser.constructorDecl_reject_output_unique_of_body
+example := @Syntax.Parser.constructorDecl_success_result_unique_of_children
+example := @Syntax.Parser.constructorDecl_reject_output_unique_of_children
+example := @Syntax.Parser.fallbackDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.fallbackDeclExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.fallbackDeclExactOutcomeSpecOfStatementFuel
+example := @Syntax.Parser.fallbackDecl_exactOutcomeSpec_of_body
+example := @Syntax.Parser.fallbackDecl_exactOutcomeSpec_of_statementFuel
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.optionalContractFieldInitializerExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.contractFieldExactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_success_result_unique
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractField_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractField_success_result_unique
+example := @Syntax.Parser.ContractInternals.contractField_reject_output_unique
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfChildren
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfLeaves
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfTermFuel
+example := @Syntax.DeclarativeGrammar.contractMemberTailExactOutcomeSpecOfMember
+example := @Syntax.DeclarativeGrammar.contractBodyExactOutcomeSpecOfMember
+example := @Syntax.DeclarativeGrammar.contractBodyExactOutcomeSpecOfCore
+example := @Syntax.DeclarativeGrammar.contractDeclExactOutcomeSpecOfBody
+example := @Syntax.DeclarativeGrammar.contractDeclExactOutcomeSpecOfCore
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfCoreTerms
+example := @Syntax.DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfCoreTermFuel
+example := @Syntax.DeclarativeGrammar.contractMemberExactOutcomeSpecOfCoreTermFuel
+example := @Syntax.DeclarativeGrammar.contractBodyExactOutcomeSpecOfCoreTermFuel
+example := @Syntax.DeclarativeGrammar.contractDeclExactOutcomeSpecOfCoreTermFuel
+example := @Syntax.Parser.ContractInternals.contractMemberCore_exactOutcomeSpec_of_leaves
+example := @Syntax.Parser.ContractInternals.contractMemberCore_exactOutcomeSpec_of_termFuel
+example := @Syntax.Parser.ContractInternals.contractMemberCore_exactOutcomeSpec_of_coreTermFuel
+example := @Syntax.Parser.ContractInternals.contractMemberCore_success_result_unique
+example := @Syntax.Parser.ContractInternals.contractMemberCore_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_exactOutcomeSpec_of_coreTermFuel
+example := @Syntax.Parser.ContractInternals.contractBody_exactOutcomeSpec_of_member
+example := @Syntax.Parser.ContractInternals.contractBody_exactOutcomeSpec_of_core
+example := @Syntax.Parser.ContractInternals.contractBody_exactOutcomeSpec_of_coreTermFuel
+example := @Syntax.Parser.ContractInternals.contractBody_success_result_unique_of_member
+example := @Syntax.Parser.ContractInternals.contractBody_reject_output_unique_of_member
+example := @Syntax.Parser.contractDecl_exactOutcomeSpec_of_body
+example := @Syntax.Parser.contractDecl_exactOutcomeSpec_of_core
+example := @Syntax.Parser.contractDecl_exactOutcomeSpec_of_coreTermFuel
+example := @Syntax.Parser.contractDecl_success_result_unique_of_body
+example := @Syntax.Parser.contractDecl_reject_output_unique_of_body
+example := @Syntax.Parser.ContractInternals.contractMemberCore_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.attachContractDerive_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.attachContractDerive_total_success
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_exactOutcomeSpec_of_core
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_success_result_unique_of_core
+example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_output_unique_of_core
+example := @Syntax.Parser.ContractInternals.recoveryBoundaryStartsAt_of_atContractRecoveryBoundary_eq_true
+example := @Syntax.Parser.ContractInternals.atContractRecoveryBoundary_eq_true_of_recoveryBoundaryStartsAt
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryStops_of_guard_eq_true
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryStops_of_advance?_eq_none
+example := @Syntax.Parser.ContractInternals.no_contractMemberRecoveryStops_of_nonBoundary_token
+example := @Syntax.Parser.ContractInternals.recoverContractMemberAux_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.recoverContractMember_exactOutcomeSpec
+example := @Syntax.Parser.ContractInternals.recoverContractMember_success_result_unique
+example := @Syntax.Parser.ContractInternals.recoverContractMember_reject_output_unique
+example := @Syntax.Parser.ContractInternals.contractMemberRejectsWithPreservedWindow_of_result
+example := @Syntax.Parser.ContractInternals.rewoundContractMember_declarativeRemainder_eq
+example := @Syntax.Parser.ContractInternals.cursor_lt_endIndex_of_atEnd_eq_false
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryBoundaryStartsAt_of_guard_eq_true
+example := @Syntax.Parser.ContractInternals.no_contractMemberRecoveryBoundaryStartsAt_of_guard_eq_false
+example := @Syntax.Parser.ContractInternals.closeContractBody_success_exact
+example := @Syntax.Parser.ContractInternals.closeContractBody_success_of_rightBrace_guard
+example := @Syntax.Parser.ContractInternals.contractMembers_success_ordinaryOutcome_sound_strong
+example := @Syntax.Parser.ContractInternals.contractMembers_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.contractDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.FileInternals.plainTopItem_success_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.plainTopItem_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.plainTopItem_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.plainTopItem_ordinaryOutcomeSpec
+example := @Syntax.Parser.FileInternals.attachDeriveAttribute_success_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.attachDeriveAttribute_total_success
+example := @Syntax.Parser.FileInternals.topItem_success_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.topItem_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.topItem_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.topItem_ordinaryOutcomeSpec
+example := @Syntax.Parser.FileInternals.recoverTopItem_success_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.recoverTopItem_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.recoverTopItem_ordinaryOutcomeSpec
+example := @Syntax.Parser.FileInternals.parseItems_success_ordinaryOutcome_sound_strong
+example := @Syntax.Parser.FileInternals.parseItems_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.parseItems_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.parseItems_ordinaryOutcomeSpec
+example := @Syntax.Parser.FileInternals.sourceFile_success_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.sourceFile_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.sourceFile_ordinaryOutcome_sound
+example := @Syntax.Parser.FileInternals.sourceFile_ordinaryOutcomeSpec
+example := @Syntax.Parser.parseTypeAliasParameters_success_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcomeSpec
+example := @Syntax.Parser.parseTypeAliasParameters_exactOutcomeSpec
+example := @Syntax.Parser.parseTypeAliasParameters_success_result_unique
+example := @Syntax.Parser.parseTypeAliasParameters_reject_output_unique
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValueAux_success_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_success_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_reject_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_ordinaryOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_exactOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_success_result_unique
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_reject_output_unique
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_success_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_ordinaryOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_exactOutcomeSpec_of_typeExpr
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_success_result_unique_of_typeExpr
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_reject_output_unique
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_exactOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_success_result_unique
+example := @Syntax.Parser.typeAlias_success_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_ordinaryOutcomeSpec
+example := @Syntax.Parser.typeAlias_exactOutcomeSpec
+example := @Syntax.Parser.typeAlias_success_result_unique
+example := @Syntax.Parser.typeAlias_reject_output_unique
+example := @Syntax.Parser.deriveTarget_success_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveTarget_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveTarget_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveTarget_ordinaryOutcomeSpec
+example := @Syntax.Parser.deriveTarget_exactOutcomeSpec
+example := @Syntax.Parser.deriveTarget_success_result_unique
+example := @Syntax.Parser.deriveTarget_reject_output_unique
+example := @Syntax.Parser.deriveAttributeValid_success_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeValid_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeValid_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeValid_ordinaryOutcomeSpec
+example := @Syntax.Parser.deriveAttributeValid_exactOutcomeSpec
+example := @Syntax.Parser.deriveAttributeValid_success_result_unique
+example := @Syntax.Parser.deriveAttributeValid_reject_output_unique
+example := @Syntax.Parser.deriveAttributeRecovered_success_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeRecovered_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeRecovered_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttributeRecovered_ordinaryOutcomeSpec
+example := @Syntax.Parser.deriveAttributeRecovered_exactOutcomeSpec
+example := @Syntax.Parser.deriveAttributeRecovered_success_result_unique
+example := @Syntax.Parser.deriveAttributeRecovered_reject_output_unique
+example := @Syntax.Parser.deriveAttribute_success_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttribute_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttribute_ordinaryOutcome_sound
+example := @Syntax.Parser.deriveAttribute_ordinaryOutcomeSpec
+example := @Syntax.Parser.deriveAttribute_exactOutcomeSpec
+example := @Syntax.Parser.deriveAttribute_success_result_unique
+example := @Syntax.Parser.deriveAttribute_reject_output_unique
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructor_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumConstructor_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.enumDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.enumDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_exactOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_success_result_unique
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_reject_output_unique
+example := @Syntax.Parser.EnumInternals.enumConstructor_exactOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructor_success_result_unique
+example := @Syntax.Parser.EnumInternals.enumConstructor_reject_output_unique
+example := @Syntax.Parser.EnumInternals.enumBody_exactOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumBody_success_result_unique
+example := @Syntax.Parser.EnumInternals.enumBody_reject_output_unique
+example := @Syntax.Parser.enumDecl_exactOutcomeSpec
+example := @Syntax.Parser.enumDecl_success_result_unique
+example := @Syntax.Parser.enumDecl_reject_output_unique
+example := @Syntax.Parser.TraitInternals.traitMethod_ordinaryOutcome_sound
+example := @Syntax.Parser.TraitInternals.traitMethod_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.traitMethodExactOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitMethod_exactOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitMethod_success_result_unique
+example := @Syntax.Parser.TraitInternals.traitMethod_reject_output_unique
+example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcome_sound
+example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitMethodTailOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TraitMethodTailRejects.output_unique
+example := @Syntax.DeclarativeGrammar.traitMethodTailExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitBodyOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TraitBodyRejects.output_unique
+example := @Syntax.DeclarativeGrammar.traitBodyExactOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitBody_exactOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitBody_success_result_unique
+example := @Syntax.Parser.TraitInternals.traitBody_reject_output_unique
+example := @Syntax.Parser.traitDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.traitDecl_ordinaryOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitDeclOrdinaryParses.result_unique
+example := @Syntax.DeclarativeGrammar.TraitDeclRejects.output_unique
+example := @Syntax.DeclarativeGrammar.traitDeclExactOutcomeSpec
+example := @Syntax.Parser.traitDecl_exactOutcomeSpec
+example := @Syntax.Parser.traitDecl_success_result_unique
+example := @Syntax.Parser.traitDecl_reject_output_unique
+example := @Syntax.Parser.selectorName_ordinaryOutcome_sound
+example := @Syntax.Parser.selectorName_ordinaryOutcomeSpec
+example := @Syntax.Parser.modulePath_ordinaryOutcome_sound
+example := @Syntax.Parser.modulePath_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedAlias_success_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedImport_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedImports_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedImports_ordinaryOutcomeSpec
+example := @Syntax.Parser.hidingClause_ordinaryOutcome_sound
+example := @Syntax.Parser.hidingClause_ordinaryOutcomeSpec
+example := @Syntax.Parser.optionalHiding_ordinaryOutcome_sound
+example := @Syntax.Parser.optionalHiding_ordinaryOutcomeSpec
+example := @Syntax.Parser.importTerminator_success_ordinaryOutcome_sound
+example := @Syntax.Parser.importTerminator_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.importTerminator_ordinaryOutcome_sound
+example := @Syntax.Parser.importTerminator_ordinaryOutcomeSpec
+example := @Syntax.Parser.plainImport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.plainImport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.plainImport_ordinaryOutcome_sound
+example := @Syntax.Parser.plainImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.namespaceImport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.namespaceImport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.namespaceImport_ordinaryOutcome_sound
+example := @Syntax.Parser.namespaceImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.wildcardImport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.wildcardImport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.wildcardImport_ordinaryOutcome_sound
+example := @Syntax.Parser.wildcardImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectiveImport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.selectiveImport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.selectiveImport_ordinaryOutcome_sound
+example := @Syntax.Parser.selectiveImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.importDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.constructorSelection_success_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorSelection_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorSelection_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorSelection_ordinaryOutcomeSpec
+example := @Syntax.Parser.exportName_success_ordinaryOutcome_sound
+example := @Syntax.Parser.exportName_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.exportName_ordinaryOutcome_sound
+example := @Syntax.Parser.exportName_ordinaryOutcomeSpec
+example := @Syntax.Parser.exportSelection_success_ordinaryOutcome_sound
+example := @Syntax.Parser.exportSelection_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.exportSelection_ordinaryOutcome_sound
+example := @Syntax.Parser.exportSelection_ordinaryOutcomeSpec
+example := @Syntax.Parser.localExportItem_success_ordinaryOutcome_sound
+example := @Syntax.Parser.localExportItem_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.localExportItem_ordinaryOutcome_sound
+example := @Syntax.Parser.localExportItem_ordinaryOutcomeSpec
+example := @Syntax.Parser.localExport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.localExport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.localExport_ordinaryOutcome_sound
+example := @Syntax.Parser.localExport_ordinaryOutcomeSpec
+example := @Syntax.Parser.pathExport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.pathExport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.pathExport_ordinaryOutcome_sound
+example := @Syntax.Parser.pathExport_ordinaryOutcomeSpec
+example := @Syntax.Parser.exportDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.exportDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.exportDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.exportDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.exportPath_success_ordinaryOutcome_sound
+example := @Syntax.Parser.exportPath_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.exportPath_ordinaryOutcome_sound
+example := @Syntax.Parser.exportPath_ordinaryOutcomeSpec
+example := @Syntax.Parser.finishExport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_ordinaryOutcomeSpec
+example := @Syntax.Parser.rawIdentifier_ordinaryOutcome_sound
+example := @Syntax.Parser.rawIdentifier_ordinaryOutcomeSpec
+example := @Syntax.Parser.PragmaInternals.pragmaItems_ordinaryOutcome_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItems_ordinaryOutcomeSpec
+example := @Syntax.Parser.pragmaDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_ordinaryOutcomeSpec
+
+example {input output : Syntax.Parser.State} {field : ContractField}
+    (result : Syntax.Parser.ContractInternals.contractField
+      Syntax.Parser.expression input = .ok field output) :
+    Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
+      Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+        input.declarativeRemainder field output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcome_sound
+    Syntax.Parser.expression
+    Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+    Syntax.Parser.expression_ordinaryOutcome_sound.1 result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractField
+      Syntax.Parser.expression input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractFieldRejects
+      Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+      Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
+        input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
+    Syntax.Parser.expression
+    Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+    Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
+    Syntax.Parser.expression_ordinaryOutcome_sound.1
+    Syntax.Parser.expression_ordinaryOutcome_sound.2 result
+
+example {input output : Syntax.Parser.State} {member : ContractMember}
+    (result : Syntax.Parser.ContractInternals.contractMemberCore input =
+      .ok member output) :
+    Syntax.DeclarativeGrammar.ContractMemberCoreOrdinaryParses
+      input.declarativeRemainder member output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberCore_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractMemberCore input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractMemberCoreRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound
+    result
+
+example {derive : DeriveAttribute}
+    {coreMember attached : ContractMember}
+    {input output : Syntax.Parser.State}
+    (result : Syntax.Parser.ContractInternals.attachContractDerive derive
+      coreMember input = .ok attached output) :
+    Syntax.DeclarativeGrammar.ContractDeriveAttaches derive coreMember
+      attached ∧
+      output.declarativeRemainder = input.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.attachContractDerive_success_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State} {member : ContractMember}
+    (result : Syntax.Parser.ContractInternals.contractMemberWithAttribute input =
+      .ok member output) :
+    Syntax.DeclarativeGrammar.ContractMemberOrdinaryParses
+      input.declarativeRemainder member output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberWithAttribute_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractMemberWithAttribute input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractMemberRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State} {member : ContractMember}
+    (result : Syntax.Parser.ContractInternals.recoverContractMember input =
+      .ok member output) :
+    Syntax.DeclarativeGrammar.ContractMemberRecoveryParses
+      input.declarativeRemainder member output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.recoverContractMember_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.recoverContractMember input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractMemberRecoveryRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.recoverContractMember_reject_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State}
+    {body : Syntax.Parser.ContractInternals.ContractBody}
+    (result : Syntax.Parser.ContractInternals.contractBody input =
+      .ok body output) :
+    Syntax.DeclarativeGrammar.ContractBodyOrdinaryParses
+      input.declarativeRemainder body.span body.members
+        output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractBody_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractBody input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractBodyRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State} {declaration : ContractDecl}
+    (result : Syntax.Parser.contractDecl input = .ok declaration output) :
+    Syntax.DeclarativeGrammar.ContractDeclOrdinaryParses
+      input.declarativeRemainder declaration output.declarativeRemainder :=
+  Syntax.Parser.contractDecl_success_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.contractDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.contractDecl_reject_ordinaryOutcome_sound result
+
+example {input output : Syntax.Parser.State} {declaration : TypeAliasDecl}
+    (result : Syntax.Parser.typeAlias input = .ok declaration output) :
+    Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses
+      input.declarativeRemainder declaration output.declarativeRemainder :=
+  Syntax.Parser.typeAlias_success_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.typeAlias input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.TypeAliasDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.enumDecl none input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.EnumDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.enumDecl_reject_ordinaryOutcome_sound none result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.traitDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.TraitDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.traitDecl_reject_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.implDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ImplDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.implDecl_reject_ordinaryOutcome_sound result
+
+example := @Syntax.DeclarativeGrammar.yulExpressionExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.yulExpressionPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulExpressionExactOutcomeSpec
+example := @Syntax.Parser.YulExpressionInternals.withFuel_exactOutcomeSpec
+example := @Syntax.Parser.YulExpressionInternals.withFuel_success_result_unique
+example := @Syntax.Parser.YulExpressionInternals.withFuel_reject_output_unique
+example := @Syntax.Parser.yulExpression_publicExactOutcomeSpec
+example := @Syntax.Parser.yulExpression_exactOutcomeSpec
+example := @Syntax.Parser.yulExpression_success_result_unique
+example := @Syntax.Parser.yulExpression_reject_output_unique
+
+example := @Syntax.DeclarativeGrammar.yulStatementExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.yulStatementPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulStatementExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulBodyExactOutcomeSpec
+example := @Syntax.Parser.yulStatementWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.yulStatementWithFuel_success_result_unique
+example := @Syntax.Parser.yulStatementWithFuel_reject_output_unique
+example := @Syntax.Parser.yulStatement_publicExactOutcomeSpec
+example := @Syntax.Parser.yulStatement_exactOutcomeSpec
+example := @Syntax.Parser.yulStatement_success_result_unique
+example := @Syntax.Parser.yulStatement_reject_output_unique
+example := @Syntax.Parser.yulBody_exactOutcomeSpec
+example := @Syntax.Parser.yulBody_success_result_unique
+example := @Syntax.Parser.yulBody_reject_output_unique
+
+example := @Syntax.Parser.ParserTraceSuccessSound
+example := @Syntax.Parser.ParserTraceSuccessComplete
+example := @Syntax.Parser.ParserSuccessContext
+example := @Syntax.Parser.ParserTraceRejectSound
+example := @Syntax.Parser.ParserTraceRejectComplete
+example := @Syntax.DeclarativeGrammar.TraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExpressionTraceExactOutcomeSpec.toTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraceExactOutcomeSpec.toExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.progress
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.closing_ne_comma
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceRejects
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceRejects
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.noTrailingDelimitedListTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceRejects.cascadeFilters
+example := @Syntax.Parser.closeDelimited_success_trace_sound
+example := @Syntax.Parser.closeDelimited_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_success_trace_sound
+example := @Syntax.Parser.delimitedNoTrailing_success_trace_sound
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_trace_success_complete
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_success_complete
+example := @Syntax.Parser.delimitedNoTrailing_trace_success_complete
+example := @Syntax.Parser.delimitedNoTrailing_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_success_context
+example := @Syntax.Parser.delimitedNoTrailing_success_context
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_reject_trace_sound
+example := @Syntax.Parser.delimitedNoTrailing_reject_trace_sound
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_trace_reject_complete
+example := @Syntax.Parser.delimitedNoTrailing_trace_reject_complete
+example := @Syntax.Parser.delimitedNoTrailing_trace_reject_iff
+example := @Syntax.Parser.delimitedNoTrailing_trace_reject_failure_iff
+
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_trace_reject_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_trace_reject_failure_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reject_complete
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reject_iff
+example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.arrayLiteralTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_success_iff_raw
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_reject_iff_raw
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_sound
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.present_token
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceRejects
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects.ordinary_of_dot_present
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.OptionalDotConstructorArgumentsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.DotConstructorTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.optionalDotConstructorArgumentsTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.dotConstructorTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_eq_none_of_absent
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_eq_of_present
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_reject_iff_list
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_success_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects.ordinary_of_comma_present
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects.ordinary_of_opening_present
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses
+example := @Syntax.DeclarativeGrammar.parenthesizedTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.comma_present
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.comma_conflicts_absent
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.output_cursor_le_endIndex
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ParenthesizedTupleTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ParenthesizedExpressionTraceParses.cascadeFilters
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_success_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_reject_iff_symbol
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_reject_state_eq
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_reject_reports_iff
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_eq_of_symbol
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_success_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTailTrace_comma_present
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_success_complete
+
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.marker_present
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.proxyExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_success_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_iff
+
+example := @Syntax.DeclarativeGrammar.namedTypeTraceValue
+example := @Syntax.DeclarativeGrammar.UnqualifiedMappingSpelling
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace
+example := @Syntax.DeclarativeGrammar.namedTypeFinishingTrace_exists
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace.cascadeFilters
+example := @Syntax.Parser.makeNamedType_eq_traceValue
+example := @Syntax.Parser.finishNamedType_eq_ok_of_trace
+example := @Syntax.Parser.finishNamedType_success_trace_sound
+example := @Syntax.Parser.finishNamedType_success_context
+example := @Syntax.Parser.finishNamedType_trace_success_iff
+example := @Syntax.Parser.finishNamedType_ne_reject
+
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.optionalLambdaReturnTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.present_cursor_lt
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_eq_none_of_absent
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_eq_of_present
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_reject_iff_type
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.dottedIdentifierTailTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.qualifiedNameTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses
+example := @Syntax.DeclarativeGrammar.qualifiedNameFromSuffix
+example := @Syntax.DeclarativeGrammar.tracedQualifiedName
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses.cursor_eq
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects.output_window
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects.output_window
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.DottedIdentifierTailTraceRejects
+example := @Syntax.DeclarativeGrammar.QualifiedNameTraceRejects
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_trace_success_complete
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_production_trace_success_complete
+example := @Syntax.Parser.qualifiedName_trace_success_complete
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_success_trace_sound
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_success_context
+example := @Syntax.Parser.qualifiedName_trace_success_sound
+example := @Syntax.Parser.qualifiedName_success_context
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_trace_reject_iff
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_trace_reject_failure_iff
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_production_trace_reject_iff
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_production_trace_reject_failure_iff
+example := @Syntax.Parser.qualifiedName_trace_reject_iff
+example := @Syntax.Parser.qualifiedName_trace_reject_failure_iff
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_reject_trace_sound
+example := @Syntax.Parser.qualifiedName_reject_trace_sound
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_trace_reject_complete
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_production_trace_reject_complete
+example := @Syntax.Parser.qualifiedName_trace_reject_complete
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_trace_success_iff
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_production_trace_success_iff
+example := @Syntax.Parser.qualifiedName_trace_success_iff
+example := @Syntax.Parser.qualifiedName_success_state_eq_of_trace
+example := @Syntax.Parser.qualifiedName_eq_ok_of_trace
+example := @Syntax.Parser.QualifiedNameInternals.qualifiedNameTail_reject_context
+example := @Syntax.Parser.qualifiedName_reject_context
+example := @Syntax.Parser.qualifiedName_reject_state_eq_of_trace
+example := @Syntax.Parser.qualifiedName_eq_reject_of_trace
+
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.progress
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.progress
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses
+example := @Syntax.DeclarativeGrammar.trailingDelimitedListTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.disjoint_success
+example := @Syntax.Parser.afterDelimitedElement_trailing_trace_success_complete
+example := @Syntax.Parser.afterDelimitedElement_trailing_production_trace_success_complete
+example := @Syntax.Parser.delimited_trace_success_complete
+example := @Syntax.Parser.delimited_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_production_trace_success_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_trace_reject_complete
+example := @Syntax.Parser.delimited_trace_reject_complete
+example := @Syntax.Parser.afterDelimitedElement_trailing_production_trace_reject_complete
+example := @Syntax.Parser.afterDelimitedElement_trailing_trace_reject_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_trace_reject_failure_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_production_trace_reject_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_production_trace_reject_failure_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_success_context
+example := @Syntax.Parser.delimited_success_context
+example := @Syntax.Parser.afterDelimitedElement_trailing_success_trace_sound
+example := @Syntax.Parser.delimited_trace_success_sound
+example := @Syntax.Parser.delimited_trace_reject_iff
+example := @Syntax.Parser.delimited_trace_reject_failure_iff
+example := @Syntax.Parser.afterDelimitedElement_trailing_reject_trace_sound
+example := @Syntax.Parser.delimited_reject_trace_sound
+
+example := @Syntax.DeclarativeGrammar.namedTypeArgumentsTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.nonempty_elements
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.present_token
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.some_progress
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects
+example := @Syntax.Parser.parseNamedTypeArguments_reject_iff_list
+example := @Syntax.Parser.parseNamedTypeArguments_reject_trace_sound
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_complete
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_iff
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.opening_present
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.disjoint_success
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_sound
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_complete
+example := @Syntax.Parser.parseNamedTypeArguments_success_context
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_iff
+example := @Syntax.Parser.requireNonempty_success_iff_toList
+example := @Syntax.Parser.requireNonempty_eq_ok_of_toList
+example := @Syntax.Parser.requireNonempty_ne_invariant_of_trace
+example := @Syntax.Parser.parseNamedTypeArguments_eq_none_of_absent
+example := @Syntax.Parser.parseNamedTypeArguments_eq_of_present
+
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.progress
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.namedTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.disjoint_success
+example := @Syntax.Parser.parseNamedType_success_iff_components
+example := @Syntax.Parser.parseNamedType_trace_success_sound
+example := @Syntax.Parser.parseNamedType_trace_success_complete
+example := @Syntax.Parser.parseNamedType_success_context
+example := @Syntax.Parser.parseNamedType_trace_success_iff
+example := @Syntax.Parser.parseNamedType_reject_iff_components
+example := @Syntax.Parser.parseNamedType_reject_trace_sound
+example := @Syntax.Parser.parseNamedType_trace_reject_complete
+example := @Syntax.Parser.parseNamedType_trace_reject_iff
+example := @Syntax.Parser.parseNamedType_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.mappingTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.ordinary_of_prefix
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.mappingTypeTraceValue
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses
+example := @Syntax.Parser.parseMappingType_success_iff_components
+example := @Syntax.Parser.parseMappingType_trace_success_sound
+example := @Syntax.Parser.parseMappingType_trace_success_complete
+example := @Syntax.Parser.parseMappingType_success_context
+example := @Syntax.Parser.parseMappingType_trace_success_iff
+example := @Syntax.Parser.parseMappingType_trace_reject_iff
+example := @Syntax.Parser.parseMappingType_trace_reject_failure_iff
+example := @Syntax.Parser.parseMappingType_reject_trace_sound
+example := @Syntax.Parser.parseMappingType_trace_reject_complete
+
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.marker_present
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.proxyTypeTraceExactOutcomeSpec
+example := @Syntax.Parser.parseProxyType_success_iff_components
+example := @Syntax.Parser.parseProxyType_trace_success_sound
+example := @Syntax.Parser.parseProxyType_trace_success_complete
+example := @Syntax.Parser.parseProxyType_success_context
+example := @Syntax.Parser.parseProxyType_trace_success_iff
+example := @Syntax.Parser.parseProxyType_reject_iff_components
+example := @Syntax.Parser.parseProxyType_reject_trace_sound
+example := @Syntax.Parser.parseProxyType_trace_reject_complete
+example := @Syntax.Parser.parseProxyType_trace_reject_iff
+example := @Syntax.Parser.parseProxyType_trace_reject_failure_iff
+
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.ordinary_of_prefix
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.comptimeTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.comptimeTypeTraceValue
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.cascadeFilters
+example := @Syntax.Parser.parseComptimeType_reject_trace_sound
+example := @Syntax.Parser.parseComptimeType_trace_reject_complete
+example := @Syntax.Parser.parseComptimeType_trace_reject_iff
+example := @Syntax.Parser.parseComptimeType_trace_reject_failure_iff
+example := @Syntax.Parser.parseComptimeType_success_iff_components
+example := @Syntax.Parser.parseComptimeType_trace_success_sound
+example := @Syntax.Parser.parseComptimeType_trace_success_complete
+example := @Syntax.Parser.parseComptimeType_success_context
+example := @Syntax.Parser.parseComptimeType_trace_success_iff
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.ordinary_of_opening_present
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.tupleTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.tupleTypeTraceValue
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.progress
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.cascadeFilters
+example := @Syntax.Parser.parseTupleType_reject_iff_list
+example := @Syntax.Parser.parseTupleType_reject_trace_sound
+example := @Syntax.Parser.parseTupleType_trace_reject_complete
+example := @Syntax.Parser.parseTupleType_trace_reject_iff
+example := @Syntax.Parser.parseTupleType_trace_reject_failure_iff
+example := @Syntax.Parser.parseTupleType_success_iff_list
+example := @Syntax.Parser.parseTupleType_trace_success_sound
+example := @Syntax.Parser.parseTupleType_trace_success_complete
+example := @Syntax.Parser.parseTupleType_success_context
+example := @Syntax.Parser.parseTupleType_trace_success_iff
+
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.marker_present
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.functionReturnsTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.present_token
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.some_progress
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.cascadeFilters
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_reject_trace_sound
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_complete
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_iff
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_failure_iff
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_eq_none_of_absent
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_eq_of_present
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_reject_iff_list
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_sound
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_complete
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_success_context
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_iff
+
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.functionTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionTypeTraceValue
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.progress
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.cascadeFilters
+example := @Syntax.Parser.parseFunctionType_reject_iff_components
+example := @Syntax.Parser.parseFunctionType_reject_trace_sound
+example := @Syntax.Parser.parseFunctionType_trace_reject_complete
+example := @Syntax.Parser.parseFunctionType_trace_reject_iff
+example := @Syntax.Parser.parseFunctionType_trace_reject_failure_iff
+example := @Syntax.Parser.parseFunctionType_success_iff_components
+example := @Syntax.Parser.parseFunctionType_trace_success_sound
+example := @Syntax.Parser.parseFunctionType_trace_success_complete
+example := @Syntax.Parser.parseFunctionType_success_context
+example := @Syntax.Parser.parseFunctionType_trace_success_iff
+example := @Syntax.Parser.typeExprWithFuel_success_context
+example := @Syntax.Parser.typeExpr_success_context
+
+example := @Syntax.DeclarativeGrammar.TypeDispatchBranch
+example := @Syntax.DeclarativeGrammar.TypeDispatchPairPresent
+example := @Syntax.DeclarativeGrammar.TypeDispatchSelects
+example := @Syntax.DeclarativeGrammar.TypeDispatchPairPresent.exact_prefix
+example := @Syntax.DeclarativeGrammar.TypeDispatchSelects.branch_unique
+example := @Syntax.DeclarativeGrammar.TypeDispatchFinalTraceRejects
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceParses
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceRejects
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.TypeDispatchFinalTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.raw_of_selected
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.raw_of_selected
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.not_final
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.final_iff
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.typeDispatchTraceExactOutcomeSpec_of_raw
+example := @Syntax.DeclarativeGrammar.typeDispatchRawTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.typeDispatchTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.cascadeFilters
+example := @Syntax.Parser.TypeDispatchTraceInternals.raw_reject_trace_sound
+example := @Syntax.Parser.TypeDispatchTraceInternals.raw_trace_reject_complete
+example := @Syntax.Parser.typeExprWithFuel_dispatch_reject_trace_sound
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_reject_complete
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_reject_iff
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_reject_failure_iff
+example := @Syntax.Parser.TypeDispatchTraceInternals.selectedBranch
+example := @Syntax.Parser.TypeDispatchTraceInternals.rawParser
+example := @Syntax.Parser.TypeDispatchTraceInternals.selectedBranch_selects
+example := @Syntax.Parser.TypeDispatchTraceInternals.selectedBranch_eq_iff
+example := @Syntax.Parser.TypeDispatchTraceInternals.typeExprWithFuel_eq_selected_raw
+example := @Syntax.Parser.typeExprWithFuel_eq_raw_of_selection
+example := @Syntax.Parser.TypeDispatchTraceInternals.raw_trace_success_sound
+example := @Syntax.Parser.TypeDispatchTraceInternals.raw_trace_success_complete
+example := @Syntax.Parser.TypeDispatchTraceInternals.raw_success_context
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_success_sound
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_success_complete
+example := @Syntax.Parser.typeExprWithFuel_dispatch_success_context
+example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_success_iff
+
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.mono
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.mono
+
+example := @Syntax.Parser.trace_success_exists_ok_of_sound
+example := @Syntax.Parser.trace_reject_exists_reject_of_sound
+example := @Syntax.Parser.trace_success_complete_of_sound
+example := @Syntax.Parser.trace_reject_complete_of_sound
+
+example := @Syntax.DeclarativeGrammar.TypeTraceQuery
+example := @Syntax.DeclarativeGrammar.TypeTraceLayer
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects
+example := @Syntax.DeclarativeGrammar.TypeTraceLayer.mono
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.induction
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.roll
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.unroll
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.strong_induction
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.unroll_iff
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.unroll_iff
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.roll
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.roll
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.cascadeFilters
+example := @Syntax.Parser.typeExprWithFuel_trace_success_sound
+example := @Syntax.Parser.typeExprWithFuel_reject_trace_sound
+example := @Syntax.Parser.typeExpr_trace_success_sound
+example := @Syntax.Parser.typeExpr_reject_trace_sound
+
+example := @Syntax.DeclarativeGrammar.TraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.TraceOutcomeAgreement.symm
+example := @Syntax.DeclarativeGrammar.TraceExactOutcomeSpec.toTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.TraceOutcomeAgreement.toTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.result_agree
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.result_agree
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.result_agree
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.result_agree
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.disjoint_success_of_agreement
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.disjoint_success_of_agreement
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.disjoint_rejection_of_agreement
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.disjoint_rejection_of_agreement
+example := @Syntax.DeclarativeGrammar.trailingDelimitedTailTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.trailingDelimitedListTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.proxyTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.comptimeTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.mappingTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.namedTypeArgumentsTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.namedTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.tupleTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.functionReturnsTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.functionTypeTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.typeDispatchTraceOutcomeAgreement_of_raw
+example := @Syntax.DeclarativeGrammar.typeDispatchRawTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.typeDispatchTraceOutcomeAgreement
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.disjoint_rejection
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.typeExprTraceExactOutcomeSpec
+example := @Syntax.Parser.typeExpr_trace_success_complete_of_ne_invariant
+example := @Syntax.Parser.typeExpr_trace_reject_complete_of_ne_invariant
+example := @Syntax.Parser.typeExpr_trace_success_iff_of_ne_invariant
+example := @Syntax.Parser.typeExpr_trace_reject_iff_of_ne_invariant
+example := @Syntax.Parser.typeExpr_trace_reject_failure_iff_of_ne_invariant
+example := @Syntax.Parser.typeExpr_trace_success_complete_onValid
+example := @Syntax.Parser.typeExpr_trace_reject_complete_onValid
+example := @Syntax.Parser.typeExpr_trace_success_iff_onValid
+example := @Syntax.Parser.typeExpr_trace_reject_iff_onValid
+example := @Syntax.Parser.typeExpr_trace_reject_failure_iff_onValid
+
+example := @Syntax.Parser.UnrestrictedFuelElementContract
+example := @Syntax.Parser.remainingCount_le_of_endIndex_eq
+example := @Syntax.Parser.remainingCount_lt_of_endIndex_eq
+example := @Syntax.Parser.acceptToken_remainingCount_lt_of_success
+example := @Syntax.Parser.symbol_remainingCount_lt_of_success
+example := @Syntax.Parser.keyword_remainingCount_lt_of_success
+example := @Syntax.Parser.contextual_remainingCount_lt_of_success
+example := @Syntax.Parser.UnrestrictedFuelElementContract.weaken
+example := @Syntax.Parser.UnrestrictedFuelElementContract.ne_invariant
+example := @Syntax.Parser.UnrestrictedFuelElementContract.remainingCount_le_of_success
+example := @Syntax.Parser.UnrestrictedFuelElementContract.remainingCount_lt_of_success
+example := @Syntax.Parser.afterDelimitedElement_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.delimitedWithPolicy_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.delimited_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.delimited_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.afterDelimitedElement_endIndex_onSuccess
+example := @Syntax.Parser.delimitedWithPolicy_endIndex_onSuccess
+example := @Syntax.Parser.delimited_endIndex_onSuccess
+example := @Syntax.Parser.parseProxyType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseProxyType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseComptimeType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseComptimeType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseMappingType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseMappingType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseNamedTypeArguments_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseNamedTypeArguments_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseNamedType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseNamedType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseFunctionType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseFunctionType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseTupleType_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.parseTupleType_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.typeExprWithFuel_ordinary_of_remainingCount_lt_unrestricted
+example := @Syntax.Parser.typeExprWithFuel_ne_invariant_of_remainingCount_lt_unrestricted
+example := @Syntax.Parser.typeExpr_ordinary
+example := @Syntax.Parser.typeExpr_ne_invariant_unrestricted
+example := @Syntax.Parser.typeExprWithFuel_unrestrictedFuelElementContract
+example := @Syntax.Parser.typeExpr_unrestrictedFuelElementContract
+example := @Syntax.Parser.typeExpr_trace_success_complete
+example := @Syntax.Parser.typeExpr_trace_reject_complete
+example := @Syntax.Parser.typeExpr_trace_success_iff
+example := @Syntax.Parser.typeExpr_trace_reject_iff
+example := @Syntax.Parser.typeExpr_trace_reject_failure_iff
+
+example := @Syntax.Parser.typeExpr_exists_trace_outcome
+example := @Syntax.Parser.typeExprTrace_outcome_exists
+
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_exactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_success_cascadeFilters
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_concrete_trace_reject_cascadeFilters
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_exactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_success_cascadeFilters
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_concrete_trace_reject_cascadeFilters
+example := @Syntax.Parser.Reply.PreservesFile
+example := @Syntax.Parser.Reply.PreservesFile.trans
+example := @Syntax.Parser.Parser.PreservesFile
+example := @Syntax.Parser.Parser.PreservesFile.file_eq_of_ok
+example := @Syntax.Parser.Parser.PreservesFile.file_eq_of_reject
+example := @Syntax.Parser.Parser.pure_preservesFile
+example := @Syntax.Parser.Parser.bind_preservesFile
+example := @Syntax.Parser.getState_preservesFile
+example := @Syntax.Parser.modifyState_preservesFile
+example := @Syntax.Parser.emitDiagnostic_preservesFile
+example := @Syntax.Parser.rejectAt_preservesFile
+example := @Syntax.Parser.acceptToken_preservesFile
+example := @Syntax.Parser.keyword_preservesFile
+example := @Syntax.Parser.symbol_preservesFile
+example := @Syntax.Parser.contextual_preservesFile
+example := @Syntax.Parser.rawIdentifier_preservesFile
+example := @Syntax.Parser.identifier_preservesFile
+example := @Syntax.Parser.qualifiedName_preservesFile
+example := @Syntax.Parser.closeDelimited_preservesFile
+example := @Syntax.Parser.afterDelimitedElement_preservesFile
+example := @Syntax.Parser.delimitedWithPolicy_preservesFile
+example := @Syntax.Parser.delimited_preservesFile
+example := @Syntax.Parser.requireNonempty_preservesFile
+example := @Syntax.Parser.parseNamedTypeArguments_preservesFile
+example := @Syntax.Parser.finishNamedType_preservesFile
+example := @Syntax.Parser.parseNamedType_preservesFile
+example := @Syntax.Parser.parseMappingType_preservesFile
+example := @Syntax.Parser.parseComptimeType_preservesFile
+example := @Syntax.Parser.parseProxyType_preservesFile
+example := @Syntax.Parser.parseTupleType_preservesFile
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_preservesFile
+example := @Syntax.Parser.parseFunctionType_preservesFile
+example := @Syntax.Parser.typeExprWithFuel_preservesFile
+example := @Syntax.Parser.typeExpr_preservesFile
+example := @Syntax.Parser.State.eq_of_file_endByte_remainder_diagnostics
+example := @Syntax.Parser.State.traceResult
+example := @Syntax.Parser.State.traceResult_declarativeRemainder
+example := @Syntax.Parser.State.traceResult_diagnostics
+example := @Syntax.Parser.State.eq_traceResult_of_fields
+example := @Syntax.Parser.State.traceResult_eq_cursor_update
+example := @Syntax.Parser.typeExpr_trace_success_state_iff
+example := @Syntax.Parser.typeExpr_trace_reject_failure_state_iff
+example := @Syntax.Parser.typeExpr_trace_reject_state_iff
+example := @Syntax.DeclarativeGrammar.typedParameterTraceValue
+example := @Syntax.DeclarativeGrammar.TypedParameterFinishingTrace
+example := @Syntax.DeclarativeGrammar.errorParameterTraceValue
+example := @Syntax.DeclarativeGrammar.ErrorParameterFinishingTrace
+example := @Syntax.DeclarativeGrammar.typedParameterFinishingTrace_exists
+example := @Syntax.DeclarativeGrammar.TypedParameterFinishingTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.TypedParameterFinishingTrace.nil_iff
+example := @Syntax.DeclarativeGrammar.TypedParameterFinishingTrace.comptime_iff
+example := @Syntax.DeclarativeGrammar.TypedParameterFinishingTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.errorParameterFinishingTrace_exists
+example := @Syntax.DeclarativeGrammar.ErrorParameterFinishingTrace.trace_eq
+example := @Syntax.DeclarativeGrammar.ErrorParameterFinishingTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.ErrorParameterFinishingTrace.cascadeFilters
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_eq_ok_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_success_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_success_context
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_ne_reject
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_ne_invariant
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_eq_ok_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_success_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_success_context
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_ne_reject
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_ne_invariant
+
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.colon_present
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.namedParameterTailTraceExactOutcomeSpec
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_of_absent
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_of_present
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_ok_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_reject_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_ordinary
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_ne_invariant
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_failure_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_failure_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_success_context
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_reject_context
+
+example := @Syntax.DeclarativeGrammar.ParameterNameFinishingTrace
+example := @Syntax.DeclarativeGrammar.parameterNameFinishingTrace_exists
+example := @Syntax.DeclarativeGrammar.ParameterNameFinishingTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.ParameterNameFinishingTrace.nil_iff
+example := @Syntax.DeclarativeGrammar.ParameterNameFinishingTrace.comptime_iff
+example := @Syntax.DeclarativeGrammar.ParameterNameFinishingTrace.cascadeFilters
+example := @Syntax.DeclarativeGrammar.CheckedParameterNameTraceParses
+example := @Syntax.DeclarativeGrammar.CheckedParameterNameTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.checkedParameterNameTraceParses_exists
+example := @Syntax.DeclarativeGrammar.CheckedParameterNameTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.CheckedParameterNameTraceParses.cascadeFilters
+example := @Syntax.Parser.parameterNameFinishing_eq_ok_of_trace
+example := @Syntax.Parser.parameterNameFinishing_success_trace_sound
+example := @Syntax.Parser.parameterNameFinishing_trace_success_state_iff
+example := @Syntax.Parser.parameterNameFinishing_continue_of_trace
+example := @Syntax.Parser.checkedParameterName_continue_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.finishTypedParameter_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.errorParameter_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.ofFunctionParameter_bind_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_preservesFile
+example := @Syntax.Parser.ParameterDispatchTraceInternals.comptimeGuard
+example := @Syntax.Parser.ParameterDispatchTraceInternals.comptimeGuard_true_iff
+example := @Syntax.Parser.ParameterDispatchTraceInternals.comptimeGuard_false_iff
+example := @Syntax.Parser.ParameterDispatchTraceInternals.comptimeGuard_eq_of_remainder_eq
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_eq_comptime_of_prefix
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_eq_ordinary_of_prefix_absent
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_eq_comptime_of_prefix
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_eq_ordinary_of_prefix_absent
+
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceParses
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceParses
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.OrdinaryNamedParameterTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ordinaryNamedParameterTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.comptimeNamedParameterTraceExactOutcomeSpec
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_eq_of_checkedName
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_ordinary
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_ne_invariant
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_success_context
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_reject_context
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_ordinary
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_ne_invariant
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_success_context
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_reject_context
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_reject_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.ordinaryNamedParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_reject_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.comptimeNamedParameter_trace_reject_failure_state_iff
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceParses
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceRejects
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedParameterCoreTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.namedParameterCoreTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ComptimeNamedParameterTraceRejects.tail_of_prefix
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_success_context
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_reject_context
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_reject_failure_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_reject_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_ordinary_unrestricted
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_ne_invariant_unrestricted
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_reject_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_trace_reject_failure_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_exists_trace_outcome
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCoreTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.lambdaParameterTraceValue
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceParses
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceRejects
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceParses
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceRejects
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ordinaryLambdaParameterTailTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.comptimeLambdaParameterTailTraceExactOutcomeSpec
+example := @Syntax.Parser.LambdaParameterInternals.ofFunctionParameter_eq_traceValue
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_eq_of_absent
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_eq_of_present
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_ordinary
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_eq_of_absent
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_eq_of_present
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_ordinary
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_reject_failure_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_success_context
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameterTail_ne_invariant
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_reject_failure_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_success_context
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameterTail_ne_invariant
+example := @Syntax.DeclarativeGrammar.parameterRecoveryTraceEvent
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceRejects
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceParses.cascade_kept
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceParses.cascade_dropped
+example := @Syntax.DeclarativeGrammar.FunctionParameterRecoveryTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.functionParameterRecoveryTraceExactOutcomeSpec
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameterAux_success_frame
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_success_frame
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_reject_shape
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_success_context
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_reject_context
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_iff
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_failure_iff
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_state_iff
+
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceParses
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind_fields
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind_eq_input_of_carrier
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.namedParameterTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionParameterRecoveryTraceRejects_missingToken_of_nonboundary
+example := @Syntax.DeclarativeGrammar.namedParameterRecoveryTrace_cascadeFilters
+example := @Syntax.Parser.namedParameter_trace_success_sound
+example := @Syntax.Parser.namedParameter_reject_trace_sound
+example := @Syntax.Parser.namedParameter_preservesFile
+example := @Syntax.Parser.namedParameter_success_context
+example := @Syntax.Parser.namedParameter_reject_context
+example := @Syntax.Parser.namedParameter_ordinary_unrestricted
+example := @Syntax.Parser.namedParameter_ne_invariant_unrestricted
+example := @Syntax.Parser.namedParameter_trace_success_complete
+example := @Syntax.Parser.namedParameter_trace_reject_complete
+example := @Syntax.Parser.namedParameter_trace_success_iff
+example := @Syntax.Parser.namedParameter_trace_reject_iff
+example := @Syntax.Parser.namedParameter_trace_reject_failure_iff
+example := @Syntax.Parser.namedParameter_trace_success_state_iff
+example := @Syntax.Parser.namedParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.namedParameter_trace_reject_state_iff
+example := @Syntax.Parser.namedParameter_exists_trace_outcome
+example := @Syntax.Parser.namedParameterTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceParses
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceParses
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.OrdinaryLambdaParameterTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ordinaryLambdaParameterTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.comptimeLambdaParameterTraceExactOutcomeSpec
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_eq_of_checkedName
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_ordinary
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_ne_invariant
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_success_context
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_ordinary
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_ne_invariant
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_success_context
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.ordinaryLambdaParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.comptimeLambdaParameter_trace_reject_failure_state_iff
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceParses
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceRejects
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.LambdaParameterCoreTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.lambdaParameterCoreTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ComptimeLambdaParameterTraceRejects.tail_of_prefix
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_success_context
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_reject_failure_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_ordinary_unrestricted
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_ne_invariant_unrestricted
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_success_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_reject_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_trace_reject_failure_iff
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCore_exists_trace_outcome
+example := @Syntax.Parser.LambdaParameterInternals.lambdaParameterCoreTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceRejects
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.error_value
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.trace_eq
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.cascade_kept
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceParses.cascade_dropped
+example := @Syntax.DeclarativeGrammar.LambdaParameterRecoveryTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.lambdaParameterRecoveryTraceExactOutcomeSpec
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_success_sound
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_reject_trace_sound
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_success_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_reject_state_iff
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_success_complete
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_trace_reject_complete
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_preservesFile
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_success_context
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_reject_context
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_ordinary
+example := @Syntax.Parser.LambdaParameterInternals.recoverLambdaParameter_ne_invariant
+example := @Syntax.DeclarativeGrammar.LambdaParameterTraceParses
+example := @Syntax.DeclarativeGrammar.LambdaParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.LambdaParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.lambdaParameterTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.lambdaParameterRecoveryTrace_cascadeFilters
+example := @Syntax.Parser.lambdaParameter_trace_success_sound
+example := @Syntax.Parser.lambdaParameter_reject_trace_sound
+example := @Syntax.Parser.lambdaParameter_preservesFile
+example := @Syntax.Parser.lambdaParameter_success_context
+example := @Syntax.Parser.lambdaParameter_reject_context
+example := @Syntax.Parser.lambdaParameter_ordinary_unrestricted
+example := @Syntax.Parser.lambdaParameter_ne_invariant_unrestricted
+example := @Syntax.Parser.lambdaParameter_trace_success_complete
+example := @Syntax.Parser.lambdaParameter_trace_reject_complete
+example := @Syntax.Parser.lambdaParameter_trace_success_iff
+example := @Syntax.Parser.lambdaParameter_trace_reject_iff
+example := @Syntax.Parser.lambdaParameter_trace_reject_failure_iff
+example := @Syntax.Parser.lambdaParameter_trace_success_state_iff
+example := @Syntax.Parser.lambdaParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.lambdaParameter_trace_reject_state_iff
+example := @Syntax.Parser.lambdaParameter_exists_trace_outcome
+example := @Syntax.Parser.lambdaParameterTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.FunctionParametersTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionParametersTraceRejects
+example := @Syntax.DeclarativeGrammar.LambdaParametersTraceParses
+example := @Syntax.DeclarativeGrammar.LambdaParametersTraceRejects
+example := @Syntax.DeclarativeGrammar.functionParametersTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.lambdaParametersTraceExactOutcomeSpec
+example := @Syntax.Parser.functionParameters_trace_success_sound
+example := @Syntax.Parser.functionParameters_reject_trace_sound
+example := @Syntax.Parser.functionParameters_trace_success_complete
+example := @Syntax.Parser.functionParameters_trace_reject_complete
+example := @Syntax.Parser.functionParameters_success_context
+example := @Syntax.Parser.functionParameters_reject_context
+example := @Syntax.Parser.functionParameters_ordinary_unrestricted
+example := @Syntax.Parser.functionParameters_ne_invariant_unrestricted
+example := @Syntax.Parser.functionParameters_trace_success_iff
+example := @Syntax.Parser.functionParameters_trace_reject_iff
+example := @Syntax.Parser.functionParameters_trace_reject_failure_iff
+example := @Syntax.Parser.functionParameters_trace_success_state_iff
+example := @Syntax.Parser.functionParameters_trace_reject_failure_state_iff
+example := @Syntax.Parser.functionParameters_trace_reject_state_iff
+example := @Syntax.Parser.functionParameters_exists_trace_outcome
+example := @Syntax.Parser.functionParametersTrace_outcome_exists
+example := @Syntax.Parser.lambdaParameters_trace_success_sound
+example := @Syntax.Parser.lambdaParameters_reject_trace_sound
+example := @Syntax.Parser.lambdaParameters_trace_success_complete
+example := @Syntax.Parser.lambdaParameters_trace_reject_complete
+example := @Syntax.Parser.lambdaParameters_success_context
+example := @Syntax.Parser.lambdaParameters_reject_context
+example := @Syntax.Parser.lambdaParameters_ordinary_unrestricted
+example := @Syntax.Parser.lambdaParameters_ne_invariant_unrestricted
+example := @Syntax.Parser.lambdaParameters_trace_success_iff
+example := @Syntax.Parser.lambdaParameters_trace_reject_iff
+example := @Syntax.Parser.lambdaParameters_trace_reject_failure_iff
+example := @Syntax.Parser.lambdaParameters_trace_success_state_iff
+example := @Syntax.Parser.lambdaParameters_trace_reject_failure_state_iff
+example := @Syntax.Parser.lambdaParameters_trace_reject_state_iff
+example := @Syntax.Parser.lambdaParameters_exists_trace_outcome
+example := @Syntax.Parser.lambdaParametersTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.lambdaExpressionTraceValue
+example := @Syntax.DeclarativeGrammar.LambdaExpressionTraceParses
+example := @Syntax.DeclarativeGrammar.LambdaExpressionTraceRejects
+example := @Syntax.DeclarativeGrammar.LambdaExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaExpressionTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.LambdaExpressionTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.lambdaExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.lambdaExpressionTrace_cascadeFilters
+example := @Syntax.DeclarativeGrammar.lambdaExpressionReturnRejectionTrace_cascadeFilters
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_success_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_success_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_eq_reject_of_marker
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_eq_reject_of_parameters
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_eq_reject_of_return
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_eq_reject_of_body
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_trace_reject_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_ordinary_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_ne_invariant_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ordinary_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ne_invariant_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_exists_trace_outcome
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpressionTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchBranch
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchSelects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchSelects.branch_unique
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchSelects_exists
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchSelects_exists_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchSelects.congr_of_tokenAt
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.selectedBranch
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.rawParser
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.selectedBranch_selects
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.selectedBranch_eq_iff
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.selectedBranch_eq_of_remainder_eq
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.expressionAtomCore_eq_selected_raw
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_eq_raw_of_selection
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTraceEvent
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.error_value
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.trace_eq
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.output_eq
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.trace_eq
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.cascade_kept
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceParses.cascade_dropped
+example := @Syntax.DeclarativeGrammar.ExpressionAtomRecoveryTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtomAux_success_frame
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_success_frame
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_reject_shape
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_preservesFile
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_success_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_state_iff
+
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchFinalTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchRawTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchRawTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchFinalTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.raw_of_selected
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.raw_of_selected
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.not_final
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.final_iff
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchRawTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_context
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_state_iff
+
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_source_endByte
+
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind_fields
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind_eq_input_of_carrier
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTraceRejects_missingToken_of_nonboundary
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTrace_cascadeFilters
+example := @Syntax.Parser.isAtomBoundary_true_iff
+example := @Syntax.Parser.isAtomBoundary_false_iff
+example := @Syntax.Parser.expressionAtom_preservesFile
+example := @Syntax.Parser.expressionAtom_success_source_end
+example := @Syntax.Parser.expressionAtom_reject_source_end
+example := @Syntax.Parser.expressionAtom_success_context
+example := @Syntax.Parser.expressionAtom_reject_context
+example := @Syntax.Parser.expressionAtom_ordinary_of_core
+example := @Syntax.Parser.expressionAtom_ne_invariant_of_core
+example := @Syntax.Parser.expressionAtom_trace_success_sound
+example := @Syntax.Parser.expressionAtom_reject_trace_sound
+example := @Syntax.Parser.expressionAtom_trace_success_complete
+example := @Syntax.Parser.expressionAtom_trace_reject_complete
+example := @Syntax.Parser.expressionAtom_trace_success_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_failure_iff
+example := @Syntax.Parser.expressionAtom_trace_success_state_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_failure_state_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_state_iff
+example := @Syntax.Parser.expressionAtom_exists_trace_outcome
+example := @Syntax.Parser.expressionAtomTrace_outcome_exists
+
+example := @Syntax.DeclarativeGrammar.ExpressionAtomLayerTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomLayerTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionAtomLayerTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionAtom_layer_trace_success_sound
+example := @Syntax.Parser.expressionAtom_layer_reject_trace_sound
+example := @Syntax.Parser.expressionAtom_layer_trace_success_complete
+example := @Syntax.Parser.expressionAtom_layer_trace_reject_complete
+example := @Syntax.Parser.expressionAtom_layer_success_context
+example := @Syntax.Parser.expressionAtomCore_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.expressionAtom_layer_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.expressionAtomLayerTrace_outcome_exists_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_ordinary_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_ne_invariant_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ne_invariant_of_unrestrictedElementFuel
+
+example := @Syntax.DeclarativeGrammar.postfixIndexTraceValue
+example := @Syntax.DeclarativeGrammar.postfixCallTraceValue
+example := @Syntax.DeclarativeGrammar.postfixFieldTraceValue
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceParses
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.opening_present
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.postfixTailTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_trace_sound
+
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_production_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_production_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_source_endByte
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_eventually
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_eventually
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_failure_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTailTrace_outcome_exists_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_state_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_failure_state_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_state_iff_of_ne_invariant
+
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionPostfixTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionPostfix_trace_success_sound
+example := @Syntax.Parser.expressionPostfix_reject_trace_sound
+example := @Syntax.Parser.expressionPostfix_trace_success_context
+example := @Syntax.Parser.expressionPostfix_reject_context_of_windowProjection
+example := @Syntax.Parser.expressionPostfix_ordinary_of_atomOutcome_bound
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_atomOutcome_bound
+example := @Syntax.Parser.expressionPostfix_ordinary_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_exists_trace_outcome_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfixTrace_outcome_exists_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_trace_success_complete_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_complete_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_success_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_failure_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_success_state_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_failure_state_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_state_iff_of_ne_invariant
+
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ordinary_of_unrestrictedBodyFuel
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ne_invariant_of_unrestrictedBodyFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixLayerTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixLayerTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionPostfixLayerTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionPostfix_layer_trace_success_sound
+example := @Syntax.Parser.expressionPostfix_layer_reject_trace_sound
+
+example := @Syntax.Parser.Reply.PreservesEndIndex
+example := @Syntax.Parser.Parser.PreservesEndIndex
+example := @Syntax.Parser.Reply.PreservesEndIndex.trans
+example := @Syntax.Parser.Parser.PreservesEndIndex.of_success_reject
+example := @Syntax.Parser.Parser.PreservesEndIndex.endIndex_eq_of_ok
+example := @Syntax.Parser.Parser.PreservesEndIndex.endIndex_eq_of_reject
+example := @Syntax.Parser.Parser.PreservesTokenWindow.preservesEndIndex
+example := @Syntax.Parser.pure_preservesEndIndex
+example := @Syntax.Parser.bind_preservesEndIndex
+example := @Syntax.Parser.closeDelimited_preservesEndIndex
+example := @Syntax.Parser.afterDelimitedElement_preservesEndIndex
+example := @Syntax.Parser.delimitedWithPolicy_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_preservesEndIndex
+example := @Syntax.Parser.expressionAtom_preservesEndIndex
+example := @Syntax.Parser.expressionAtom_endIndex_onSuccess
+example := @Syntax.Parser.expressionAtom_endIndex_onReject
+example := @Syntax.Parser.expressionAtom_unrestrictedChildContract
+example := @Syntax.Parser.expressionAtom_unrestrictedChildContract_succ
+
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_preservesEndIndex
+example := @Syntax.Parser.expressionPostfix_preservesEndIndex
+example := @Syntax.Parser.expressionPostfix_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfix_unrestrictedChildContract
+example := @Syntax.Parser.expressionPostfix_unrestrictedChildContract_succ
+example := @Syntax.Parser.expressionPostfix_layer_exists_trace_outcome_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfixLayerTrace_outcome_exists_of_unrestrictedChildFuels
+
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionUnaryTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_success_state_shape
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_success_context
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_diagnostics_eq_onSuccess
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_ne_reject
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_sound
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_complete
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_state_iff
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_exists_exact_trace_outcome
+example := @Syntax.Parser.ExpressionInternals.unaryOperatorsTrace_outcome_exists
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_sound
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_reject_trace_sound
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_complete
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_complete
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_context
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_state_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_state_iff
+
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_endIndex_onSuccess
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_preservesEndIndex
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_ordinary_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_ne_invariant_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedPostfixContract
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedChildContract
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedChildContract_succ
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_exists_trace_outcome_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnaryTrace_outcome_exists_of_unrestrictedPostfixFuel
+
+end Tests
+end
