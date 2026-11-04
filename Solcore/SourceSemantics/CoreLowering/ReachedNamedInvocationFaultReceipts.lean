@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 
 /-! Finite projections of the same actual body receipt. The fault token is
 unchanged by caller restoration; the body post remains at its original store. -/

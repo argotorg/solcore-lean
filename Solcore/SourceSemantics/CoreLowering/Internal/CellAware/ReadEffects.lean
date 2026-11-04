@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellBitNotStatementMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedLiteralEvid
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedExpressions
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestoration
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies

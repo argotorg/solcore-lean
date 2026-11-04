@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultRecei
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.LambdaBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardSequences

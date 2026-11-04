@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicDiagnosticPriority
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-! The actual compatible factory retains its optional callable allocation.
 Sealed compilation supplies the producer receipts used by decoder priority;

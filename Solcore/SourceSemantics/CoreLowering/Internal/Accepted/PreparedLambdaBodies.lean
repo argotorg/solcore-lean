@@ -1,12 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.CompilerProfiles
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalLambdaCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaReadDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 
 /-!

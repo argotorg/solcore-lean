@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSamePolicyCompilerLeafReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualStoredCalls
 import Solcore.SourceSemantics.CoreLowering.FunctionCodeCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileNativeInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions

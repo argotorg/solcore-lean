@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.SourceBodyTemplateScope
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
@@ -20,7 +20,7 @@ import Solcore.SourceSemantics.SourceBodyResultAnnotation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparation
 import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagnosticSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-!
 # Selected compilations: indirect dispatch

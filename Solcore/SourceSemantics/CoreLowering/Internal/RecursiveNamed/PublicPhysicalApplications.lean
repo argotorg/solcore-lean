@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls

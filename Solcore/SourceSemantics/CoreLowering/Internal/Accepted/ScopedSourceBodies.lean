@@ -10,8 +10,8 @@ import Lean
 import Solcore.SourceSemantics.CoreLowering.CallableAncestryComposition
 import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralIssuedSourceReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedRecipes
 
 /-!

@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultRecei
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualFunctionViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
@@ -20,9 +20,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperat
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 
 /-!
 # Staged bounds: direct and recursive callers

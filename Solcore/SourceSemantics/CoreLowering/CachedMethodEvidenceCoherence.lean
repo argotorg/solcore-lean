@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.LeafTraitEvidenceCoherence
 
 /-! A finite compiler cache can authenticate evidence coherence for its actual

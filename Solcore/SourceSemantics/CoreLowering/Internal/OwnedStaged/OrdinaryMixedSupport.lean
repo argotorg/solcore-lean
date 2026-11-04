@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.LambdaBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinaryMethodRoots

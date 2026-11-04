@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultRecei
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryPreparedScopeAnnotationCallsReady
 
 /-!

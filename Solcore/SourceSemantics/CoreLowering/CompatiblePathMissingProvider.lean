@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathMissingTerminal
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceKeyTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPlaceAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 
 /-! A selected static suffix reads the provider and key view retained by the
 same prepared path. This proof examines only static membership certificates. -/

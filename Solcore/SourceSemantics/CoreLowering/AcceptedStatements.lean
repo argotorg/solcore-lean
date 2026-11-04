@@ -17,7 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationForLoop
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeNative
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationMatches
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeChildrenExtension
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationLoops
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForNative

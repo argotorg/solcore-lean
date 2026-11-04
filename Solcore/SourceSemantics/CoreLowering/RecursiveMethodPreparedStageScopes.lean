@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 
 /-! The actual method cache row and authenticated codebook descriptor select
 its staged body scope. The full method dictionary stays attached; no ordinary

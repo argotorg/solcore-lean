@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedInvocationFaultReceipts
 
 /-! Finite projections retain the actual named call route. Argument failure

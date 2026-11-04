@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTyping
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipal
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 
 /-! Actual operator selection supplies full independent Source body typing and
 graph closure. Diagnostic typing follows that real method authority and cached

@@ -1,10 +1,8 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaFormationReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralLambdaValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaFormationReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedCallerProtocol
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 
 /-!
 # Admitted profile: lambda formation

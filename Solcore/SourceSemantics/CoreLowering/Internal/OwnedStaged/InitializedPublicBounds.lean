@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRo
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinarySequenceCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.Frontend.SourceCoreFailurePreservationReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 
 /-!
 # Staged public bounds of initialized bodies

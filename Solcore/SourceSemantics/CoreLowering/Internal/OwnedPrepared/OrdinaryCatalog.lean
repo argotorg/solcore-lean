@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalCatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReachedNamedConcreteRangeReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaIssuedProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
 
 /-!

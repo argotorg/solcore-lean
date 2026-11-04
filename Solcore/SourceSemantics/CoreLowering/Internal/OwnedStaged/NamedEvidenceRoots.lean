@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectC
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DirectCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalMixedFamilies
 

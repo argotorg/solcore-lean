@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationRanges
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagnosticSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-! The unconditional issuer receipt combines with actual contextual Source
 views only at the queried key. Canonical uniqueness fixes the owning occurrence

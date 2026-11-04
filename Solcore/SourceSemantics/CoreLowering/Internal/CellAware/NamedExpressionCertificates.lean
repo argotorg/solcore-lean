@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedCallFaults
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.DecodedCallFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors

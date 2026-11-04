@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryCallerReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
@@ -13,8 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinaryMethodR
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardSequences
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.LambdaBodies
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates

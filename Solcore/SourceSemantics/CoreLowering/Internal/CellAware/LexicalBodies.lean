@@ -16,9 +16,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollecto
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 
 /-!
 # Cell-aware bodies: the lexical family

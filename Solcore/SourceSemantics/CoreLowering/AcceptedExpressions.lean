@@ -9,10 +9,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 
 /-!

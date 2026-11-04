@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparation
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryAnnotationCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagnosticSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternValues
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalGlobals
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 
 /-!
 # Recursive named public results: application results

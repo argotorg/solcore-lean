@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 
 /-!
 # Cell-aware staged expressions and terminals

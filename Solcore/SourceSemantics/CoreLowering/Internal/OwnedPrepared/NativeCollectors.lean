@@ -17,7 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertif
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
 import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaJointStaticReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 
 /-!
 # Prepared callables: native collectors

@@ -1,14 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedArgumentAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCanonicalEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedCallerProtocol
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestorationAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 
 /-!
 # Prepared callables: named catalog

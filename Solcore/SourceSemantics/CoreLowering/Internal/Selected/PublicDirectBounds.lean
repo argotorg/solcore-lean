@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgume
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalCalls

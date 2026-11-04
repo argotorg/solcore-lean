@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPr
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocation
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
 

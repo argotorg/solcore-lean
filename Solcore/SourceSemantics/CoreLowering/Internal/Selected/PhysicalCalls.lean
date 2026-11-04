@@ -6,14 +6,14 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.DirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DirectCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection

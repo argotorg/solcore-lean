@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMatchPrefixAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
 import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion

@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectC
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.LambdaBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaReadDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 
 /-!
 # Staged public bounds on the physical protocol

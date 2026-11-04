@@ -3,8 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfile
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompilerPolicyProfiles
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
@@ -18,9 +18,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCaller
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPhysicalCaptures
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 
 /-!
 # Staged bounds: method selection and terminals

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedHeaderReceiptOperations
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeInitializerSourceSites
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
@@ -10,10 +10,9 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceS
 import Solcore.SourceSemantics.CoreLowering.ProtectedWhileGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchReady
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMatchPrefixAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPostReceiptOperations
 
 /-!
 # Admitted profile: loops, matches and data heads

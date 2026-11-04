@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch

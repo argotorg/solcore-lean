@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceTypeRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualStoredCalls
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

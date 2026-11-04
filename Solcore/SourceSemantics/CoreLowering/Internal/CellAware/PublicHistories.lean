@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplic
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration

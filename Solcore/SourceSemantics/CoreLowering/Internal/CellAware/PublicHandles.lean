@@ -24,9 +24,8 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 
 /-!
 # Cell-aware public handles and starts

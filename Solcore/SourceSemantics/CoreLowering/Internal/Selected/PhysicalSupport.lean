@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthorit
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.DirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 

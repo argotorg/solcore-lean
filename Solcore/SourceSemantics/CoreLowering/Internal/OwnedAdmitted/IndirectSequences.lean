@@ -1,10 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureInvocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.ExpressionTrees
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedArgumentFaultPaths
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectCompiler
 
 /-!
 # Admitted profile: indirect sequences

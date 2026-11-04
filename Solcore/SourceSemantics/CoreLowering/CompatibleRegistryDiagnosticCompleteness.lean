@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationRanges
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-! An authentic compatible diagnostic issuer rebuilds at every bounded
 extension of its actual metadata registry. No execution receipt is required. -/

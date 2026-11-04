@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReceivingPreparedShapeInterpretations
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedStagedCallFaults
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenOrdinaryCalls
 
 /-! An exact original specialization supplies the full diagnostic inventory.
 The actual public receiver supplies its rebuilt table and callable append;

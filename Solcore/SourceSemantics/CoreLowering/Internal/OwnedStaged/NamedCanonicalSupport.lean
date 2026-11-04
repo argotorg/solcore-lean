@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualFunctionViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
@@ -11,7 +11,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPr
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompilerPolicyProfiles
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerPolicies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults

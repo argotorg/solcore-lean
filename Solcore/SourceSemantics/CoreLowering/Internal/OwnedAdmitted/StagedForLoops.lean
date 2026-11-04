@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStagedProjectedBitNotTail
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStagedProjectedBitNotAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.GenericProjectedBitNotPreparedOrigins
@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryMethodCatalogSeparat
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationErasedStageCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagnosticSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 
 /-!
 Actual executable-plan preparation supplies ordinary catalog provenance at an

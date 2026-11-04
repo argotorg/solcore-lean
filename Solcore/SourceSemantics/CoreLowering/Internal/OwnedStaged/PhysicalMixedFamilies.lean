@@ -8,11 +8,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectC
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalLambdaCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalFunctionViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots

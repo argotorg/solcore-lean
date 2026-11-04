@@ -5,8 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCellAllocationProducer
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies

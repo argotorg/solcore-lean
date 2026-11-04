@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 
 /-! Assignment tokens retain their exact specialized Source and compiler
 inventory. Receiving metadata is supplied by the actual public call. -/

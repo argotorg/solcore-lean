@@ -11,8 +11,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedPrefixe
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredArgumentAlignment
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSpineEvaluation
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
@@ -22,7 +22,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodDictionaryIdentity
 import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginSource
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoots

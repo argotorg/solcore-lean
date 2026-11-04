@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSp
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaTemplatePermission
 

@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableLedger
 import Solcore.SourceSemantics.CoreLowering.CallableIndependentSourceViews
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.CallableClosedSchemeSubstitutionAgreement
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReachedNamedConcreteRangeReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.Dynamic.Preservation
 
 /-!

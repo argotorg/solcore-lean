@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
@@ -17,8 +17,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DirectCallers
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 
 /-!
 # Selected compilations: direct calls

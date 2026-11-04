@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCa
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedAmbient

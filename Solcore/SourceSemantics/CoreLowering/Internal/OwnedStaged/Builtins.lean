@@ -6,8 +6,8 @@ import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredArgumentAlignment
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalFunctionFaultPostContracts
-import Solcore.SourceSemantics.CoreLowering.NamedInvocationFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
 

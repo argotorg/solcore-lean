@@ -24,7 +24,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 
 /-!
 # Selected compilations: expression bounds
