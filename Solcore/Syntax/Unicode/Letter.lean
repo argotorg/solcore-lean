@@ -1,5 +1,9 @@
 import Solcore.Syntax.Unicode.Range
 
+/-!
+Unicode letters: `isLetter`, from range tables.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Unicode

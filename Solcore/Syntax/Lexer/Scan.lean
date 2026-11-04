@@ -1,5 +1,10 @@
 import Solcore.Syntax.Lexer.Result
 
+/-!
+Pure scanners for comments and strings: `scanLineComment`, `scanBlockComment`, `scanString`,
+`scanQuotedString`, `scanDelimitedMeta`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Lexer

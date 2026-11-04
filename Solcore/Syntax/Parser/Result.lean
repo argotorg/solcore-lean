@@ -1,5 +1,9 @@
 import Solcore.Syntax.Parser.Diagnostic
 
+/-!
+What the parser returns: `ParseOutput`, `ParseResult`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

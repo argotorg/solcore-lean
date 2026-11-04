@@ -1,6 +1,10 @@
 import Solcore.Syntax.Literal
 import Solcore.Syntax.ValidityBasics
 
+/-!
+Inline Yul: `YulExpr`, `YulStmt`, `YulCase`, `YulIdentifier`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

@@ -1,5 +1,9 @@
 import Solcore.Syntax.Source
 
+/-!
+Lexical tokens: `Token`, `TokenKind`, `HardKeyword`, `ContextualKeyword`, `Symbol`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

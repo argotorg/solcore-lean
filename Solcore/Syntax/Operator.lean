@@ -1,5 +1,9 @@
 import Solcore.Syntax.Type
 
+/-!
+Operators: `UnaryOp`, `BinaryOp`, `ValueAssignOp`, with their spellings and precedence.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

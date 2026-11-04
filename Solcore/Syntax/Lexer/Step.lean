@@ -1,6 +1,10 @@
 import Solcore.Syntax.Lexer.State
 import Solcore.Syntax.Lexer.ScanProperties
 
+/-!
+One step of the lexer: `step`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Lexer

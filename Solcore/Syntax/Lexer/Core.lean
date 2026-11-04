@@ -1,5 +1,9 @@
 import Solcore.Syntax.Lexer.Step
 
+/-!
+The lexer: `lex` runs `lexLoop` with enough fuel for the whole source.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Lexer

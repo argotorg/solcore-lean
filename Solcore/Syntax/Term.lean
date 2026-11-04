@@ -2,6 +2,10 @@ import Solcore.Syntax.Literal
 import Solcore.Syntax.Operator
 import Solcore.Syntax.Yul
 
+/-!
+Terms: `Expr`, `Pattern`, `Statement`, `Block`, `MatchCase`, `MatchArms`, `ForItem`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

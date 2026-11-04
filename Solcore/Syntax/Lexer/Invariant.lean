@@ -1,5 +1,9 @@
 import Solcore.Syntax.Lexer.Character
 
+/-!
+The cursor invariant of the lexer: `CursorSuffix`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

@@ -1,6 +1,10 @@
 import Solcore.Syntax.Lexer.Result
 import Solcore.Syntax.SpanSequence
 
+/-!
+The lexer's output contract: `LexedFile.ValidFor`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

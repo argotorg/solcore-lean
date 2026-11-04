@@ -1,5 +1,10 @@
 import Solcore.Syntax.Token
 
+/-!
+Carriers used across the syntax: `Identifier`, `QualifiedName`, `NonemptyList`,
+`DelimitedList`, `NonemptyDelimitedList`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

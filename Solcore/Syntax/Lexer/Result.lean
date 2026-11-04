@@ -1,5 +1,9 @@
 import Solcore.Syntax.Declaration
 
+/-!
+What the lexer returns: `LexedFile`, `LexicalDiagnostic`, `LexResult`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

@@ -1,3 +1,8 @@
+
+/-!
+Source files and positions: `SourceFile`, `SourceId`, `SourceSpan`, `Located`,
+`SpannedText`, `Comment`.
+-/
 set_option autoImplicit false
 
 namespace Solcore.Syntax

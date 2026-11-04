@@ -1,5 +1,9 @@
 import Solcore.Syntax.Unicode.Range
 
+/-!
+Unicode numbers: `isNumber`.
+-/
+
 namespace Solcore.Syntax.Unicode
 
 /-!

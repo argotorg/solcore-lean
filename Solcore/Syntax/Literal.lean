@@ -1,5 +1,9 @@
 import Solcore.Syntax.Foundation
 
+/-!
+Literals: `CoreLiteral`, `YulLiteral`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

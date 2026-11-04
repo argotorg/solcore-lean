@@ -1,5 +1,9 @@
 import Solcore.Syntax.Source
 
+/-!
+`SpanSequence.ValidFor`: spans that belong to one file and appear in source order.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

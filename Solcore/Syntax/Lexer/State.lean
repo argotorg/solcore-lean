@@ -1,6 +1,10 @@
 import Solcore.Syntax.Lexer.Invariant
 import Solcore.Syntax.Lexer.Contract
 
+/-!
+The lexer's state: `State`, with its reverse accumulators.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Lexer

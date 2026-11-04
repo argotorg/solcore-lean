@@ -1,5 +1,10 @@
 import Solcore.Syntax.Parser.State
 
+/-!
+Primitive parsers: `getState`, `emitDiagnostic`, `rejectAt`, `acceptToken`, `keyword`, `symbol`,
+`contextual`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser

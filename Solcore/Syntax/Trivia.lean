@@ -1,7 +1,8 @@
 import Solcore.Syntax.Source
 import Solcore.Syntax.Declaration
 
-/-! Pure source-trivia selection, independent of parser state and replies. -/
+/-! Pure source-trivia selection, independent of parser state and replies. Main declaration:
+`attachTopItemComments`, which attaches a file's comments to its items. -/
 
 set_option autoImplicit false
 

@@ -2,6 +2,10 @@ import Solcore.Syntax.Parser.Result
 import Solcore.Syntax.SpanSequence
 import Init.Data.List.Nat.Pairwise
 
+/-!
+The parser's machine: `State`, `TokenWindow`, `Reply`, `Failure`, `Parser`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser

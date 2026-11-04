@@ -1,5 +1,10 @@
 import Solcore.Syntax.Lexer
 
+/-!
+What the parser reports: `ParseDiagnostic`, `ParseDiagnosticKind`, `ParseExpectation`,
+`ParserInvariantError`, `SyntaxInvariantError`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

@@ -1,5 +1,10 @@
 import Solcore.Syntax.Module
 
+/-!
+Declarations and whole files: `ParsedFile`, `TopItem`, `FunctionDecl`, `EnumDecl`, `TraitDecl`,
+`ImplDecl`, `ContractDecl`, `TypeAliasDecl`, `DeriveAttribute`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

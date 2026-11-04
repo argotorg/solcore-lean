@@ -1,5 +1,9 @@
 import Solcore.Syntax.Lexer
 
+/-!
+`isValidIdentifier`, the check on identifier spellings.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

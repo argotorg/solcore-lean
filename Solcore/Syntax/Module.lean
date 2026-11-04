@@ -1,6 +1,10 @@
 import Solcore.Syntax.Term
 import Solcore.Syntax.ValidityBasics
 
+/-!
+Module-level items: `ModulePath`, `ImportDecl`, `ExportDecl`, `PragmaDecl`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax

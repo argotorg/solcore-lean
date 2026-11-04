@@ -2,6 +2,11 @@ import Solcore.Syntax.Lexer.Scan
 import Solcore.Syntax.Unicode.Letter
 import Solcore.Syntax.Unicode.Number
 
+/-!
+Character classes and text scanners of the lexer: `isWhitespace`, `isCoreIdentifierStart`,
+`isCoreIdentifierContinue`, `TextScan`, `IdentifierScan`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Lexer

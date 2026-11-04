@@ -1,3 +1,7 @@
+
+/-!
+Range tables of scalar values: `ScalarRange`, `inScalarRanges`.
+-/
 namespace Solcore.Syntax.Unicode
 
 /-- Inclusive Unicode scalar-value bounds used by generated category tables. -/

@@ -1,5 +1,10 @@
 import Solcore.Syntax.Foundation
 
+/-!
+Types and parameters: `TypeExpr`, `Predicate`, `WhereClause`, `GenericParameters`,
+`FunctionParameter`, `LambdaParameter`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Syntax
