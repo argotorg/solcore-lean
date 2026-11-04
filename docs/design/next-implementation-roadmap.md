@@ -35,7 +35,7 @@ test corpus.
 | 1 | CI and continuous bounded random campaigns across all existing profiles | Local gate complete; continuous fuzzing driver implemented, counting the recorded upstream findings with stable signatures and the mismatches of recorded mismatch classes as known; automatic CI triggers disabled, manual dispatch only; the complete default fixed suite of fifty-five profiles measured locally within its documented 7,200 seconds and 1 GiB on Sonatina O0 and Yul; no passing hosted run yet; the pinned end-to-end fixture comparison runs only locally, standalone or as the fuzz driver's opt-in fixtures run kind | Reproducible CI jobs, scheduled seed exploration, retained findings and verified cancellation/resource limits. |
 | 2 | Generated Sonatina O2, then Yul comparisons | Local gate complete; the twenty-seven storage-family profiles also run on Yul when selected and are validated locally; the call-return, call-sequence and call-branch profiles also run on Yul when selected; `stateful-calls` and `stateful-forwarded-value` stay on Sonatina; the pinned end-to-end fixtures run on Hull, O0, O2 and Yul in a comparison of the compiled paths, standalone or in the fuzz driver, without an original Core reference, with derived ADT arguments mutated at every boundary Word of their tags, dynamic offsets and `bytes` lengths, with sequence mutants that carry one change forward through every later step, with source mutants that change one literal, operator, condition or inline Yul site of a fixture's program; at `e2eef194` all 182 fixtures compile on every path | The same original cases run on each enabled backend with explicit backend provenance and replay. |
 | 3 | Missing runtime operation mappings | Implemented; O2 random run has a recorded finding | Tested Rust-dialect mappings, dynamic-input regressions, generation, reduction and replay for each added operation. |
-| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the twenty profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call, revert data, halt, checked arithmetic and shift profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
+| 4 | Richer generated grammar | Call-graph, loop and aggregate families validated locally; G0 generator revision four, revision three's per-case swarm masks restricted to each emitter's features, is the random default for the seventeen G0-based pure profiles; random runtime-input campaigns add four seeded inputs to each function's boundary inputs, can request whole functions and, in the twenty profiles whose functions can be identities, exclude functions that return every boundary input unchanged, generating whole functions in as many case-tool requests as the 2 MiB response limit needs; nested bounded loop, bounded recursion, inline Yul, loop-closure, recursive-loop, inline Yul loop, inline Yul memory, user-defined enum, trait, trait hierarchy, Solcore memory value, memory call, revert data, halt, checked arithmetic, shift, memory array and array ABI profiles are validated locally on O0, O2 and Yul; pure campaigns compile each distinct source once per backend; an O2 random comptime run, the O0 and Yul random inline Yul runs, the O0, O2 and Yul random inline Yul loop runs and the O2 random inline Yul memory run have recorded compiler crashes, the fixed and random Yul trait runs and the fixed Yul trait hierarchy run a recorded solc rejection, the random trait hierarchy runs a recorded frontend rejection on every backend, and the fixed and random O0 memory value runs recorded Sonatina O0 mismatches; hosted run pending | Broader typed compositions with bounded generation and reductions that preserve binding, effects and failure identity. |
 | 5 | A minimal proof for the actual Rust-dialect emitter | Closed, runtime-input, named-helper, raw-primitive, call-graph, private-mutation, aggregate, aggregate call-graph, call-graph loop, aggregate loop, generic, two-slot storage, two-slot rollback, keyed-storage and event-log emitters proved locally; other emitters open | A small connected meaning-preservation theorem for what is actually emitted, not for a substitute native Lean syntax. |
 | 6 | State and ABI extensions | Keyed-storage, bounded dynamic-array, event-log, call-value, bounded-`bytes`, contract-forwarded value, Keccak-addressed mapping, sender-keyed ledger, 256-byte `bytes`, nested `uint256[][]`, malformed-calldata, several-methods, storage-loop, Keccak-loop, tuple-return, inline Yul storage-loop and Keccak-loop, bounded `bytes`-return, enum and struct storage, enum-return, enum-argument, enum-array, array-return, constructor-argument, call-return, call-sequence and call-branch extensions validated locally, malformed calldata for the dynamic-array, nested-array and 256-byte `bytes` contracts and comparing std error reverts by selector, two to four external methods on one contract dispatched as std does, a bounded source loop whose iterations read and write declared slots, a bounded source loop whose iterations read and write Keccak-addressed mapping entries and emit one log each, static ABI tuple returns of two to four Words through the `wordTupleOutcomeV1` contract entry convention, both loop plans with every storage access, entry hash and log in inline Yul blocks around the Solcore step call, `bytes` returns of up to 64 bytes through the `boundedBytesOutcomeV1` convention, user-defined enum and struct values in contract fields and behind mapping keys through `std.StorageGeneric`, returned user-defined enums of two to four constructors through the `enumOutcomeV1` convention, user-defined enum arguments decoded by std's derived decoder, canonical and malformed, compared by std's selector or empty revert data, calldata arrays of user-defined enums read element by element through std's `abiArrayGet`, canonical and malformed, compared by std's selectors, `ArrayOutOfBounds()` among them, or empty revert data, and memory arrays of `uint256`, `bytes4`, `bytes` and `uint256[]` elements returned through std's `abi_encode` and `return_` under `wordTupleOutcomeV1`, the shape read at run time, constructor arguments decoded by std's memory reader from the init code's suffix, canonical and malformed, with the deployment row compared, a parent's decoding of a child method's tuple, `bytes` or enum return data through std's `raw_call` and memory reader, typed and malformed, under a call-and-resume convention, at one call per transaction, a parent's two or three calls with `returndatasize` and in-bounds `returndatacopy` reads around each in inline Yul, under a call chain, and a parent's zero to three calls from sites in branches and bounded loops, as the input decides, with `returndatasize` reads around each site and in a loop condition, under a choice chain; all thirty-two stateful profiles compare the observed contracts' whole committed storage on all three paths; random stateful campaigns generate steps with G0 revision three and sequences of up to eight transactions, and storage campaigns compile each distinct source once per backend; `bytes` returns beyond 64 bytes, returned enums, enum arguments, enum arrays, array returns, constructor arguments, call returns, call sequences and call branches beyond the recorded shapes and other dynamic return values are not built; O2 random log, forwarded-value and dynamic-array runs have recorded compiler crashes; hosted run pending | Explicit additional observations and transaction semantics, with actual three-way tests and sequence reduction. |
 | 7 | Native Source goal two | In progress: statement closure over the actual compiler tree, a first expression subset and statement shape for named rows, their public-root connection, one concrete instance, direct calls at expression roots closed by one size induction over a family of rows, call authority from a complete inventory, and the public root's preservation direction for call-containing rows; root reflection, lifting of call-containing bodies, a one-call instance, nested calls, remaining expression and statement forms, fault lifting, a richer instance and chained public calls remain | Complete accepted-body preservation and connect all actual passes to the public session. |
@@ -12080,6 +12080,134 @@ execution:
 `Panic(0x41)` from a storage array, a `push` at length `2^256 − 1` or an
 offset past `~0 / stride`, cannot occur for word-sized elements, so only
 `new` reaches it.
+
+**Memory arrays, slices and their panics: results.** `f7ddb6eab` implements
+the definitions above:
+- `Solcore.Synthesis.Core.Arrays` (the plans of both profiles, their static
+  scope and admission, the ABI calldata and pinned selectors, the direct
+  interpreter over Lean numbers and the shapes it reaches, the Core reference
+  over length and element cells whose right injection is the revert data, the
+  draws and fitting) and `ArraysShrink` (the plan size and reductions);
+  `ArraysEmitter`, `ArrayCases`, shared by `MemoryArrayCases` and
+  `ArrayAbiCases` through one profile record with each profile's minimum
+  budget; the case-tool commands `memory-arrays-generate`,
+  `memory-arrays-emit`, `array-abi-generate` and `array-abi-emit`; the
+  adapter's two schemas, both in `REVERTING_SCHEMAS`, `runtime-array-abi` in
+  the new `OUTPUT_SCHEMAS`, whose return data a direct row may carry, and its
+  calldata recomputed by `array_calldata` with `ARRAY_SELECTORS`; and campaign
+  and suite registration. Both profiles are runtime-input and identity-filter
+  profiles, not G0-based, with budgets up to 2,048 nodes and compact retained
+  case files; their coverage is `memoryArrayCoverage` and `arrayAbiCoverage`.
+  The campaign's test adapter flips the last bit of return data as it does of
+  revert data. No native tool is added; the case tool carries both.
+- Two shapes follow their definitions more closely than the first draft of the
+  code, which the probe's statistics measured: `alias` needs the observation
+  after the write and through the other name, and `view` the observation of a
+  slice after the write. With them, the memory array corpus took 36 seeds and
+  288 cases, two more than the definitions give.
+- A registered Lean test, `Solcore/Test/SourceArrayCases.lean`, checks:
+  - four fixtures' sources against golden texts, and their results on the
+    Core reference and on the interpreter, against golden values from the
+    corpus validator's Python model, at twelve inputs each. The first memory
+    array fixture is `int8`: `new` at an input length, a literal and its
+    alias written through the alias, a slice of the literal seen after a
+    write, a grid at a flagged length, a checked sum, a loop with an unchecked
+    product and a generic read, and a read through the literal; the second is
+    `uint256` over the storage array: three pushes, a slice of it, `pop`, a
+    read through the slice, `setLength`, a checked division of an element, a
+    helper's array in a grid of two rows and a checked `sc_inc` through a row.
+    The ABI fixtures take a raw `calldata<uint16[]>` and a clean `uint16[]`
+    and return the second after a write, with a copy, a read and a loop over
+    the first; and a raw `int8[]` whose `sc_tail` slice is returned as a copy
+    after a raw `sc_put` and a read through a grid row holding it. Their
+    results cover returned Words and data, `Panic(0x11)`, `Panic(0x32)`,
+    `Panic(0x41)` and `DirtyHigherBitsForInteger()`, a stale storage slice
+    and a normalized returned element;
+  - that admission refuses 36 memory array and 14 array ABI plans outside the
+    definitions and admits six plans;
+  - the reference against the interpreter at twelve inputs on the admitted
+    plans of the first 200 seeds of each profile, reaching every kind of
+    revert data;
+  - that generation is deterministic, draws every shape value within 2,200
+    memory array and 500 array ABI seeds and none outside the inventories,
+    replays exactly, also with seeded inputs and the identity filter, that the
+    minimum budget drops steps and a budget below it generates nothing; that
+    tampering is refused and replay never reads the saved observation; and
+    that reductions apply, including the loop's body run once, a removed step
+    and index, clean elements, the fold for an array result and a removed
+    second parameter, and replay.
+- Fixed corpora `scripts/semantic-memory-array-corpus.json`, 288 cases from
+  36 seeds between 1 and 2,185, 139 returns, 91 `Panic(0x32)`, 32
+  `Panic(0x11)`, 15 `Panic(0x41)`, 6 `Panic(0x12)` and 5 `Panic(0x31)`; and
+  `scripts/semantic-array-abi-corpus.json`, 144 cases from 18 seeds between 4
+  and 469, 59 returns, 49 `Panic(0x32)`, 27 `DirtyHigherBitsForInteger()`, 6
+  `Panic(0x11)`, 2 `Panic(0x12)` and 1 `Panic(0x41)`.
+  `Tests/scripts/test-semantic-memory-array-corpus.py`,
+  and `test-semantic-array-abi-corpus.py` running its walk with the ABI
+  profile, rebuild the selection, admit every plan with their own scope walk,
+  recompute every shape and the shrink measure with their own interpreter
+  over Python lists, re-emit every source and compare it exactly, encode the
+  calldata from the ABI specification with selectors from `keccak256`,
+  evaluate every case's plan against the recorded outcome, and check 33 and
+  26 shrink candidates natively and 55 and 52 negative checks. That model,
+  re-emission, calldata and shapes agree with the Lean side on every accepted
+  plan of the first 1,000 seeds at twelve inputs: 576 memory array plans,
+  6,912 outcomes (3,669 returns, 2,398 `Panic(0x32)`, 400 `Panic(0x11)`, 316
+  `Panic(0x41)`, 70 `Panic(0x31)` and 59 `Panic(0x12)`), and 686 array ABI
+  plans, 8,232 outcomes (3,495 returns, 3,129 `Panic(0x32)`, 1,324
+  `DirtyHigherBitsForInteger()`, 143 `Panic(0x41)`, 123 `Panic(0x11)` and 18
+  `Panic(0x12)`).
+
+The gate passed before the profiles were committed: the kernel check, 1,002
+Python tests, `lake build` (10,375 jobs), forty-two native tools prepared and
+verified offline, `lake test`, twenty-seven corpus validator runs and the
+chunked-generation check over the thirty-two pure profiles.
+
+Frozen matrices at the lane commit picked as `f7ddb6eab`: five freeze records
+of 356 digests, taken before, between and after the runs, were identical
+(combined SHA-256
+`fd8372a2e0086f74f79f77c848c128daadd612cb29ba2960b79cec18ac143949`, case tool
+`95e32fddc939d32c34b01e2bd539967a206568e66e94a4f13d2cb295ea3f32ed`, Hull
+runner, driver, code-image exporter, solc and Anvil unchanged from the integer
+profiles' matrices). Two runs at a time, under a load average of about ten
+from another session's Lean build:
+- The fixed corpora matched all 288 memory array and 144 array ABI cases on
+  O0, O2 and Yul with complete coverage, 95 and 46 values, in 452, 429 and
+  619 seconds and 228, 214 and 331, retaining 19.3, 16.3 and 23.3 MB and 10.2,
+  8.6 and 12.1 MB.
+- Random suites from root seed 1 with 32 whole functions a profile and seeded
+  inputs drew, for memory arrays (profile seed 14347209489705160726), 384
+  cases from 32 sources in 50 attempts, 18 excluded for one outcome at every
+  boundary input, with 182 returns, 167 `Panic(0x32)`, 24 `Panic(0x41)`, 10
+  `Panic(0x11)` and 1 `Panic(0x12)` and 77 of the 95 shape values; and for the
+  array ABI (profile seed 5165266463250140409) 384 cases from 32 sources in 50
+  attempts, 17 excluded for one outcome at every boundary input and one fitted
+  plan left without an observation, with 160 returns, 126 `Panic(0x32)`, 86
+  `DirtyHigherBitsForInteger()`, 8 `Panic(0x41)` and 4 `Panic(0x11)` and 42 of
+  the 46 values. O0 matched all 384 and 384 cases, in 466 and 501 seconds;
+  O2 executed 384 and 384, all matched, with no mismatch, inconclusive case,
+  error or rejection, in 438 and 479 seconds; Yul matched all 384 and 384, in
+  634 and 702 seconds. The three backends ran identical case sets.
+- An O0 smoke run of profiles whose adapter and campaign paths these changes
+  touch matched `closed-g0` 16 of 16, `runtime-word` 16 of 16,
+  `runtime-revert-data` 152 of 152 and `runtime-checked-arithmetic` 136 of
+  136.
+
+No mismatch, crash or compiler rejection was found, and no upstream defect
+beyond the two frontend rejections the probe recorded. The random memory
+array suites missed 18 values: `uint64`, the `copy` declaration, checked
+`sub` and unchecked `add`, `div` and `sub` writes, loops over a row or a
+slice, every `sharing` value, `Panic(0x31)` and the `inc`, `pop`,
+`slice-read`, `stale` and `sum` panics; the random array ABI suites missed
+`get` and loop reads of a calldata parameter, `Panic(0x12)` and a rejection
+at a calldata read; the fixed corpora cover all of them. The
+two corpora add about 680 seconds on O0, 643 on O2 and 950 on Yul to the
+complete fixed suites. `runtime-memory-arrays` took 619 of the 900 seconds
+CI allows a profile on Yul, a margin of 281 seconds, less than the 310 of
+`runtime-memory-calls` in the last complete Yul suite, though under more than
+twice its load. The O0 fixed suite, last projected at about 6,550 seconds
+before the integer profiles' 316 and the later call profiles, would now take
+more than CI's 7,200.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).

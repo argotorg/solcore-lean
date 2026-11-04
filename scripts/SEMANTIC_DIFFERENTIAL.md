@@ -391,7 +391,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data`, `runtime-checked-arithmetic`, `runtime-shifts` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data`, `runtime-checked-arithmetic`, `runtime-shifts`, `runtime-memory-arrays`, `runtime-array-abi` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 | `runtime-halts` | not needed: every accepted plan halts at a boundary input, so none returns all its inputs |
@@ -411,7 +411,11 @@ byte added to or xored with `sc_x` can be a plan's only nonzero Word, and
 of whose sites raises at a boundary input returns its input. A one-step
 `runtime-checked-arithmetic` or `runtime-shifts` plan at a 256-bit type, such
 as `(sc_a0 + 0)` or `(sc_a0 << 0)`, returns its input too, although none of
-either profile's first 1,000 seeds does, so both apply the filter.
+either profile's first 1,000 seeds does, so both apply the filter. A
+`runtime-memory-arrays` or `runtime-array-abi` plan whose only observation
+reads `sc_v0` at a 256-bit type returns its input, as four of the first 1,000
+memory array plans do, so both apply it as well; an array result is never an
+identity.
 `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
@@ -3089,6 +3093,154 @@ No mismatch, crash or rejection was found. The first random O0 run, at
 `6b2f86b99`, stopped on a race in the suite's disk walk, which
 `927fe89c3` fixes: a case work directory a campaign removed during the walk
 raised `FileNotFoundError`.
+
+## Compare Solcore memory arrays and their ABI
+
+Since solcore-rs `e2eef194` (#145), `T[]` is a memory array in a local, a
+parameter or a return type, `new T[](n)` allocates `n` zeroed elements,
+`a[i]` reads and writes through a checked `memref`, `a[s:e]` and its three
+other forms are read-only views, a contract field `T[]` is a storage array
+with `push`, `pop` and `setLength`, and memory arrays appear in the public
+ABI. An index or slice bound out of range reverts with `Panic(0x32)`, an
+empty `pop` with `Panic(0x31)` and an oversized allocation with
+`Panic(0x41)`. The memory value and memory call profiles still spell their
+Word arrays `memory<DynArray<uint256>>`, which upstream accepts, so two new
+profiles share one plan module, `Solcore.Synthesis.Core.Arrays`, each
+admitting its own plans:
+- `runtime-memory-arrays` (contract `SynthesizedMemoryArrays`) converts the
+  input Word to one to three values of one of the twelve integer types and up
+  to three `uint256` indices, masked or flagged so that a length is small or
+  at least `2^255`, then runs one to twelve steps: arrays made with `new`,
+  literals, aliases, `toArray` and a helper; slices in all four forms of
+  arrays, slices, grid rows and the storage array, and one returned by a
+  helper; `T[][]` grids made with `new T[][](n)` or of arrays or values, and
+  row replacement; plain, compound (checked or in an `unchecked` block) and
+  `memref` writes, a helper filling its parameter; the storage array's
+  member calls; observations of lengths, elements, a grid's length, a checked
+  sum and generic `ridx` and `Length` helpers; and at most one loop over a
+  collection's length.
+- `runtime-array-abi` (contract `SynthesizedArrayAbi`) takes one or two
+  `T[]` or `calldata<T[]>` parameters before the input Word. Their lengths
+  and elements are made from the input, the elements raw for a narrow type
+  half the time, so that std's decoder rejects some with
+  `DirtyHigherBitsForInteger()` (`0x6cc54a63`): a memory parameter when it is
+  decoded, a calldata one when an element is read or copied. The same steps
+  run without the storage array, and the result is the fold or a `T[]`: an
+  array, a memory parameter or a slice's `toArray`, whose raw values std's
+  encoder masks or sign-extends.
+
+Every observation is folded into the returned Word,
+`sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(X))`.
+
+The Core reference holds an array as a pair of a length cell and eight
+element cells, those past its static bound one spare cell, so an alias, a
+grid row and a memory parameter hold the same pair and see each other's
+writes, and a copy is a new pair. A grid is its length and its slot cells,
+each holding an array; a slice is its base, start and length and reads
+through its base, a storage slice checking the storage array's current
+length. Every index, slice bound, allocation and `pop` is checked as std
+checks it, a compound write uses the integer profiles' checked or unchecked
+operations, and the loop runs at most its collection's static bound of
+guarded iterations. A panic is the right injection of 36 bytes of revert
+data and a decoder's rejection that of four; the left injection is the fold,
+or for `runtime-array-abi` the return data with its length in bytes. The
+adapter compares revert data of both profiles exactly (`REVERTING_SCHEMAS`),
+accepts original Core's return data for `runtime-array-abi`
+(`OUTPUT_SCHEMAS`), and recomputes that profile's calldata with its own ABI
+encoder and the selectors in `ARRAY_SELECTORS`, `keccak256` of each
+signature.
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-memory-arrays \
+  --profile runtime-array-abi --backend sonatina-o0 --output .upstream/semantic-arrays-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-memory-arrays \
+  --profile runtime-array-abi --seed 1 --functions 32 --output .upstream/semantic-arrays-random
+python3 Tests/scripts/test-semantic-memory-array-corpus.py
+python3 Tests/scripts/test-semantic-array-abi-corpus.py
+```
+
+Native commands are `memory-arrays-generate` and `array-abi-generate SEED
+NODES COUNT ATTEMPTS FUEL [seeded-inputs-v1/splitmix64]
+[exclude-boundary-identity-v1]`, and `memory-arrays-emit` and
+`array-abi-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`memoryArrayPlan` or `arrayAbiPlan` and the whole Core reference, whose
+exact correspondence native admission checks for every origin, and
+`memoryArrayShapes` or `arrayAbiShapes`, which replay recomputes. Replay
+requires a generated plan to be its seed's. Their retained case files are
+compact JSON, about 22 KB a memory array case and 25 KB an array ABI case.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profiles record no G0 step features.
+- The node budget bounds the applied reference: default 1,024, at most 2,048,
+  at least 256 for memory arrays and 512 for the array ABI, whose decoder and
+  encoder take about 300 nodes; a case's reference is at most 4,096 nodes.
+- Exclusions, under `memory-array-profile` and `array-abi-profile`, are a
+  plan still over the budget or not admitted, such as a fitted plan left
+  without an observation, then one with the same outcome at all eight
+  boundary inputs, most often an index out of range at every input, or one
+  that exhausts fuel. A plan whose only observation reads
+  `sc_v0` at a 256-bit type returns its input, so random campaigns apply
+  `exclude-boundary-identity-v1`.
+- Reductions remove a step with the steps that read what it declares, run the
+  loop's body once, lower a write to a plain one, an unchecked one to checked
+  and an operation to `+`, a helper's slice or array to the slice or literal
+  it makes, a grid to `new T[][](0)` and a slice to `B[:]`, drop a literal's
+  last value or a grid's last row, lower an index or a length to 0, a value
+  to `sc_v0` and an observation to a length, remove an index, a value, a raw
+  flag or the second parameter, lower a parameter's length to 0 and its
+  elements to clean and an array result to the fold, then the inputs.
+- `memoryArrayRequirements` declares the plan's `types`, `declarations`,
+  `writes`, `targets`, `members`, `observations`, `collections`, `bases`,
+  `loops`, `indices`, `lengths` and `sharing` (a write through one name of an
+  array seen through another, through a row and its array, to a slice's base
+  seen through a slice, and around a copy), and the `outcomes` and deciding
+  `panics` its run reaches at the boundary inputs, 95 values;
+  `arrayAbiRequirements` declares its `types`, `parameters`, parameter
+  `lengths`, `elements` and `values` (clean or raw), `results`,
+  `calldataReads` and `parameterWrites`, and the `encodings` of returned
+  arrays, `outcomes` and `dirty` sites reached, 46 values.
+
+The fixed corpora take, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing value, until nothing is missing, each at
+the eight boundary inputs, and both require every value. Memory arrays:
+seeds 1, 4, 5, 6, 10, 11, 14, 15, 17, 18, 22, 23, 24, 25, 26, 33, 35, 38,
+47, 49, 56, 65, 68, 69, 76, 79, 81, 90, 91, 101, 102, 113, 186, 274, 312 and
+2185, the last for the `stale` panic, give 288 cases from 36 sources, 139
+returns, 91 `Panic(0x32)`, 32 `Panic(0x11)`, 15 `Panic(0x41)`, 6
+`Panic(0x12)` and 5 `Panic(0x31)`. The array ABI: seeds 4, 5, 7, 8, 10, 12,
+13, 16, 18, 19, 20, 22, 30, 34, 39, 41, 47 and 469 give 144 cases from 18
+sources, 59 returns, 49 `Panic(0x32)`, 27 `DirtyHigherBitsForInteger()`, 6
+`Panic(0x11)`, 2 `Panic(0x12)` and 1 `Panic(0x41)`.
+`Tests/scripts/test-semantic-memory-array-corpus.py`, and
+`test-semantic-array-abi-corpus.py` with the ABI profile, rebuild that
+selection, admit every plan with their own scope walk, recompute every shape
+and the shrink measure with their own interpreter over Python lists, re-emit
+every source and compare it exactly, encode the calldata from the ABI
+specification with selectors from `keccak256`, evaluate every case's plan
+against the recorded outcome, and check replay, reductions and tampering
+natively. That model, re-emission, calldata and shapes agree with the native
+ones on every accepted plan of the first 1,000 seeds at twelve inputs: 576
+memory array plans with 6,912 outcomes, 3,243 of them revert data, and 686
+array ABI plans with 8,232 outcomes, 4,737 of them revert data.
+
+The gate passed before the profiles were committed: the kernel check, 1,002
+Python tests, `lake build` (10,375 jobs), forty-two native tools, `lake test`,
+twenty-seven corpus validator runs and the chunked-generation check over the
+thirty-two pure profiles. Frozen matrices at the lane commit picked as
+`f7ddb6eab`, with the freeze digest unchanged on every run:
+- The fixed corpora matched all 288 and 144 cases on O0, O2 and Yul with
+  complete coverage, in 452, 429 and 619 seconds and 228, 214 and 331.
+- Random suites from root seed 1 with 32 whole functions a profile drew 384
+  memory array cases from 32 sources, 202 of them revert data, and 77 of the
+  95 shape values, and 384 array ABI cases from 32 sources, 224 of them
+  revert data, and 42 of the 46 values; O0, O2 and Yul matched all of them.
+
+No mismatch, crash or rejection was found. The emitter avoids two frontend
+rejections the probe met: a converted literal as a `new` length, as in
+`new uint256[](uint256(2))`, and `Typedef.rep(s[0])` with a literal index of
+a let-bound slice or a calldata parameter, where it writes the index as
+`uint256(k)`. On Yul, `runtime-memory-arrays` took 619 of the 900 seconds CI
+allows a profile, under a load average of about ten.
 
 ## Compare aggregate compositions with call graphs
 
