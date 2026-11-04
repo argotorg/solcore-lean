@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Conditional uniqueness and disjointness of the optional annotation. This

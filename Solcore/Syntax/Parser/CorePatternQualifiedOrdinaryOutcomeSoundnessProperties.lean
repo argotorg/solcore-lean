@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternQualifiedOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternQualifiedOrdinaryRejectionSoundnessProperties
 
 /-! Packaged executable ordinary outcomes for `qualifiedPattern`. -/

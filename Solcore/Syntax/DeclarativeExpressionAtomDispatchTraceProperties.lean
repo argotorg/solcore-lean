@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeExpressionAtomDispatchTraceGrammar
-import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.DeclarativeLiteralExpressionTraceExactnessProperties
 import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativeDotConstructorTraceOutcomeProperties

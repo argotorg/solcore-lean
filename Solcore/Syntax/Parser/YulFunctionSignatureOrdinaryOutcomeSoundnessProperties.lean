@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulFunctionOutcomeProperties
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.YulNameOutcomeProperties

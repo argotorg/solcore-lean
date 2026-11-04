@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionStepOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionAtomOutcomes
 import Solcore.Syntax.Parser.CoreExpressionAtomCoreOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionAtomPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionLayerOrdinaryOutcomeSoundnessProperties

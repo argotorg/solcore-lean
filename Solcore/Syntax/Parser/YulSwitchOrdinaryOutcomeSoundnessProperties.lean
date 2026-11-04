@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulSwitchOutcomeProperties
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Parser.YulExpressionPublicFuelSoundnessProperties
 import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
 import Solcore.Syntax.Parser.YulSwitchCaseListOrdinaryOutcomeSoundnessProperties

@@ -1,11 +1,10 @@
 import Solcore.Syntax.Declaration
 import Solcore.Syntax.Validity
-import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
+import Solcore.Syntax.Internal.TypeOutcomes
 import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Grammar.Basics
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingExactnessProperties
-import Solcore.Syntax.DeclarativeDelimitedTrailingExactnessProperties
-import Solcore.Syntax.DeclarativeTransactionalFallbackExactnessProperties
+import Solcore.Syntax.Internal.DelimitedExactness
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Lexer
 import Solcore.Syntax.Identifier
 import Solcore.Syntax.Parser

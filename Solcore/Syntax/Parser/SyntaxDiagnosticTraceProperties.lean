@@ -63,7 +63,7 @@ import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceProperties
 import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceStateProperties
 import Solcore.Syntax.Parser.LambdaExpressionTraceProperties
 import Solcore.Syntax.Grammar.Expressions
-import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.ExpressionAtomDispatchSelectionTraceProperties
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceProperties

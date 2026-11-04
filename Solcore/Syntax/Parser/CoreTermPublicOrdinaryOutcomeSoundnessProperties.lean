@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockExactnessProperties
+import Solcore.Syntax.Internal.BlockExactness
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermFuelOrdinaryOutcomeSoundnessProperties
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreTermExactnessProperties
+import Solcore.Syntax.Internal.StatementValues
 import Solcore.Syntax.Parser.CoreTermFuelOrdinaryOutcomeSoundnessProperties
 
 /-! Exact executable Core outcomes at an explicitly shared recursion fuel. -/

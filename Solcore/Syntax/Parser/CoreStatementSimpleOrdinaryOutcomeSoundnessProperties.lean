@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementSimpleCompleteOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreStatementSimpleOrdinaryRejectionSoundnessProperties
 
 /-! Packaged ordinary outcomes for canonical Core `let` and `return`. -/

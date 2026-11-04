@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceGrammar
-import Solcore.Syntax.DeclarativeCoreExpressionLeafExactnessProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Independent total, disjoint, and exact literal/Boolean diagnostic outcomes. -/
 

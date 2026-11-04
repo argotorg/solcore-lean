@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreIdentifierExpressionOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreExpressionAtomLeafSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionNameOutcomeSoundnessProperties
 

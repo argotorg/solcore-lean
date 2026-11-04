@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulBodyExactnessProperties
+import Solcore.Syntax.Internal.SignatureOutcomes
 import Solcore.Syntax.Parser.YulBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementPublicFuelSoundnessProperties
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.IsolatedCoreBlockOrdinaryOutcomeSoundnessProperties
 

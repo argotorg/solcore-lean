@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreDeclarationExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.Impl
 
 /-! Unconditional executable exactness for implementation declarations. -/

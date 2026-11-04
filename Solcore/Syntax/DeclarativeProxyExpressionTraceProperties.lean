@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeProxyExpressionTraceGrammar
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Structure, exactness, and protected-event composition are separate laws.

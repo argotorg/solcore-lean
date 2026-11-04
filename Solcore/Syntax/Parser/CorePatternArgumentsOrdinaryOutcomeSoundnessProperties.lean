@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternArgumentsOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.DelimitedFallbackRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
 import Solcore.Syntax.Parser.Pattern

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeReturnStatementRejectionTraceGrammar
 import Solcore.Syntax.DeclarativeReturnStatementTraceProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Exact first-return-failure outcomes under explicit expression laws.
 Uncommitted reports and preceding event sequences are independently unique. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulAssignmentOutcomeProperties
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.YulExpressionRejectionSoundnessProperties
 import Solcore.Syntax.Parser.YulNamesOutcomeProperties

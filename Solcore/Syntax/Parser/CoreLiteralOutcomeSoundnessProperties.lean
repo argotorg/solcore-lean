@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreLiteralOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreExpressionAtomLeafSoundnessProperties
 
 /-! Exact executable ordinary outcomes for Core literal leaves. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreForItemsTailOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreForItemOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.Statement.Control
 

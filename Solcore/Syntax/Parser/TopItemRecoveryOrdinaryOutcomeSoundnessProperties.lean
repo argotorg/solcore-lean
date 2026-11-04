@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeTopItemRecoveryExactnessProperties
-import Solcore.Syntax.DeclarativeTopItemRecoveryOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.FileRecoveryTotalityProperties
 import Solcore.Syntax.Parser.TopItemRecoveryBoundaryProperties
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreLambdaParameterPublicOutcomeProperties
+import Solcore.Syntax.Internal.ParameterOutcomes
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 
 /-! Executable reflection of the public parameter recovery boundary. -/

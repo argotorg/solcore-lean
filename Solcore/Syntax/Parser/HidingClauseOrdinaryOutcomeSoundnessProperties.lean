@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeHidingClauseOutcomeProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.HidingClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 

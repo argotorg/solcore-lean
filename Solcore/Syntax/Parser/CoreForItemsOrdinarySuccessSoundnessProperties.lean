@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreForItemsOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreForItemSoundnessProperties
 import Solcore.Syntax.Parser.CoreForItemsTailOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

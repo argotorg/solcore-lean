@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomCoreOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionAtomOutcomes
 import Solcore.Syntax.Parser.CoreExpressionAtomCoreOrdinaryRejectionSoundnessProperties
 
 /-! Packaged executable ordinary outcomes for `expressionAtomCore`. -/

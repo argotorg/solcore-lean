@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectorNameExactnessProperties
-import Solcore.Syntax.DeclarativeSelectorNameOutcomeProperties
+import Solcore.Syntax.Internal.ExportOutcomes
 import Solcore.Syntax.Parser.SelectorNameOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameOrdinarySuccessSoundnessProperties
 

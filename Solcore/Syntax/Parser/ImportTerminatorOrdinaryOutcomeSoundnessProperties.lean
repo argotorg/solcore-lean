@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeImportTerminatorExactnessProperties
-import Solcore.Syntax.DeclarativeImportTerminatorOutcomeProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
 

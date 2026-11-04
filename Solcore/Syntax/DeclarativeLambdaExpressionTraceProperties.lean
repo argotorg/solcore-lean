@@ -3,7 +3,7 @@ import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceExactnessProperties
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProtectionProperties
 import Solcore.Syntax.Internal.TypeTrace
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Raw lambda exactness assumes only exact outcomes for the supplied body
 relations. Parameters and optional return types already have concrete exactness.

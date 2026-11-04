@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulExpressionExactnessProperties
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Parser.YulExpressionFuelCleanSoundnessProperties
 
 /-! Public executable bridges for the concrete recursive Yul-expression grammar. -/

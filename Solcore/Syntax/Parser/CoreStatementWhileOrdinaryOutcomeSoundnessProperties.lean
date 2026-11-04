@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementWhileOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

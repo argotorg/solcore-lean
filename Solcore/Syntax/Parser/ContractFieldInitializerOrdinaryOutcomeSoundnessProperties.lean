@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractFieldExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.Contract
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 

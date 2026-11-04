@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternDotConstructorOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternArgumentsOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternNameOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

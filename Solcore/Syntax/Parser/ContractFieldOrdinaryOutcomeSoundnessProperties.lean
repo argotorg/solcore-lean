@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractFieldExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.ContractFieldOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ContractFieldOrdinarySuccessSoundnessProperties
 

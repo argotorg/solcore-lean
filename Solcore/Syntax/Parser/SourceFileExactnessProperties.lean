@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSourceFileExactnessProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.FileItemsExactnessProperties
 import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
 

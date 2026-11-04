@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CanonicalParserTotalityProperties
 import Solcore.Syntax.Parser.SourceFileExactnessProperties
-import Solcore.Syntax.DeclarativeSyntaxExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 
 /-! Complete source-file AST and remainder correspondence on valid parser states. -/
 

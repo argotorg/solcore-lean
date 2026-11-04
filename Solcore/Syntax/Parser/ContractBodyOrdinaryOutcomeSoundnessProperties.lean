@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractBodyExactnessProperties
+import Solcore.Syntax.Internal.ContractBodyOutcomes
 import Solcore.Syntax.Parser.ContractBodyTailOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ContractBodyTailOrdinarySuccessSoundnessProperties
 

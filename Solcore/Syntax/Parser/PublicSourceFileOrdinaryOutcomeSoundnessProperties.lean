@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePublicSourceFileOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.CompleteOutputProperties
 import Solcore.Syntax.Parser.Nesting
 import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties

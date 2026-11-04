@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Lexer.Contract
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.DeclarativeNestingOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 
 /-! Bounded nesting preflight for the canonical syntax parser. -/
 

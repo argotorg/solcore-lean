@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionParameterCoreOutcomeProperties
+import Solcore.Syntax.Internal.ParameterOutcomes
 import Solcore.Syntax.Parser.FunctionParameterCoreOrdinaryRejectionSoundnessProperties
 
 /-! Complete executable ordinary outcome of `namedParameterCore`. -/

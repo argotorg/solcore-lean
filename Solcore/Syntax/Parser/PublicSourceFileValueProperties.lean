@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePublicSourceFileValueProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.PublicSourceFileOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileExactnessProperties
 

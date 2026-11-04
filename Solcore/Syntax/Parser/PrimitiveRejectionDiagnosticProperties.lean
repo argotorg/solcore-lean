@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Parser.RawIdentifierOrdinaryOutcomeSoundnessProperties
 
 /-! Exact diagnostic reports for current-input and identifier rejection. -/

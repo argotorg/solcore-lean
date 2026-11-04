@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeWildcardImportOutcomeProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.WildcardImportOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportOrdinarySuccessSoundnessProperties
 

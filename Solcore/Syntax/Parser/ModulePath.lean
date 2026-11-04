@@ -5,8 +5,7 @@ import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.CoreTypeQualifiedNameRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
-import Solcore.Syntax.DeclarativeModulePathExactnessProperties
-import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
 

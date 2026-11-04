@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreMatchScrutineesOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.Statement.Match
 
 /-! Executable outcomes for requiring nonempty Core match scrutinees. -/

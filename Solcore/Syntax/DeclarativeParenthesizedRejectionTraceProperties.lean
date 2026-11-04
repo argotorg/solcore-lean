@@ -1,6 +1,5 @@
 import Solcore.Syntax.DeclarativeParenthesizedRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Erasure separates raw marker failures from the older selected grammars. -/
 

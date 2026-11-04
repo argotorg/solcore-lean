@@ -11,7 +11,7 @@ import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.TypeNamedTotalityProperties
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.DeclarativeTypeDispatchSelectionProperties
+import Solcore.Syntax.Internal.TypeOutcomes
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.TypeFunctionTotalityProperties
 import Solcore.Syntax.Parser.TypeFuelTotalityProperties

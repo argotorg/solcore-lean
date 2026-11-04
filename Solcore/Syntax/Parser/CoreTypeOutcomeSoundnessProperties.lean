@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreTypeExactnessProperties
+import Solcore.Syntax.Internal.TypeExactness
 import Solcore.Syntax.Parser.CoreFunctionTypeRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeNamedRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeSimpleRejectionSoundnessProperties

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeExpressionUnaryTraceGrammar
-import Solcore.Syntax.DeclarativeCoreExpressionOperatorExactnessProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Maximal unary-prefix determinism and independent postfix exactness fix

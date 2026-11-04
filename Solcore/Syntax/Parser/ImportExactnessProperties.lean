@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeImportDeclExactnessProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.ImportSelectionExactnessProperties
 import Solcore.Syntax.Parser.PlainImportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportOrdinaryOutcomeSoundnessProperties

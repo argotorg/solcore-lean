@@ -1,7 +1,6 @@
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-!

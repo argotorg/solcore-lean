@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveTargetOutcomeProperties
-import Solcore.Syntax.DeclarativeDeriveTargetExactnessProperties
+import Solcore.Syntax.Internal.DeriveOutcomes
 import Solcore.Syntax.Parser.DeriveTargetOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 

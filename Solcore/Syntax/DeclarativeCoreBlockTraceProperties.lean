@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreBlockTraceGrammar
 import Solcore.Syntax.DeclarativeCoreBlockTailTraceProperties
-import Solcore.Syntax.DeclarativeCoreTypePrimitiveProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.TypeOutcomes
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Raw-block trace erasure, exact functionality, and cursor/window laws.
 Only the abstract statement judgment needs corresponding context-preservation

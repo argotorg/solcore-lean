@@ -1,9 +1,8 @@
-import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
+import Solcore.Syntax.Internal.DelimitedExactness
 import Solcore.Syntax.Grammar.Yul
-import Solcore.Syntax.DeclarativeDelimitedTrailingSuccessProperties
-import Solcore.Syntax.DeclarativeYulNameOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
+import Solcore.Syntax.Internal.YulBlockOutcomes
 import Solcore.Syntax.Grammar.Basics
-import Solcore.Syntax.DeclarativeYulStatementTerminatedBoundaryProperties
 
 /-!
 Yul expressions at fuel, and the ordinary statements built on them.

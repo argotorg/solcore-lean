@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
-import Solcore.Syntax.DeclarativeTypeAliasParametersExactnessProperties
+import Solcore.Syntax.Internal.DeriveOutcomes
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
@@ -10,11 +10,9 @@ import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 import Solcore.Syntax.Parser.TypeFuelTotalityProperties
-import Solcore.Syntax.DeclarativeTypeAliasValueRecoveryExactnessProperties
-import Solcore.Syntax.DeclarativeTypeAliasValueExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
-import Solcore.Syntax.DeclarativeTypeAliasDeclarationExactnessProperties
 
 set_option autoImplicit false
 

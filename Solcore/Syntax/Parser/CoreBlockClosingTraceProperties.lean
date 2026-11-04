@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockTailTraceProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Parser.Block
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 

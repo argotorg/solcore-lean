@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFallbackDeclarationExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinarySuccessSoundnessProperties
 

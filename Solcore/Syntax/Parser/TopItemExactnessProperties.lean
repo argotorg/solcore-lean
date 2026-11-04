@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSyntaxExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 
 /-! Unconditional executable exactness for plain and derive-aware top items. -/

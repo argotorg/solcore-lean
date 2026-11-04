@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionUnaryLeftOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreExpressionBinaryLayerSoundnessProperties
 
 /-!

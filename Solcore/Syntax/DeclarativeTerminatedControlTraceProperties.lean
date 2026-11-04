@@ -1,6 +1,5 @@
 import Solcore.Syntax.DeclarativeTerminatedControlTraceGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Exact functionality and ordinary erasure of silent control traces. -/
 

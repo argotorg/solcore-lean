@@ -8,15 +8,13 @@ import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.DeclarativeEnumConstructorExactnessProperties
+import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.TypeFuelTotalityProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.DeclarativeEnumBodyExactnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.DeclarativeEnumDeclarationExactnessProperties
 import Solcore.Syntax.Parser.GenericParametersTotalityProperties
 
 set_option autoImplicit false

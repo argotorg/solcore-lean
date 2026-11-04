@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionDotConstructorOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

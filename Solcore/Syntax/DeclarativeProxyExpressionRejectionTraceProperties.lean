@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceGrammar
 import Solcore.Syntax.DeclarativeProxyExpressionTraceProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Independent raw rejection erasure, exactness, and event protection. The

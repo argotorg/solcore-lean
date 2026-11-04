@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternComptimeOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.Pattern
 

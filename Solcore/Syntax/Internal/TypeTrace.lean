@@ -1,13 +1,11 @@
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.Grammar.Types
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
 import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.Internal.NameTrace
-import Solcore.Syntax.DeclarativeCoreTypeNameOutcomeProperties
-import Solcore.Syntax.DeclarativeTypeDispatchSelectionProperties
+import Solcore.Syntax.Internal.TypeOutcomes
 
 /-!
 Exact diagnostic traces of type expressions.

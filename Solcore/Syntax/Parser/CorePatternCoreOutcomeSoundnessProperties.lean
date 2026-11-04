@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternCoreOutcomeRejectionSoundnessProperties
 
 /-! Packaged generic executable ordinary outcomes for `patternCore`. -/

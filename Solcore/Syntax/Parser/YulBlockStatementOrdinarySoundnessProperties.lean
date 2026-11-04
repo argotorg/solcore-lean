@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulBlockStatementOutcomeProperties
+import Solcore.Syntax.Internal.YulBlockOutcomes
 import Solcore.Syntax.Parser.YulBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Yul.Statement
 

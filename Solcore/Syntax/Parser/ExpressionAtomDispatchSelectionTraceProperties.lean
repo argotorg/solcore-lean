@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CorePatternCoreOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

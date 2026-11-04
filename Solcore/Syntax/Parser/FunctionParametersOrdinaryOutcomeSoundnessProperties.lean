@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties

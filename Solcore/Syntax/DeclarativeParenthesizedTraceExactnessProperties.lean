@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeParenthesizedTraceProperties
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Exact child outcomes determine every forward element, close, remainder,
 and diagnostic occurrence. Cover need not be injective in either endpoint. -/

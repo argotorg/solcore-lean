@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePathExportExactnessProperties
+import Solcore.Syntax.Internal.ExportOutcomes
 import Solcore.Syntax.Parser.PathExportOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PathExportSoundnessProperties
 

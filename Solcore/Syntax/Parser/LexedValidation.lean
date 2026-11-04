@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Lexer.Contract
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.DeclarativeLexedValidationOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 
 /-! Executable provenance validation for already-tokenized syntax input. -/
 

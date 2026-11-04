@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeReturnStatementTraceGrammar
-import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Independent return-trace erasure, context structure, and exact uniqueness. -/
 

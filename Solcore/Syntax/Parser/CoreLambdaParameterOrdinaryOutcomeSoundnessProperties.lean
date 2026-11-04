@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreLambdaParameterExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.CoreLambdaParameterBoundaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterCoreOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties

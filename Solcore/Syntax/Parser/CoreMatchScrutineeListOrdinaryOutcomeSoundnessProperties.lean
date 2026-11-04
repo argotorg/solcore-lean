@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreMatchScrutineeListOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
 

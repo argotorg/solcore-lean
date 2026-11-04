@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTransactionalFallbackOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Parser.Term
 
 /-! Executable outcome bridges for recognized Core-statement fallback. -/

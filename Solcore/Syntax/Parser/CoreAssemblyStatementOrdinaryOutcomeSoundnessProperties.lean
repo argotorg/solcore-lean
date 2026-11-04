@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreAssemblyStatementOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.Statement.Control
 import Solcore.Syntax.Parser.YulBodyPublicSoundnessProperties
 import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties

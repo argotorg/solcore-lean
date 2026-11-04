@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTopItemDeriveAttachmentProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.File
 

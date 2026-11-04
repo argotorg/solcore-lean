@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeWhereClauseExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.PredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties

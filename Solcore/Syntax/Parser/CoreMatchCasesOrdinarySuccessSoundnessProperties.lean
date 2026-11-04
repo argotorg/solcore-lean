@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreMatchCasesOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreMatchCaseOrdinaryOutcomeSoundnessProperties
 
 /-!

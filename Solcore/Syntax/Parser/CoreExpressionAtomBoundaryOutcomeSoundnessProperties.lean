@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomPublicOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreExpressionAtomRecoveryOrdinarySoundnessProperties
 
 /-! Executable lookahead bridges for the public Core atom recovery boundary. -/

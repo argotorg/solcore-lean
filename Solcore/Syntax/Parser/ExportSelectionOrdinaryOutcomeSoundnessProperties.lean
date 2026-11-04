@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExportSelectionExactnessProperties
+import Solcore.Syntax.Internal.ExportOutcomes
 import Solcore.Syntax.Parser.ExportSelectionOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 

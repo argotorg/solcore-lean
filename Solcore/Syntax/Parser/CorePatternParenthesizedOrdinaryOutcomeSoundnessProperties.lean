@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternParenthesizedOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternParenthesizedOrdinaryRejectionSoundnessProperties
 
 /-! Packaged executable ordinary outcomes for parenthesized patterns. -/

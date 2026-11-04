@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeLeftAssociativeTraceGrammar
-import Solcore.Syntax.DeclarativeCoreExpressionOperatorExactnessProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Independent operand exactness fixes every maximal left-associated trace.

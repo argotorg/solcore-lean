@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePragmaItemsRejectionTraceGrammar
 import Solcore.Syntax.DeclarativePragmaTraceProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Prefix erasure and exact functionality for rejected pragma item traces. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementExactnessProperties
+import Solcore.Syntax.Internal.SignatureOutcomes
 import Solcore.Syntax.Parser.YulStatementFuelCleanSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementFuelOrdinarySoundnessProperties
 

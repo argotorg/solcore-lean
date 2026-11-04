@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreProxyExpressionOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

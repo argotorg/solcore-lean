@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternRecoveryOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Pattern
 

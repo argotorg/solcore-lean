@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.CoreExpressionUnarySoundnessProperties
 import Solcore.Syntax.Parser.ExpressionUnaryTotalityProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.DeclarativeCoreExpressionOperatorExactnessProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 
 /-! Prefix unary scanning is silent on every successful fuel/accumulator
 combination and can never reject. Production fuel is adequate on arbitrary

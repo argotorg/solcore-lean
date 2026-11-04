@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionSignatureExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.FunctionSignatureOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureOrdinarySuccessSoundnessProperties
 

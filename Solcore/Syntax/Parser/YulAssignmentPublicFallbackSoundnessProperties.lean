@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulAssignmentPublicFallbackProperties
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Parser.YulAssignmentRejectionSoundnessProperties
 import Solcore.Syntax.Parser.YulExpressionPublicFuelSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementBasicSoundnessProperties

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreStatementIfOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.DeclarativeCoreStatementIfOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 
 /-! Packaged executable ordinary outcomes for canonical Core `if`. -/
 

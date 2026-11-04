@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreMatchCaseOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Statement.Match
 import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties

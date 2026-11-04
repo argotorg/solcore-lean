@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulNameOutcomeProperties
+import Solcore.Syntax.Internal.YulBlockOutcomes
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Yul.LeafProperties
 

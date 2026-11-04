@@ -1,7 +1,6 @@
 import Solcore.Syntax.DeclarativePragmaTraceGrammar
 import Solcore.Syntax.Internal.NameTrace
-import Solcore.Syntax.DeclarativePragmaExactnessProperties
-import Solcore.Syntax.DeclarativePragmaItemsExactnessProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 
 /-! Exact event order and functional successful pragma traces. -/
 

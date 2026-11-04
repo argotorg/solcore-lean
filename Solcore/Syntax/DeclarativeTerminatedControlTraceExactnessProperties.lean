@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeTerminatedControlTraceProperties
-import Solcore.Syntax.DeclarativeCoreStatementControlLeafOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.DeclarativeCoreBlockTraceExactnessProperties
 
 /-! Total, mutually exclusive exact control-leaf traces, derived only from

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
-import Solcore.Syntax.DeclarativeCoreExpressionAtomRecoveryExactnessProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Exact standalone recovery keeps its complete error AST, token remainder,

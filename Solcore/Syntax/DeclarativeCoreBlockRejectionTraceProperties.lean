@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreBlockRejectionTraceGrammar
 import Solcore.Syntax.DeclarativeCoreBlockTraceProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-! Exact raw-block rejection traces and exclusion of successful traces.
 All functionality assumptions belong to the abstract statement judgments;

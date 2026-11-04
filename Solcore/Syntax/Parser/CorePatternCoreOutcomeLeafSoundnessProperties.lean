@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CoreLiteralOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternBasicSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

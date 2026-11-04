@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePragmaItemsExactnessProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.PragmaItemsOrdinaryRejectionSoundnessProperties
 
 /-! Complete executable ordinary outcomes for pragma item scanning. -/

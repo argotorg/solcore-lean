@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreParenthesizedOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreParenthesizedOrdinaryRejectionSoundnessProperties
 
 /-! Packaged executable ordinary outcomes for guarded Core parentheses. -/

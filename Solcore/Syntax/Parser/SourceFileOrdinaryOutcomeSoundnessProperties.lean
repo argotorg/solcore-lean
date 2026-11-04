@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSourceFileOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.FileItemsOrdinaryOutcomeSoundnessProperties
 
 /-! Complete broad executable outcomes for canonical syntax files. -/

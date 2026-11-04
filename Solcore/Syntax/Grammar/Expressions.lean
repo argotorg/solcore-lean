@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Grammar.Signatures
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 
 /-!
 Declarative grammar of expressions.

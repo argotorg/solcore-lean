@@ -1,9 +1,8 @@
-import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreExpressionStepOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreLambdaParameterPublicOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
-import Solcore.Syntax.DeclarativeCorePatternStepOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
+import Solcore.Syntax.Internal.ExpressionAtomOutcomes
+import Solcore.Syntax.Internal.ParameterOutcomes
+import Solcore.Syntax.Internal.TypeOutcomes
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Grammar.StatementLayer
 
 /-!

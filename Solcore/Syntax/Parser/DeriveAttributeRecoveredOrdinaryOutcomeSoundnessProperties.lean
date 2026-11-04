@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryExactnessProperties
+import Solcore.Syntax.Internal.DeriveOutcomes
 import Solcore.Syntax.Parser.DeriveAttributeRecoveredOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeRecoveredOrdinarySuccessSoundnessProperties
 

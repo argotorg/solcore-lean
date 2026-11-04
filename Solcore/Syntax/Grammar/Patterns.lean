@@ -1,9 +1,9 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Unicode.Lowercase
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreTypeNameOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreExpressionNameOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
+import Solcore.Syntax.Internal.TypeOutcomes
+import Solcore.Syntax.Internal.ExpressionOutcomes
 
 /-!
 Declarative grammar of patterns.

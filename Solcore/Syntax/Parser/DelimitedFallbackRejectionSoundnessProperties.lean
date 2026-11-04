@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
+import Solcore.Syntax.Internal.DelimitedExactness
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.Pattern
 

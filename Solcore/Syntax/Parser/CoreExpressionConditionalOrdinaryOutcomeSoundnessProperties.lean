@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionConditionalOutcomeProperties
+import Solcore.Syntax.Internal.ExpressionOutcomes
 import Solcore.Syntax.Parser.CoreExpressionConditionalOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionConditionalOrdinarySuccessSoundnessProperties
 

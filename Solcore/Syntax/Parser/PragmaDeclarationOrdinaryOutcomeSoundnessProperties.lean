@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePragmaExactnessProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTransactionalFallbackOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Yul.Statement
 

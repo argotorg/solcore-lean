@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectiveImportOutcomeProperties
+import Solcore.Syntax.Internal.ImportOutcomes
 import Solcore.Syntax.Parser.SelectiveImportOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportOrdinarySuccessSoundnessProperties
 

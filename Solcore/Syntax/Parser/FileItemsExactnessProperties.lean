@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFileItemsExactnessProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.FileItemsOrdinaryOutcomeSoundnessProperties
 
 /-! Exact executable file-item results without exposing the reverse accumulator. -/

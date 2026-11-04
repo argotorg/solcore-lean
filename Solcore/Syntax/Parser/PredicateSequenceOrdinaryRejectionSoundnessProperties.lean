@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.BarePredicateSequenceOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.DeclarativePredicateSequenceExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.PredicateSequenceSoundnessProperties
 
 /-! Exact executable rejection reflection for grouped-first predicate choice. -/

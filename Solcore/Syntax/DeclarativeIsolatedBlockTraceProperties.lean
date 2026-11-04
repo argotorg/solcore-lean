@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeIsolatedBlockTraceErasureProperties
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 
 /-! Exact ASTs, endpoints, reports, and ordered traces through block isolation.
 Only fixed-context inner functionality and disjointness are assumed; totality

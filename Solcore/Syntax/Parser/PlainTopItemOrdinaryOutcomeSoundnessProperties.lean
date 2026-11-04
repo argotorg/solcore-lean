@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePlainTopItemOutcomeProperties
+import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.PlainTopItemOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemOrdinarySuccessSoundnessProperties
 

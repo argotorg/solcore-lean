@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternPublicOutcomeProperties
+import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternRecoveryOrdinarySoundnessProperties
 
 /-! Executable lookahead bridges for the public Core pattern boundary. -/

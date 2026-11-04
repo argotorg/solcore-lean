@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePredicateSequenceExactnessProperties
+import Solcore.Syntax.Internal.SignatureExactness
 import Solcore.Syntax.Parser.BarePredicateSequenceSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.PredicateOrdinaryRejectionSoundnessProperties

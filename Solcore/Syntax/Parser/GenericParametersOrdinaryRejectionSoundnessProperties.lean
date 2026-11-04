@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeGenericParametersExactnessProperties
+import Solcore.Syntax.Internal.SignatureOutcomes
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

@@ -1,18 +1,8 @@
-import Solcore.Syntax.DeclarativeTransactionalFallbackOutcomeProperties
-import Solcore.Syntax.DeclarativeYulBlockStatementOutcomeProperties
-import Solcore.Syntax.DeclarativeYulFunctionOutcomeProperties
-import Solcore.Syntax.DeclarativeYulLetOrdinaryOutcomeProperties
-import Solcore.Syntax.DeclarativeYulNameStatementOutcomeProperties
-import Solcore.Syntax.DeclarativeYulStatementControlOutcomeProperties
-import Solcore.Syntax.DeclarativeYulSwitchOutcomeProperties
+import Solcore.Syntax.Internal.DelimitedOutcomes
+import Solcore.Syntax.Internal.YulBlockOutcomes
+import Solcore.Syntax.Internal.YulStatementOutcomes
 import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.Grammar.YulOrdinary
-import Solcore.Syntax.DeclarativeYulBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeTransactionalFallbackExactnessProperties
-import Solcore.Syntax.DeclarativeYulFunctionExactnessProperties
-import Solcore.Syntax.DeclarativeYulStatementBasicExactnessProperties
-import Solcore.Syntax.DeclarativeYulStatementControlExactnessProperties
-import Solcore.Syntax.DeclarativeYulSwitchExactnessProperties
 
 /-!
 Yul statements at fuel, and the public body grammar.

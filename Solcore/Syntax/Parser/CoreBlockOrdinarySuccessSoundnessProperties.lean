@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
+import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.Block
 
 /-!

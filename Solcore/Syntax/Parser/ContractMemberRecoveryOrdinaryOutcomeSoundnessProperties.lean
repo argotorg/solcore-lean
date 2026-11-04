@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractMemberRecoveryExactnessProperties
+import Solcore.Syntax.Internal.DeriveOutcomes
 import Solcore.Syntax.Parser.ContractMemberRecoveryBoundaryProperties
 import Solcore.Syntax.Parser.ContractRecoveryTotalityProperties
 
