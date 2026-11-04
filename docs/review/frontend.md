@@ -278,22 +278,22 @@ use them either. They stay because tests use them.
 
 | File | Topic |
 | --- | --- |
-| `Fragments/Internal/ClosedSource` | Closed source syntax, evaluation and executable checking. |
-| `Fragments/Internal/Computation` | Computation bodies, return trees and compiled functions. |
-| `Fragments/Internal/Expected` | Expected-type lambda and local binding adapters. |
-| `Fragments/Internal/ExpectedLambdas` | One family of expected lambda arguments, through any depth of source groups and conditionals. |
-| `Fragments/Internal/Foundations` | Word binaries, word matches, named and structural types, and local references. |
-| `Fragments/Internal/LambdaDepth` | Bounds on lambda depth in closed source, and self-application. |
-| `Fragments/Internal/LocalApplication` | Local applications and their runtime function. |
-| `Fragments/Internal/LocalComputations` | The nonrecursive union of local profiles, and its runtime function. |
-| `Fragments/Internal/LocalExpressions` | The canonical local expression fragment: syntax, names, typing, evaluation, renaming and safety. |
-| `Fragments/Internal/LocalFunctionApplication` | Root application of a known function, with the fuel, store and resumption facts built on it. |
-| `Fragments/Internal/RecursiveComputation` | Recursive local computation and its entry operations. |
-| `Fragments/Internal/ReturnBodies` | Single returns, terminal `if`, and return trees. |
-| `Fragments/Internal/RuntimeFunctions` | Runtime parameter declarations and compiled runtime functions. |
-| `Fragments/Internal/RuntimeParameters` | Runtime parameter inputs, argument construction and input validation. |
-| `Fragments/Internal/SourceValues` | Mixed values that retain source closures, with their application and matching. |
-| `Fragments/Internal/TypedLet` | Annotated local declarations before a terminal return, in bodies and trees. |
+| [`Fragments/Internal/ClosedSource`](../../Solcore/Frontend/Fragments/Internal/ClosedSource.lean) | Closed source syntax, evaluation and executable checking. |
+| [`Fragments/Internal/Computation`](../../Solcore/Frontend/Fragments/Internal/Computation.lean) | Computation bodies, return trees and compiled functions. |
+| [`Fragments/Internal/Expected`](../../Solcore/Frontend/Fragments/Internal/Expected.lean) | Expected-type lambda and local binding adapters. |
+| [`Fragments/Internal/ExpectedLambdas`](../../Solcore/Frontend/Fragments/Internal/ExpectedLambdas.lean) | One family of expected lambda arguments, through any depth of source groups and conditionals. |
+| [`Fragments/Internal/Foundations`](../../Solcore/Frontend/Fragments/Internal/Foundations.lean) | Word binaries, word matches, named and structural types, and local references. |
+| [`Fragments/Internal/LambdaDepth`](../../Solcore/Frontend/Fragments/Internal/LambdaDepth.lean) | Bounds on lambda depth in closed source, and self-application. |
+| [`Fragments/Internal/LocalApplication`](../../Solcore/Frontend/Fragments/Internal/LocalApplication.lean) | Local applications and their runtime function. |
+| [`Fragments/Internal/LocalComputations`](../../Solcore/Frontend/Fragments/Internal/LocalComputations.lean) | The nonrecursive union of local profiles, and its runtime function. |
+| [`Fragments/Internal/LocalExpressions`](../../Solcore/Frontend/Fragments/Internal/LocalExpressions.lean) | The canonical local expression fragment: syntax, names, typing, evaluation, renaming and safety. |
+| [`Fragments/Internal/LocalFunctionApplication`](../../Solcore/Frontend/Fragments/Internal/LocalFunctionApplication.lean) | Root application of a known function, with the fuel, store and resumption facts built on it. |
+| [`Fragments/Internal/RecursiveComputation`](../../Solcore/Frontend/Fragments/Internal/RecursiveComputation.lean) | Recursive local computation and its entry operations. |
+| [`Fragments/Internal/ReturnBodies`](../../Solcore/Frontend/Fragments/Internal/ReturnBodies.lean) | Single returns, terminal `if`, and return trees. |
+| [`Fragments/Internal/RuntimeFunctions`](../../Solcore/Frontend/Fragments/Internal/RuntimeFunctions.lean) | Runtime parameter declarations and compiled runtime functions. |
+| [`Fragments/Internal/RuntimeParameters`](../../Solcore/Frontend/Fragments/Internal/RuntimeParameters.lean) | Runtime parameter inputs, argument construction and input validation. |
+| [`Fragments/Internal/SourceValues`](../../Solcore/Frontend/Fragments/Internal/SourceValues.lean) | Mixed values that retain source closures, with their application and matching. |
+| [`Fragments/Internal/TypedLet`](../../Solcore/Frontend/Fragments/Internal/TypedLet.lean) | Annotated local declarations before a terminal return, in bodies and trees. |
 
 ## What a reviewer should know
 

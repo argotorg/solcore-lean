@@ -1,7 +1,4 @@
-import Solcore.Frontend.Fragments.Local
-import Solcore.Frontend.Fragments.RuntimeAdapter
-import Solcore.Frontend.Fragments.ClosedSource
-import Solcore.Frontend.Fragments.ReturnTree
+import Solcore.Frontend.Fragments
 import Solcore.Frontend.Current
 
 /-!
