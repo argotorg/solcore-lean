@@ -170,7 +170,10 @@ def hLevels (ls : List Level) : UInt64 := mixList 27 (ls.map hLevel)
 def hBinderInfo : BinderInfo → UInt64
   | .default => 31 | .implicit => 32 | .strictImplicit => 33 | .instImplicit => 34
 
+/-- A recursor's minor premise is bound under its constructor's name, so a private constructor
+puts the module in the binder name. -/
 def hBinderName (n : Name) : UInt64 :=
+  let n := privateToUserName n
   hash (if n.hasMacroScopes || hasMacroScopeMarker n then stripMacroScopes n else n)
 
 def strLit? : Expr → Option String
