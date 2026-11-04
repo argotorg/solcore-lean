@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedProgramProfiles
 
 /-! Runtime coverage of returned generalized instances and retained captures.

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCallEvidenceCertificates
 import Solcore.Frontend.SourceCoreLocalEvidence
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Accepted outer evidence lowering supplies full selected metadata and the
 independent ordered dictionary. None delegates ordinary lowering and does not

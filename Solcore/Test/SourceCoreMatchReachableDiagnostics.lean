@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchExtraction
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The single match traversal preserves the selected diagnostic policy through
 ordered child requests, header/post receipts and the actual function finish.

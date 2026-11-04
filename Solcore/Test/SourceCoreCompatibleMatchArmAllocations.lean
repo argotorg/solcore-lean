@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmPrefix
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Consumers of the actual compatible marked arm allocator. Both evaluation
 directions reach the same independent source allocations even when the

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ImperativeNativePolicyTyping
 import Solcore.SourceSemantics.CoreLowering.CaptureCopyTyping
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! A concrete typed callback profile exercises the actual statement/header
 compiler without assuming the whole body's native type. The profile covers

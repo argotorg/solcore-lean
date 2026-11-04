@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 import Solcore.Test.SourceCoreUnifiedCorpusSupport
-import Solcore.Test.SourceRecursiveStageTupleExpressions
+import Solcore.Test.SourceSemantics.CompiledOrigins
 import Solcore.Test.SourceCoreRecursiveStagePrimitiveMeaning
 
 /-! Actual tuple acceptance retains the ordered child receipts. These static

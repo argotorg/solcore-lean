@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedScopedControlMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedFrames
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual scoped block and conditional lowering supplies the full recursive

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBodyMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The real compiler equations feed the function-body factory and concrete
 finite call consumers. Core-only fixtures cover Unit fallthrough, loop control,

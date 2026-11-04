@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfileFactory
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual cached loops with named globals certify their free-slot support.
 Formal consumers retain exact code, real body state and arbitrary actual

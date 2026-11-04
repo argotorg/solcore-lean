@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchPreparedDiagnostics
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual prepared diagnostics across statement, initializer and post origins.
 The public compiler consumer retains native/source static inputs and residual

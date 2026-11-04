@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreSelectedInterleavedLocalSource
-import Solcore.Test.SourceSemanticsCaptureCopies
+import Solcore.Test.SourceSemantics.Semantics
 import Solcore.SourceSemantics.Dynamic.Preservation
 
 /-! Independent Source execution of the original identity body after a genuine

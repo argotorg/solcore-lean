@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewScalarTrees
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false

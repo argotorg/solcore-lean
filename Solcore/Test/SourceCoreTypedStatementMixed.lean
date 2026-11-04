@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedStatementMixedMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Typed mapping initializers reach three source allocations, then fail in the fourth

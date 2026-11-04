@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCallEvidence
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual ordered materialization, including repeated IDs/goals, is related
 to independent source evidence. Rejected selection and forged implementation

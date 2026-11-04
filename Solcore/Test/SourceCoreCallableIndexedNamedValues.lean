@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedValues
 import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false

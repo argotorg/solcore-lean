@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewAllocations
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 #check_failure Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames.Annotated.mk

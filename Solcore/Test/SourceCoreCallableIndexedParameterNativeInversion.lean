@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterNativeInversion
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The actual checked cached root supplies native typing for its original
 named body. Packed argument and wrapper slots survive the prefix inversion,

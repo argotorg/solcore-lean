@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMixedMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! A mixed prefix reaches three source allocations, then fails in its fourth

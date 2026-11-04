@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! A concrete nested builtin condition in actual for lowering closes all

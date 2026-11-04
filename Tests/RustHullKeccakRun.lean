@@ -1,3 +1,3 @@
-import Solcore.Test.RustHullKeccak
+import Solcore.Test.Frontend.RustHull.Runtime
 
 def main : IO Unit := Tests.RustHullKeccak.run

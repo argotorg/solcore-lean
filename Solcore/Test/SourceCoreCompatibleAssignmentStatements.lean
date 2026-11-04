@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Assignment spines consume actual compatible flow receipts and retain all

@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual checked local polymorphic lambdas run through Core. A generalized
 local copies its lexical cells once, every concrete instance shares that

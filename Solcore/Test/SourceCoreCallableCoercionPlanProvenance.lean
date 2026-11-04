@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPlanProvenance
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Complete carrier identity survives insertion, duplicate acceptance and a
 later helper extension. Same keys with changed source, evidence or stage data

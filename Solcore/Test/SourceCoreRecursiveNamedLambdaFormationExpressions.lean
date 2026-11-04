@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeProfileFactory
 import Solcore.Test.SourceCoreUnifiedCorpusSupport
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Formation is a leaf of the same whole expression tree and survives inside
 actual named callees in one fixed runtime value model. The lambda body receipt

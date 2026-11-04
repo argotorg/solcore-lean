@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionEvidenceOrigins
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual selector/materializer receipts supply independent dictionary origin.
 Tests retain first-match behavior, repeated goals, source order and the explicit

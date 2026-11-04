@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchExtraction
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual flow extraction now retains all fixed match ledgers. The formal
 consumer builds Ready from source context validity and the unchanged diagnostic

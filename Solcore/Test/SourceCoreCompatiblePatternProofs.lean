@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternLeaves
 import Solcore.SourceSemantics.CoreLowering.CompatiblePatternMetadata
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! Actual compatible compiler consumers use general payloads and ambient

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinForHeader
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run

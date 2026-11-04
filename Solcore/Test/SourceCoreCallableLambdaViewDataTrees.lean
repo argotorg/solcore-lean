@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewRecursiveTrees
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualRecursive
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run

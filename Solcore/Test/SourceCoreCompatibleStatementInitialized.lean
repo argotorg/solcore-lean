@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementInitializedMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! The initializer reads the old scope. Independent success/fault source

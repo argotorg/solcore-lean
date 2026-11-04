@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! A nested builtin inside an ordinary parent extracts its complete tree from

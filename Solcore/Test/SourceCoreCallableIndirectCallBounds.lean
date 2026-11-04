@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
 import Solcore.Frontend.SourceCoreCallableIndexedPrograms
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Foundation consumers for actual indirect lowering and original Core child
 grades. The runtime fixture audits the real prepared contract policy and all

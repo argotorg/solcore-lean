@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The independently selected compatible arm reaches an actual closure body
 with exactly its real captured environment. Both finite directions preserve the

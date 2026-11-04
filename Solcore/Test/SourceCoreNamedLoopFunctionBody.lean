@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionBodyMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual compiler equations and concrete nested named-loop trees feed finite
 function-body consumers. Checked fixtures retain returns and fault writes through

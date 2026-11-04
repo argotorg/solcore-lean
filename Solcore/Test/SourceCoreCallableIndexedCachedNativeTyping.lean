@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedCachedNativeTyping
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Cached native roots type their actual second-pass closures. Both global
 slots and wrapper input types are retained; native typing grants no source

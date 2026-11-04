@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Guarded equal assignments need no nonexistent operand diagnostic. Concrete

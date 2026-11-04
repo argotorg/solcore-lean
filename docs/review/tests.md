@@ -114,6 +114,68 @@ Covers [`Solcore/ContractRuntime`](../../Solcore/ContractRuntime): frames, world
 | [`ValueCalls`](../../Solcore/Test/ContractRuntime/ValueCalls.lean) | Value call boundary tests | 6 |
 | [`WorldState`](../../Solcore/Test/ContractRuntime/WorldState.lean) | World state tests | 19 |
 
+### Frontend
+
+Covers [`Solcore/Frontend`](../../Solcore/Frontend): checked programs, runtime fragments, the source compiler.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Source/CompilationPlan`](../../Solcore/Test/Frontend/Source/CompilationPlan.lean) | Compilation plan tests | 2 |
+| [`Source/Compiler`](../../Solcore/Test/Frontend/Source/Compiler.lean) | Source compiler tests | 15 |
+| [`Source/CompilerFeatureSupport`](../../Solcore/Test/Frontend/Source/CompilerFeatureSupport.lean) | Source compiler test support | 1 |
+| [`Source/Inference`](../../Solcore/Test/Frontend/Source/Inference.lean) | Source inference tests | 10 |
+| [`Source/Specialization`](../../Solcore/Test/Frontend/Source/Specialization.lean) | Specialization and coercion tests | 9 |
+| [`Source/Staged`](../../Solcore/Test/Frontend/Source/Staged.lean) | Staged source tests | 9 |
+| [`Source/StagedIntegers`](../../Solcore/Test/Frontend/Source/StagedIntegers.lean) | Staged integer tests | 6 |
+| [`Source/TypedRuntime`](../../Solcore/Test/Frontend/Source/TypedRuntime.lean) | Typed runtime tests | 4 |
+
+### Frontend/RustHull
+
+Covers [`Solcore/Frontend/RustHull`](../../Solcore/Frontend/RustHull): the imported Hull: execution and correspondence with upstream.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Accounts`](../../Solcore/Test/Frontend/RustHull/Accounts.lean) | Hull account tests | 15 |
+| [`Calls`](../../Solcore/Test/Frontend/RustHull/Calls.lean) | Hull call tests | 17 |
+| [`Correspondence`](../../Solcore/Test/Frontend/RustHull/Correspondence.lean) | Hull correspondence tests | 13 |
+| [`Creation`](../../Solcore/Test/Frontend/RustHull/Creation.lean) | Hull creation tests | 11 |
+| [`Effects`](../../Solcore/Test/Frontend/RustHull/Effects.lean) | Hull effect correspondence tests | 10 |
+| [`Runtime`](../../Solcore/Test/Frontend/RustHull/Runtime.lean) | Hull runtime tests | 8 |
+
+### SourceSemantics
+
+Covers [`Solcore/SourceSemantics`](../../Solcore/SourceSemantics): source semantics and inference.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`CompiledOrigins`](../../Solcore/Test/SourceSemantics/CompiledOrigins.lean) | Compiled origin tests | 22 |
+| [`Inference`](../../Solcore/Test/SourceSemantics/Inference.lean) | Source inference tests | 6 |
+| [`Semantics`](../../Solcore/Test/SourceSemantics/Semantics.lean) | Source semantics tests | 9 |
+| [`SemanticsBoundary`](../../Solcore/Test/SourceSemantics/SemanticsBoundary.lean) | Source semantics boundary tests | 3 |
+| [`SemanticsSubstitution`](../../Solcore/Test/SourceSemantics/SemanticsSubstitution.lean) | Source substitution tests | 1 |
+
+### Synthesis
+
+Covers [`Solcore/Synthesis`](../../Solcore/Synthesis): generators, emitters, golden files and fixed corpora.
+
+| File | Tests | Old modules |
+| --- | --- | ---: |
+| [`Aggregates`](../../Solcore/Test/Synthesis/Aggregates.lean) | Aggregate and closure profile tests | 9 |
+| [`Arrays`](../../Solcore/Test/Synthesis/Arrays.lean) | Array profile tests | 10 |
+| [`Bytes`](../../Solcore/Test/Synthesis/Bytes.lean) | Bytes profile tests | 12 |
+| [`CallGraphs`](../../Solcore/Test/Synthesis/CallGraphs.lean) | Call graph profile tests | 10 |
+| [`Calls`](../../Solcore/Test/Synthesis/Calls.lean) | Call profile tests | 17 |
+| [`Enums`](../../Solcore/Test/Synthesis/Enums.lean) | Enum profile tests | 10 |
+| [`EventsAndReverts`](../../Solcore/Test/Synthesis/EventsAndReverts.lean) | Event and revert profile tests | 4 |
+| [`Generators`](../../Solcore/Test/Synthesis/Generators.lean) | Generator tests | 18 |
+| [`Loops`](../../Solcore/Test/Synthesis/Loops.lean) | Loop profile tests | 18 |
+| [`Malformed`](../../Solcore/Test/Synthesis/Malformed.lean) | Malformed calldata profile tests | 9 |
+| [`Memory`](../../Solcore/Test/Synthesis/Memory.lean) | Memory profile tests | 2 |
+| [`Scalars`](../../Solcore/Test/Synthesis/Scalars.lean) | Scalar profile tests | 16 |
+| [`SourceMeaning`](../../Solcore/Test/Synthesis/SourceMeaning.lean) | Source meaning tests | 10 |
+| [`Storage`](../../Solcore/Test/Synthesis/Storage.lean) | Storage profile tests | 16 |
+| [`Traits`](../../Solcore/Test/Synthesis/Traits.lean) | Trait profile tests | 5 |
+
 ## A file that stays where it is
 
 [`Solcore/Test/SourceCallReturnGolden.lean`](../../Solcore/Test/SourceCallReturnGolden.lean) keeps its path
@@ -122,4 +184,4 @@ for its golden rows, so it can neither move nor share a file with other tuples o
 
 ## Not merged yet
 
-2542 old modules are still flat in `Solcore/Test`.
+2205 old modules are still flat in `Solcore/Test`.

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallAdmission
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The reached declaration's actual Valid witness closes ordinary raw-call
 admission with unchanged caller type scopes, including residually open bodies.

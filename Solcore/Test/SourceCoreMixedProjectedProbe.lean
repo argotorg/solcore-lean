@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.SourceCompiler
 
 /-! One original combines a retained generalized identity, a virtual mapping

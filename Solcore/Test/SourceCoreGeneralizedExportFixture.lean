@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedExportProbe
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
 import Solcore.SourceSemantics.CoreLowering.CallableNamedMetadata
 

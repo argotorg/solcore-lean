@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreNamedBranchSource
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.Dynamic.Evaluation
 
 /-! One unchanged original function captures an identity lambda as a generalized

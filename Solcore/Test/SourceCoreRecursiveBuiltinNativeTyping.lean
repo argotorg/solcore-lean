@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinNativeTyping
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! Nested contracted builtins close every native child obligation from the

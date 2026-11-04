@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfiles
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The same named for body and recursive catalog static profile accept reachable
 operand diagnostics. Concrete named expression children close the body meaning;

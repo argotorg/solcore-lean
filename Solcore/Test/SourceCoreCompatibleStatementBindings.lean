@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual marked compiler receipts supply a two-binding semantic certificate.

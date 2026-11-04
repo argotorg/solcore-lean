@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual outer acceptance retains raw arguments, selected slots and emitted
 suffixes. The formal consumers keep the original raw-form laws explicit; they

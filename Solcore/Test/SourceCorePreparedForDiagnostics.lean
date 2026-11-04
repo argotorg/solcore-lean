@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForCertificates
 import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfiles
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual prepared operand laws follow the existing for traversal into named
 body and recursive catalog receipts. Source syntax/typing, child certificates,

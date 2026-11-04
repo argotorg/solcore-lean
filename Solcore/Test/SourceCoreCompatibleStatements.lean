@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedFrames
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Static production receipts plus full finite sequence proofs. An actual fresh

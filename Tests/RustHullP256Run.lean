@@ -1,3 +1,3 @@
-import Solcore.Test.RustHullP256
+import Solcore.Test.Frontend.RustHull.Runtime
 
 def main : IO Unit := Tests.RustHullP256.run

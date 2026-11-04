@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchSelectionPrefix
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Whole actual compatible match receipt extraction and ordered source
 selection, plus runtime regressions for hidden/arm allocations, no-branch

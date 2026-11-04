@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBod
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralReturnSiteShells
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFiniteSourceRuntimeReceipts
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The written fixture retains actual successful compiler equations, one
 initializer-root parent action, numeric evidence, and finite graph/runtime

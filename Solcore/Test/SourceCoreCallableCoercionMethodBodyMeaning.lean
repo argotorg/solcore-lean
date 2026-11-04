@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodBodyMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual body/parameter/hook equations and finite builtin body trees close a
 fixed selected method dictionary. Reflection produces the independent source

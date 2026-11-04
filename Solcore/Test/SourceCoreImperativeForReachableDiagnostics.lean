@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
 import Solcore.SourceSemantics.CoreLowering.NamedImperativeForStatements
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Reachable assignment diagnostics pass through the same ordinary statement,

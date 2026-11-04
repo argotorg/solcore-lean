@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodEvidenceInvariant
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The same accepted concrete method body is consumed at arbitrary covering
 source dictionaries. None of the formal consumers identify evidence trees or

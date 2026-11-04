@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawGroupMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The consumers begin with actual delegated acceptance and its actual
 contextual callback, then close raw meaning with a concrete builtin child.

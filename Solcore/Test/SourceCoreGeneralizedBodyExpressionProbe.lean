@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.SourceCompiler
 set_option autoImplicit false
 set_option Elab.async false

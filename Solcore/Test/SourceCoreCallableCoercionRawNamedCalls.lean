@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual outer ordinary calls use the reached full header and original-source
 ordered argument Trees. The formal consumers close argument/body runtime laws

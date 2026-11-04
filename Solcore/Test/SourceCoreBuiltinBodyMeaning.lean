@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBuiltinMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The real seven builtin bodies retain arbitrary captures and stores. A
 selected argument allocates once before invocation; completed executions recover

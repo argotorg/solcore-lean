@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewIndexedTrees
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualGeneral
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualTyped
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false

@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.SourceCompiler
 
 /-! One unchanged original body combines short-circuit operators, a generalized identity,

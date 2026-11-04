@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedStatementMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedFrames
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Repeated indexing crosses a discarded-payload slot and captures a real

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSelectedInvocation
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual emitted compiler receipts determine the complete independent body;
 an arbitrary source selector and dictionary are consumed without body equality

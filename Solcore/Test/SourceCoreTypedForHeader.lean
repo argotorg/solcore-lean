@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedForHeaderPost
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual for-item lowering, whole native typing and an independent source

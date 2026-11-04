@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallCertificates
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallProtocol
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! Actual tagged/contracted builtin invocation retains argument effects and

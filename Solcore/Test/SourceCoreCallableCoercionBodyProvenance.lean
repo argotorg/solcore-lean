@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual generic coercion rechecking is tied to the loaded method carrier,
 then to structural source substitution. Executable checks use the public Core

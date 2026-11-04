@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual method selection supplies the independent source judgment and exact
 ordered dictionary. Runtime checks exercise the same accepted compiler paths;

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
 import Solcore.Test.SourceCoreUnifiedCorpusSupport
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run

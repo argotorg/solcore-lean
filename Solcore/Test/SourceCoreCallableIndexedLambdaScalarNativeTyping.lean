@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaScalarNativeTyping
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The consumer creates Code and real named history without a Code or native
 HasType premise. Static scalar syntax/typing and exact callback equations remain

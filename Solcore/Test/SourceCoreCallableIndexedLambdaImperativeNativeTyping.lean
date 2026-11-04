@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaImperativeNativeTyping
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The consumer creates Code and real named history without a Code or native
 HasType premise. Static native callback laws and exact body equations remain visible. IO checks heterogeneous packed parameters, lexical captures, lazy faults

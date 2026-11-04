@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedScopedStatementMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedFrames
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! The same checked retained expression has two independent list meanings:

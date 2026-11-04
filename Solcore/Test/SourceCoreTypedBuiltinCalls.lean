@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallTypedCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! Actual builtin lowering closes concrete General argument meanings. Finite

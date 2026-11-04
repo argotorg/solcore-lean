@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedRestoration
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false

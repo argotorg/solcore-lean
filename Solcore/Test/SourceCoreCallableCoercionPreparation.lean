@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionEvidenceOrigins
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Outer preparation supplies actual method-extension witnesses, including
 coercions inside appended carriers. Formal consumers retain same-fuel source

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Test.SourceCoreUnifiedOperatorCorpus
 import Solcore.Test.SourceCoreCallableCoercionSourceSelection
 

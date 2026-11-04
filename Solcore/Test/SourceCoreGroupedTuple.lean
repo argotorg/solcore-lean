@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.SourceCorePlanCatalog
 
 /-! Grouped tuple regressions cross the parser, checker and specialization

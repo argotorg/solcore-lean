@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Test.SourceCoreAssignmentFaultSites
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run

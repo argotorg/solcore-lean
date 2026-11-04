@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPathMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Two actual emitted methods consume concrete builtin body certificates.
 Source traces use the actual selected dictionaries, without assuming dictionary

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCallRequirementLayouts
 import Solcore.Frontend.SourceCoreLocalEvidence
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Reached evidence validity comes from actual caller resolution, ordered
 materialization and callee authentication. Unrelated invalid templates, exact

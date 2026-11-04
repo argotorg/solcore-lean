@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
 import Solcore.Frontend.SourceCoreCallableIndexedRestoration
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! The compiler-owned ordinary site constructs its history alignment instead
 of receiving it. Runtime regressions inspect exact named source, saved lexical

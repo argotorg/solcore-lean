@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Assignment inside while consumes actual lowering and whole-code typing,

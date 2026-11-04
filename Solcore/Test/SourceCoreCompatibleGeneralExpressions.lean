@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualGeneral
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.SourceCoreCompatibleFunctions
 import Solcore.Frontend.SourceCoreCallableIndexedFrames
 import Solcore.Frontend.ProgramChecking

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSelectedExpressionFactory
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallScalarArguments
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceSignatureFacts
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual reached selection closes full named argument Trees without covering
 unrelated global methods. The original ordered source metadata, separate

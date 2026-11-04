@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Mixed for/while consumes actual lowering and whole-code typing,

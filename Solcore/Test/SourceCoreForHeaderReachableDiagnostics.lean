@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.BuiltinForHeader
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderPost
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! One header Tree supports unconditional and reachable diagnostics. Concrete

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
-import Solcore.Test.SourceRecursiveStageTupleExpressions
+import Solcore.Test.SourceSemantics.CompiledOrigins
 import Solcore.Test.SourceCoreRecursiveStagePrimitiveMeaning
 
 /-! The actual primitive receipts supply the staged child meanings for an

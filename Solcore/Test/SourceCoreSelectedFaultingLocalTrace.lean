@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreSelectedFaultingLocalSource
-import Solcore.Test.SourceSemanticsCaptureCopies
+import Solcore.Test.SourceSemantics.Semantics
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.Fault
 

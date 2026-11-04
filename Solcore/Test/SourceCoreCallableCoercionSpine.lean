@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSpineEvaluation
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual helper acceptance supplies ordered static receipts. Native tests
 observe saved captures, early failure, duplicate calls and hidden caller slots.

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableNamedCanonicalOrder
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 
 /-! The checker and specialization factory keep distinct ordered ledgers.

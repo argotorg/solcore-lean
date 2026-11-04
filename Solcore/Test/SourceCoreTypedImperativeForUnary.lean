@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForUnaryCertificates
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Bare unary assignments preserve source order at every recursive loop

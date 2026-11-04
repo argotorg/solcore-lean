@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Finite actual match children preserve duplicate occurrence order. The
 recursive statement receipt admits matches inside loops and restores source

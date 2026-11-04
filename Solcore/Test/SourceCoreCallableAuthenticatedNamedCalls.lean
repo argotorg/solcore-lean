@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Authenticated children retain the actual special hook, ordered arguments,
 and nonempty caller evidence. The final consumers build their Tree from actual

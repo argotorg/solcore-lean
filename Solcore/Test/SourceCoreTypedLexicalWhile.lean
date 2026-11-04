@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual lowering, checker receipts and independent source control connect to

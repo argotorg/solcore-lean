@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedBuiltinValues
 import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual builtin references under a sealed indexed artifact supply all

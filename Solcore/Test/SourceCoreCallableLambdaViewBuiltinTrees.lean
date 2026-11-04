@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBuiltinTrees
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false

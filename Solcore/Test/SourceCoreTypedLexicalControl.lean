@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! A scoped block lazily initializes a mapping and allocates three locals before

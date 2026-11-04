@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourcePathMeaning
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Arbitrary independent source paths consume the actual emitted list, without
 selected-dictionary annotations. Runtime tests retain three actual method edges,

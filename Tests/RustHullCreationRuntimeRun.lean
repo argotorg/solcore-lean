@@ -1,3 +1,3 @@
-import Solcore.Test.RustHullCreationRuntime
+import Solcore.Test.Frontend.RustHull.Accounts
 
 def main : IO Unit := Tests.RustHullCreationRuntime.run

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallBuiltinArguments
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Actual builtin argument callbacks close the final raw-call argument Trees.
 The concrete semantic consumers retain the original parent requirements/output

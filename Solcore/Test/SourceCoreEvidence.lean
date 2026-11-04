@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-! Closed evidence and retained coercions run through ordinary cached Core
 functions. The checker keeps its existing admission rules. -/
