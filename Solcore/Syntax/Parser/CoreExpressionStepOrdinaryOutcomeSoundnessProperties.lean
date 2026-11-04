@@ -4,7 +4,7 @@ import Solcore.Syntax.Parser.CoreExpressionAtomPublicOrdinaryOutcomeSoundnessPro
 import Solcore.Syntax.Parser.CoreExpressionLayerOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionPostfixOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Expression.Atom
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-!
 One-call executable ordinary outcomes for a complete Core expression step.

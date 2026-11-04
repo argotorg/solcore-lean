@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionPostfixGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.Internal.NameTrace
 

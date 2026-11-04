@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DeriveRecoveryDiagnosticProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Backward diagnostic reflection for derive targets and attributes. -/
 

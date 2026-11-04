@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementFuelGrammar
+import Solcore.Syntax.Grammar.YulFuel
 import Solcore.Syntax.Parser.YulAssignmentPublicFallbackSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementLayerSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementRecursiveDiagnosticReflectionProperties

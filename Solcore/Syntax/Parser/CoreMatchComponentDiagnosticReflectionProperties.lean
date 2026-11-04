@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreBlockSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Statement.Match
 
 /-! Diagnostic reflection for Core-match parsing components. -/

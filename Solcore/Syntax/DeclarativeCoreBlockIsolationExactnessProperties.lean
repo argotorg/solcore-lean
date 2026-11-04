@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreBlockExactnessProperties
-import Solcore.Syntax.DeclarativeCoreBlockPublicIsolationOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.TermLevels
+import Solcore.Syntax.Grammar.Basics
 
 /-! Exactness transport through balanced Core-block isolation. -/
 

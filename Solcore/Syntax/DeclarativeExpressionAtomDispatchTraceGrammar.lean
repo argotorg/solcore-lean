@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceGrammar
 import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceGrammar

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeConstructorDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeFunctionParametersOutcomeProperties
 import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeProperties
 

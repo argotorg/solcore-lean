@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Yul.Expression
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.LiteralProperties
 
 /-! Provenance and cursor contracts for nonrecursive inline-Yul leaves. -/

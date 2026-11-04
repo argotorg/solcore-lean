@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExportPathOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.ExportPathTotalityProperties

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedNonemptyTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativePredicateOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-!
 Deterministic parser-independent outcomes for predicates and grouped predicate

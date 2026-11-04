@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreBlockOutcomeGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-!
 Functionality, rejection exclusivity, and clean embedding for ordinary raw

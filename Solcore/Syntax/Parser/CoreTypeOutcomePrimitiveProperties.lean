@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreTypeOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Types
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Executable lookahead bridges shared by exact Core-type outcomes. -/
 

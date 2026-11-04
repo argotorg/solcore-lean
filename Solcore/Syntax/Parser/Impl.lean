@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Function
-import Solcore.Syntax.DeclarativeImplHeadArgumentsOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
@@ -12,16 +12,14 @@ import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.DeclarativeImplHeadArgumentsExactnessProperties
 import Solcore.Syntax.DeclarativeImplMethodExactnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.DeclarativeImplBodyOutcomeGrammar
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.DeclarativeImplBodyExactnessProperties
-import Solcore.Syntax.DeclarativeImplDeclarationOutcomeGrammar
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.DeclarativeImplDeclarationExactnessProperties
 import Solcore.Syntax.Parser.FunctionProperties
-import Solcore.Syntax.CallableDeclarationValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
 import Solcore.Syntax.Parser.FunctionDeclarationTotalityProperties
 import Solcore.Syntax.Parser.DelimitedNonemptyProperties

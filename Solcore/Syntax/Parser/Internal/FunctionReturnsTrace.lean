@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-!
 Parser side of the traces of an optional `returns` clause: silent absence,

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeContractDeriveAttachmentProperties
 import Solcore.Syntax.DeclarativeContractMemberCoreOutcomeProperties
-import Solcore.Syntax.DeclarativeContractMemberWithAttributeOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeDeriveAttributeOutcomeProperties
 
 /-!

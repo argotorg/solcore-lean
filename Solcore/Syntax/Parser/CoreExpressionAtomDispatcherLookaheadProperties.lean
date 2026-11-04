@@ -1,6 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomDispatcherGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.Literal
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-!
 Bridges between executable atom-dispatch lookaheads and the independent

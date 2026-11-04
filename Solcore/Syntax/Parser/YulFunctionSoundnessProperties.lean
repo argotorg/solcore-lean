@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeYulFunctionGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Yul
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.DelimitedAllowEmptyDiagnosticFreeSoundnessProperties
 import Solcore.Syntax.Parser.YulBlockSoundnessProperties
 import Solcore.Syntax.Parser.YulFunctionDiagnosticReflectionProperties

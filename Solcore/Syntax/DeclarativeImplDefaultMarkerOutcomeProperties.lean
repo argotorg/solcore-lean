@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeImplDefaultMarkerOutcomeGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
+import Solcore.Syntax.Grammar.Basics
 
 /-! Deterministic exact outcomes for the optional implementation marker. -/
 

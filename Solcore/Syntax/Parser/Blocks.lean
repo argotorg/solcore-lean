@@ -3,22 +3,16 @@ import Solcore.Syntax.Source
 import Solcore.Syntax.Term
 import Solcore.Syntax.Token
 import Solcore.Syntax.Parser.Primitive
-import Solcore.Syntax.Parser.Validity
-import Solcore.Syntax.ExpressionValidity
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.Diagnostic
-import Solcore.Syntax.Parser.PrimitiveProperties
 import Solcore.Syntax.Yul
 import Solcore.Syntax.Type
 import Solcore.Syntax.Foundation
 import Solcore.Syntax.Operator
-import Solcore.Syntax.DeclarativeCoreBlockGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Literal
-import Solcore.Syntax.DeclarativeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
-import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.ValidityBasics
 
 /-!
 Block capture and Core block parsing.

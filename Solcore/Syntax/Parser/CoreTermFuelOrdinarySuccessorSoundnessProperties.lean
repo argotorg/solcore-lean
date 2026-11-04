@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreTermFuelEquationProperties
+import Solcore.Syntax.Grammar.TermLevels
 import Solcore.Syntax.Parser.CoreBlockIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionStepOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterOrdinaryOutcomeSoundnessProperties

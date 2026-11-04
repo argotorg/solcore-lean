@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.FunctionSignatureOrdinaryOutcomeSoundnessProperties

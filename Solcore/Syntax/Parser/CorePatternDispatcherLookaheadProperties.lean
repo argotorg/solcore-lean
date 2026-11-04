@@ -1,6 +1,5 @@
-import Solcore.Syntax.DeclarativeCorePatternGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.Literal
+import Solcore.Syntax.Grammar.Patterns
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Executable-to-declarative lookahead bridges for ordered pattern parsing. -/
 

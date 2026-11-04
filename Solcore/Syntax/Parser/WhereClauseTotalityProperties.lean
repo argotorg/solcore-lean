@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.PredicateSequenceTotalityProperties
-import Solcore.Syntax.Parser.WhereClauseProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Valid-input totality for canonical optional `where` clauses. -/
 

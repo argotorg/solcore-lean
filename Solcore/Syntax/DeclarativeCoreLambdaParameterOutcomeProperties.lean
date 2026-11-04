@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
-import Solcore.Syntax.DeclarativeCoreLambdaParameterOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes of the lambda-parameter core. -/
 

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionNameOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreIdentifierExpressionOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes for a Core identifier expression. -/
 

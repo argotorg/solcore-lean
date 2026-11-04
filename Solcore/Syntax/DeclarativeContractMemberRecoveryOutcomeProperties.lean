@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractMemberRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Functionality and outcome exclusion for contract-member recovery. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionLambdaOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
 
 /-! Deterministic ordinary outcomes for guarded Core lambda expressions. -/

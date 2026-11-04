@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeHidingClauseOutcomeProperties
 import Solcore.Syntax.DeclarativeImportTerminatorOutcomeProperties
 import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
 import Solcore.Syntax.DeclarativeSelectedImportsOutcomeProperties
-import Solcore.Syntax.DeclarativeSelectiveImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad selective-import outcomes. -/
 

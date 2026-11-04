@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.ExportProperties
 
 /-! Success soundness of maximal canonical export paths. -/

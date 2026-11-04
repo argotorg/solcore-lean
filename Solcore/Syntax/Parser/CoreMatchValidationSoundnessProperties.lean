@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreMatchStatementGrammar
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Statement.Match
 
 /-! Diagnostic reflection and clean soundness of Core-match arity validation. -/

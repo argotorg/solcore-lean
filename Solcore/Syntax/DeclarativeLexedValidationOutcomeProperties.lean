@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeLexedValidationOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Totality, functionality, and acceptance laws for lexical validation. -/
 

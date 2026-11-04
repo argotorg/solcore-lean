@@ -1,8 +1,8 @@
 import Solcore.Syntax.Declaration
-import Solcore.Syntax.CoreTermValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
-import Solcore.Syntax.DeclarativeFileGrammar
-import Solcore.Syntax.DeclarativeGrammar
+import Solcore.Syntax.Grammar.SourceFile
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingExactnessProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingExactnessProperties
 import Solcore.Syntax.DeclarativeTransactionalFallbackExactnessProperties
@@ -100,9 +100,8 @@ import Solcore.Syntax.Parser.DiagnosticFilter
 import Solcore.Syntax.Parser.DeriveCarrierProperties
 import Solcore.Syntax.Parser.DeclarationCanonicalProperties
 import Solcore.Syntax.Parser.Preflight
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.LiteralProperties
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Parser.Yul.LeafProperties
 

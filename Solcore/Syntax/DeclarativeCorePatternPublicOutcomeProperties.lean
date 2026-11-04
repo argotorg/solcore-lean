@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternPublicOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.DeclarativeCorePatternRecoveryOutcomeProperties
 
 /-! Deterministic outcomes at the public Core pattern recovery boundary. -/

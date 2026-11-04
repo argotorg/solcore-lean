@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Derive
 

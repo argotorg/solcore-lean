@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeImportTerminatorOutcomeProperties
 import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
-import Solcore.Syntax.DeclarativeNamespaceImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad namespace-import helper outcomes. -/
 

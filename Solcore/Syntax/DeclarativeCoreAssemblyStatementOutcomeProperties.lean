@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreAssemblyStatementOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic ordinary outcomes for Core `assembly`. -/
 

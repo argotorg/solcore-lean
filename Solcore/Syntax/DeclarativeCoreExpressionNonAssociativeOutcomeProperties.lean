@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionLayerOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes for Core non-associative expressions. -/
 

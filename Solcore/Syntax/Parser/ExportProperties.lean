@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Export
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Provenance, token-window, and cursor contracts for export subparsers. -/
 

@@ -1,8 +1,8 @@
 import Solcore.Syntax.Parser.Terms
-import Solcore.Syntax.Parser.Literal
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.Parser.LiteralProperties
-import Solcore.Syntax.ExpressionValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.LiteralTotalityProperties
 import Solcore.Syntax.Parser.TypeFuelTotalityProperties
 import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties

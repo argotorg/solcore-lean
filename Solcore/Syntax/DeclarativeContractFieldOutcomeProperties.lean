@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractFieldOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 

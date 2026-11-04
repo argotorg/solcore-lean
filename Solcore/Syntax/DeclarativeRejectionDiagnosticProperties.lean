@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Totality and exactness of independent current-input rejection reports. -/
 

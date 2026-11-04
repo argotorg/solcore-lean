@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeHidingClauseOutcomeProperties
 import Solcore.Syntax.DeclarativeImportTerminatorOutcomeProperties
 import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
-import Solcore.Syntax.DeclarativeWildcardImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad wildcard-import outcomes. -/
 

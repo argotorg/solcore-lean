@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Exact ordinary-rejection reflection for simple recursive Core-type forms. -/
 

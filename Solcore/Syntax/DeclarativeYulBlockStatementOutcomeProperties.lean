@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeYulBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeYulStatementControlGrammar
+import Solcore.Syntax.Grammar.Yul
 
 /-! Ordinary outcomes for lifting one parsed Yul block into statement form. -/
 

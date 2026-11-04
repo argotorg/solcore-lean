@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 
 /-! Exact ordinary-rejection reflection for the delimited tail loop. -/

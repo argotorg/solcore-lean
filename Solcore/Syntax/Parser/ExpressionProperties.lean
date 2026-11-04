@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Expression
 import Solcore.Syntax.Parser.Expression.Atom
-import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.ExpressionValidity
+import Solcore.Syntax.ValidityBasics
+import Solcore.Syntax.Validity
 
 /-! Provenance and state contracts for canonical Core expression layers. -/
 

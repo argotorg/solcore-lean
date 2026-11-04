@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulExpressionGrammar
+import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.Parser.DelimitedAllowEmptyDiagnosticFreeSoundnessProperties
 import Solcore.Syntax.Parser.Yul.ExpressionProperties
 

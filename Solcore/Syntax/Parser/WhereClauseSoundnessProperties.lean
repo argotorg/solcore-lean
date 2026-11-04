@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.PredicateSequenceSoundnessProperties
-import Solcore.Syntax.Parser.WhereClauseProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Success soundness for optional canonical `where` clauses. -/
 

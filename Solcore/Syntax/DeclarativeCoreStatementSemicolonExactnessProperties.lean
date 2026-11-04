@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementSimpleGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Exact source spans and remainders for optional Core statement semicolons. -/

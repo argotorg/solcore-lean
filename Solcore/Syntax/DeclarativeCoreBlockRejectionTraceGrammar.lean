@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockTraceGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Independent ordinary rejection traces of raw Core blocks. A missing
 closing brace or rejected statement returns before tail validation. Only

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Disjointness of exact delimited-tail rejection traces from success. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulExpressionOrdinaryGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedFallbackRejectionSoundnessProperties
 import Solcore.Syntax.Parser.YulExpressionLeafSoundnessProperties

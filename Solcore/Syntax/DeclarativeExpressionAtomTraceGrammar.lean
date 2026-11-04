@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
-import Solcore.Syntax.DeclarativeCoreExpressionAtomPublicOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Public atom outcomes over arbitrary core traces. Rewind preserves the
 failed carrier and end index and restores only the original cursor. Boundary

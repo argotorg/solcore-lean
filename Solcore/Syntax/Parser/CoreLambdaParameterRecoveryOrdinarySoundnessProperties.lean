@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreLambdaParameterRecoveryOutcomeProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.Parameter
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Exact executable ordinary successes of parameter recovery. -/
 

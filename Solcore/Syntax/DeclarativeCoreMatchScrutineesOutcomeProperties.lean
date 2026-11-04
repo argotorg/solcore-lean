@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreMatchStatementGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-! Deterministic outcomes for requiring nonempty Core match scrutinees. -/
 

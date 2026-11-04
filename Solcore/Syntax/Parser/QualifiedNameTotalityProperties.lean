@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 
 /-! Fuel adequacy and totality for qualified-name parsing. -/

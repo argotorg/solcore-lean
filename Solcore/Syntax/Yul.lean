@@ -1,5 +1,5 @@
 import Solcore.Syntax.Literal
-import Solcore.Syntax.CollectionValidity
+import Solcore.Syntax.ValidityBasics
 
 set_option autoImplicit false
 

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeProperties
-import Solcore.Syntax.DeclarativeTraitMethodOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact ordinary outcomes for signature-only trait methods. -/
 

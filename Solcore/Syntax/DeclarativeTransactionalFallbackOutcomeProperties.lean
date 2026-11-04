@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.DeclarativeTransactionalFallbackGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Deterministic laws for prioritized transactional fallback outcomes. -/
 

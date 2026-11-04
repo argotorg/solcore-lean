@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeFunctionParametersOutcomeProperties
-import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
 import Solcore.Syntax.DeclarativeReturnClauseOutcomeProperties
 import Solcore.Syntax.DeclarativeWhereClauseOutcomeProperties

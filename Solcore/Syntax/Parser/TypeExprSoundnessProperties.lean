@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.TypeFunctionSoundnessProperties
 import Solcore.Syntax.Parser.TypeMappingSoundnessProperties
 import Solcore.Syntax.Parser.TypeNamedSoundnessProperties
-import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.TypeSimpleSoundnessProperties
 
 /-! Aggregate success soundness for recursive type-expression parsing. -/

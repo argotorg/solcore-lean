@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectedImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.SelectedAliasOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.SelectedAliasOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameOrdinaryRejectionSoundnessProperties

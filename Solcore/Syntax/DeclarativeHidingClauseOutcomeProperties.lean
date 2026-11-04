@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDelimitedNonemptyTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeHidingClauseOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.DeclarativeSelectorNameOutcomeProperties
 
 /-! Deterministic and exclusive broad ordinary hiding-clause outcomes. -/

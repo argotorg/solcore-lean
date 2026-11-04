@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeConstructorDeclarationOutcomeProperties
-import Solcore.Syntax.DeclarativeFallbackDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact ordinary outcomes for canonical fallback declarations. -/
 

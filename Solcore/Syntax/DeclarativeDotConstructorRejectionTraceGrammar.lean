@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceGrammar
 import Solcore.Syntax.Internal.DelimitedTrace
-import Solcore.Syntax.DeclarativeCoreExpressionDotConstructorOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Exact raw leading-dot rejection traces. A missing dot is represented even
 outside dispatcher selection. Optional arguments commit only on a left parenthesis;

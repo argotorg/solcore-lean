@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreArrayLiteralOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
 
 /-! Deterministic ordinary outcomes for guarded Core array literals. -/

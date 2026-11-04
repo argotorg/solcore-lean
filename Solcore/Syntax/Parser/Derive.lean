@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Declarations
-import Solcore.Syntax.Parser.Delimited
-import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.TopLevel
 
 set_option autoImplicit false

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 
 /-! Exact functionality of primitive declarative token outcomes. -/
 

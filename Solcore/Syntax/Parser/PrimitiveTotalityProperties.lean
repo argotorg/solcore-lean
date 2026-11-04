@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedTotalityProperties
-import Solcore.Syntax.Parser.PrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Totality contracts for primitive token parsers. -/
 

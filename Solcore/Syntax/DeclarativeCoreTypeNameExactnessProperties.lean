@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreTypeNameOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Exact qualified-name outcomes used by recursive Core named types. -/

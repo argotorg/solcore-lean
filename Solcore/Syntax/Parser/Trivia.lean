@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Parser.Result
 import Solcore.Syntax.Trivia
-import Solcore.Syntax.FileValidity
+import Solcore.Syntax.Validity
 
 /-!
 Compatibility façade for the pure syntax-level trivia implementation.

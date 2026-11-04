@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreAssignmentStatementGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreAssignmentStatementDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-!
 Exact declarative soundness for assignment operators and optional assignment

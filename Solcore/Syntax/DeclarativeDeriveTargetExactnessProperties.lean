@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDeriveTargetOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Full value and rejection-endpoint functionality for derive targets. -/

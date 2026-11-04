@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreAssignmentStatementOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-!
 Functionality, rejection exclusivity, and clean embedding for ordinary Core

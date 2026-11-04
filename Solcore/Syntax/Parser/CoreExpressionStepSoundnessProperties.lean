@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionStepGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreExpressionLayerSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionPostfixSoundnessProperties
 

@@ -5,11 +5,8 @@ import Solcore.Syntax.Parser.Diagnostic
 import Solcore.Syntax.Foundation
 import Solcore.Syntax.Token
 import Solcore.Syntax.Lexer.Result
-import Solcore.Syntax.DeclarativeDiagnosticCascadeGrammar
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeGrammar
-import Solcore.Syntax.DeclarativeNestingOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.SpanSequence
-import Solcore.Syntax.DeclarativeLexedValidationOutcomeGrammar
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Module
 import Solcore.Syntax.Parser.Modules

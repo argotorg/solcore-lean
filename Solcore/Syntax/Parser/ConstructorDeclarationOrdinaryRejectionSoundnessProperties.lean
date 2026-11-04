@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeConstructorDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractEntry
 import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePragmaTraceGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Independent successful prefixes, uncommitted reports, and rejection events. -/
 

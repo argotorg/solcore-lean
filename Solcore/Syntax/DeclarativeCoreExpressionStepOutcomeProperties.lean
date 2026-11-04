@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeCoreExpressionAtomCoreOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreExpressionAtomPublicOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreExpressionLayerOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreExpressionStepOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic outcomes for one complete Core expression step. -/
 

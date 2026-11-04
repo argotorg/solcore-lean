@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.DeclarativeSelectedAliasOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for selected-import aliases. -/
 

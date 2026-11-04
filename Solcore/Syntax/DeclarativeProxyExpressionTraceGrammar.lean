@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreProxyExpressionOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent proxy traces retain the exact marker and nested type AST.

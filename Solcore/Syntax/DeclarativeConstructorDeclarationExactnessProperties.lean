@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeContractEntryModifierExactnessProperties
 import Solcore.Syntax.DeclarativeCoreBlockIsolationExactnessProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
 
 /-!

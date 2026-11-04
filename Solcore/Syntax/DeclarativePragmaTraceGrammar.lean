@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.NameTrace
-import Solcore.Syntax.DeclarativePragmaOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Independent ordered identifier events and complete pragma success traces. -/
 

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.DeclarativeTopItemRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Functionality and outcome exclusion for top-item recovery. -/
 

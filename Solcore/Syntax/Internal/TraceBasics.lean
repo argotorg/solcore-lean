@@ -1,7 +1,5 @@
-import Solcore.Syntax.DeclarativeDiagnosticCascadeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Term
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeGrammar
 
 /-!
 Foundations of the grammar's exact diagnostic traces.

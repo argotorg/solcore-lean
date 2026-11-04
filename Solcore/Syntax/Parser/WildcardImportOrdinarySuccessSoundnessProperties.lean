@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeWildcardImportOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Modules
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.ModulePath

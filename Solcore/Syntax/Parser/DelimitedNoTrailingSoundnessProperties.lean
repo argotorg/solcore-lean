@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Success soundness for nonempty lists that reject a trailing comma. -/
 

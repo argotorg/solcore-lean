@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Strict cursor progress for every successful canonical type parser. -/
 

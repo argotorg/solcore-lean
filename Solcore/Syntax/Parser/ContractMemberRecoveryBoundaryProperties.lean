@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractMemberRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.ContractRecoveryProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties

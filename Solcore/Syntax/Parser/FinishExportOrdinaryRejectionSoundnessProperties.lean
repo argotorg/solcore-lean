@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFinishExportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Export
 

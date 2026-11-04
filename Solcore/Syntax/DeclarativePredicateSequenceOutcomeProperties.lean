@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePredicateOutcomeProperties
-import Solcore.Syntax.DeclarativePredicateSequenceOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-!
 Deterministic ordinary outcomes for bare and grouped-first predicate

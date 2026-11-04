@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.ModulePath
 import Solcore.Syntax.Parser.Operator
 

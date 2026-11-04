@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Signatures
-import Solcore.Syntax.Parser.ParameterProperties
-import Solcore.Syntax.Parser.Predicate
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.TypeRecursiveProperties
-import Solcore.Syntax.Parser.WhereClauseProperties
-import Solcore.Syntax.SignatureValidity
+import Solcore.Syntax.Parser.Internal.ParameterBasics
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Parser.Internal.TypeBasics
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.FunctionParameterDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PredicateSequenceDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties

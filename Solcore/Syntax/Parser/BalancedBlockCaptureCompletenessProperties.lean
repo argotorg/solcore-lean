@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeBalancedBlockGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.Block
 
 /-!

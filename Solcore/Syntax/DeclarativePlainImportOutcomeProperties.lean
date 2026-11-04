@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeImportTerminatorOutcomeProperties
 import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
-import Solcore.Syntax.DeclarativePlainImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for plain import payloads. -/
 

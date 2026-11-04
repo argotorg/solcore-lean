@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.CoreLambdaParameterSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaReturnTypeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptyDiagnosticFreeSoundnessProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-!
 Diagnostic reflection and exact parser-independent soundness for Core lambda

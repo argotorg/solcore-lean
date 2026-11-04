@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementCoreGrammar
+import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.Parser.CoreYulStatementBasicSoundnessProperties
 import Solcore.Syntax.Parser.CoreYulStatementRecoveryDiagnosticProperties
 import Solcore.Syntax.Parser.YulFunctionSoundnessProperties

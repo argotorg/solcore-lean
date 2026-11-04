@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionLambdaOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent exact traces for optional lambda return annotations. An absent

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Tokens
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Module
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties

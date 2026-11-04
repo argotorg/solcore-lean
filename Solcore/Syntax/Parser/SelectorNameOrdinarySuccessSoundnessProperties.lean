@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectorNameOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 
 /-! Broad ordinary-success soundness for import and export selector names. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Primitive facts used by ordinary-rejection reflection. -/
 

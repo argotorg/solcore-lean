@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
-import Solcore.Syntax.DeclarativeCoreStatementSimpleOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 
 /-! Deterministic ordinary outcomes of Core `let` and `return` statements. -/

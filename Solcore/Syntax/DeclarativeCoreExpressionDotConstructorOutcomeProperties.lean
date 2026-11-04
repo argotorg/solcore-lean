@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionDotConstructorOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeCoreExpressionNameOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
 

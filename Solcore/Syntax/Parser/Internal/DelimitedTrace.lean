@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 

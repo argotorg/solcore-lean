@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryOutcomeProperties
 import Solcore.Syntax.DeclarativeDeriveAttributeValidOutcomeProperties
 

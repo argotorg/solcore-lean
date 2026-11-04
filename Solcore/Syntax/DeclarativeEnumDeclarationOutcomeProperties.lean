@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeEnumBodyOutcomeProperties
-import Solcore.Syntax.DeclarativeEnumDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for complete enum declarations. -/

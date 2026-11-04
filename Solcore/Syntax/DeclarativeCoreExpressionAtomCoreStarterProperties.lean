@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreArrayLiteralOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreExpressionAtomCoreOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeCoreExpressionLambdaOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreIdentifierExpressionOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreLiteralOutcomeProperties

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeNestingOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Functionality and outcome exclusion for bounded nesting scans. -/
 

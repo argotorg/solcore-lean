@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementSimpleGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent successful return traces. A current semicolon selects no

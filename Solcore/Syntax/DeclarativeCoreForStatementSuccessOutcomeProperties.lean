@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreForItemsOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreForStatementOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Functional ordinary success for complete Core `for` statements. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Parameter
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Diagnostic commitments of named-parameter errors and recovery. -/
 

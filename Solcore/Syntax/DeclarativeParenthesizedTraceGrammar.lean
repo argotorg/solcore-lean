@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreCollectionAtomGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent prioritized parenthesized success traces. Tail results contain

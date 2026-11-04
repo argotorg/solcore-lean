@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreParenthesizedOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Unconditional ordinary-success reflection for Core parentheses. -/

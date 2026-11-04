@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeEnumBodyOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeEnumConstructorOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for canonical enum bodies. -/

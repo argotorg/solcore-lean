@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeFunctionDeclarationOutcomeProperties
-import Solcore.Syntax.DeclarativeImplMethodOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact ordinary outcomes for implementation methods. -/
 

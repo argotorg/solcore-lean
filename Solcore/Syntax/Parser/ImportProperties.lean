@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Import
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Compositional contracts for canonical import parsing. -/
 

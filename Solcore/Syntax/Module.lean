@@ -1,5 +1,5 @@
 import Solcore.Syntax.Term
-import Solcore.Syntax.NameValidity
+import Solcore.Syntax.ValidityBasics
 
 set_option autoImplicit false
 

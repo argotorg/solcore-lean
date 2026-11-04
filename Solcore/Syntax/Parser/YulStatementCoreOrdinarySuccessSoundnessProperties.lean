@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementCoreEmbeddingProperties
+import Solcore.Syntax.Grammar.YulFuel
 import Solcore.Syntax.Parser.RecognizedYulStatementFallbackOutcomeProperties
 import Solcore.Syntax.Parser.YulBlockStatementOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.YulForStatementOrdinaryOutcomeSoundnessProperties

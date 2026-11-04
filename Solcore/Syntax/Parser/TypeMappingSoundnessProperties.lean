@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Success soundness for canonical mapping type parsing. -/
 

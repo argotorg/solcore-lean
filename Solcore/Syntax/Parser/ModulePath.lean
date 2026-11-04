@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Modules
-import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Module
-import Solcore.Syntax.DeclarativeModulePathOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.CoreTypeQualifiedNameRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties

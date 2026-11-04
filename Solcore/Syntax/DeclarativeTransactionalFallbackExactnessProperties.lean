@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativeTransactionalFallbackOutcomeProperties
 
 /-! Full functionality transport through prioritized transactional fallback. -/

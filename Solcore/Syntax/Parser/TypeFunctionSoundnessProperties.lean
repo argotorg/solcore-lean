@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.TypeDelimitedSoundnessProperties
 
 /-! Success soundness for recursive function types and their return suffix. -/

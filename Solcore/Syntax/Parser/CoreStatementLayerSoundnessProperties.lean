@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementLayerGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreAssemblyStatementSoundnessProperties
 import Solcore.Syntax.Parser.CoreAssignmentStatementSoundnessProperties
 import Solcore.Syntax.Parser.CoreForStatementSoundnessProperties

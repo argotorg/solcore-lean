@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreLiteralOutcomeProperties
-import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Deterministic ordinary outcomes of the three infallible selected leaves. -/
 

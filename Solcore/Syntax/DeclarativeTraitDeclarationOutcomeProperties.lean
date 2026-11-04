@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
 import Solcore.Syntax.DeclarativeTraitBodyOutcomeProperties
-import Solcore.Syntax.DeclarativeTraitDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeWhereClauseOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for complete trait declarations. -/

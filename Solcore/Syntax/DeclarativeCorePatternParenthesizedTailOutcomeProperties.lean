@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternParenthesizedOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Determinism and rejection exclusion for parenthesized-pattern tails. -/
 

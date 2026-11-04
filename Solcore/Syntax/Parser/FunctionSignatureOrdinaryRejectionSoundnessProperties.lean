@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.FunctionModifierSoundnessProperties

@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
 import Solcore.Syntax.DeclarativeFunctionParameterPublicOutcomeProperties
-import Solcore.Syntax.DeclarativeFunctionParametersOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic exact outcomes for recovery-aware function parameters. -/
 

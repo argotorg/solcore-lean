@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Statement.Match
 
 /-! Ordinary stability of diagnostic-only Core match validation. -/

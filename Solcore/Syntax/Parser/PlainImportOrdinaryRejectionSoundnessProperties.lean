@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePlainImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ModulePath
 

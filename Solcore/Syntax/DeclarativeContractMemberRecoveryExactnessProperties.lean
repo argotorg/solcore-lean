@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeContractMemberRecoveryOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Full functionality of contract-member recovery outcomes. -/

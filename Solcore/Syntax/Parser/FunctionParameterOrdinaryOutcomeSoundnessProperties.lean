@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterBoundaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterCoreOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-!
 Complete executable ordinary outcomes at the public named-parameter rewind,

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomPublicOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeCoreExpressionAtomRecoveryProperties
 
 /-! Deterministic outcomes at the public Core atom recovery boundary. -/

@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreStatementControlGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreStatementControlDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-!
 Exact parser-independent soundness for basic Core control statements.

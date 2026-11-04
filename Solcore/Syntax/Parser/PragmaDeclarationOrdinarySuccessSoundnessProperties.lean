@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePragmaOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.PragmaItemsOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.RawIdentifierOrdinaryOutcomeSoundnessProperties
 

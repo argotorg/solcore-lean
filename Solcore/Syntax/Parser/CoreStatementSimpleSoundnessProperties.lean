@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreStatementSimpleGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreStatementSimpleDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 
 /-!

@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceGrammar
 import Solcore.Syntax.Internal.TypeTrace
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Raw lambda expressions retain their marker, complete parameter list,
 optional return annotation, and body. Parameter recovery events are committed

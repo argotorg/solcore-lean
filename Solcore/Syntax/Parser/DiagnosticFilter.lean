@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Parser.Trivia
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 set_option autoImplicit false
 

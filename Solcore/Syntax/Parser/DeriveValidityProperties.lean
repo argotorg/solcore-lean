@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeriveValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.Derive
 
 /-! Source-provenance laws for canonical derive-attribute parsing. -/

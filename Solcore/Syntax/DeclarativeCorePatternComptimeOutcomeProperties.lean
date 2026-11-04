@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternComptimeOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Deterministic ordinary outcomes for Core compile-time patterns. -/
 

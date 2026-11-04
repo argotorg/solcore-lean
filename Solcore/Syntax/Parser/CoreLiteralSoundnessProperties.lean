@@ -1,6 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreLiteralGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Diagnostic reflection and declarative soundness for Core literal leaves. -/

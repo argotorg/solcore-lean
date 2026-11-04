@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreMatchStatementGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreMatchComponentDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Exact diagnostic-free soundness for Core-match structural components. -/
 

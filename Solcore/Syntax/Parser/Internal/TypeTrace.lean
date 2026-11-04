@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.Internal.FunctionReturnsTrace
 import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
@@ -10,8 +10,7 @@ import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.TypeNamedTotalityProperties
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
-import Solcore.Syntax.Parser.Name
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.DeclarativeTypeDispatchSelectionProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.TypeFunctionTotalityProperties

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Statement.Match
-import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.StatementValidity
+import Solcore.Syntax.ValidityBasics
+import Solcore.Syntax.Validity
 
 /-! Contracts for canonical Core match-statement components. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeConstructorDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeContractFieldOutcomeProperties
-import Solcore.Syntax.DeclarativeContractMemberCoreOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeEnumDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeFallbackDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeFunctionDeclarationOutcomeProperties

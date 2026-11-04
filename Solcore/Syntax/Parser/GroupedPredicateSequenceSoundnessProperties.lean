@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
-import Solcore.Syntax.Parser.PredicateSequenceProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.PredicateSoundnessProperties
 
 /-! Success soundness for parenthesized predicate sequences. -/

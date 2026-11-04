@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreLiteralSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptyDiagnosticFreeSoundnessProperties
 

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-!
 Exact executable ordinary outcomes for the checked Core identifier primitive.

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Ordered guard selection is unique and exists for every token remainder,
 including missing backing or a cursor outside the numeric window. These are

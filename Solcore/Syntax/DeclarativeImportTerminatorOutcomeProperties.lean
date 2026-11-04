@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.DeclarativeImportTerminatorOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad ordinary import-terminator outcomes. -/
 

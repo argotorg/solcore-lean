@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Exact executable ordinary outcomes for the raw identifier primitive. -/
 

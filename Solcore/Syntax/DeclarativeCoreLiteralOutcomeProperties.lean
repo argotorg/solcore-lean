@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreLiteralOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes for Core literal leaves. -/
 

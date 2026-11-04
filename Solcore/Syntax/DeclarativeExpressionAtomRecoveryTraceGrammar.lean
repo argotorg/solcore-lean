@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomRecoveryGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Grammar.Basics
 
 /-! Standalone atom recovery consumes its mandatory first token, then uses the
 existing boundary-prioritized scan. Exactly one recovered expression-atom

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePredicateSequenceOutcomeProperties
-import Solcore.Syntax.DeclarativeWhereClauseOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic exact outcomes for optional canonical `where` clauses. -/
 

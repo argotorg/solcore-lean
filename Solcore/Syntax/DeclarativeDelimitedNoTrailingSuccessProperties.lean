@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-!
 Functionality and relation embeddings for successful generic delimited lists

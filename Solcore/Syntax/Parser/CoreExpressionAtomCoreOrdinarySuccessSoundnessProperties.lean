@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomCoreOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreArrayLiteralOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionAtomDispatcherLookaheadProperties
 import Solcore.Syntax.Parser.CoreExpressionDotConstructorOrdinaryOutcomeSoundnessProperties

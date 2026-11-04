@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionLayerOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Expression
 

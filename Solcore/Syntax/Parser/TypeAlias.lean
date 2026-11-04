@@ -1,12 +1,11 @@
 import Solcore.Syntax.Parser.Declarations
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.DeclarativeTypeAliasParametersExactnessProperties
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.TypeRecursiveProperties
-import Solcore.Syntax.TypeDeclarationValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties

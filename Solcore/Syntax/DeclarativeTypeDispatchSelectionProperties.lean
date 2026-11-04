@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTypeDispatchSelectionGrammar
+import Solcore.Syntax.Grammar.Types
 
 /-! The explicit prioritized selectors determine at most one branch. This is
 selection uniqueness, not existence of a successful or rejected type outcome. -/

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreTermPublicOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.TermLevels
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Exact raw Core blocks, conditional on exact fixed-fuel statements. -/

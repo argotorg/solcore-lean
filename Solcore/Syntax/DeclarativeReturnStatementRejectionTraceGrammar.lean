@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeReturnStatementTraceGrammar
-import Solcore.Syntax.DeclarativeCoreStatementSimpleOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-! Exact independent rejection traces of optional return values and return
 statements. Earlier expression events are separate from the uncommitted report. -/

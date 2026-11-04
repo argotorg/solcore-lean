@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
-import Solcore.Syntax.Parser.Predicate
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
 
 /-! Diagnostic-free reflection for predicates, their sequences, and `where`. -/

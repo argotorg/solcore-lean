@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Compositional contracts for canonical literal token consumers. -/
 

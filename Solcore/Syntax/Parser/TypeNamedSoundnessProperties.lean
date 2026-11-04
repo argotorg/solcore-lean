@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
 import Solcore.Syntax.Parser.TypeDelimitedSoundnessProperties
-import Solcore.Syntax.Parser.TypeNamedProperties
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Success soundness for named type parsing and optional type arguments. -/
 

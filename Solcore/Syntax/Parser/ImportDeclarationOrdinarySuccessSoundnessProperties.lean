@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeImportDeclOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Modules
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.NamespaceImportOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportOrdinarySuccessSoundnessProperties

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreBlockOutcomeGrammar
-import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-! Independent successful raw Core blocks with exact diagnostic sequences.
 Statement events follow source order. Tail-validation events are appended only

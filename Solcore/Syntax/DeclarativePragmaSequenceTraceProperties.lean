@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePragmaSequenceTraceGrammar
 import Solcore.Syntax.DeclarativePragmaTraceProperties
-import Solcore.Syntax.DeclarativeFileItemsOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Carrier, progress, exactness, and ordinary-file erasure for independent
 pragma-only sequences. Traces and written declaration order are retained. -/

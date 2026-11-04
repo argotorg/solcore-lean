@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingSuccessProperties
 import Solcore.Syntax.DeclarativeYulBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeYulFunctionOutcomeGrammar
+import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.DeclarativeYulNameOutcomeProperties
 
 /-!

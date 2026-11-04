@@ -4,7 +4,7 @@ import Solcore.Syntax.DeclarativeCorePatternDotConstructorOutcomeProperties
 import Solcore.Syntax.DeclarativeCorePatternParenthesizedOutcomeProperties
 import Solcore.Syntax.DeclarativeCorePatternPublicOutcomeProperties
 import Solcore.Syntax.DeclarativeCorePatternQualifiedOutcomeProperties
-import Solcore.Syntax.DeclarativeCorePatternStepOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Deterministic outcomes for one complete Core pattern recursion step. -/
 

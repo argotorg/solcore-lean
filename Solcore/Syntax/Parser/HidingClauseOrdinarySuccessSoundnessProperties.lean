@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeHidingClauseOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
 
 /-! Broad ordinary-success soundness for required and optional hiding clauses. -/

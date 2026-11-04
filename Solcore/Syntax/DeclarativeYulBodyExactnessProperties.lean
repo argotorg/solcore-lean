@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulBodyGrammar
+import Solcore.Syntax.Grammar.YulFuel
 import Solcore.Syntax.DeclarativeYulStatementExactnessProperties
 
 /-! Fully exact public inline-Yul body ASTs, source spans, and endpoints. -/

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreProxyExpressionOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Grammar.Basics
 
 /-! Raw proxy rejection distinguishes a missing marker from a nested type
 failure. The exact final report stays separate from the child's ordered events. -/

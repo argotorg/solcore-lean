@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeConstructorSelectionOutcomeProperties
-import Solcore.Syntax.DeclarativeExportNameOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.DeclarativeSelectorNameOutcomeProperties
 
 /-! Deterministic and exclusive broad ordinary outcomes for export names. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PredicateSequenceProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.PredicateSoundnessProperties
 
 /-! Success soundness for unparenthesized predicate sequences. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeSelectedAliasOutcomeProperties
-import Solcore.Syntax.DeclarativeSelectedImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.DeclarativeSelectorNameOutcomeProperties
 
 /-! Deterministic and exclusive broad outcomes for one selected import. -/

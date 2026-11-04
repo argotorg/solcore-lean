@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeTopItemDeriveAttachmentProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.File
 
 /-! Exact executable reflection for top-item derive attachment. -/

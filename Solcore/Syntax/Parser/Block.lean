@@ -1,12 +1,9 @@
 import Solcore.Syntax.Parser.Blocks
-import Solcore.Syntax.DeclarativeCoreBlockGrammar
-import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.State
-import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.ExpressionValidity
+import Solcore.Syntax.ValidityBasics
+import Solcore.Syntax.Validity
 
 set_option autoImplicit false
 

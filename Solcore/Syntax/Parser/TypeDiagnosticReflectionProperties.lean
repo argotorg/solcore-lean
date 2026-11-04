@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Diagnostic-free reflection for recursive type-expression parsing. -/
 

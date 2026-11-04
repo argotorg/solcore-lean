@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Operator
 
 /-! Success soundness of canonical import/export selector parsing. -/

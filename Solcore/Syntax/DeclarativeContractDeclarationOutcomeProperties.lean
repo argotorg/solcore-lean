@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeContractBodyOutcomeProperties
-import Solcore.Syntax.DeclarativeContractDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for contract declarations. -/

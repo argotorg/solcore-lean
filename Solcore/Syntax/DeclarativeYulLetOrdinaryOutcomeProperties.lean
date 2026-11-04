@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulLetOrdinaryGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 import Solcore.Syntax.DeclarativeYulNameOutcomeProperties
 
 /-!

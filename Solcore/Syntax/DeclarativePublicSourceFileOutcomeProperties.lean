@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeNestingOutcomeProperties
-import Solcore.Syntax.DeclarativePublicSourceFileOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Branch exclusion and exact shapes of broad public syntax outcomes. -/
 

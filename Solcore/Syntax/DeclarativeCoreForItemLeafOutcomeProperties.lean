@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreAssignmentStatementOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreForItemOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.DeclarativeCoreStatementSimpleOutcomeProperties
 
 /-! Deterministic ordinary outcomes for the two Core `for` item branches. -/

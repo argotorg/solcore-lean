@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExportDeclOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.DeclarativeLocalExportOutcomeProperties
 import Solcore.Syntax.DeclarativePathExportOutcomeProperties
 

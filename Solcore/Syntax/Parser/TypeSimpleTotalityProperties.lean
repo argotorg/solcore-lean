@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Conditional totality for non-function recursive type forms. -/
 

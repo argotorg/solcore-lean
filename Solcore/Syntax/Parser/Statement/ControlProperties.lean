@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Statement.Control
 import Solcore.Syntax.Parser.Statement.SimpleProperties
 import Solcore.Syntax.Parser.Yul.StatementProperties
-import Solcore.Syntax.StatementValidity
+import Solcore.Syntax.Validity
 
 /-! Contracts for canonical Core control-statement parsers. -/
 

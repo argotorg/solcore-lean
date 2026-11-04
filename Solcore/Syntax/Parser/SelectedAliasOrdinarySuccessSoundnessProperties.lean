@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectedAliasOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 
 /-! Broad ordinary-success soundness for optional selected-import aliases. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreStatementControlLeafOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic outcomes for Core block and terminated-control statements. -/
 

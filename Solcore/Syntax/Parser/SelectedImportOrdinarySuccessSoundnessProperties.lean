@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeSelectedImportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 
 /-! Broad ordinary-success soundness for one selected import. -/

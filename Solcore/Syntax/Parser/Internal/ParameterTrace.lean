@@ -1,13 +1,13 @@
-import Solcore.Syntax.DeclarativeCoreLambdaGrammar
+import Solcore.Syntax.Parser.Internal.LambdaParameterRecovery
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.Parameter
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.ParameterProperties
 import Solcore.Syntax.Parser.FunctionParameterBoundaryOutcomeSoundnessProperties
 
 /-!
@@ -17,6 +17,7 @@ recovery and dispatch.
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ParameterDispatchTraceProperties
+
 /-! Shared exact lookahead for non-recovering function and lambda parameters.
 The contextual marker is selected only when the next identifier is visible in
 the active window. These proof-side projections do not execute either branch
@@ -110,10 +111,12 @@ theorem LambdaParameterInternals.lambdaParameterCore_eq_ordinary_of_prefix_absen
   rfl
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ParameterNameFinishingTraceProperties
+
 /-! Exact state bridges for the inline ordinary-name check shared by named
 and lambda parameters. No executable helper is introduced. A continuation law
 retains every result, including the complete Failure and State on rejection.
@@ -201,10 +204,12 @@ theorem checkedParameterName_continue_of_trace {α : Type} (next : Identifier �
       simp only [State.traceResult, List.reverse_append, List.append_assoc]
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ParameterRecoveryTraceStateProperties
+
 /-! Standalone recovery appends exactly one event on success, retains the
 complete source/window, and rejects without committing its terminal report.
 The scan never replays diagnostics from the tokens that it skips. -/
@@ -305,10 +310,12 @@ theorem recoverParameter_reject_context {input rejected : State} {failure : Fail
   exact ⟨rfl, rfl⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ParameterRecoveryTraceProperties
+
 /-! Standalone recovery has unrestricted exact trace contracts. Completeness
 uses ordinary execution, not existence from the independent joint specification.
 The caller's earlier failure report is neither reconstructed nor re-emitted. -/
@@ -429,10 +436,12 @@ theorem recoverParameter_trace_reject_state_iff
     exact reportEq ▸ recoverParameter_trace_reject_failure_state_iff.mpr result
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterRecoveryTraceProperties
+
 /-! Lambda recovery retags only the recovered error AST. Exact function
 recovery supplies its whole state, events, complete Failure, and unconditional
 ordinary outcome. No caller report is committed or re-emitted by this wrapper. -/
@@ -545,20 +554,13 @@ theorem recoverLambdaParameter_reject_context {input rejected : State} {failure 
   rw [result] at window
   exact ⟨recoverLambdaParameter_preservesFile.file_eq_of_reject result, window.2⟩
 
-theorem recoverLambdaParameter_ordinary : Parser.Ordinary recoverLambdaParameter := by
-  intro input
-  rcases recoverParameter_ordinary input with ⟨parameter, next, result⟩ | ⟨failure, rejected, result⟩
-  · exact .inl ⟨_, next, by simp only [recoverLambdaParameter, result]; rfl⟩
-  · exact .inr ⟨failure, rejected, by simp only [recoverLambdaParameter, result]⟩
-
-theorem recoverLambdaParameter_ne_invariant (input : State) (error : ParserInvariantError) :
-    recoverLambdaParameter input ≠ .invariant error := recoverLambdaParameter_ordinary.ne_invariant input error
-
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.TypedParameterFinishingTraceProperties
+
 /-! Exact execution of both parameter finishers on every state. The complete
 AST and state are fixed; only the finishing events are appended. Previously
 emitted type/name diagnostics remain prior events, never regenerated here. -/
@@ -687,10 +689,12 @@ theorem errorParameter_ne_invariant (span : SourceSpan) (constraint : ParseConst
   contradiction
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterTailTraceProperties
+
 /-! Exact raw named-parameter tail execution on arbitrary states. The colon is
 silent; successful type events precede finishing events. Missing colons recover
 with an error parameter, whereas type rejection forwards its uncommitted report. -/
@@ -860,10 +864,12 @@ theorem namedParameterTail_ne_invariant (input : State) (error : ParserInvariant
     ⟨_, _, result⟩ | ⟨_, _, result⟩ <;> rw [result] at failed <;> contradiction
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterTailTraceStateProperties
+
 /-! Bidirectional tail correspondence fixes the AST, full Failure, every state
 field, and the ordered diagnostic suffix. No validity or child contracts are
 required. These laws concern the raw tail, not outer parameter recovery. -/
@@ -990,10 +996,12 @@ theorem namedParameterTail_reject_context {input rejected : State} {failure : Fa
   exact ⟨(namedParameterTail_preservesFile start marker name errorSpan).file_eq_of_reject result, window.2⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ParameterSourceFrameProperties
+
 /-! Every ordinary raw function/lambda parameter reply preserves the complete
 input source file. Diagnostic-producing finishers and retagging do not alter
 that source. Recovery loops and public recovering wrappers are not covered. -/
@@ -1114,10 +1122,12 @@ theorem lambdaParameterCore_preservesFile : Parser.PreservesFile lambdaParameter
 end LambdaParameterInternals
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterTailTraceProperties
+
 /-! Actual ordinary/comptime lambda tails use the same typed tail and a pure
 retag. Their absent-colon outcomes differ. These raw-tail laws impose no input
 validity and do not cover name dispatch or public recovery. -/
@@ -1297,10 +1307,12 @@ theorem comptimeLambdaParameterTail_ordinary (marker : Token) (name : Identifier
     exact .inl ⟨_, _, by simp only [comptimeLambdaParameterTail_eq_of_absent marker name absent, errorResult]; rfl⟩
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterTailTraceStateProperties
+
 /-! Exact lambda-tail correspondence determines the whole Reply and State,
 including complete uncommitted Failures and arbitrary prior diagnostics.
 Retagging changes the AST carrier only, never the returned state or events. -/
@@ -1481,10 +1493,12 @@ theorem comptimeLambdaParameterTail_ne_invariant (marker : Token) (name : Identi
   (comptimeLambdaParameterTail_ordinary marker name).ne_invariant input error
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.OrdinaryLambdaParameterTraceProperties
+
 /-! Raw ordinary lambda parameters check the identifier spelling before entering
 the tail. All prior events and the complete first failure are retained, without
 the selected-core guard or the public parameter recovery policy. -/
@@ -1583,10 +1597,12 @@ theorem ordinaryLambdaParameter_reject_context {input rejected : State} {failure
   exact ⟨ordinaryLambdaParameter_preservesFile.file_eq_of_reject result, window.2⟩
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ComptimeLambdaParameterTraceProperties
+
 /-! The raw comptime path has a silent contextual marker, a checked identifier,
 and the comptime lambda tail. The second name never receives the ordinary-name warning.
 Marker, name, and tail failures are separate first-failure alternatives. -/
@@ -1707,10 +1723,12 @@ theorem comptimeLambdaParameter_reject_context {input rejected : State} {failure
   exact ⟨comptimeLambdaParameter_preservesFile.file_eq_of_reject result, window.2⟩
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterRawTraceStateProperties
+
 /-! Whole-reply correspondence for both raw lambda-parameter paths. The state
 reconstruction keeps every independent remainder field and every prior event;
 the diagnostic-report and complete-Failure formulations are both exact. -/
@@ -1821,10 +1839,12 @@ theorem comptimeLambdaParameter_trace_reject_failure_state_iff
     exact ⟨failure, result, rfl⟩
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterCoreTraceProperties
+
 /-! Unconditional exact traces for the non-recovering lambda-parameter core.
 The same independent two-token guard chooses each raw success or rejection;
 the returned AST, complete State, Failure, and event order are unchanged.
@@ -1969,10 +1989,12 @@ theorem lambdaParameterCore_ne_invariant_unrestricted (input : State) (error : P
     ⟨_, _, result⟩ | ⟨_, _, result⟩ <;> rw [result] at failed <;> contradiction
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterCoreTraceExistenceProperties
+
 /-! Exact remainder/suffix formulations and non-vacuous outcome existence for
 the non-recovering lambda-parameter core. Existence uses ordinary execution
 and soundness, not independent uniqueness or success/rejection disjointness. -/
@@ -2054,10 +2076,12 @@ theorem lambdaParameterCoreTrace_outcome_exists (source : SourceId) (endByte : N
   · exact .inr ⟨rejected.declarativeRemainder, failure.toDiagnostic, trace, remainderEq ▸ rejection⟩
 
 end Solcore.Syntax.Parser.LambdaParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterTraceProperties
+
 /-! Public lambda parameters retain failed-core events when rewinding the cursor.
 Only the non-boundary path commits the core report before standalone recovery.
 Ordinary execution is unrestricted and supplies completeness independently of
@@ -2196,10 +2220,12 @@ theorem lambdaParameter_trace_reject_complete :
     (fun _ _ => lambdaParameterTraceExactOutcomeSpec) lambdaParameter_ne_invariant_unrestricted
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.LambdaParameterTraceStateProperties
+
 /-! The public rewind/recovery trace reconstructs every field of both outcomes,
 including the exact terminal Failure separately from committed reports. -/
 
@@ -2331,10 +2357,12 @@ theorem lambdaParameterTrace_outcome_exists (source : SourceId) (endByte : Nat) 
   · exact .inr ⟨rejected.declarativeRemainder, failure.toDiagnostic, trace, remainderEq ▸ rejection⟩
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.OrdinaryNamedParameterTraceProperties
+
 /-! Raw ordinary named parameters check the identifier spelling before entering
 the tail. All prior events and the complete first failure are retained, without
 the selected-core guard or the public parameter recovery policy. -/
@@ -2433,10 +2461,12 @@ theorem ordinaryNamedParameter_reject_context {input rejected : State} {failure 
   exact ⟨ordinaryNamedParameter_preservesFile.file_eq_of_reject result, window.2⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.ComptimeNamedParameterTraceProperties
+
 /-! The raw comptime path has a silent contextual marker, a checked identifier,
 and the named tail. The second name never receives the ordinary-name warning.
 Marker, name, and tail failures are separate first-failure alternatives. -/
@@ -2560,10 +2590,12 @@ theorem comptimeNamedParameter_reject_context {input rejected : State} {failure 
   exact ⟨comptimeNamedParameter_preservesFile.file_eq_of_reject result, window.2⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterRawTraceStateProperties
+
 /-! Whole-reply correspondence for both raw named-parameter paths. The state
 reconstruction keeps every independent remainder field and every prior event;
 the diagnostic-report and complete-Failure formulations are both exact. -/
@@ -2674,10 +2706,12 @@ theorem comptimeNamedParameter_trace_reject_failure_state_iff
     exact ⟨failure, result, rfl⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterCoreTraceProperties
+
 /-! Unconditional exact traces for the non-recovering function-parameter core.
 The same independent two-token guard chooses each raw success or rejection;
 the returned AST, complete State, Failure, and event order are unchanged.
@@ -2822,10 +2856,12 @@ theorem namedParameterCore_ne_invariant_unrestricted (input : State) (error : Pa
     ⟨_, _, result⟩ | ⟨_, _, result⟩ <;> rw [result] at failed <;> contradiction
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterCoreTraceExistenceProperties
+
 /-! Exact remainder/suffix formulations and non-vacuous outcome existence for
 the non-recovering function-parameter core. Existence uses ordinary execution
 and soundness, not independent uniqueness or success/rejection disjointness. -/
@@ -2907,10 +2943,12 @@ theorem namedParameterCoreTrace_outcome_exists (source : SourceId) (endByte : Na
   · exact .inr ⟨rejected.declarativeRemainder, failure.toDiagnostic, trace, remainderEq ▸ rejection⟩
 
 end Solcore.Syntax.Parser.FunctionParameterInternals
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterTraceProperties
+
 /-! Public named parameters retain failed-core events when rewinding the cursor.
 Only the non-boundary path commits the core report before standalone recovery.
 Ordinary execution is unrestricted and supplies completeness independently of
@@ -3049,10 +3087,12 @@ theorem namedParameter_trace_reject_complete :
     (fun _ _ => namedParameterTraceExactOutcomeSpec) namedParameter_ne_invariant_unrestricted
 
 end Solcore.Syntax.Parser
+
 end
 
 section
 -- leanmerge: from Solcore.Syntax.Parser.NamedParameterTraceStateProperties
+
 /-! The public rewind/recovery trace reconstructs every field of both outcomes,
 including the exact terminal Failure separately from committed reports. -/
 
@@ -3184,4 +3224,5 @@ theorem namedParameterTrace_outcome_exists (source : SourceId) (endByte : Nat) (
   · exact .inr ⟨rejected.declarativeRemainder, failure.toDiagnostic, trace, remainderEq ▸ rejection⟩
 
 end Solcore.Syntax.Parser
+
 end

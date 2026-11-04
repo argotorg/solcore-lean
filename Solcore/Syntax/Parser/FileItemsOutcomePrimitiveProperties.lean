@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFileItemsOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Parser.FileCompleteProperties
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TopItemRecoveryBoundaryProperties

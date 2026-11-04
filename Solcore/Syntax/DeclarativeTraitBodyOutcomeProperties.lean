@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTraitBodyOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeTraitMethodOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for prioritized trait bodies. -/

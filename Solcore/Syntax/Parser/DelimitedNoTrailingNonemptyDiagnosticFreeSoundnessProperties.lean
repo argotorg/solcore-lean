@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Diagnostic-free exact soundness for required no-trailing lists. -/
 

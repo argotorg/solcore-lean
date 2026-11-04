@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.ExportProperties
 
 /-! Exact semicolon soundness for canonical export finishing. -/

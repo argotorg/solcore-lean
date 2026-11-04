@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ParameterRecoveryDiagnosticProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 
 /-! Diagnostic-free success soundness for named function parameters. -/

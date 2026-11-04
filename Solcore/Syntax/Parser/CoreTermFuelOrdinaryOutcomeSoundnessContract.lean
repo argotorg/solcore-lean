@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreTermLevelOutcomeProperties
+import Solcore.Syntax.Grammar.TermLevels
 import Solcore.Syntax.Parser.Term
 
 /-! Executable reflection contracts for one mutual Core recursion fuel. -/

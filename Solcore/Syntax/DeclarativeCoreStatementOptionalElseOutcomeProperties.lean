@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreStatementIfOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic diagnostic-inclusive outcomes for optional Core `else`. -/
 

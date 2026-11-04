@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternArgumentsOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 
 /-! Deterministic ordinary outcomes for constructor-pattern arguments. -/

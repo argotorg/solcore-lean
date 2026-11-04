@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomRecoveryGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Functionality and outcome exclusion for Core atom recovery. -/
 

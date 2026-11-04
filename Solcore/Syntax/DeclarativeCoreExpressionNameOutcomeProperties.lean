@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionNameOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes for one Boolean-first Core name. -/
 

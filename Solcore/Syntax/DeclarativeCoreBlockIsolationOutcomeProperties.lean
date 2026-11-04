@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-!
 Capture functionality and deterministic outcomes for balanced Core block

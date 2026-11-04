@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeYulAssignmentOrdinaryGrammar
-import Solcore.Syntax.DeclarativeYulAssignmentOutcomeGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
+import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.DeclarativeYulNameOutcomeProperties
 
 /-!

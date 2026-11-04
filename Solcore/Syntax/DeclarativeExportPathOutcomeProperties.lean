@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
-import Solcore.Syntax.DeclarativeExportPathOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for maximal export paths. -/
 

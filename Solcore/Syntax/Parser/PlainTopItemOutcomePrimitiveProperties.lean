@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePlainTopItemOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.File
 

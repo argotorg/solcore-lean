@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreTypeNameOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreTypePrimitiveProperties
-import Solcore.Syntax.DeclarativeModulePathOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad ordinary outcomes for module paths. -/
 

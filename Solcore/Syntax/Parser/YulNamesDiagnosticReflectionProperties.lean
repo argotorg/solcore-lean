@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.YulExpressionLeafSoundnessProperties
 import Solcore.Syntax.Parser.Yul.Common
 

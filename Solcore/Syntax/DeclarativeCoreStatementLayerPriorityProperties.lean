@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreStatementLayerGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Exact guard selection for the ordered Core statement dispatcher. -/
 

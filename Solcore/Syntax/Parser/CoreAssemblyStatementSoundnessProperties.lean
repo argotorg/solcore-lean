@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreAssemblyStatementGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreAssemblyStatementDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-!
 Exact diagnostic-free soundness for the Core wrapper around an abstract Yul

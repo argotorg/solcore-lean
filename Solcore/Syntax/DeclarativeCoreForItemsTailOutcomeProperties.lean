@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreForItemOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreForItemsOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic ordinary outcomes for Core `for` item-list tails. -/
 

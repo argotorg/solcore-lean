@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeDelimitedNonemptyTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeGenericParametersOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic exact outcomes for canonical generic parameters. -/
 

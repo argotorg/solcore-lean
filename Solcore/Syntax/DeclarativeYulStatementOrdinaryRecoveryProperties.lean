@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementOrdinaryRecoveryGrammar
+import Solcore.Syntax.Grammar.Yul
 
 /-!
 Functionality, boundary exclusion, and clean embedding for the outer

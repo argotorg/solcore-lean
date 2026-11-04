@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeCoreStatementControlLeafOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Exact block-statement traces wrap a raw Core block with required tail
 semicolons. No balanced capture, recovery, or parent-window restoration occurs. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.Parser.CorePatternCoreOutcomeLeafSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternCoreOutcomePrimitiveProperties
 

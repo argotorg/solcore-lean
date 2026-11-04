@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTopItemRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.File
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties

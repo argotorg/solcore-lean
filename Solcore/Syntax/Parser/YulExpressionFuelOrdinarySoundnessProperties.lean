@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulExpressionFuelGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 import Solcore.Syntax.Parser.YulExpressionLayerOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.YulExpressionLayerSoundnessProperties
 import Solcore.Syntax.Parser.Yul.ExpressionProperties

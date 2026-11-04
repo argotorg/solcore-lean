@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Numeric endpoint frames forget source, token carriers, and the byte end.
 Both ordinary outcomes preserve only endIndex; invariants impose no condition.

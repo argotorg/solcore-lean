@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeImplBodyOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeImplMethodOutcomeProperties
 
 /-! Deterministic exact ordinary outcomes for prioritized implementation bodies. -/

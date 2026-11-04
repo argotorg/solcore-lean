@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
 import Solcore.Syntax.DeclarativeFinishExportOutcomeProperties
 import Solcore.Syntax.DeclarativeLocalExportItemOutcomeProperties
-import Solcore.Syntax.DeclarativeLocalExportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for local export payloads. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.CoreTermValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.TermRecursiveProperties
 
 /-! Unconditional canonical contracts for the public Core term parsers. -/

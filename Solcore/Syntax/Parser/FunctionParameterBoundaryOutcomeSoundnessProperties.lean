@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionParameterOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 
 /-! Executable reflection of the public function-parameter recovery boundary. -/

@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeCoreLiteralOutcomeGrammar
-import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Grammar.Patterns
+import Solcore.Syntax.Grammar.Basics
 
 /-! Exact independent silent traces for Core literals and Boolean builtins.
 Literal spellings and Boolean identifier-shaped ASTs remain unchanged. -/

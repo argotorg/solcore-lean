@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.DelimitedNonemptyProperties
 import Solcore.Syntax.Parser.DelimitedTotalityProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
-import Solcore.Syntax.Parser.TypeNamedProperties
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-! Valid-input totality for the named-type parser path. -/
 

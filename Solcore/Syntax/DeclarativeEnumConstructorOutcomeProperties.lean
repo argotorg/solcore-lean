@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeEnumConstructorOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact ordinary outcomes for enum constructors. -/
 

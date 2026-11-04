@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractBodyOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
 

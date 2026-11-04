@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeContractDeriveAttachmentGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.Contract
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Exact executable reflection for contract-member derive attachment. -/
 

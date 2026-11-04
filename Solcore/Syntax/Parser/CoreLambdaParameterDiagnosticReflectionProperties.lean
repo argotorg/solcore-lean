@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreLambdaGrammar
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.Parser.ParameterRecoveryDiagnosticProperties
 import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties

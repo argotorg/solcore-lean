@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.File
-import Solcore.Syntax.Parser.Validity
-import Solcore.Syntax.CoreTermValidity
-import Solcore.Syntax.FileValidity
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Validity
 
 /-! Contracts for top-level wrapping and derive attachment. -/
 

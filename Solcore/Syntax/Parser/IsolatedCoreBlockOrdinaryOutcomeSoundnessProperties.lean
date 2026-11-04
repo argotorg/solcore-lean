@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.BalancedBlockCaptureCompletenessProperties
 import Solcore.Syntax.Parser.BalancedBlockCaptureSoundnessProperties
 

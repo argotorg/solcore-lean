@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Statement.Simple
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.StatementValidity
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Validity
 
 /-! Contracts for nonrecursive canonical Core-statement components. -/
 

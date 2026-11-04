@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreLambdaReturnTypeOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Unconditional ordinary-success reflection for Core lambda expressions. -/
 

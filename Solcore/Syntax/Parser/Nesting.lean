@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.SourceFiles
 import Solcore.Syntax.Lexer.Contract
-import Solcore.Syntax.DeclarativeNestingOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
 import Solcore.Syntax.DeclarativeNestingOutcomeProperties
 

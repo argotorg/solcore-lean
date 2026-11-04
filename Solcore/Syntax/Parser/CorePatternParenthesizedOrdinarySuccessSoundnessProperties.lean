@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternParenthesizedOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.Parser.CorePatternBasicSoundnessProperties
 
 /-! Unconditional ordinary-success reflection for parenthesized patterns. -/

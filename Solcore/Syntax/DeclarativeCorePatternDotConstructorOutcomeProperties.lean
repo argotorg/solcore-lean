@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCorePatternArgumentsOutcomeProperties
-import Solcore.Syntax.DeclarativeCorePatternDotConstructorOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Deterministic ordinary outcomes for leading-dot Core constructor patterns. -/
 

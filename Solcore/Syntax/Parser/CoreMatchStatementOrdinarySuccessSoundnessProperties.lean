@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreMatchStatementOutcomeProperties
+import Solcore.Syntax.Grammar.StatementLayer
 import Solcore.Syntax.Parser.CoreMatchCasesOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreMatchDefaultOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreMatchScrutineeListOrdinaryOutcomeSoundnessProperties

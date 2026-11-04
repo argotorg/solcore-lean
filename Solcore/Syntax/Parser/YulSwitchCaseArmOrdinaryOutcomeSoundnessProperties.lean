@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulSwitchOutcomeGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 import Solcore.Syntax.Parser.Yul.Control
 import Solcore.Syntax.Parser.YulBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.YulExpressionLeafSoundnessProperties

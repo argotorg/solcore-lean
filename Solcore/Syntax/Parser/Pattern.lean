@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.Terms
 import Solcore.Syntax.Parser.Expression
 import Solcore.Syntax.Unicode.Lowercase
 import Solcore.Syntax.Parser.LiteralProperties
-import Solcore.Syntax.PatternValidity
+import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.LiteralTotalityProperties
 import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties

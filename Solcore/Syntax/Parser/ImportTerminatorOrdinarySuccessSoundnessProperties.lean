@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeImportTerminatorOutcomeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Modules
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Import
 
 /-! Broad ordinary-success reflection for import terminators. -/

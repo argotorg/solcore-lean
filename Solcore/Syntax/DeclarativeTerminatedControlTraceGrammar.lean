@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreStatementControlLeafOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Statements
+import Solcore.Syntax.Grammar.Basics
 
 /-! Independent exact traces for keyword-plus-semicolon control statements.
 Both success and rejection are silent; the first missing token fixes the report. -/

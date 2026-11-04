@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Block
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Backward diagnostic reflection through balanced block isolation. -/
 

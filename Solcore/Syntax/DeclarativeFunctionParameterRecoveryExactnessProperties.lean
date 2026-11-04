@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreLambdaParameterRecoveryOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Exact values for malformed named-function-parameter recovery. -/

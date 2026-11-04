@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTopItemDeriveAttachmentGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Functional and total laws for pure top-item derive attachment. -/
 

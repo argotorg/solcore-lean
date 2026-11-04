@@ -1,14 +1,12 @@
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
-import Solcore.Syntax.DeclarativeGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Parser.Diagnostic
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 import Solcore.Syntax.Internal.TraceBasics
-import Solcore.Syntax.DeclarativeCoreTypeOutcomeGrammar
+import Solcore.Syntax.Grammar.Types
 import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
 import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativeCoreTypeNameOutcomeProperties
-import Solcore.Syntax.DeclarativeTypeDispatchSelectionGrammar
 import Solcore.Syntax.DeclarativeTypeDispatchSelectionProperties
 
 /-!

@@ -1,6 +1,5 @@
 import Solcore.Syntax.DeclarativeCorePatternCoreOutcomeLeafProperties
-import Solcore.Syntax.DeclarativeCorePatternNameOutcomeGrammar
-import Solcore.Syntax.DeclarativeCorePatternQualifiedNameOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
 
 /-! Unique ordinary values for non-recursive Core pattern leaves and names. -/

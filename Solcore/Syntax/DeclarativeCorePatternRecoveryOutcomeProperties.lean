@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Functionality and outcome exclusion for Core pattern recovery. -/
 

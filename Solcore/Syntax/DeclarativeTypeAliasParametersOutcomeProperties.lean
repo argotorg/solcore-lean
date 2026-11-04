@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeTypeAliasOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact outcomes for optional type-alias parameters. -/
 

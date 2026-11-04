@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTopItemRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-!
 Parser-independent diagnostic traces of standalone top-item recovery. Each

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDelimitedNonemptyTrailingOutcomeProperties
 import Solcore.Syntax.DeclarativeSelectedImportOutcomeProperties
-import Solcore.Syntax.DeclarativeSelectedImportsOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for selected-import lists. -/
 

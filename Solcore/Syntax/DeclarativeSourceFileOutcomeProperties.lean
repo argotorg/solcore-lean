@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeFileItemsOutcomeProperties
-import Solcore.Syntax.DeclarativeSourceFileOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Deterministic broad ordinary outcomes for complete syntax files. -/
 

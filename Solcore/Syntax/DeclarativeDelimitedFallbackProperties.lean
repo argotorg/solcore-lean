@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDelimitedTailRejectionProperties
-import Solcore.Syntax.DeclarativeCorePatternConstructorGrammar
-import Solcore.Syntax.DeclarativeYulExpressionGrammar
+import Solcore.Syntax.Grammar.Patterns
+import Solcore.Syntax.Grammar.Yul
 
 /-!
 Whole-list rejection disjointness and concrete transactional fallback specs.

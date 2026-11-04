@@ -1,8 +1,8 @@
-import Solcore.Syntax.DeclarativeCoreForStatementGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreAssignmentTailSoundnessProperties
 import Solcore.Syntax.Parser.CoreForItemDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.CoreStatementSimpleSoundnessProperties
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Statement.ForItemFuelTotalityProperties
 
 /-!

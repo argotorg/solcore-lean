@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryOutcomeGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
+import Solcore.Syntax.Grammar.Basics
 
 /-! Deterministic ordinary outcomes for derive-attribute recovery. -/
 

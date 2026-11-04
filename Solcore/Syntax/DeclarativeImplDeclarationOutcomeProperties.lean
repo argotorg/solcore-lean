@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
 import Solcore.Syntax.DeclarativeImplBodyOutcomeProperties
-import Solcore.Syntax.DeclarativeImplDeclarationOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeImplDefaultMarkerOutcomeProperties
 import Solcore.Syntax.DeclarativeImplHeadArgumentsOutcomeProperties
 import Solcore.Syntax.DeclarativeWhereClauseOutcomeProperties

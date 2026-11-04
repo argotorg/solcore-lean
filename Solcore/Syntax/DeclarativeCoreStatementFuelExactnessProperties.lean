@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreStatementLayerExactnessProperties
-import Solcore.Syntax.DeclarativeCoreTermFuelEquationProperties
+import Solcore.Syntax.Grammar.TermLevels
 
 /-! Base and successor lifts for exact mutually recursive Core statement fuel. -/
 

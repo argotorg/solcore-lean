@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreLambdaParameterOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreLambdaParameterPublicOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.DeclarativeCoreLambdaParameterRecoveryOutcomeProperties
 
 /-! Deterministic ordinary outcomes of the public lambda parameter. -/

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockIsolationOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent diagnostic traces through balanced block isolation. Inner

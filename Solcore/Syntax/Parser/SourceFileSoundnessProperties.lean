@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFileGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Parser.FileCompleteProperties
 import Solcore.Syntax.Parser.FileItemsSoundnessProperties
 import Solcore.Syntax.Parser.TopItemSoundnessProperties

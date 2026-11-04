@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreLambdaParameterRecoveryOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic ordinary outcomes of parameter recovery. -/
 

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Modules
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Module
 

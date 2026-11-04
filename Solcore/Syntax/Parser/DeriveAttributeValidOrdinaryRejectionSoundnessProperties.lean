@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeValidOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties

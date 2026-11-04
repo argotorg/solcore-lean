@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCorePatternArgumentsOutcomeProperties
-import Solcore.Syntax.DeclarativeCorePatternQualifiedOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 
 /-! Deterministic ordinary outcomes for qualified Core patterns. -/
 

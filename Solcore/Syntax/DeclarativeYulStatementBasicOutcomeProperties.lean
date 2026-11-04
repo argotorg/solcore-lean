@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingSuccessProperties
-import Solcore.Syntax.DeclarativeYulStatementBasicOutcomeGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 
 /-!
 Functionality, rejection exclusivity, deterministic outcomes, and clean

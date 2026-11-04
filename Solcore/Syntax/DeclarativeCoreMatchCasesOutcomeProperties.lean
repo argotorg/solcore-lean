@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreMatchCaseOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreMatchCasesOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic outcomes for the maximal Core match-case sequence. -/
 

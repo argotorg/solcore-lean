@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeParenthesizedTraceGrammar
-import Solcore.Syntax.DeclarativeCoreParenthesizedOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Expressions
+import Solcore.Syntax.Grammar.Basics
 
 /-! Raw tuple-tail and parenthesized rejection traces. Marker failures are
 included even outside dispatcher-selected entry points. The final report is

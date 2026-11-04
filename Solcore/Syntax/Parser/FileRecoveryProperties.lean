@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.File
-import Solcore.Syntax.CoreTermValidity
-import Solcore.Syntax.FileValidity
+import Solcore.Syntax.Validity
 
 /-! Contracts for canonical top-level error recovery. -/
 

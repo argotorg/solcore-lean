@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreSourceFileOrdinaryGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermFuelDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties

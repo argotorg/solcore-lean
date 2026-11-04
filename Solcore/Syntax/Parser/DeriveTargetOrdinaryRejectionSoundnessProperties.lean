@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveTargetOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties

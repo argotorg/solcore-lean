@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternQualifiedOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.Parser.CorePatternArgumentsOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternQualifiedNameOrdinaryOutcomeSoundnessProperties
 

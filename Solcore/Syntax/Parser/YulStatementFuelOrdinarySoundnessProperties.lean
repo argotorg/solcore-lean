@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementFuelGrammar
+import Solcore.Syntax.Grammar.YulFuel
 import Solcore.Syntax.Parser.YulStatementCoreOrdinaryRejectSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementLayerOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.YulStatementTerminatedOrdinarySoundnessProperties

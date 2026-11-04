@@ -1,6 +1,5 @@
-import Solcore.Syntax.DeclarativeYulExpressionLeafGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Grammar.Yul
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Yul.LeafProperties
 
 /-!

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractDeriveAttachmentGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Functional and total laws for pure contract-member derive attachment. -/
 

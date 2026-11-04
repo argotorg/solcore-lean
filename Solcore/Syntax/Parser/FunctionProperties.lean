@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Syntax.CallableDeclarationValidity
+import Solcore.Syntax.Validity
 
 /-! State and start-token contracts for complete function declarations. -/
 

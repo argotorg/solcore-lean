@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreStatementWhileOutcomeGrammar
+import Solcore.Syntax.Grammar.Statements
 
 /-! Deterministic ordinary outcomes for canonical Core `while`. -/
 

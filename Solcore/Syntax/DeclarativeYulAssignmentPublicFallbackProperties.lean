@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeYulAssignmentOutcomeProperties
-import Solcore.Syntax.DeclarativeYulExpressionFuelGrammar
+import Solcore.Syntax.Grammar.YulOrdinary
 
 /-!
 Concrete parser-independent transactional assignment fallback for the public

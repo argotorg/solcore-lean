@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulNameOutcomeGrammar
+import Solcore.Syntax.Grammar.Yul
 
 /-!
 Functionality, exclusivity, and clean-grammar embeddings for ordinary Yul-name

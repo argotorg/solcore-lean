@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementCoreExactnessProperties
-import Solcore.Syntax.DeclarativeYulStatementFuelGrammar
+import Solcore.Syntax.Grammar.YulFuel
 import Solcore.Syntax.DeclarativeYulStatementLayerExactnessProperties
 
 /-! Exact recursive fixed-fuel and public inline-Yul statement outcomes. -/

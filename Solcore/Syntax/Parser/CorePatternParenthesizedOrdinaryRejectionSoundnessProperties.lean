@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCorePatternParenthesizedOutcomeGrammar
+import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.Parser.CorePatternParenthesizedOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 

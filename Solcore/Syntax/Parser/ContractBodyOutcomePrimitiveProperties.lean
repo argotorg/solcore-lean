@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractBodyOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractMemberRecoveryBoundaryProperties
 import Solcore.Syntax.Parser.ContractMemberWithAttributeOrdinaryRejectionSoundnessProperties
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeArrayLiteralTraceGrammar
 import Solcore.Syntax.Internal.DelimitedTrace
-import Solcore.Syntax.DeclarativeCoreCollectionAtomGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Array mapping retains the list's exact structure and protected event
 suffix. Ordinary erasure requires a child carrier law separately; the trace

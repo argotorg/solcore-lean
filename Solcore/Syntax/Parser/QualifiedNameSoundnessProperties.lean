@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Success soundness of canonical qualified-name parsing. -/
 

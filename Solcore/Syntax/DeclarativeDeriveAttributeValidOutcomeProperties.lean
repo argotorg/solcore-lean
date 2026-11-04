@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeDeriveAttributeValidOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.DeclarativeDeriveTargetOutcomeProperties
 
 /-! Deterministic exact outcomes for the normal derive-attribute path. -/

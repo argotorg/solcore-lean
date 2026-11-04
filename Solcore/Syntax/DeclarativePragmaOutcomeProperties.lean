@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativePragmaItemsOutcomeProperties
-import Solcore.Syntax.DeclarativePragmaOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for complete pragmas. -/
 

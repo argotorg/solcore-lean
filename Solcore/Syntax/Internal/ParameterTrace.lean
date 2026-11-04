@@ -1,13 +1,12 @@
 import Solcore.Syntax.Internal.NameTrace
-import Solcore.Syntax.DeclarativeCoreLambdaParameterRecoveryOutcomeGrammar
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
+import Solcore.Syntax.Grammar.Signatures
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativeFunctionParameterRecoveryExactnessProperties
 import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
 import Solcore.Syntax.Internal.TraceBasics
-import Solcore.Syntax.DeclarativeCoreLambdaGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Diagnostic
 import Solcore.Syntax.Internal.TypeTrace
-import Solcore.Syntax.DeclarativeFunctionParameterOutcomeGrammar
 import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 

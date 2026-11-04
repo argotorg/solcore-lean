@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreProxyExpressionOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Deterministic ordinary outcomes for a guarded Core proxy leaf. -/
 

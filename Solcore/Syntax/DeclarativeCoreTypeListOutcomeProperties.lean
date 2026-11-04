@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreTypeSuccessProperties
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Disjointness of generic list rejection from recursive Core-type lists. -/
 

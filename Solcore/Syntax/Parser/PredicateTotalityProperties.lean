@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PredicateSequenceTailProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.TypeFuelTotalityProperties
 import Solcore.Syntax.Parser.TypeNamedTotalityProperties
 

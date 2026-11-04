@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeYulExpressionCoreExactnessProperties
-import Solcore.Syntax.DeclarativeYulExpressionOrdinaryOutcomeProperties
+import Solcore.Syntax.Grammar.YulOrdinary
 
 /-! Exact recovery spans and full outcomes of one inline-Yul expression layer. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionLayerGrammar
+import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Independent maximal left-associative traces at one binary precedence.

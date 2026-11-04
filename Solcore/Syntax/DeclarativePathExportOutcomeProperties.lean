@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeExportPathOutcomeProperties
 import Solcore.Syntax.DeclarativeExportSelectionOutcomeProperties
 import Solcore.Syntax.DeclarativeFinishExportOutcomeProperties
-import Solcore.Syntax.DeclarativePathExportOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 
 /-! Deterministic and exclusive broad outcomes for path export payloads. -/
 

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedNonemptyProperties
-import Solcore.Syntax.Parser.PredicateSequenceProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.PredicateTotalityProperties
 
 /-! Valid-input totality for canonical predicate sequences. -/

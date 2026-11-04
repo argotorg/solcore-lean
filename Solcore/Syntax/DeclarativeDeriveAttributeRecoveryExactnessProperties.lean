@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryOutcomeProperties
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Full functionality of recovered derive-attribute outcomes. -/

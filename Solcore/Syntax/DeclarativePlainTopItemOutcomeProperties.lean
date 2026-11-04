@@ -4,7 +4,7 @@ import Solcore.Syntax.DeclarativeExportDeclOutcomeProperties
 import Solcore.Syntax.DeclarativeFunctionDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeImplDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeImportDeclOutcomeProperties
-import Solcore.Syntax.DeclarativePlainTopItemOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 import Solcore.Syntax.DeclarativePragmaOutcomeProperties
 import Solcore.Syntax.DeclarativeTraitDeclarationOutcomeProperties
 import Solcore.Syntax.DeclarativeTypeAliasOutcomeProperties

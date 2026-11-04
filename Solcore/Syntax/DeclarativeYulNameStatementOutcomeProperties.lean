@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeTransactionalFallbackOutcomeProperties
 import Solcore.Syntax.DeclarativeYulAssignmentOrdinaryOutcomeProperties
 import Solcore.Syntax.DeclarativeYulAssignmentPublicFallbackProperties
 import Solcore.Syntax.DeclarativeYulStatementBasicOutcomeProperties
-import Solcore.Syntax.DeclarativeYulStatementCoreGrammar
+import Solcore.Syntax.Grammar.Yul
 
 /-!
 Parser-independent ordinary outcomes for the name-start branch of the Yul

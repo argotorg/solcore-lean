@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Diagnostic-free soundness for possibly empty trailing-delimited lists. -/
 

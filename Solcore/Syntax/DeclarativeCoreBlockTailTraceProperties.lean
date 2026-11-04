@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.Internal.TraceBasics
 
 /-! Total, unique, protected statement-termination traces. Empty traces recover

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
-import Solcore.Syntax.DeclarativeTypeAliasOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic ordinary outcomes for recovery-aware type-alias values. -/
 

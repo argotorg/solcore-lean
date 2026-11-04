@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeDeriveAttributeOutcomeProperties
 import Solcore.Syntax.DeclarativePlainTopItemOutcomeProperties
 import Solcore.Syntax.DeclarativeTopItemDeriveAttachmentProperties
-import Solcore.Syntax.DeclarativeTopItemOutcomeGrammar
+import Solcore.Syntax.Grammar.SourceFile
 
 /-! Deterministic broad ordinary outcomes for public top-item dispatch. -/
 

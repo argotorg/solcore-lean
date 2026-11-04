@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
-import Solcore.Syntax.DeclarativeYulExpressionOrdinaryCoreProperties
+import Solcore.Syntax.Grammar.YulOrdinary
 
 /-! Exact values and endpoints of non-recursive inline-Yul expression leaves. -/
 

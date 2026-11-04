@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedNonemptyTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeImplHeadArgumentsOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic exact outcomes for implementation head arguments. -/
 

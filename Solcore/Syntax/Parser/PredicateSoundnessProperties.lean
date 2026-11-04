@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PredicateProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 
 /-! Success soundness for one trait predicate. -/

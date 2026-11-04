@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Exact ordinary-rejection reflection for Core-type qualified names. -/
 

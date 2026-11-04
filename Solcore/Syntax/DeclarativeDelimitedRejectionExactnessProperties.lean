@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.Grammar.Basics
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 
 /-! Exact rejection-endpoint functionality for generic delimited lists. -/

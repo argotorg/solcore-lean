@@ -1,5 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
 
 /-! Deterministic ordinary outcomes for one checked Core identifier. -/
 

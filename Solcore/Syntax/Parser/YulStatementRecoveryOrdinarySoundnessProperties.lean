@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulStatementOrdinaryRecoveryGrammar
+import Solcore.Syntax.Grammar.Yul
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Yul.Statement
 

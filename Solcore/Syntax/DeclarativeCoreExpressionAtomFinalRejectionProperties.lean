@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionAtomFinalRejectionGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Exclusivity of the final Core atom dispatcher rejection. -/
 

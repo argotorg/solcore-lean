@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeCoreYulStatementBasicGrammar
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
+import Solcore.Syntax.Grammar.Yul
+import Solcore.Syntax.Grammar.Basics
 
 /-!
 Parser-independent ordinary outcomes for a Yul statement core followed by its

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeExactOutcomeSpec
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Exact ordinary grammar outcomes correspond to executable outcomes when
 the fixed input cannot produce an internal invariant failure. -/

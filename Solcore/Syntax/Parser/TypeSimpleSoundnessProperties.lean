@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.TypeDelimitedSoundnessProperties
 
 /-! Success soundness for comptime, proxy, and tuple type parsers. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Production-fuel adequacy for malformed function-parameter recovery. -/
 

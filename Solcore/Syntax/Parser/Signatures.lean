@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Type
 import Solcore.Syntax.Parser.Primitive
@@ -6,19 +6,13 @@ import Solcore.Syntax.Token
 import Solcore.Syntax.Parser.Diagnostic
 import Solcore.Syntax.Parser.Types
 import Solcore.Syntax.Foundation
-import Solcore.Syntax.Parser.Delimited
 import Solcore.Syntax.Source
 import Solcore.Syntax.Declaration
 import Solcore.Syntax.Parser.Tokens
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.SignatureValidity
-import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.TypeValidity
-import Solcore.Syntax.Parser.WhereClauseProperties
-import Solcore.Syntax.Parser.PrimitiveProperties
-import Solcore.Syntax.ParameterValidity
-import Solcore.Syntax.Parser.TypeRecursiveProperties
-import Solcore.Syntax.Parser.ParameterProperties
+import Solcore.Syntax.Validity
+import Solcore.Syntax.ValidityBasics
+import Solcore.Syntax.Parser.Internal.ParameterBasics
+import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-!
 Parsers for function signatures.

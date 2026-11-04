@@ -1,6 +1,5 @@
-import Solcore.Syntax.DeclarativeCorePatternComptimeGrammar
-import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.DiagnosticReflectionProperties
+import Solcore.Syntax.Grammar.Patterns
+import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Pattern
 
 /-!

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedOutcomeGrammar
-import Solcore.Syntax.DeclarativeYulBlockOutcomeGrammar
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Grammar.Yul
 
 /-!
 Functionality, rejection exclusivity, and clean embedding for ordinary

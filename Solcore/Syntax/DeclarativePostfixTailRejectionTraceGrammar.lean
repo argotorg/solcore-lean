@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePostfixTailTraceGrammar
 import Solcore.Syntax.Internal.DelimitedTrace
-import Solcore.Syntax.DeclarativeCoreTypeOutcomeGrammar
+import Solcore.Syntax.Grammar.Types
 
 /-! Independent exact postfix rejections. Selected opening markers cannot
 fail; failures occur in the nested index, its closing bracket, call arguments,

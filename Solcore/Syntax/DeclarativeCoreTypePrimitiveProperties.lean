@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreTypeOutcomeGrammar
+import Solcore.Syntax.Grammar.Types
 
 /-! Primitive functionality facts used by declarative Core-type outcomes. -/
 

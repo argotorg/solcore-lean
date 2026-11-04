@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
-import Solcore.Syntax.DeclarativeDeriveTargetOutcomeGrammar
+import Solcore.Syntax.Grammar.Declarations
 
 /-! Deterministic and exclusive ordinary outcomes for dotted derive targets. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreParenthesizedOutcomeGrammar
+import Solcore.Syntax.Grammar.Expressions
 
 /-! Determinism and rejection exclusion for the parenthesized tuple tail. -/
 

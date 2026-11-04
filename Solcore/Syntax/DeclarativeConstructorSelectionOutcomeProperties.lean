@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeConstructorSelectionOutcomeGrammar
+import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
 import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingSuccessProperties

@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Contract
-import Solcore.Syntax.CoreTermValidity
-import Solcore.Syntax.ContractDeclarationValidity
+import Solcore.Syntax.Validity
 
 /-! Contracts for canonical contract-member error recovery. -/
 

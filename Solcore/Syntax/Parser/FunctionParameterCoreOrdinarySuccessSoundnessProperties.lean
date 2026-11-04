@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeFunctionParameterOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.Parameter
+import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-! Executable ordinary-success reflection for `namedParameterCore`. -/
 

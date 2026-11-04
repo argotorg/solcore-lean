@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreMatchCasesValueProperties
-import Solcore.Syntax.DeclarativeCoreMatchStatementOutcomeProperties
+import Solcore.Syntax.Grammar.StatementLayer
 
 /-! Exact success values for diagnostic-inclusive Core match statements. -/
 

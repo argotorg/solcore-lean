@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedTrailingOutcomeProperties
-import Solcore.Syntax.DeclarativeReturnClauseOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic exact outcomes for optional canonical `returns` clauses. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.Internal.Basics
 
 /-! Conditional totality for generic delimited parser loops. -/
 

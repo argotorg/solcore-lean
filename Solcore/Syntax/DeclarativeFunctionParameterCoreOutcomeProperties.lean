@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
-import Solcore.Syntax.DeclarativeFunctionParameterOutcomeGrammar
+import Solcore.Syntax.Grammar.Signatures
 
 /-! Deterministic ordinary outcomes of non-recovering named parameters. -/
 
