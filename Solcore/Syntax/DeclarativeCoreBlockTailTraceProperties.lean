@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Total, unique, protected statement-termination traces. Empty traces recover
 the existing diagnostic-free tail predicate without imposing it on all parses. -/

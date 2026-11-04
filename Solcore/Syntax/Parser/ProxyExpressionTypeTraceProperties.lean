@@ -1,8 +1,8 @@
 import Solcore.Syntax.Parser.ProxyExpressionSuccessTraceProperties
 import Solcore.Syntax.Parser.ProxyExpressionRejectionTraceProperties
-import Solcore.Syntax.Parser.TypeExprTraceUnrestrictedProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceProperties
-import Solcore.Syntax.DeclarativeTypeExprTraceStructuralProperties
+import Solcore.Syntax.Internal.TypeTrace
 
 /-! Concrete recursive-type specialization of the raw proxy-expression trace.
 All five execution contracts hold on arbitrary states without caller-supplied

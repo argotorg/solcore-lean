@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.PostfixTailTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.PostfixTailTraceContextProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Fixed-fuel postfix trace correspondence reconstructs every State field.
 The explicit no-invariant premise is retained: independent trace uniqueness

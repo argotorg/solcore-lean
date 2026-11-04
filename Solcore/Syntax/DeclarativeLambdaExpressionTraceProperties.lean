@@ -1,9 +1,8 @@
 import Solcore.Syntax.DeclarativeLambdaExpressionTraceGrammar
-import Solcore.Syntax.DeclarativeParameterListTraceProperties
+import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceExactnessProperties
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProtectionProperties
-import Solcore.Syntax.DeclarativeTypeExprTraceOutcomeProperties
-import Solcore.Syntax.DeclarativeTypeExprTraceStructuralProperties
+import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
 
 /-! Raw lambda exactness assumes only exact outcomes for the supplied body

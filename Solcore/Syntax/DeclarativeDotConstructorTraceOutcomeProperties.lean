@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTraceOutcomeSpec
+import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.DeclarativeDotConstructorTraceProperties
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceProperties
 

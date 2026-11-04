@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePragmaTraceGrammar
-import Solcore.Syntax.DeclarativeIdentifierTraceProperties
+import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativePragmaExactnessProperties
 import Solcore.Syntax.DeclarativePragmaItemsExactnessProperties
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExpressionAtomDispatchSuccessTraceProperties
 import Solcore.Syntax.Parser.ExpressionAtomDispatchRejectionTraceProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact trace suffixes and complete State reconstruction for one atom-core
 layer. Rejected States need an explicit file/end-byte frame, not preservation

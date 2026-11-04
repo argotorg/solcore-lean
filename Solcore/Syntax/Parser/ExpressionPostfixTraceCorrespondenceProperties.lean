@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeExpressionPostfixTraceProperties
 import Solcore.Syntax.Parser.ExpressionPostfixTraceSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Pointwise correspondence for the actual production-fuel postfix parser.
 Independent atom/nested exactness and observed soundness require a separate

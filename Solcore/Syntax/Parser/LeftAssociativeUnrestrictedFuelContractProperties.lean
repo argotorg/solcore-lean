@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionLeftAssociativeTotalityProperties
-import Solcore.Syntax.Parser.UnrestrictedFuelElementContract
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
 
 /-! Left-associative layers preserve unrestricted operand contracts at the

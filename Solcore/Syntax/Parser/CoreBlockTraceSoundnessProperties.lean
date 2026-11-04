@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.StatementDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.CoreBlockClosingTraceProperties
 
 /-! Raw Core success traces from explicit statement soundness and context laws.

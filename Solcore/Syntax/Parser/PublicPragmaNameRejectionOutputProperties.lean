@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.LexedValidation
 import Solcore.Syntax.Parser.PragmaNameRejectionTraceProperties
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
 import Solcore.Syntax.Parser.SourceFileBoundaryStopTraceProperties
-import Solcore.Syntax.Parser.UnexpectedDiagnosticCascadeProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Complete public outputs when a recognized pragma start stops at a missing
 name. Independent rejection reports retain their source/end-byte context;

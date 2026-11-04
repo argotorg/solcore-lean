@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceProperties
-import Solcore.Syntax.Parser.TypeSourceFrameProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
 
 /-! Raw lambda rejection is exact at the suffix and complete-Failure boundary.
 Whole-State reconstruction additionally states the final block's rejection

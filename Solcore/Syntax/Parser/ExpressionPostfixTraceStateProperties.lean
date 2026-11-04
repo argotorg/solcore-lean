@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExpressionPostfixTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.ExpressionPostfixTraceContextProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Whole-State correspondence for actual atom-plus-postfix execution at an
 explicit invariant-free input. Rejected child frames preserve only file and

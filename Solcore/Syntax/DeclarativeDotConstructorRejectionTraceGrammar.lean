@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingRejectionTraceGrammar
+import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.DeclarativeCoreExpressionDotConstructorOutcomeGrammar
 
 /-! Exact raw leading-dot rejection traces. A missing dot is represented even

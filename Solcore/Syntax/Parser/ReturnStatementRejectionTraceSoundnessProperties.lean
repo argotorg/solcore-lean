@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.OptionalReturnValueRejectionTraceProperties
 import Solcore.Syntax.Parser.OptionalReturnValueTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
-import Solcore.Syntax.Parser.StatementRejectionTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact return-statement rejection keeps all expression events before the
 first failure and leaves its full report uncommitted. -/

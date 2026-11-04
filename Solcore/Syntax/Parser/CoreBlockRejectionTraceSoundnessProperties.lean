@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.StatementRejectionTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.CoreBlockClosingTraceProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 

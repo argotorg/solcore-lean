@@ -1,8 +1,6 @@
 import Solcore.Syntax.DeclarativeArrayLiteralTraceGrammar
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceCompletenessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceContextProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Exact traces for the actual array wrapper, conditional only on the five

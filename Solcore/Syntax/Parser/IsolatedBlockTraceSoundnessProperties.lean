@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.BlockDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.BalancedBlockCaptureCompletenessProperties
 import Solcore.Syntax.Parser.BalancedBlockCaptureSoundnessProperties
 import Solcore.Syntax.Parser.IsolatedBlockDiagnosticTraceProperties

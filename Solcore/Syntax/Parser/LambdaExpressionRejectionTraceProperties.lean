@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeLambdaExpressionTraceGrammar
-import Solcore.Syntax.Parser.LambdaParametersTraceProperties
+import Solcore.Syntax.Parser.Internal.ParameterListTrace
 import Solcore.Syntax.Parser.OptionalLambdaReturnTypeConcreteTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Raw lambda first failures preserve parameter/return events and the exact
 separate terminal report. Only the supplied block's rejection contract is

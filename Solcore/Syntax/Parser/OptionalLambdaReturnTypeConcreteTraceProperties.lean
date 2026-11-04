@@ -1,8 +1,8 @@
 import Solcore.Syntax.Parser.OptionalLambdaReturnTypeRejectionTraceProperties
-import Solcore.Syntax.Parser.TypeExprTraceUnrestrictedProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceExactnessProperties
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProtectionProperties
-import Solcore.Syntax.DeclarativeTypeExprTraceStructuralProperties
+import Solcore.Syntax.Internal.TypeTrace
 
 /-! Concrete recursive-type specialization of an optional lambda return type.
 The absent arrow returns none without changing state; a present arrow carries

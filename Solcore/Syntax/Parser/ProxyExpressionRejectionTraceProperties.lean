@@ -1,7 +1,5 @@
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceGrammar
-import Solcore.Syntax.Parser.DiagnosticTraceContracts
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

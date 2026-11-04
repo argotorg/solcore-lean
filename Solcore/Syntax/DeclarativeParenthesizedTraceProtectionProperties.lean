@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeParenthesizedTraceGrammar
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Parenthesis and comma tokens emit no events. Protected child traces keep
 their source order and every duplicate through all successful branches. -/

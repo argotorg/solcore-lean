@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceProtectionProperties
-import Solcore.Syntax.DeclarativeExpressionNameTraceProtectionProperties
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! A checked constructor name remains protected when its argument list
 later rejects. Protected child events follow it in order, while the separate

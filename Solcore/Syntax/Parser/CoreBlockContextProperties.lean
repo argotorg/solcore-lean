@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.StatementDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Successful raw Core blocks preserve source and the complete token/byte
 window under the corresponding inner statement frame law, for arbitrary events. -/

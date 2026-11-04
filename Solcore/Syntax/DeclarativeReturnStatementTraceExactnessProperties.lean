@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExpressionTraceOutcomeSpec
+import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.DeclarativeReturnStatementRejectionTraceProperties
 import Solcore.Syntax.DeclarativeCoreBlockTraceExactnessProperties
 

@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.LambdaExpressionSuccessTraceProperties
 import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceStateProperties
 import Solcore.Syntax.DeclarativeLambdaExpressionTraceProperties
-import Solcore.Syntax.Parser.TypeUnrestrictedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
 
 /-! Raw lambda outcome existence follows from ordinary execution of the
 supplied block and the concrete parameter/type parsers. It is not inferred

@@ -1,5 +1,5 @@
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceGrammar
-import Solcore.Syntax.DeclarativeExpressionNameTraceGrammar
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! Independent leading-dot constructor success traces. Names are Boolean
 first and checked spelling events precede argument events. Optional argument

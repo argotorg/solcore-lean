@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Unconditional trace contracts for the real Boolean/identifier expression
 leaf. This does not assert contracts for general recursive Core expressions. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeExpressionAtomDispatchSelectionGrammar
 import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceGrammar
-import Solcore.Syntax.DeclarativeExpressionNameTraceGrammar
+import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceGrammar
 import Solcore.Syntax.DeclarativeParenthesizedRejectionTraceGrammar
 import Solcore.Syntax.DeclarativeArrayLiteralTraceGrammar

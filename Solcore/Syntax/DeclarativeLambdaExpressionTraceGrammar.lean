@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeParameterListTraceGrammar
+import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceGrammar
-import Solcore.Syntax.DeclarativeTypeExprTraceGrammar
+import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
 
 /-! Raw lambda expressions retain their marker, complete parameter list,

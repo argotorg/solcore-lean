@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePostfixTailTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingRejectionTraceGrammar
+import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeGrammar
 
 /-! Independent exact postfix rejections. Selected opening markers cannot

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceContextProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Exact optional-argument success. The absent branch never calls the child;

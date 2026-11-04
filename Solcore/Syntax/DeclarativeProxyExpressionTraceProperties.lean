@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeProxyExpressionTraceGrammar
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Structure, exactness, and protected-event composition are separate laws.
 Ordinary erasure needs no token law; progress and carrier preservation explicitly

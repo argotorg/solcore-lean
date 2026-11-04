@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.PostfixTailRejectionTraceSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceCompletenessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingRejectionTraceCompletenessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 
 /-! Every finite independent rejection executes at all sufficiently large
 postfix fuels. The threshold counts derivation steps, not cursor distance;

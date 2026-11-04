@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreExpressionUnarySoundnessProperties
 import Solcore.Syntax.Parser.ExpressionUnaryTotalityProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.DeclarativeCoreExpressionOperatorExactnessProperties
 
 /-! Prefix unary scanning is silent on every successful fuel/accumulator

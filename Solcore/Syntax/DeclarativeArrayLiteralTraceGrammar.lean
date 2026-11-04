@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingRejectionTraceGrammar
+import Solcore.Syntax.Internal.DelimitedTrace
 
 /-! Independent array-literal traces wrap an allow-empty no-trailing bracketed
 list. The wrapper changes only the AST: remainder, reports, and events are

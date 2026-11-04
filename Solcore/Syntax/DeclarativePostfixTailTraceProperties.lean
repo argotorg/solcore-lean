@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePostfixTailRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceOutcomeProperties
-import Solcore.Syntax.DeclarativeIdentifierTraceProperties
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! Fixed-base postfix success functionality follows from independent child
 functionality. No child carrier, progress, parser, or existence law is assumed. -/

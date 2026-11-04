@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.Parser.DiagnosticFilter
 import Solcore.Syntax.Parser.TopItemRecoveryTraceCompletenessProperties
 

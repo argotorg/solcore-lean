@@ -1,6 +1,6 @@
-import Solcore.Syntax.DeclarativeExpressionNameTraceProperties
+import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.Parser.BooleanIdentifierRejectionTraceProperties
-import Solcore.Syntax.Parser.IdentifierTraceProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
 
 /-! Exact Boolean-first expression-name success with checked spelling events. -/

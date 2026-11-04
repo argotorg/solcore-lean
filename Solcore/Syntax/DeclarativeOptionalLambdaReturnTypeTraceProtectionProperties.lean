@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceGrammar
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Only supplied protected type events are preserved. The separate final
 rejection report has no implied protection property. -/

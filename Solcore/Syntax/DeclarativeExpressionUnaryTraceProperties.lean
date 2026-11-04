@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeExpressionUnaryTraceGrammar
 import Solcore.Syntax.DeclarativeCoreExpressionOperatorExactnessProperties
-import Solcore.Syntax.DeclarativeTraceOutcomeSpec
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Maximal unary-prefix determinism and independent postfix exactness fix
 the complete wrapped AST, remainder, ordered events, and terminal report.

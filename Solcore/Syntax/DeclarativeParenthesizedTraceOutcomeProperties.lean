@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExpressionTraceOutcomeSpec
+import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.DeclarativeParenthesizedTraceExactnessProperties
 import Solcore.Syntax.DeclarativeParenthesizedTraceDisjointnessProperties
 

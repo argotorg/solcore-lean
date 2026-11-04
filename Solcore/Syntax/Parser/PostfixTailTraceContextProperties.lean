@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceContextProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

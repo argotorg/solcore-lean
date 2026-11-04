@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeParenthesizedRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Protected child events survive later tuple-tail or parenthesized
 rejection. Marker/closing failures emit nothing, and their uncommitted report

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceExactnessProperties
-import Solcore.Syntax.DeclarativeExpressionNameTraceProperties
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! Ordinary erasure, progress, and exact structure. The older whole-list
 grammar needs child carrier/end-index preservation, supplied separately here. -/

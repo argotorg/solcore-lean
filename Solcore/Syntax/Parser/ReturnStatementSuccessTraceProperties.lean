@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.OptionalReturnValueTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveSuccessTraceProperties
-import Solcore.Syntax.Parser.StatementDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact successful return statements from explicit expression trace laws.
 The keyword and semicolon are silent; only the optional expression adds events. -/

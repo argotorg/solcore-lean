@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.TerminatedControlSuccessTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
-import Solcore.Syntax.Parser.StatementRejectionTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact first-failure reports for real terminated control statements.
 Neither successful token consumption nor rejection commits a diagnostic. -/

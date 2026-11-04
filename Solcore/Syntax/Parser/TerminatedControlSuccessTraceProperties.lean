@@ -1,7 +1,6 @@
 import Solcore.Syntax.DeclarativeTerminatedControlTraceProperties
 import Solcore.Syntax.Parser.CoreStatementControlSoundnessProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveSuccessTraceProperties
-import Solcore.Syntax.Parser.StatementDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact silent success for the real keyword-plus-semicolon statement parser. -/
 

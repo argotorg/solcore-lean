@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedUnrestrictedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

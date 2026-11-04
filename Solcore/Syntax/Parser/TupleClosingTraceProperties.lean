@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeParenthesizedTraceGrammar
-import Solcore.Syntax.Parser.DelimitedClosingTraceProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Exact silent tuple closing. Forward elements determine group versus tuple;

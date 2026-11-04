@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceGrammar
-import Solcore.Syntax.Parser.DelimitedNoTrailingRejectionTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact optional-argument rejection under explicit child expression laws.
 The left-parenthesis guard commits to the raw list result without changing its

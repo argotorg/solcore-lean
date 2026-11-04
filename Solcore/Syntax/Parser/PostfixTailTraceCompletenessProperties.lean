@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.PostfixTailSuccessTraceSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingTraceCompletenessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 
 /-! Finite independent postfix successes execute above a derivation-dependent
 fuel threshold. Index children may rewind, so this threshold is deliberately

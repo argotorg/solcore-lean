@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeIdentifierCascadeProperties
+import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativePragmaTraceGrammar
 
 /-! The ordered checked-item events of successful pragmas are all protected

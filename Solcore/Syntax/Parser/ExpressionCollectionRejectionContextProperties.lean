@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Expression.Atom
 

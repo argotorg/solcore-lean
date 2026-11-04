@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.ExpressionAtomRecoveryTraceStateProperties
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceProperties
 import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
-import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Standalone recovery has unrestricted exact trace contracts. Completeness
 uses ordinary execution, not existence from the independent joint specification.

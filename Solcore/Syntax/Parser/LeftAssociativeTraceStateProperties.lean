@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.LeftAssociativeTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.LeftAssociativeTraceContextProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Whole-State left-associative correspondence preserves every traced token,
 cursor, endIndex, and ordered event. Only file/endByte frames reconstruct the

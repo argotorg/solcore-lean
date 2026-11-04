@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingRejectionTraceProperties
-import Solcore.Syntax.DeclarativeExpressionNameTraceProperties
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! Independent rejection erasure, functionality, and exclusion. The older
 ordinary dot relation is dispatcher-selected, so raw-dot erasure explicitly

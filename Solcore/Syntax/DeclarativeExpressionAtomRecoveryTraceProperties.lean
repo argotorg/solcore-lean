@@ -1,8 +1,7 @@
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
 import Solcore.Syntax.DeclarativeCoreExpressionAtomRecoveryExactnessProperties
 import Solcore.Syntax.DeclarativeRejectionDiagnosticProperties
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeProperties
-import Solcore.Syntax.DeclarativeTraceOutcomeSpec
+import Solcore.Syntax.Internal.TraceBasics
 
 /-! Exact standalone recovery keeps its complete error AST, token remainder,
 and singleton event distinct from the terminal report. The recovered event is

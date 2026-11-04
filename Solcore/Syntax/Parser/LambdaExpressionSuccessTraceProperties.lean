@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeLambdaExpressionTraceGrammar
-import Solcore.Syntax.Parser.LambdaParametersTraceProperties
+import Solcore.Syntax.Parser.Internal.ParameterListTrace
 import Solcore.Syntax.Parser.OptionalLambdaReturnTypeConcreteTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveSuccessTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Raw lambda success composes the silent marker, recovering parameter list,
 optional return type, and supplied block. All parameter recovery events remain

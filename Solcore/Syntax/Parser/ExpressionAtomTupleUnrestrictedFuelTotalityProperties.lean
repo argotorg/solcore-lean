@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.UnrestrictedFuelElementContract
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Parenthesized atoms and their actual tuple loop are ordinary on arbitrary

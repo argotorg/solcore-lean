@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.TupleClosingTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Closing failure preserves the entire state and asks only for a right
 parenthesis, regardless of the accumulated reverse element prefix. -/

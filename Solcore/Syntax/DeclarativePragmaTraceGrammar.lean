@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeIdentifierTraceGrammar
+import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.DeclarativePragmaOutcomeGrammar
 
 /-! Independent ordered identifier events and complete pragma success traces. -/

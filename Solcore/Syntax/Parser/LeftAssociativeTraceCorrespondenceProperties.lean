@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeLeftAssociativeTraceProperties
 import Solcore.Syntax.Parser.LeftAssociativeTraceSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
 
 /-! Whole left-associative correspondence uses independent operand exactness

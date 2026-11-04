@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixGrammar
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceGrammar
-import Solcore.Syntax.DeclarativeIdentifierTraceGrammar
+import Solcore.Syntax.Internal.DelimitedTrace
+import Solcore.Syntax.Internal.NameTrace
 
 /-! Independent maximal postfix traces. Index, call, and checked-identifier
 field suffixes retain their ordered lookahead guards and exact AST spans.

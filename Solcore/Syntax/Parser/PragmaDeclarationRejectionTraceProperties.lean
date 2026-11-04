@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativePragmaRejectionTraceProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.PragmaDeclarationTraceProperties
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
 import Solcore.Syntax.Parser.PragmaItemsRejectionTraceCompletenessProperties

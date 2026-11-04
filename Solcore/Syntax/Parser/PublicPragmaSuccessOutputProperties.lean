@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePragmaCascadeProperties
 import Solcore.Syntax.Parser.LexedValidation
-import Solcore.Syntax.Parser.ParseDiagnosticCascadeProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.PragmaDeclarationTraceProperties
 import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties

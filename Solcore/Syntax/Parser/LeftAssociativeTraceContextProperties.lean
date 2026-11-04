@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreExpressionBinaryOperatorSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Left-associative execution retains source and an arbitrary window
 observation under exactly the corresponding operand frames. Successful child

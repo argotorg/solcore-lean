@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativePostfixTailRejectionTraceProperties
 import Solcore.Syntax.Parser.PostfixTailSuccessTraceSoundnessProperties
 import Solcore.Syntax.Parser.PostfixTailRejectionTraceSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Pointwise postfix correspondence separates deterministic independent
 outcomes from actual invariant exclusion. No fuel bound, child progress,

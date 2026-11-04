@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeLeftAssociativeTraceGrammar
 import Solcore.Syntax.Parser.CoreExpressionBinaryOperatorSoundnessProperties
-import Solcore.Syntax.Parser.DiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact ordinary-outcome soundness at every left-associative loop fuel.
 Only successful operand file/endByte framing is needed to compose traces.

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProperties
-import Solcore.Syntax.Parser.DelimitedClosingTraceProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Exact optional-return execution under explicit trace laws for the actual

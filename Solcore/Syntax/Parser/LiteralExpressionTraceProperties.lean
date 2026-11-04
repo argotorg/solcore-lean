@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreLiteralRejectionTraceProperties
-import Solcore.Syntax.Parser.ExpressionDiagnosticTraceContracts
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Five unconditional expression trace contracts for the real literal leaf. -/
 

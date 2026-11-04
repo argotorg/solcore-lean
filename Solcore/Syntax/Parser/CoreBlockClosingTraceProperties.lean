@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreBlockTailTraceProperties
 import Solcore.Syntax.DeclarativePrimitiveExactnessProperties
 import Solcore.Syntax.Parser.Block
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact brace closing, tail-validation events, and silent closing rejection. -/
 

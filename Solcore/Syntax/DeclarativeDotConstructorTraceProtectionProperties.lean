@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceGrammar
-import Solcore.Syntax.DeclarativeExpressionNameTraceProtectionProperties
-import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceProtectionProperties
+import Solcore.Syntax.Internal.NameTrace
+import Solcore.Syntax.Internal.DelimitedTrace
 
 /-! Checked name events are intrinsically protected; protected argument
 events follow them without reordering, dropping metadata, or deduplication. -/

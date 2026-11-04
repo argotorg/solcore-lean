@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
 import Solcore.Syntax.Parser.CoreExpressionAtomRecoveryOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.SourceFrameProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.TypeTrace
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Standalone recovery appends exactly one event on success, retains the
 complete source/window, and rejects without committing its terminal report.

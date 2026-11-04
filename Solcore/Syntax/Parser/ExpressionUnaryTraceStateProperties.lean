@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionUnaryTraceCorrespondenceProperties
-import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Whole unary replies are reconstructed from the exact traced remainder.
 Both successful and rejected postfix frames preserve only file/endByte; token
