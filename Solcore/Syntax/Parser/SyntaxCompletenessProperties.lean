@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreTypeCompletenessProperties
 import Solcore.Syntax.Parser.CoreTermPublicCompletenessProperties
-import Solcore.Syntax.Parser.CoreLambdaParameterCompletenessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 import Solcore.Syntax.Parser.CoreBlockPublicCompletenessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationCompletenessProperties
 import Solcore.Syntax.Parser.ImplementationDeclarationCompletenessProperties

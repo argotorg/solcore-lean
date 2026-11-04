@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.Operator
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Success soundness of canonical import/export selector parsing. -/
 

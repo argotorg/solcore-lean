@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Statement.MatchProperties
 
 /-! Totality for the nonempty Core-match scrutinee conversion. -/

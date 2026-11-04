@@ -1,33 +1,20 @@
 import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Grammar.Declarations
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedSoundnessProperties
-import Solcore.Syntax.Parser.Signature
-import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Internal.ContractMemberOutcomes
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.WhereClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.FunctionProperties
 import Solcore.Syntax.Validity
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.FunctionDeclarationTotalityProperties
-import Solcore.Syntax.Parser.DelimitedNonemptyProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
-import Solcore.Syntax.Parser.GenericParametersTotalityProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
-import Solcore.Syntax.Parser.WhereClauseTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeTotality
+import Solcore.Syntax.Parser.Internal.ParameterTotality
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
-import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
-import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 
 set_option autoImplicit false
 

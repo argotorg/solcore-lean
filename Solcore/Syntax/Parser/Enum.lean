@@ -1,21 +1,13 @@
 import Solcore.Syntax.Parser.Declarations
-import Solcore.Syntax.Parser.Signature
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Validity
-import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Grammar.Declarations
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 import Solcore.Syntax.Internal.DeclarationExactness
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.GenericParametersTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeTotality
 
 set_option autoImplicit false
 

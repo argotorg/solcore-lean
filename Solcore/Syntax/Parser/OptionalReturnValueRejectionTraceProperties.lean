@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeReturnStatementRejectionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Statement.Simple
 
 /-! Rejected optional return values preserve semicolon-first priority and the

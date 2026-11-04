@@ -1,8 +1,7 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.PragmaItemsOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.RawIdentifierOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Exact executable ordinary rejection for complete pragma declarations. -/
 

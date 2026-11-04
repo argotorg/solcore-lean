@@ -2,12 +2,12 @@ import Solcore.Syntax.DeclarativeIsolatedBlockTraceGrammar
 import Solcore.Syntax.Parser.Block
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Internal.TraceBasics
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
-import Solcore.Syntax.Parser.DiagnosticFilter
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.Primitive
 import Solcore.Syntax.DeclarativeCoreBlockTraceGrammar
 import Solcore.Syntax.DeclarativeCoreBlockRejectionTraceGrammar
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-!
 Foundations of the parser's trace proofs: the contracts a traced child parser

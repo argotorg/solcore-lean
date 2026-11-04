@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.LiteralSuccessTraceProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact silent Core-literal rejection, retaining the complete input state. -/
 

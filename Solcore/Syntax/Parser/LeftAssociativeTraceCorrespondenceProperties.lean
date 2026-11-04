@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeLeftAssociativeTraceProperties
 import Solcore.Syntax.Parser.LeftAssociativeTraceSoundnessProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Whole left-associative correspondence uses independent operand exactness
 and explicit pointwise invariant exclusion. Successful operand framing keeps

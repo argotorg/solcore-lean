@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.StatementLayer
 import Solcore.Syntax.Parser.CoreAssignmentStatementOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.RecognizedCoreStatementFallbackOrdinaryOutcomeSoundnessProperties
 
 /-! Shared guarded-success machinery for the Core statement dispatcher. -/

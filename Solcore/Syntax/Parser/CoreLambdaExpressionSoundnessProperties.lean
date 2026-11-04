@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreLambdaParameterSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaReturnTypeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedAllowEmptyDiagnosticFreeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.ParameterBasics
 
 /-!

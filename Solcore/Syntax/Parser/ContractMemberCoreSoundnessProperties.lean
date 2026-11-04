@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.ContractFieldSoundnessProperties
 import Solcore.Syntax.Parser.DeclarationLeafDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Parametric strict soundness for attribute-free contract-member dispatch. -/
 

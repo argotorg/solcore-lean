@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeReturnStatementTraceProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Statement.Simple
 
 /-! Exact optional-return success with semicolon-first priority. Expression

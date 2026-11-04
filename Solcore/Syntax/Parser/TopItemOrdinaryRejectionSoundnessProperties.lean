@@ -1,5 +1,5 @@
 import Solcore.Syntax.Grammar.SourceFile
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.DeriveAttributeOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TopItemDeriveAttachmentOrdinarySoundnessProperties

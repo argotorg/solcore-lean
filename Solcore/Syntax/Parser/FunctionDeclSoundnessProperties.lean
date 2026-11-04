@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.FunctionProperties
-import Solcore.Syntax.Parser.FunctionSignatureDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 
 /-! Parametric diagnostic-free soundness for ordinary function declarations. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.CoreBlockClosingTraceProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact raw Core rejection reports and preceding statement-event traces.
 Rejection returns before the delayed whole-body tail validation. -/

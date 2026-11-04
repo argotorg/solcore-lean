@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Statement.Match
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Executable ordinary success and exact rejection for one Core match case. -/
 

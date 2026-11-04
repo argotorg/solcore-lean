@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractEntry
 import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Exact executable rejection of canonical contract constructors. -/
 

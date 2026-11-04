@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.Statement.Control
-import Solcore.Syntax.Parser.YulBodyPublicSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulPublicSoundness
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Executable ordinary outcomes for Core `assembly`. -/
 

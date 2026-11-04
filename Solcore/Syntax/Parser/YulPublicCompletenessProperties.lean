@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.Yul.BodyTotalityProperties
-import Solcore.Syntax.Parser.YulBodyPublicSoundnessProperties
-import Solcore.Syntax.Parser.YulExpressionPublicFuelSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulTotality
+import Solcore.Syntax.Parser.Internal.YulPublicSoundness
+import Solcore.Syntax.Parser.Internal.YulAssignmentSoundness
 
 /-! Complete public Yul grammar correspondence on valid parser states. -/
 

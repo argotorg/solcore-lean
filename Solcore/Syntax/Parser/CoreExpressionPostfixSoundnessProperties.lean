@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreExpressionPostfixDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptyDiagnosticFreeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-!

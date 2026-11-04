@@ -1,8 +1,8 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractBodyOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Exact broad ordinary rejection for complete contract declarations. -/
 

@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.ContractBodySoundnessProperties
 import Solcore.Syntax.Parser.ContractCanonicalProperties
-import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
-import Solcore.Syntax.Parser.Signature
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 
 /-! Parametric diagnostic-free soundness for complete contract declarations. -/
 

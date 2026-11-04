@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExportPathTotalityProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Totality boundary for local, path, and public export dispatch. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.ExpressionProperties
 
 /-! Fuel-aware totality for conditional-expression parsing. -/

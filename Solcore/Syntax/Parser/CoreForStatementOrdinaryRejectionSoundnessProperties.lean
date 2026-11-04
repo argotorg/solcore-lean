@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreForStatementOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Executable exact rejection for complete Core `for` statements. -/
 

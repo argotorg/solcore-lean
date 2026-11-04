@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Collection rejection preserves the file and any chosen window observation.

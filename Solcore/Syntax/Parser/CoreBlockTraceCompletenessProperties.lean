@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreBlockTraceSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact raw Core success traces from explicit statement completeness and
 context laws. Production fuel suffices by strict cursor progress alone. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreMatchComponentSoundnessProperties
 import Solcore.Syntax.Parser.CoreMatchStatementDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.DelimitedNonemptyTrailingDiagnosticFreeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact diagnostic-free soundness for complete Core `match` statements. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Block
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Valid-input totality for Core block loops and captured blocks. -/
 

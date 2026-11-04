@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractDeriveAttachmentOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.DeriveAttributeOrdinaryOutcomeSoundnessProperties
 
 /-! Broad ordinary-success reflection for derive-aware contract members. -/

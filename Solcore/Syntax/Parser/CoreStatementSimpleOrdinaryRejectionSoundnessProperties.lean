@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreStatementSimpleOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Exact executable rejection for canonical Core `let` and `return`. -/
 

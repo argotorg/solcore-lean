@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Internal.TypeBasics
 
 /-!

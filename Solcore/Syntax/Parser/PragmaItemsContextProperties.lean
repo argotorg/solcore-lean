@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Pragma
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Unconditional source-file and full-window frame laws for pragma items.
 Cursor changes and emitted diagnostics do not alter diagnostic report context. -/

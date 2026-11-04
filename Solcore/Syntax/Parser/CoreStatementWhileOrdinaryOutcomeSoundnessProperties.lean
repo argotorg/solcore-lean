@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Statement.Control
 
 /-! Executable ordinary success and exact rejection for Core `while`. -/

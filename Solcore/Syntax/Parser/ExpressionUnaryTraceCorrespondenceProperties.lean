@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionUnaryTraceProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Unary success and rejection correspondence use only the matching supplied
 postfix soundness/completeness directions. The silent production prefix adds

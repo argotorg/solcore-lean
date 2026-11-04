@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.StatementLayer
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.RecognizedCoreStatementFallbackOrdinaryOutcomeSoundnessProperties
 
 /-! Primitive bridges used by the ordered Core statement rejection proof. -/

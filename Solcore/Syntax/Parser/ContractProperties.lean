@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.DeclarationCanonicalProperties
 import Solcore.Syntax.Parser.DeriveCarrierProperties
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.Internal.TypeBasics
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 import Solcore.Syntax.Validity
 
 /-! Contracts for canonical contract declaration parsing. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreAssignmentTailOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreStatementSimpleSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Executable ordinary-success and exact-rejection bridges for the terminal Core

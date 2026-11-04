@@ -1,6 +1,5 @@
 import Solcore.Syntax.Grammar.Declarations
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 
 /-! Exact ordinary-rejection reflection for dotted derive targets. -/

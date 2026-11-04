@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExpressionLeftAssociativeTotalityProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-! Left-associative layers preserve unrestricted operand contracts at the
 same fuel. A tail has one extra unit of operand allowance because its actual

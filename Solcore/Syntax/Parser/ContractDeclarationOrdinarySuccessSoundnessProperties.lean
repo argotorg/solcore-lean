@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractBodyOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 
 /-! Broad ordinary-success soundness for complete contract declarations. -/
 

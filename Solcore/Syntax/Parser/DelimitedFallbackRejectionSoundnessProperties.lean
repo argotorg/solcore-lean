@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.DelimitedExactness
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Pattern
 
 /-!

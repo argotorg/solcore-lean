@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ContractProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.TypeTotality
 
 /-! Valid-input totality laws local to contract fields. -/
 

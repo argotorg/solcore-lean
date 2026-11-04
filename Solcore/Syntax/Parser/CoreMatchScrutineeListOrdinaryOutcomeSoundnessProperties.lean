@@ -1,6 +1,5 @@
 import Solcore.Syntax.Internal.StatementOutcomes
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Executable ordinary outcomes for the parenthesized Core match scrutinee list.

@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.CoreExpressionAtomCoreOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaExpressionOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreParenthesizedOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-! Exact ordinary-rejection reflection for `expressionAtomCore`. -/
 

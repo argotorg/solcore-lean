@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Derive
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-! Fuel adequacy and ordinary control flow for derive recovery. -/
 

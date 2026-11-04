@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.OptionalLambdaReturnTypeTraceProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! A selected arrow propagates the actual type rejection unchanged. The
 arrow-absent branch cannot reject, so there is no raw missing-arrow report. -/

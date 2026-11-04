@@ -5,7 +5,7 @@ import Solcore.Syntax.Parser.FileTopItemProperties
 import Solcore.Syntax.Parser.ImportProperties
 import Solcore.Syntax.Parser.Pragma
 import Solcore.Syntax.Parser.Trait
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Compositional contracts for top-level declaration dispatch. -/
 

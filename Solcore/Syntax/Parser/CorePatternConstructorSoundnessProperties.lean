@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CorePatternConstructorArgumentSoundnessProperties
 import Solcore.Syntax.Parser.NameOperatorDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Diagnostic reflection and exact parser-independent soundness for leading-dot

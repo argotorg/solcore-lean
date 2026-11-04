@@ -1,6 +1,6 @@
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeTotality
 
 /-! Complete ordinary grammar correspondence for public Core types. -/
 

@@ -7,7 +7,7 @@ import Solcore.Syntax.Parser.ImportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Trait
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Broad executable success reflection for the plain top-item dispatcher. -/
 

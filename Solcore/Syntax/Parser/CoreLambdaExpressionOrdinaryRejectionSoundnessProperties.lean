@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreLambdaExpressionOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact guarded ordinary-rejection reflection for Core lambda expressions. -/
 

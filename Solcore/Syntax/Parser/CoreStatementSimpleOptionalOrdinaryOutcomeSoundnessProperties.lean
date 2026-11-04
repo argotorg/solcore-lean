@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.StatementOutcomes
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Statement.Simple
 
 /-! Ordinary executable outcomes for optional Core statement components. -/

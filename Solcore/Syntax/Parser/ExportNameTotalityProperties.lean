@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.ExportProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.Operator
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Conditional totality for one exported selector name. -/
 

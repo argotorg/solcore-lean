@@ -1,21 +1,18 @@
 import Solcore.Syntax.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.Internal.FunctionReturnsTrace
 import Solcore.Syntax.Internal.NameTrace
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.TypeNamedTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeFormTotality
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Internal.TypeOutcomes
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.TypeFunctionTotalityProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
-import Solcore.Syntax.Parser.TypeStrictProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.TypeTotality
 
 /-!
 Parser side of the identifier and type traces: soundness, completeness,

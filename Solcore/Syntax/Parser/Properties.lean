@@ -1,14 +1,14 @@
 import Solcore.Syntax.Lexer.Properties
 import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.File
-import Solcore.Syntax.Parser.DiagnosticFilter
+import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.DeriveCarrierProperties
 import Solcore.Syntax.Parser.DeclarationCanonicalProperties
 import Solcore.Syntax.Parser.Preflight
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.LiteralProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Parser.State
-import Solcore.Syntax.Parser.Yul.LeafProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-! Source-provenance laws for the total canonical parser. -/
 

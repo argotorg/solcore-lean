@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Bounded postfix-tail execution on arbitrary States. Real suffix markers

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Statement.Simple
-import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Backward propagation of diagnostic freedom through Core `let` and `return`

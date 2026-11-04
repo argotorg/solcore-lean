@@ -7,7 +7,7 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.Pragma
-import Solcore.Syntax.Parser.TopLevel
-import Solcore.Syntax.Parser.Trivia
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.Trait
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs

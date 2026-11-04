@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.TermStatementFallbackFuelTotalityProperties
-import Solcore.Syntax.Parser.Yul.BodyTotalityProperties
+import Solcore.Syntax.Parser.Internal.YulTotality
 
 /-! Valid-input totality for Core inline-assembly statements. -/
 

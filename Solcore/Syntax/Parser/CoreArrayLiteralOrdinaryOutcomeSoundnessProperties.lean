@@ -1,7 +1,5 @@
 import Solcore.Syntax.Internal.ExpressionOutcomes
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Executable ordinary outcomes for guarded Core array literals. -/

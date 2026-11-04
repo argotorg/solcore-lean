@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Statement.MatchCasesFuelTotalityProperties
 import Solcore.Syntax.Parser.Statement.MatchDefaultFuelTotalityProperties
 import Solcore.Syntax.Parser.Statement.MatchScrutineeTotalityProperties

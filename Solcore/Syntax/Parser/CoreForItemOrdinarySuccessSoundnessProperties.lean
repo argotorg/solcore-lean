@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreAssignmentTailOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.CoreStatementSimpleOptionalOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Statement.Simple
 

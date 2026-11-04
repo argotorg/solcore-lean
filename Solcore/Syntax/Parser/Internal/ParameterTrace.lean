@@ -1,14 +1,13 @@
 import Solcore.Syntax.Parser.Internal.LambdaParameterRecovery
 import Solcore.Syntax.Grammar.Expressions
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.FunctionParameterBoundaryOutcomeSoundnessProperties
 
 /-!
 Parser side of the parameter traces: raw and core parameters, tails,

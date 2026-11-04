@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.DelimitedFallbackRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Pattern
 
 /-! Executable ordinary outcomes for Core constructor-pattern arguments. -/

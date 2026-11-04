@@ -1,7 +1,6 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.ExportPathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FinishExportOrdinaryOutcomeSoundnessProperties

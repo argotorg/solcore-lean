@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
 
 /-! Exact ordinary-rejection reflection for import terminators. -/

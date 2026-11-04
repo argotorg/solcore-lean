@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CoreLiteralOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternBasicSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact executable ordinary outcomes of the three `patternCore` leaves. -/
 

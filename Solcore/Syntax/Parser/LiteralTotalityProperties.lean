@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.LiteralProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-! Totality contracts for canonical literal token consumers. -/
 

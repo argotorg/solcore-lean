@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.CoreExpressionAtomDispatcherLookaheadProperties
 import Solcore.Syntax.Parser.CorePatternDispatcherLookaheadProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Positive lookahead bridges for exact `patternCore` branch selection. -/
 

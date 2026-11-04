@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreAssignmentTailSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Executable ordinary-success and exact RHS-rejection bridges for Core

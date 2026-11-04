@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.DeriveRecoveryDiagnosticProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 import Solcore.Syntax.Parser.DeriveValidityProperties

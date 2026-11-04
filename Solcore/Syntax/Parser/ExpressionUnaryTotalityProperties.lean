@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Fuel adequacy and totality for prefix unary-operator scanning. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExportProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-! Production-fuel adequacy for export-path parsing. -/
 

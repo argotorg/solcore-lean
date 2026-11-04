@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.PatternOutcomes
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Pattern
 
 /-! Exact ordinary-success reflection for Core pattern recovery scans. -/

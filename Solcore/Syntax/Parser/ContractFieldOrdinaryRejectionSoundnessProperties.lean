@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ContractFieldInitializerOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 
 /-! Exact executable rejection for contract storage fields. -/
 

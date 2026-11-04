@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.Contract
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Executable ordinary outcomes for optional contract-field initializers. -/
 

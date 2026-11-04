@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.ExpressionOutcomes
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.CoreLiteralSoundnessProperties
 
 /-! Exact executable ordinary outcomes for one Boolean-first Core name. -/

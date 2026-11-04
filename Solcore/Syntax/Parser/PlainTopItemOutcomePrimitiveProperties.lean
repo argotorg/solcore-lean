@@ -1,5 +1,5 @@
 import Solcore.Syntax.Grammar.SourceFile
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.File
 
 /-! Shared executable primitives for broad attribute-free top-item outcomes. -/

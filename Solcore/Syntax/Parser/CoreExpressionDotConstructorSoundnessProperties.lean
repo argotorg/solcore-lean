@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreLiteralSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptyDiagnosticFreeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Diagnostic reflection and exact declarative soundness for leading-dot Core

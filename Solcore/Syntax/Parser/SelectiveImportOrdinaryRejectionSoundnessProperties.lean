@@ -1,5 +1,5 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.HidingClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.Import

@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.PatternOutcomes
 import Solcore.Syntax.Parser.CorePatternArgumentsOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternNameOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Executable ordinary outcomes for leading-dot Core constructor patterns. -/
 

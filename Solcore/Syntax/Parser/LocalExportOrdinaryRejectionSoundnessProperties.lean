@@ -1,6 +1,5 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.FinishExportOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportItemOrdinaryOutcomeSoundnessProperties
 

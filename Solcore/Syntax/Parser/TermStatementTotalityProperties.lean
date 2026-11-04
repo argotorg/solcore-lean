@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.TermStatementProperties
 
 /-! Valid-input totality for the recognized-statement fallback boundary. -/

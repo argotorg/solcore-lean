@@ -1,6 +1,5 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ExportNameOrdinaryOutcomeSoundnessProperties
 
 /-! Exact executable rejection reflection for export selections. -/

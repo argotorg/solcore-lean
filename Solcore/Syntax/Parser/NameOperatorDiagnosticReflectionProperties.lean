@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.ModulePath
-import Solcore.Syntax.Parser.Operator
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Diagnostic-freedom reflection for shared name and selector parsers. -/
 

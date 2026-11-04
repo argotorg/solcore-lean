@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ExportFinishSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportItemSoundnessProperties
 

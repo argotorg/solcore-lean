@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Parser side of the delimited-list traces: the executable list parsers

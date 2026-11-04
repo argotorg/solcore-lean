@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreStatementControlSoundnessProperties
-import Solcore.Syntax.Parser.YulKeywordRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 
 /-!
 Executable ordinary outcomes for Core block and terminated-control statements.

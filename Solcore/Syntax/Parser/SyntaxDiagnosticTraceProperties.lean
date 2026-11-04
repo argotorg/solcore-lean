@@ -111,7 +111,7 @@ import Solcore.Syntax.Parser.ExpressionPostfixTraceStateProperties
 import Solcore.Syntax.Parser.ExpressionAtomBoundedBodyFuelTotalityProperties
 import Solcore.Syntax.DeclarativeExpressionPostfixLayerTraceProperties
 import Solcore.Syntax.Parser.ExpressionPostfixLayerTraceProperties
-import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.ExpressionCollectionNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionAtomNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionAtomUnrestrictedChildContractProperties

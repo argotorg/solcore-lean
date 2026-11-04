@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! An independently observed missing pragma name fixes the complete
 uncommitted failure and preserves the existing raw diagnostic sequence. -/

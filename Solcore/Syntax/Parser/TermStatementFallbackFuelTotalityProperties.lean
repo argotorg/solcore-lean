@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.TermStatementFallbackTotalityProperties
 
 /-! Recursive-fuel totality for the terminal Core-statement fallback. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreBlockOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-!
 Exact executable ordinary-rejection soundness for raw Core blocks.

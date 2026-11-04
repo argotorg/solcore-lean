@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.ContractProperties
-import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-! Parametric diagnostic-free soundness for contract storage fields. -/
 

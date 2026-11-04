@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreBlockOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Statement.Match
 
 /-! Executable ordinary outcomes for prioritized optional Core default. -/

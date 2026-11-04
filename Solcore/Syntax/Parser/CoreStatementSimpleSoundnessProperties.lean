@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Statements
 import Solcore.Syntax.Parser.CoreStatementSimpleDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Exact parser-independent soundness for Core `let` and `return` statements.

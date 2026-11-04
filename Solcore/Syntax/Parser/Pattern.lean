@@ -1,13 +1,12 @@
 import Solcore.Syntax.Parser.Terms
 import Solcore.Syntax.Parser.Expression
 import Solcore.Syntax.Unicode.Lowercase
-import Solcore.Syntax.Parser.LiteralProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Validity
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.LiteralTotalityProperties
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
-import Solcore.Syntax.Parser.DelimitedNonemptyProperties
-import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
+import Solcore.Syntax.Parser.Internal.TypeFormTotality
 
 set_option autoImplicit false
 

@@ -1,6 +1,5 @@
 import Solcore.Syntax.Grammar.Patterns
-import Solcore.Syntax.Parser.CoreTypeQualifiedNameRejectionSoundnessProperties
-import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-! Exact executable ordinary outcomes for qualified Core pattern paths. -/
 

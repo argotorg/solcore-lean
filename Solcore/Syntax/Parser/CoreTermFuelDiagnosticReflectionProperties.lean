@@ -2,8 +2,8 @@ import Solcore.Syntax.Parser.CoreExpressionSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternSoundnessProperties
 import Solcore.Syntax.Parser.CoreStatementLayerDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.IsolatedCoreBlockSoundnessProperties
-import Solcore.Syntax.Parser.YulBlockDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.YulStatementRecursiveDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.YulBlockSoundness
+import Solcore.Syntax.Parser.Internal.YulSwitchSoundness
 
 /-! Diagnostic reflection for mutually recursive and public Core terms. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreParenthesizedOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact ordinary-rejection reflection for guarded Core parentheses. -/
 

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Raw collection atoms retain the numeric endIndex of both ordinary

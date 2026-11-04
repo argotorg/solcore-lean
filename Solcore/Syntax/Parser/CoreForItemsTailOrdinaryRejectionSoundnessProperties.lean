@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CoreForItemOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreForItemsTailOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Executable exact rejection for Core `for` item-list tails. -/
 

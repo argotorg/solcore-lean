@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Fuel-aware totality for the postfix-expression tail loop. -/

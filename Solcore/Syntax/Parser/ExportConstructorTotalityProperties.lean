@@ -1,8 +1,6 @@
-import Solcore.Syntax.Parser.DelimitedNonemptyProperties
-import Solcore.Syntax.Parser.DelimitedTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.ExportProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 
 /-! Totality for export constructor selections. -/
 

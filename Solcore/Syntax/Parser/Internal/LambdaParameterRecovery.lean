@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Types
-import Solcore.Syntax.Parser.ParameterRecoveryTotalityProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterRecoveryTotality
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 
 /-!
 Two totality facts about `recoverLambdaParameter`.

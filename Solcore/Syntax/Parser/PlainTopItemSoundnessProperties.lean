@@ -7,7 +7,7 @@ import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Trait
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Parametric strict soundness for attribute-free top-item dispatch. -/
 

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ContractMemberCoreSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Derive
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
 

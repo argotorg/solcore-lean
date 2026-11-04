@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.ExpressionUnaryTotalityProperties
 
 /-! Fuel-aware totality for complete prefix-unary expression layers. -/

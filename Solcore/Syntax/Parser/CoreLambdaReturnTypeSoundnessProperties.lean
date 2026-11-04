@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreLambdaParameterDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Exact declarative soundness for optional Core lambda return types.

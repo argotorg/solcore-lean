@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.TraceBasics
-import Solcore.Syntax.Parser.DiagnosticFilter
+import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.TopItemRecoveryTraceCompletenessProperties
 
 /-! Exact correspondence between independent cascade filtering and the public

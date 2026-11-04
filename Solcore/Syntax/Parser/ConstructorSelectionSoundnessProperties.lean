@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ExportProperties
 
 /-! Success soundness of canonical constructor selections. -/

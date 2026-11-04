@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Modules
 import Solcore.Syntax.Parser.PragmaItemsOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.RawIdentifierOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact executable ordinary success for complete pragma declarations. -/
 

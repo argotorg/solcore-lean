@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.TermStatementTotalityProperties
-import Solcore.Syntax.Parser.TypeFuelTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeTotality
 
 /-! Totality for the non-recovering `let` and `return` statement branches. -/
 

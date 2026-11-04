@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Derive
 
 /-! Resource and ordinary-result contracts for canonical derive targets. -/

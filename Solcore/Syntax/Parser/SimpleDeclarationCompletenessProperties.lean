@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
 import Solcore.Syntax.Parser.Trait
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Complete syntax-only correspondence for type aliases, enums, and traits.
 The supplied enum derive attribute is fixed but needs no provenance premise. -/

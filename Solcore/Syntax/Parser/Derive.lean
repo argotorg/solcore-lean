@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.TopLevel
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 set_option autoImplicit false
 

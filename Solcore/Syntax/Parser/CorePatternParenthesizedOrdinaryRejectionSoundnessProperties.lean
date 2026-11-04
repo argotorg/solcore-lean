@@ -1,6 +1,6 @@
 import Solcore.Syntax.Grammar.Patterns
 import Solcore.Syntax.Parser.CorePatternParenthesizedOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Exact ordinary-rejection reflection for parenthesized patterns. -/
 

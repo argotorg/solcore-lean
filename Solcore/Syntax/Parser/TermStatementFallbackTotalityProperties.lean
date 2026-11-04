@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.TermStatementTotalityProperties
 
 /-! Valid-input totality for the terminal Core-statement fallback. -/

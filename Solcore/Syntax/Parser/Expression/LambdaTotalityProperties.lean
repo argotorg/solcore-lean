@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Expression.Atom
-import Solcore.Syntax.Parser.LambdaParameterCoreTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterTotality
 
 /-! Totality for lambda expressions over an abstract block parser. -/
 

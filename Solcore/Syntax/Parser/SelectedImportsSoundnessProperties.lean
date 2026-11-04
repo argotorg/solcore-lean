@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DelimitedSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ImportProperties
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 

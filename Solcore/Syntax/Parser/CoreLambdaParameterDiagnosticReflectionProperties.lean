@@ -1,8 +1,8 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Expression.Atom
-import Solcore.Syntax.Parser.ParameterRecoveryDiagnosticProperties
-import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Diagnostic reflection for Core lambda parameters and their optional return

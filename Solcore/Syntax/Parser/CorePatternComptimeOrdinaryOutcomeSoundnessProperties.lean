@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.PatternOutcomes
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Pattern
 
 /-! Executable ordinary outcomes for Core compile-time patterns. -/

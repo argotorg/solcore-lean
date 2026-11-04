@@ -2,12 +2,10 @@ import Solcore.Syntax.Parser.Modules
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Module
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.CoreTypeQualifiedNameRejectionSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Internal.ImportOutcomes
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
+import Solcore.Syntax.Parser.Internal.TypeFormTotality
 
 set_option autoImplicit false
 

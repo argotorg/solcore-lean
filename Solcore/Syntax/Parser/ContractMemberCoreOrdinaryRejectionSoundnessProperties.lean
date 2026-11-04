@@ -3,11 +3,11 @@ import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessPrope
 import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Exact broad rejection reflection for attribute-free contract members. -/
 

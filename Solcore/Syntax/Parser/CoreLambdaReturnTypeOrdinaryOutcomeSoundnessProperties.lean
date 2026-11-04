@@ -1,5 +1,5 @@
 import Solcore.Syntax.Internal.ExpressionAtomOutcomes
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Executable ordinary outcomes for an optional Core lambda return type. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Exact raw proxy rejection uses contracts for the actual type parser.

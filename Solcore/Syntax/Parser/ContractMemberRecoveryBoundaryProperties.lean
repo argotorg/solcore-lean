@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Declarations
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.ContractRecoveryProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-! Executable-to-declarative boundary bridges for contract-member recovery. -/
 

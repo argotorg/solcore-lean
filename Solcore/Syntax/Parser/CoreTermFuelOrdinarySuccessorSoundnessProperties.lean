@@ -1,12 +1,11 @@
 import Solcore.Syntax.Grammar.TermLevels
 import Solcore.Syntax.Parser.CoreBlockIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionStepOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreLambdaParameterOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 import Solcore.Syntax.Parser.CorePatternStepOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreStatementLayerOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermFuelOrdinaryOutcomeSoundnessContract
 import Solcore.Syntax.Parser.CoreTermFuelOrdinaryShapeProperties
-import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 
 /-! One-step construction of mutual Core fuel outcome reflection. -/
 

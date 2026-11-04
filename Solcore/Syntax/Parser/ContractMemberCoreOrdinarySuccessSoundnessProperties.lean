@@ -6,7 +6,7 @@ import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Broad ordinary-success reflection for attribute-free contract members. -/
 

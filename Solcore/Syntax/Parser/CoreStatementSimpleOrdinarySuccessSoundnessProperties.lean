@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.CoreStatementSimpleOptionalOrdinaryOutcomeSoundnessProperties
 
 /-! Ordinary executable success for canonical Core `let` and `return`. -/

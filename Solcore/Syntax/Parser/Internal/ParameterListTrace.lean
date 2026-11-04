@@ -1,10 +1,9 @@
 import Solcore.Syntax.Internal.ParameterTrace
 import Solcore.Syntax.Parser.Internal.ParameterTrace
-import Solcore.Syntax.Parser.NamedParameterTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
-import Solcore.Syntax.Parser.Signature
-import Solcore.Syntax.Parser.LambdaParameterCoreTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Parser.Expression.Atom
 
 /-!

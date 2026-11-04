@@ -1,17 +1,15 @@
 import Solcore.Syntax.Parser.Declarations
 import Solcore.Syntax.Parser.Function
-import Solcore.Syntax.Parser.FunctionParameterDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.Signature
+import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.ValidityBasics
 import Solcore.Syntax.Validity
-import Solcore.Syntax.Parser.NamedParameterTotalityProperties
+import Solcore.Syntax.Parser.Internal.ParameterTotality
 import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
 import Solcore.Syntax.Parser.Internal.Basics
-import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Grammar.Declarations
-import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.FunctionParametersOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 
 set_option autoImplicit false
 

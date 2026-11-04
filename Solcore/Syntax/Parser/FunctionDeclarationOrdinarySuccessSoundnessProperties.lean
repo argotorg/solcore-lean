@@ -1,7 +1,7 @@
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Function
-import Solcore.Syntax.Parser.FunctionSignatureOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
 
 /-! Ordinary success soundness for complete named-function declarations. -/
 

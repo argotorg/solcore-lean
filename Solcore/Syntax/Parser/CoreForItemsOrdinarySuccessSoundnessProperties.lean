@@ -1,7 +1,7 @@
 import Solcore.Syntax.Internal.StatementOutcomes
 import Solcore.Syntax.Parser.CoreForItemSoundnessProperties
 import Solcore.Syntax.Parser.CoreForItemsTailOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Executable ordinary success for public Core `for` item lists. -/
 

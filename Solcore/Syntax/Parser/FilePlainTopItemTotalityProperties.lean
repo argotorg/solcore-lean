@@ -1,9 +1,9 @@
 import Solcore.Syntax.Parser.FilePlainTopItemProperties
 import Solcore.Syntax.Parser.ExportCanonicalTotalityProperties
 import Solcore.Syntax.Parser.ImportTotalityProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.PragmaTotalityProperties
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Internal.TypeAliasProofs
 
 /-! Conditional invariant freedom for top-level declaration dispatch. -/
 

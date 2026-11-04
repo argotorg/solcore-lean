@@ -1,7 +1,6 @@
 import Solcore.Syntax.Grammar.Expressions
 import Solcore.Syntax.Parser.CoreLiteralSoundnessProperties
-import Solcore.Syntax.Parser.TypeDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TypeSoundness
 
 /-!
 Diagnostic reflection and declarative soundness for Core expression leaves.
