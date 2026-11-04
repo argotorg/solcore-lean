@@ -130,9 +130,9 @@ form a front layer. They stay in `Internal/`, and this table lists the ones used
 | `RecursiveNamedPublicSpecializationMeaning.Prepared` | A prepared named row | `RecursiveNamed/CatalogAndSpecialization` |
 | `RecursiveNamedPublicRootMeaning.RootSelection` | The stored root that a public start selects | `RecursiveNamed/PublicRoots` |
 | `CallableIndexedParameterMeaning.Arguments` | How arguments are represented | `Callable/IndexedParameters` |
-| `CompatiblePayload.FunctionModel` | How function values are represented in payloads | `Compatible/Encoding` |
+| `CompatiblePayload.FunctionModel` | How function values are represented in payloads | `Compatible/Payloads` |
 | `GenericHeap.CellHeapRepresents` | The heap relation over whole cells | `Foundations/GenericHeaps` |
-| `LambdaMetadataViews.MetadataView` | A Source view of runtime metadata | `Foundations/CapturesAndLedgers` |
+| `LambdaMetadataViews.MetadataView` | A Source view of runtime metadata | `Foundations/LambdaViewsAndMarkedCaptures` |
 | `ProtectedStateTransition.Index` | The index of a protected state | `Protected/StateAllocation` |
 
 ## What `Internal/` holds
