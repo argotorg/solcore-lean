@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.BalancedBlockCaptureCompletenessProperties
-import Solcore.Syntax.Parser.BalancedBlockCaptureSoundnessProperties
+import Solcore.Syntax.Parser.Internal.BlockSoundness
 import Solcore.Syntax.Parser.IsolatedBlockDiagnosticTraceProperties
 
 /-! Independent isolation traces from executable results, conditional on

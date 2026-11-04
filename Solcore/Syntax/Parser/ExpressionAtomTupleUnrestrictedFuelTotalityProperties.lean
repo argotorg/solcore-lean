@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Parenthesized atoms and their actual tuple loop are ordinary on arbitrary
 States. A real opening/comma token pays one fuel unit; successful children

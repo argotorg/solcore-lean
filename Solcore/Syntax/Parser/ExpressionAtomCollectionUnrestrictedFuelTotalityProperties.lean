@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Dot constructors and arrays use the actual no-trailing list policy under
 the three-field unrestricted child contract. Only successful endIndex and

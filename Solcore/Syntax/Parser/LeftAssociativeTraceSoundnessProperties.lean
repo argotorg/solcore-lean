@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeLeftAssociativeTraceGrammar
-import Solcore.Syntax.Parser.CoreExpressionBinaryOperatorSoundnessProperties
+import Solcore.Syntax.Parser.Internal.OperatorSoundness
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact ordinary-outcome soundness at every left-associative loop fuel.

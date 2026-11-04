@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExpressionAtomNumericWindowProperties
+import Solcore.Syntax.Parser.Internal.ExpressionTotality
 import Solcore.Syntax.Parser.ExpressionAtomBoundedBodyFuelTotalityProperties
 
 /-! One actual recovering atom constructs a minimal fuel contract from its

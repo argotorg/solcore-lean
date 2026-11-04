@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeBlockStatementTraceProperties
 import Solcore.Syntax.Parser.CoreBlockContextProperties
 import Solcore.Syntax.Parser.CoreBlockTraceCompletenessProperties
 import Solcore.Syntax.Parser.CoreBlockRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.Statement.Control
+import Solcore.Syntax.Parser.Internal.ControlSoundness
 
 /-! Exact block-statement traces map the required-policy raw Core block.
 Ordinary failures escape unchanged; no isolation or recovery occurs here. -/

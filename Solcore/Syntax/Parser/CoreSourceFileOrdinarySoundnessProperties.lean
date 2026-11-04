@@ -1,6 +1,5 @@
 import Solcore.Syntax.Grammar.SourceFile
-import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTermFuelDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.TermSoundness
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
 
 /-! Concrete ordinary soundness for complete canonical Core source files. -/

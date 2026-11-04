@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Block
+import Solcore.Syntax.Parser.Internal.BlockSoundness
 
 /-! Compositional laws from executable child outcomes, not independent grammar
 judgments. Balanced isolation resets child diagnostics and restores the parent. -/

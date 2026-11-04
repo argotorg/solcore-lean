@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Function
+import Solcore.Syntax.Parser.Internal.TermBasics
 import Solcore.Syntax.Validity
 
 /-! State and start-token contracts for complete function declarations. -/

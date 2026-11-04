@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Collection rejection preserves the file and any chosen window observation.
 Taking the identity observes the full window; taking endByte allows endIndex

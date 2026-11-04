@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeLiteralDiagnosticTraceProperties
-import Solcore.Syntax.Parser.CoreLiteralOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExpressionProofs
 
 /-! Exact ASTs, silent traces, and one-token state updates for literal leaves. -/
 

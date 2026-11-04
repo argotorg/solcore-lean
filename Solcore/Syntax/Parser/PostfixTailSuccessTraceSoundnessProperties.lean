@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativePostfixTailTraceGrammar
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Every successful actual postfix tail retains the exact maximal suffix AST
 and ordered nested/name events. Soundness holds for every fuel without a child

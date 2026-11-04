@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.SignatureSoundness
-import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
+import Solcore.Syntax.Parser.Internal.PublicTermTotality
 
 /-! Valid-input totality for complete canonical function declarations. -/
 

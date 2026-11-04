@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeArrayLiteralTraceGrammar
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Exact traces for the actual array wrapper, conditional only on the five
 child-expression contracts. Successful mapping changes the AST alone; ordinary

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExpressionAtomUnrestrictedChildContractProperties
 import Solcore.Syntax.Parser.ExpressionPostfixUnrestrictedFuelTotalityProperties
-import Solcore.Syntax.Parser.PostfixNumericWindowProperties
+import Solcore.Syntax.Parser.Internal.ExpressionTotality
 
 /-! Actual atom-plus-postfix execution and its minimal contract are built from
 nested-expression/body contracts. The intermediate atom contract is constructed,

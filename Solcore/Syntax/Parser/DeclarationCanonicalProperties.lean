@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ContractEntry
 import Solcore.Syntax.Parser.Impl
-import Solcore.Syntax.Parser.TermCanonicalProperties
+import Solcore.Syntax.Parser.Internal.TermBasics
 
 /-! Canonical recursive-validity instances for body-bearing declarations. -/
 

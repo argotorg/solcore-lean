@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeDotConstructorTraceProperties
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Exact optional-argument success. The absent branch never calls the child;
 the present branch is the actual no-trailing list, with explicit child laws. -/

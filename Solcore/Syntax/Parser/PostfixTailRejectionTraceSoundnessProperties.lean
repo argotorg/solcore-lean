@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativePostfixTailRejectionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Every ordinary postfix-tail rejection retains the exact first report and
 ordered child/name events. The selected opening symbols are silent and cannot

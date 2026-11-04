@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Declarations
-import Solcore.Syntax.Parser.Function
+import Solcore.Syntax.Parser.Internal.TermBasics
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.Internal.SignatureSoundness
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness

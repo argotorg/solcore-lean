@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeIsolatedBlockTraceGrammar
-import Solcore.Syntax.Parser.Block
+import Solcore.Syntax.Parser.Internal.BlockSoundness
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Internal.TraceBasics
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness

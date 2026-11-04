@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeProxyExpressionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! The real proxy parser preserves every nested type event. Its execution
 contracts are conditional on the real type parser, whose diagnostics are not

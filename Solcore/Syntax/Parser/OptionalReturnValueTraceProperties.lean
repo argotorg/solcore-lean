@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeReturnStatementTraceProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
-import Solcore.Syntax.Parser.Statement.Simple
+import Solcore.Syntax.Parser.Internal.SimpleStatementSoundness
 
 /-! Exact optional-return success with semicolon-first priority. Expression
 events are retained unchanged, and the empty-value branch never invokes it. -/

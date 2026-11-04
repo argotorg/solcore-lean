@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.ExpressionOutcomes
-import Solcore.Syntax.Parser.CorePatternCoreOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.PatternProofs
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Proof-side reflection of all ordered atom guards. The selected raw parser
 has exactly the original Reply, including arbitrary recursive child behavior;

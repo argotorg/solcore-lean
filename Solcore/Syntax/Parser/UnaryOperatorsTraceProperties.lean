@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.CoreExpressionUnarySoundnessProperties
-import Solcore.Syntax.Parser.ExpressionUnaryTotalityProperties
+import Solcore.Syntax.Parser.Internal.OperatorSoundness
+import Solcore.Syntax.Parser.Internal.ExpressionTotality
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Internal.ExpressionOutcomes
 

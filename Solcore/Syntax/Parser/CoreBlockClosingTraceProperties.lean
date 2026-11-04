@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreBlockTailTraceProperties
 import Solcore.Syntax.Internal.DelimitedOutcomes
-import Solcore.Syntax.Parser.Block
+import Solcore.Syntax.Parser.Internal.BlockSoundness
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Exact brace closing, tail-validation events, and silent closing rejection. -/

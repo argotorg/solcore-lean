@@ -1,11 +1,11 @@
 import Solcore.Syntax.Parser.Declarations
-import Solcore.Syntax.Parser.Function
+import Solcore.Syntax.Parser.Internal.TermBasics
 import Solcore.Syntax.Parser.Internal.ParameterSoundness
 import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.ValidityBasics
 import Solcore.Syntax.Validity
 import Solcore.Syntax.Parser.Internal.ParameterTotality
-import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
+import Solcore.Syntax.Parser.Internal.PublicTermTotality
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.Internal.TypeSoundness

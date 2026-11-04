@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExpressionLeftAssociativeTotalityProperties
+import Solcore.Syntax.Parser.Internal.ExpressionTotality
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Internal.DelimitedTotality
 

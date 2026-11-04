@@ -4,7 +4,7 @@ import Solcore.Syntax.Parser.Internal.ParameterTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.ParameterSoundness
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-!
 Parser side of the parameter-list traces: function and inline lambda

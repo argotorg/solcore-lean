@@ -9,7 +9,7 @@ import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 import Solcore.Syntax.Parser.Internal.ParameterTotality
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
+import Solcore.Syntax.Parser.Internal.PublicTermTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.FunctionProperties
 

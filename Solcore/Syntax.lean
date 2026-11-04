@@ -15,7 +15,7 @@ import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
 import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreBlockPublicExactnessProperties
+import Solcore.Syntax.Parser.Internal.TermSoundness
 import Solcore.Syntax.Parser.CoreDeclarationExactnessProperties
 import Solcore.Syntax.Parser.CorePublicParseOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.Internal.SignatureSoundness

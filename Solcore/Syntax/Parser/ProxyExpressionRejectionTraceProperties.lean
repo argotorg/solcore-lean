@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceGrammar
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Exact raw proxy rejection uses contracts for the actual type parser.
 The marker contributes no event, and nested failures preserve their complete

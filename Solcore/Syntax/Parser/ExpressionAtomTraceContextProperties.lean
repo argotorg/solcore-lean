@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionAtomRecoveryTraceProperties
-import Solcore.Syntax.Parser.CoreExpressionAtomBoundaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Public atom guards and frames over the actual supplied core. Source/end-byte
 frames deliberately allow changed token carriers and end indices. Full-window

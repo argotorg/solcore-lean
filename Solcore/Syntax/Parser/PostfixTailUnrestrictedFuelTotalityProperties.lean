@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Bounded postfix-tail execution on arbitrary States. Real suffix markers
 pay loop fuel before nested work. Successful children need only endIndex

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.DeclarationExactness
 import Solcore.Syntax.Parser.ContractDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreTermPublicExactnessProperties
+import Solcore.Syntax.Parser.Internal.TermSoundness
 
 /-! Unconditional executable exactness for complete contract declarations. -/
 

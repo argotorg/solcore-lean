@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
-import Solcore.Syntax.Parser.CoreExpressionAtomRecoveryOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 import Solcore.Syntax.Parser.Internal.TypeTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 

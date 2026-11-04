@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionNameTraceProperties
-import Solcore.Syntax.Parser.CoreExpressionNameOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExpressionProofs
 
 /-! Exact identifier fallback failure after both Boolean guards are absent. -/
 

@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeParenthesizedTraceGrammar
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Exact silent tuple closing. Forward elements determine group versus tuple;
 the closing span is supplied by the token, never recovered by inverting cover. -/

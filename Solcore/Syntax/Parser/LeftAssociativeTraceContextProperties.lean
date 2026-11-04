@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.CoreExpressionBinaryOperatorSoundnessProperties
+import Solcore.Syntax.Parser.Internal.OperatorSoundness
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 
 /-! Left-associative execution retains source and an arbitrary window

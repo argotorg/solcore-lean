@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.ContractFieldTotalityProperties
 import Solcore.Syntax.Parser.ContractMemberStrictProperties
 import Solcore.Syntax.Parser.ContractMemberTotalityProperties
 import Solcore.Syntax.Parser.Enum
-import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
+import Solcore.Syntax.Parser.Internal.PublicTermTotality
 
 /-! Unconditional totality for canonical production contract fields. -/
 

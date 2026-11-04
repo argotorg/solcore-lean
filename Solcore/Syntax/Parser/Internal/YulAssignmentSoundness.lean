@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.YulTotality
 import Solcore.Syntax.Grammar.YulOrdinary
-import Solcore.Syntax.Parser.DelimitedFallbackRejectionSoundnessProperties
+import Solcore.Syntax.Parser.Internal.PatternStepSoundness
 import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 import Solcore.Syntax.Parser.Internal.YulBlockSoundness
 import Solcore.Syntax.Internal.YulStatementOutcomes

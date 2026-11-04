@@ -2,7 +2,7 @@ import Solcore.Syntax.Grammar.Declarations
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreSoundnessProperties
-import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.TermSoundness
 import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties

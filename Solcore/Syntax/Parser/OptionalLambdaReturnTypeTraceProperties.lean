@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProperties
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
-import Solcore.Syntax.Parser.Expression.Atom
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 
 /-! Exact optional-return execution under explicit trace laws for the actual
 type parser. The arrow is silent. Source/full-window preservation is a
