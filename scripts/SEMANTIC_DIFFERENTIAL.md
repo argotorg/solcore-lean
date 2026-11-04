@@ -420,7 +420,7 @@ identity.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-ten of the twenty profiles do not use G0. Only generated cases pass filters:
+twelve of the twenty-two profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -433,7 +433,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the nineteen
+acceptance. Reductions record no filter. The generation commands of the twenty-one
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -595,7 +595,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the thirty pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the thirty-two pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -8140,7 +8140,7 @@ boundary; this section describes how to run it.
   their creation code reads only its own runtime object, besides the
   arguments appended after the constructor-argument wrapper's init code. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the thirty pure, the
+- **Admission:** `export-rust-yul.py` admits the thirty-two pure, the
   twenty-four storage-family and the two call-return wrappers, taken from the
   adapters' profile tables;
   the three malformed profiles reuse wrappers. Each must compile to one
@@ -8173,7 +8173,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the thirty pure profiles. `--backend yul`
+Its default Yul selection stays the thirty-two pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 

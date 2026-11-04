@@ -194,7 +194,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the thirty pure profiles with `--backend yul`, and for the
+available for the thirty-two pure profiles with `--backend yul`, and for the
 twenty-seven storage-family profiles and the call-return, call-sequence and
 call-branch profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
@@ -207,7 +207,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same sixty-two-profile suite runs locally with shared time and disk limits.
+The same sixty-four-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -341,6 +341,19 @@ gives 0 from the width on, and `>>` is arithmetic for a signed type. All 136
 and 128 fixed cases and 384 random cases of 32 functions each match on O0, O2
 and Yul ([Solcore integer arithmetic and shifts](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-integer-arithmetic-and-shifts)).
 
+The `runtime-memory-arrays` profile exercises `T[]` over the twelve integer
+types as solcore-rs #145 defines it: `new T[](n)`, array literals, aliases,
+copies, helpers, the four slice forms, `T[][]` grids, plain, compound,
+unchecked and `memref` writes, a contract field's storage array with `push`,
+`pop` and `setLength`, and a loop. The `runtime-array-abi` profile passes `T[]`
+and `calldata<T[]>` parameters and returns `T[]`. Their original Core references
+model an array as a length cell and element cells, so aliases share cells and
+a copy allocates new ones. An index or slice bound out of range is
+`Panic(0x32)`, an empty `pop` `Panic(0x31)`, an oversized `new` `Panic(0x41)`,
+and compound writes keep the integer profiles' panics. All 288 and 144 fixed
+cases and 384 random cases of 32 functions each match on O0, O2 and Yul
+([Solcore memory arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-arrays-and-their-abi)).
+
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
 operands, local bindings and branches. Its 56-case corpus checks shared callees,
@@ -361,7 +374,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the twenty profiles whose functions can be identities they
+inputs, and in the twenty-two profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
