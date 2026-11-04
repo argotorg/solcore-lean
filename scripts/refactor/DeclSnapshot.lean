@@ -271,8 +271,12 @@ def hLevelParams (ps : List Name) : UInt64 := mixList 51 (ps.map hLevelName)
 mutual
 
 unsafe def hExpr (ctx : Ctx) (mc : ModCtx) (e : Expr) : HM UInt64 := do
-  let key := ptrAddrUnsafe e
+  -- Inside a content hash (`busy` is not empty) bound names do not count, so the cache keeps
+  -- the two modes apart with the pointer's low bit, which alignment leaves free.
+  let inContent := !(← get).busy.isEmpty
+  let key := if inContent then ptrAddrUnsafe e ||| 1 else ptrAddrUnsafe e
   if let some h := (← get).cache[key]? then return h
+  let hName (n : Name) : UInt64 := if inContent then 19 else hBinderName n
   let h ← match e with
     | .bvar i => pure (mix 1 (UInt64.ofNat i))
     | .sort l => pure (mix 2 (hLevel l))
@@ -283,16 +287,16 @@ unsafe def hExpr (ctx : Ctx) (mc : ModCtx) (e : Expr) : HM UInt64 := do
     | .lam n t b bi => do
       let ht ← hExpr ctx mc t
       let hb ← hExpr ctx mc b
-      pure (mix 4 (mix (hBinderName n) (mix (hBinderInfo bi) (mix ht hb))))
+      pure (mix 4 (mix (hName n) (mix (hBinderInfo bi) (mix ht hb))))
     | .forallE n t b bi => do
       let ht ← hExpr ctx mc t
       let hb ← hExpr ctx mc b
-      pure (mix 5 (mix (hBinderName n) (mix (hBinderInfo bi) (mix ht hb))))
+      pure (mix 5 (mix (hName n) (mix (hBinderInfo bi) (mix ht hb))))
     | .letE n t v b nonDep => do
       let ht ← hExpr ctx mc t
       let hv ← hExpr ctx mc v
       let hb ← hExpr ctx mc b
-      pure (mix 6 (mixList (hBinderName n) [ht, hv, hb, hBool nonDep]))
+      pure (mix 6 (mixList (hName n) [ht, hv, hb, hBool nonDep]))
     | .lit (.natVal k) => pure (mix 7 (hNat k))
     | .lit (.strVal s) => pure (mix 8 (hStr (normStr mc s)))
     | .mdata _ b => hExpr ctx mc b
@@ -322,7 +326,9 @@ unsafe def hConstRef (ctx : Ctx) (n : Name) : HM UInt64 := do
   if ← cachedUnstable n then deepHash ctx n
   else return mix 12 (hash n)
 
-/-- Content hash of a constant, independent of its name. -/
+/-- Content hash of a constant, independent of its name and of bound names: Lean reuses a
+matcher within a file when only the bound names differ, so which copy a constant refers to can
+change in a merge without changing what it says. -/
 unsafe def deepHash (ctx : Ctx) (n : Name) : HM UInt64 := do
   if let some h := (← get).deep[n]? then return h
   if (← get).busy.contains n then

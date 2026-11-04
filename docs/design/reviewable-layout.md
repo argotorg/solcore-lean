@@ -100,8 +100,9 @@ The tools are in `scripts/refactor/`, and each prints its usage.
   name prefixes, macro scopes and macro helper names, which depend on the
   module. Lean caches matchers, `_proof_i`, `_simp_i` and `_sparseCasesOn_i`
   per module, so these are skipped; the constants that use them still cover
-  their content. A full snapshot takes about 70 seconds and 3 GB, and it
-  refuses to run on a stale build.
+  their content, up to bound names, because a file can reuse a matcher that
+  differs only in those. A full snapshot takes about 70 seconds and 3 GB, and
+  it refuses to run on a stale build.
 - **`snapshot.py diff A B [--renames FILE]`.** Exits non-zero on any added,
   removed or changed declaration.
 - **`leanmerge.py`.**
