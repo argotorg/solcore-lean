@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedPrefix
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 
 /-! An accepted generalized declaration snapshots its scope. The compiler's
 request Source copies the same identifiers as the runtime Source; the marked

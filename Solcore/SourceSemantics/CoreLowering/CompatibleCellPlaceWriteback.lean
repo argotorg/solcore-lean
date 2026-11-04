@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceRoot
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopeAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathUpdates
 
 /-! The compatible setter reads the latest optional root, rebuilds its actual

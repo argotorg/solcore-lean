@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryExpressionProfile
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalLambdaCompilation
-import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySyntax
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 
 /-! Materialized ordinary bodies reuse the common finite statement scanner.
 The profile retains the original lambda and every expression-tree receipt.

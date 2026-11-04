@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyProfileReceipts
-import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodyCollector
-import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalBodyExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaScopeDeclarations
 
 /-! Original closure typing and actual contextual compilation produce the

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
-import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourceLifting
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions

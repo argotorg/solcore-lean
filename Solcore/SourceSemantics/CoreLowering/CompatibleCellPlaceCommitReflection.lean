@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
 import Solcore.SourceSemantics.CoreLowering.GenericCellHeapOperations
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopeAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 
 /-! The final mapped write for the projection-parametric shared heap.
 This reuses the source write relation; compatibility changes the payload model,

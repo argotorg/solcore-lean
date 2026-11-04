@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalViewedEntry
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodySourceAdmission
-import Solcore.SourceSemantics.CoreLowering.CellAwareOwnedBodyRestoration
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyRestorationAdmission
 
 /-! Actual generalized local application joins the original Source rule,

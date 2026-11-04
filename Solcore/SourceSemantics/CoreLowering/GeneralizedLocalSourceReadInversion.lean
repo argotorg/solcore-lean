@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceRead
-import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedReadBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
 
 /-! A genuinely retained generalized cell excludes ordinary reads at that
 same location. Original requirement evidence closes the selected dictionary;

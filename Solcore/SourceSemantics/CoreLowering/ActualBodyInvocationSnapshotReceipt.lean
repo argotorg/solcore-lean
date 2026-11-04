@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationAllocationReceipt
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSnapshotCode
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 
 /-! A generalized declaration of an actual body policy snapshots its scope. Its
 marked descriptor allocation has the same receipt as an ordinary initialized

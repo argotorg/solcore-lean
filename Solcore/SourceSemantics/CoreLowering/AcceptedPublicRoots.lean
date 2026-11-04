@@ -1,9 +1,8 @@
-import Solcore.SourceSemantics.CoreLowering.CellAwareNamedPreparedReceipt
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
-import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedOutput
-import Solcore.SourceSemantics.CoreLowering.CellAwarePublicResultContext
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
 

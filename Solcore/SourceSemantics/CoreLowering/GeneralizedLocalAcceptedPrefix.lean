@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedDeclaration
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedInitializer
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedLocatedRows
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedContinuation
 
 /-! Actual generalized declarations reach their emitted continuation for any
 accepted candidate body. Ordered stored rows, the creation frame, and the real

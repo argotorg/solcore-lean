@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellBareAssignmentSnapshot
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentRhs
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopeAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 
 /-! A completed RHS retains the original snapshot and reads the same ordinary
 root from its actual later mixed heap. Descriptor retention is an executed

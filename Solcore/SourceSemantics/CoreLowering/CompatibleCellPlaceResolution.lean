@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceResolution
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceRoot
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopeAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.DataPlaceChildExpressions
 
 /-! Effectful key evaluation and the actual compatible live getter implement

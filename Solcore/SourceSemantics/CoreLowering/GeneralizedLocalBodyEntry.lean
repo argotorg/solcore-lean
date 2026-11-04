@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalCallFrame
-import Solcore.SourceSemantics.CoreLowering.CellAwareLambdaViewPrefix
-import Solcore.SourceSemantics.CoreLowering.CellAwareBodyFrames
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 
 /-! The actual materialized closure enters its emitted body through the retained
 lexical snapshot, the read recipe, the manifest, and the marked parameter fold.

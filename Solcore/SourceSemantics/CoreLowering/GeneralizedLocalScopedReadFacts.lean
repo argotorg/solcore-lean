@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopePhysical
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalNamedReadFormation
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceReadInversion
 

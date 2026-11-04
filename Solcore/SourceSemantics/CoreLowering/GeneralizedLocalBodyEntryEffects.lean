@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyEntry
-import Solcore.SourceSemantics.CoreLowering.CellAwareScopeAuthority
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 
 /-! Entering an actual materialized body writes only the unmapped context frame
 and appends marked parameters. Both operations retain every generalized row. -/
