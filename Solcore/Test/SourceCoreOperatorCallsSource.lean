@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreNamedBranchSource
+import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
 
 /-! Independent declarative typing of a real checked conditional whose selected
 arithmetic operands invoke an imported function. All nodes and call metadata

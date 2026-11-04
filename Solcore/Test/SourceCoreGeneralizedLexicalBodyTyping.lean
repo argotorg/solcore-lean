@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyFixture
-import Solcore.Test.SourceCoreMixedImperativeTyping
+import Solcore.Test.SourceSemantics.CoreLowering.Mixed.Control
 
 /-! The complete lexical-body regression shares the original declarative typing observer. -/
 set_option autoImplicit false

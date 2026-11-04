@@ -207,12 +207,26 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 
 | File | Tests | Old modules |
 | --- | --- | ---: |
+| [`Callable/Ancestry`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Ancestry.lean) | Callable ancestry tests | 24 |
+| [`Callable/Coercion`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Coercion.lean) | Callable coercion tests | 18 |
+| [`Callable/Indexed`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Indexed.lean) | Indexed callable tests | 23 |
+| [`Callable/IndexedLambda`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/IndexedLambda.lean) | Indexed lambda tests | 22 |
+| [`Callable/LambdaViews`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/LambdaViews.lean) | Lambda view tests | 14 |
+| [`Callable/Paired`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Paired.lean) | Paired callable tests | 22 |
+| [`Callable/Prepared`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Prepared.lean) | Prepared callable tests | 12 |
 | [`Captured/Assignments`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Assignments.lean) | Captured closure assignment tests | 36 |
 | [`Captured/Branches`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Branches.lean) | Captured closure branch tests | 26 |
 | [`Captured/Locals`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Locals.lean) | Captured local tests | 28 |
 | [`Captured/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Loops.lean) | Captured closure loop tests | 26 |
 | [`Captured/Mappings`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Mappings.lean) | Captured mapping tests | 14 |
 | [`Captured/Nested`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Nested.lean) | Nested capture tests | 19 |
+| [`Compatible/Ambient`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Ambient.lean) | Compatible ambient tests | 17 |
+| [`Compatible/Encoding`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Encoding.lean) | Compatible encoding tests | 5 |
+| [`Compatible/Expressions`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Expressions.lean) | Compatible expression tests | 15 |
+| [`Compatible/General`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/General.lean) | Compatible general tests | 20 |
+| [`Compatible/Matches`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Matches.lean) | Compatible match tests | 15 |
+| [`Compatible/Payloads`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Payloads.lean) | Compatible payload tests | 2 |
+| [`Compatible/Statements`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Statements.lean) | Compatible statement tests | 14 |
 | [`Evidence/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Closure.lean) | Closure evidence tests | 20 |
 | [`Evidence/Direct`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Direct.lean) | Direct evidence tests | 16 |
 | [`Evidence/Method`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Method.lean) | Method evidence tests | 16 |
@@ -227,6 +241,13 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Method/OwnEvidence`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/OwnEvidence.lean) | Own method evidence tests | 23 |
 | [`Method/PublicSequences`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/PublicSequences.lean) | Method public sequence tests | 24 |
 | [`Method/Scoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/Scoped.lean) | Scoped method tests | 21 |
+| [`Mixed/Control`](../../Solcore/Test/SourceSemantics/CoreLowering/Mixed/Control.lean) | Mixed control tests | 29 |
+| [`Mixed/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Mixed/Loops.lean) | Mixed loop tests | 28 |
+| [`Mixed/Operators`](../../Solcore/Test/SourceSemantics/CoreLowering/Mixed/Operators.lean) | Mixed operator tests | 31 |
+| [`Mixed/Reads`](../../Solcore/Test/SourceSemantics/CoreLowering/Mixed/Reads.lean) | Mixed read tests | 30 |
+| [`Named/Branches`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Branches.lean) | Named branch tests | 36 |
+| [`Named/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Loops.lean) | Named loop tests | 26 |
+| [`Named/Operators`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Operators.lean) | Named operator tests | 17 |
 | [`Recursive/Formation`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Formation.lean) | Recursive formation tests | 19 |
 | [`Recursive/Index`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Index.lean) | Recursive index tests | 27 |
 | [`Recursive/NamedCatalog`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedCatalog.lean) | Recursive named catalog tests | 20 |
@@ -235,6 +256,14 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Recursive/NamedPublic`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedPublic.lean) | Recursive named public tests | 18 |
 | [`Recursive/NamedStatements`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedStatements.lean) | Recursive named statement tests | 13 |
 | [`Recursive/Stages`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Stages.lean) | Recursive stage tests | 9 |
+| [`Selected/Faulting`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Faulting.lean) | Faulting selected tests | 23 |
+| [`Selected/Generalized`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Generalized.lean) | Generalized selected tests | 29 |
+| [`Selected/GeneralizedSource`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/GeneralizedSource.lean) | Generalized local source tests | 2 |
+| [`Selected/Interleaved`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Interleaved.lean) | Interleaved selected tests | 12 |
+| [`Selected/OperatorAlias`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/OperatorAlias.lean) | Selected operator alias tests | 1 |
+| [`Selected/Profiles`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Profiles.lean) | Selected profile tests | 22 |
+| [`Selected/ProfilesControl`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/ProfilesControl.lean) | Selected control profile tests | 11 |
+| [`Selected/Projected`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Projected.lean) | Selected projected tests | 17 |
 
 ### Synthesis
 
@@ -271,8 +300,9 @@ runs along a feature of its own:
 - **Matchers.** Inside a file Lean reuses a matcher even when its bound names differ, and the equations
   `f.eq_i` take their variable names from it. This keeps `RecursiveFunctions`, `RecursiveConditionals`,
   `RecursiveLazy`, `RecursiveUnary` and `SymbolicDepth` apart from their neighbours.
-- **Binder annotations.** Lean also reuses an auxiliary proof whose binders differ only in annotations.
-  This keeps `ExpectedPairedBridges` apart from `ExpectedDataImages`.
+- **Binder annotations.** Lean also reuses an auxiliary whose binders differ only in annotations. This
+  keeps `ExpectedPairedBridges` apart from `ExpectedDataImages`, and is why `Selected/OperatorAlias`,
+  `Selected/GeneralizedSource` and `Foundations/Snapshots` are files of their own.
 
 ## A file that stays where it is
 
@@ -282,4 +312,4 @@ for its golden rows, so it can neither move nor share a file with other tuples o
 
 ## Not merged yet
 
-1123 old modules are still flat in `Solcore/Test`.
+586 old modules are still flat in `Solcore/Test`.

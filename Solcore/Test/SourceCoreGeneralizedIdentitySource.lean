@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreSelectedInterleavedLocalSource
+import Solcore.Test.SourceSemantics.CoreLowering.Selected.Interleaved
 import Solcore.SourceSemantics.Dynamic.Preservation
 
 /-! Independent Source execution for a generalized identity lambda. The shape

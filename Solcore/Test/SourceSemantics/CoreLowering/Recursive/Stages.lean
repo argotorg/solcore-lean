@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveStageMappingReadMeaning
 import Solcore.Frontend.SourceCoreCallableIndexedLedger
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageMappingTupleMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
-import Solcore.Test.SourceCoreCompatibleGeneralRuntimeExtraction
+import Solcore.Test.SourceSemantics.CoreLowering.Compatible.General
 import Solcore.Test.SourceSemantics.CompiledOrigins
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 

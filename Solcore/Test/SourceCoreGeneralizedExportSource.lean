@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedExportFixture
-import Solcore.Test.SourceCoreNamedBranchSource
+import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
 import Solcore.SourceSemantics.Dynamic.Evaluation
 
 /-! Exact original factory graphs. A generalized declaration copies the

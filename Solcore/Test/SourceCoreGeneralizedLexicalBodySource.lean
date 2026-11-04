@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedLexicalBodyFixture
-import Solcore.Test.SourceCoreMixedImperativeSourceSteps
+import Solcore.Test.SourceSemantics.CoreLowering.Mixed.Control
 
 /-! The complete original lambda retains ordinary declarations, scoped discard,
 a conditional and the product result with captured Bool and numeric leaf.

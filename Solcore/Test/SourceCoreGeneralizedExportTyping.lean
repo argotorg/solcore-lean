@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedExportSource
-import Solcore.Test.SourceCoreSelectedGeneralizedLocalTypingValidation
+import Solcore.Test.SourceSemantics.CoreLowering.Selected.GeneralizedSource
 
 /-! Declarative typing of all three original functions, constructed from
 checked source observations. Compiler execution is not a typing premise. -/

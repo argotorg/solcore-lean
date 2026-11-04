@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionFixture
-import Solcore.Test.SourceCoreMixedImperativeTyping
+import Solcore.Test.SourceSemantics.CoreLowering.Mixed.Control
 
 /-! The duplicate/captured/numeric regression shares the original declarative typing observer. -/
 set_option autoImplicit false

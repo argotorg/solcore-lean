@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreGeneralizedBodyExpressionFixture
-import Solcore.Test.SourceCoreMixedImperativeSourceSteps
+import Solcore.Test.SourceSemantics.CoreLowering.Mixed.Control
 
 /-! The complete original lambda keeps both parameter reads, its captured Bool,
 and its numeric leaf. Observations record syntax and typing metadata only. -/
