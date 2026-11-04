@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 
 /-!
 # Typed scoped control

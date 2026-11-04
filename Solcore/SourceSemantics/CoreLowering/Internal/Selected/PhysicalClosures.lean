@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.SourceCompiledLocalLexicalAllocation
 import Solcore.SourceSemantics.SourceCompiledLocalCanonicalReadOrder
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
-import Solcore.SourceSemantics.CoreLowering.ResidualScopeReachability
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies

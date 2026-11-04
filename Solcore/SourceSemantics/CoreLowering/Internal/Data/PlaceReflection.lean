@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
-import Solcore.SourceSemantics.CoreLowering.IntegerPrimitives
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.Frontend.SourceCoreDataPlaces
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution

@@ -1,15 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
-import Solcore.SourceSemantics.CoreLowering.FunctionCalls
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 
 /-!

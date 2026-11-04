@@ -1,14 +1,13 @@
-import Solcore.SourceSemantics.CoreLowering.FunctionCallBody
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreLambdaTemplates
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 import Solcore.Core.Correspondence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.Frontend.SourceCoreIndexedSession
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
-import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
 
 /-!
 # Recursive named rows: global initialization

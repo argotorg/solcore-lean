@@ -2,7 +2,7 @@ import Solcore.Frontend.SourceCoreCallableViews
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
-import Solcore.SourceSemantics.CoreLowering.RecursiveMethodOriginIdentity
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.MethodIdentity
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.Frontend.CorrelatedTypedSourceInstances
@@ -15,10 +15,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.SourceSemantics.SourceBodyResultAnnotation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
-import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
-import Solcore.SourceSemantics.CoreLowering.CallEntryCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.Frontend.SourceCoreCallablePairedAncestry
 import Solcore.Frontend.SourceCoreCallablePairedAllocationFrames
 

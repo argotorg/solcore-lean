@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
-import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.CellStagedBareAssignment

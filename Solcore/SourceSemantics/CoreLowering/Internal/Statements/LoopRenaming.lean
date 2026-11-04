@@ -1,8 +1,7 @@
 import Solcore.Core.LocalLoop
-import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.Dynamic
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
 
 /-!
 # Loop renaming and execution

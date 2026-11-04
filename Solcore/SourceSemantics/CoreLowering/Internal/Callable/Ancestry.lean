@@ -3,7 +3,7 @@ import Solcore.Frontend.SourceCoreCallableViews
 import Solcore.Frontend.SourceCoreLambdaTemplates
 import Solcore.Frontend.SourceCoreCallableContextFrames
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
-import Solcore.SourceSemantics.CoreLowering.EmptySourceSubstitution
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.TypeSystem.SubstitutionProperties
 
 /-!

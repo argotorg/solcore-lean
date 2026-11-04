@@ -1,11 +1,11 @@
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
-import Solcore.SourceSemantics.CoreLowering.ScalarAssignmentReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 
 /-!
 # Finite loops

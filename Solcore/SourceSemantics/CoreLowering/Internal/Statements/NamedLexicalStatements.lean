@@ -3,8 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.WhileLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
-import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedScopedControl

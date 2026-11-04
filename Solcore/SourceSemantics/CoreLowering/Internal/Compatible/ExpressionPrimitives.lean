@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.ScalarExpressionFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.PrimitiveExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.SourceSemantics.CoreLowering.PrimitiveOperations
-import Solcore.SourceSemantics.CoreLowering.IntegerPrimitives
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.Frontend.SourceCoreInteger
 
 /-!

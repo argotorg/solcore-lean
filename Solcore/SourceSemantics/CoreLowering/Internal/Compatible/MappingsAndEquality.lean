@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
-import Solcore.SourceSemantics.CoreLowering.OrderedMapping
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.SourceSemantics.Dynamic.Place
-import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.Dynamic.RuntimeType

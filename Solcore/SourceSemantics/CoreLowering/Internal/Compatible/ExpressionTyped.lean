@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
-import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 
 /-!

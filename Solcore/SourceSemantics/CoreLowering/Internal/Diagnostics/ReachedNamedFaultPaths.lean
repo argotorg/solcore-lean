@@ -1,11 +1,11 @@
-import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
-import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GeneralExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedLexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped

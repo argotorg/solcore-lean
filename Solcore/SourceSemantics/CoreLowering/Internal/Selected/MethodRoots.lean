@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
-import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.MethodIdentity
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins

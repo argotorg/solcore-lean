@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GeneralExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 
 /-!
 # Compatible expressions: indices and members

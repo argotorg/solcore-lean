@@ -1,15 +1,15 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode
-import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 
 /-!
 # Indexed callables: lambda and named values

@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignm
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceDiagnosticTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies

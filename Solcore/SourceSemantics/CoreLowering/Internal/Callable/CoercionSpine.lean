@@ -1,7 +1,7 @@
 import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.ProgramChecking
 import Solcore.Core.Renaming
-import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 
 /-!
 # Coercions: spines and preparation

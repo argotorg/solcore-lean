@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
-import Solcore.SourceSemantics.CoreLowering.CachedMethodEvidenceCoherence
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.MethodIdentity
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardSequences
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Coercions

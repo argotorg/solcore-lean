@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeader
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
-import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-!

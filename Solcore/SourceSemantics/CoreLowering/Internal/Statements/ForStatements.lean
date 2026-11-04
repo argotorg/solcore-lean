@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ForFinite
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopCertificates
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.ScalarAssignmentReflection
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 
 /-!
 # For statements

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ReachableContinuations
 import Solcore.SourceSemantics.Dynamic.Control
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads

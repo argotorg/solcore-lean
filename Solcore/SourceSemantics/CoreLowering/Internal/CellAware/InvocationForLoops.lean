@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationExpressions
-import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTermina
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
-import Solcore.SourceSemantics.CoreLowering.SourceLetDeclarationFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ControlStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts

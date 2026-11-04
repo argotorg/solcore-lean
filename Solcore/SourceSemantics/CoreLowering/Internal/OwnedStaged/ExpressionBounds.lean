@@ -15,11 +15,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
-import Solcore.SourceSemantics.CoreLowering.RecursiveMethodSelectionIdentity
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.MethodIdentity
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.RecursiveMethodDictionaryIdentity
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 
 /-!

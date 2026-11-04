@@ -6,9 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTypingOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceDiagnosticTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
-import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures

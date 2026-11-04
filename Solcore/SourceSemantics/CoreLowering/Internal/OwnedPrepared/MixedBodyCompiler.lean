@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualStoredCalls
-import Solcore.SourceSemantics.CoreLowering.FunctionCodeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambdas

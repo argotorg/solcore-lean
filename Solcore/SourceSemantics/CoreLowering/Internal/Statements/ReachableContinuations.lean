@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.Frontend.SourceCoreLoops
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 
 /-!

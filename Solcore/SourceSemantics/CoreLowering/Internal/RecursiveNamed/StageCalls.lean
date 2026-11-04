@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
 import Solcore.SourceSemantics.Staging.RecursiveScope
-import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.Staging.RecursiveTraceProperties
-import Solcore.SourceSemantics.CoreLowering.CallStageBoundary
-import Solcore.SourceSemantics.CoreLowering.ContractedFunctionCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 
 /-!

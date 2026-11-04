@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 

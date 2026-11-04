@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
-import Solcore.SourceSemantics.CoreLowering.FunctionCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.Frontend.SourceCoreAssignmentFaultSites
 import Solcore.Frontend.SourceCoreProgramFaultSites

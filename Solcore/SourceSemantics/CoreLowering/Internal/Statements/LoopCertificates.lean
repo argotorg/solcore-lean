@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.Core.LocalLoop
 import Solcore.SourceSemantics.Dynamic
-import Solcore.SourceSemantics.CoreLowering.ScalarExpressionReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.BasicStatementTreeCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ControlStatements
 import Solcore.Frontend.SourceCoreLoops
 
 /-!

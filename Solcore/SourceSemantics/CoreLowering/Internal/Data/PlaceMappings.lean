@@ -1,11 +1,10 @@
-import Solcore.SourceSemantics.CoreLowering.GenericHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 import Solcore.Frontend.SourceCoreDataPlaces
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.Dynamic.Initialization
 import Solcore.SourceSemantics.Static
 

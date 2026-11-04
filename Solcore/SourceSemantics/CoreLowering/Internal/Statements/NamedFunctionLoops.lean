@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
-import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-!

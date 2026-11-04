@@ -11,10 +11,9 @@ import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
-import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.Patterns
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-!

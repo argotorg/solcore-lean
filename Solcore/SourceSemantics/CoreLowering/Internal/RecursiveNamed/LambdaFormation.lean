@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.NativeExpressionContextSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 
 /-!

@@ -4,9 +4,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalCont
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyReads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
-import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
-import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
@@ -19,9 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceBitNot
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
-import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 
 /-!
 # Cell-aware staged writes and generalized declarations

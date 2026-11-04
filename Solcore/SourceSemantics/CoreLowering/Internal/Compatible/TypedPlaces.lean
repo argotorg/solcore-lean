@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 
 /-!

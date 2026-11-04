@@ -1,8 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
-import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
-import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
 
 /-!

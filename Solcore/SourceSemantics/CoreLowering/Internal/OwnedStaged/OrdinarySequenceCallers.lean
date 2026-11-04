@@ -19,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValue
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
-import Solcore.SourceSemantics.CoreLowering.CallContractCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 
 /-!
 # Staged bounds: ordinary sequence callers

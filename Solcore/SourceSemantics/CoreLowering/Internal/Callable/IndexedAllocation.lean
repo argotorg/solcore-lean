@@ -2,16 +2,14 @@ import Solcore.Frontend.SourceCoreCallableIndexedDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
 import Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames
-import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.Core.Derived
 import Solcore.Frontend.SourceCoreAllocationLayouts
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
-import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
-import Solcore.SourceSemantics.CoreLowering.GenericHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.Frontend.SourceCoreCallableIndexedAncestry
-import Solcore.SourceSemantics.CoreLowering.GenericCellHeapOperations
 import Solcore.Frontend.SourceCoreCallableIndexedPrograms
-import Solcore.SourceSemantics.CoreLowering.AmbientDefinitions
 import Solcore.Frontend.SourceCoreUnifiedRuntime
 import Solcore.SourceSemantics.Dynamic.ProgramOutcome
 

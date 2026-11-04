@@ -1,10 +1,10 @@
-import Solcore.SourceSemantics.CoreLowering.GenericHeapPayload
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
-import Solcore.SourceSemantics.CoreLowering.OrderedMapping
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
-import Solcore.SourceSemantics.CoreLowering.ContractedFunctionValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 
 /-!
 # Data: payloads

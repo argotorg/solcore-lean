@@ -8,11 +8,11 @@ import Solcore.SourceSemantics.SourceResidualNodeSubstitutionAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.Frontend.ResidualLexicalScopes
-import Solcore.SourceSemantics.CoreLowering.ResidualScopeReachability
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.SourceSemantics.CoreLowering.ReadOnlyRenaming
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 
 /-!

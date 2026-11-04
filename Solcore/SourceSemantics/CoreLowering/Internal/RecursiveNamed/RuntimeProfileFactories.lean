@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormat
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionRawCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 
 /-!
 # Recursive named rows: runtime profile factories

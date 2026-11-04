@@ -2,9 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.Frontend.SourceCoreGeneralFunctions
-import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.Frontend.SourceCoreCallableContracts
-import Solcore.SourceSemantics.CoreLowering.CallStageBoundary
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.Frontend.SourceCoreCallableFaultSites
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.Graph
 import Solcore.Frontend.SourceInference.TypedIRProperties
 import Solcore.SourceSemantics.Staging.CallBoundary
-import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
 
 /-!
 # Callable runtime: indirect calls

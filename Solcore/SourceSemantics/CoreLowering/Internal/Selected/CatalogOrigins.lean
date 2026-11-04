@@ -16,7 +16,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPr
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.Staging.SelectedBodyPreservation
 import Solcore.SourceSemantics.Staging.RecursiveLiftOutcomes
-import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 

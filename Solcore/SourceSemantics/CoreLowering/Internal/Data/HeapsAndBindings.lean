@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
-import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
-import Solcore.SourceSemantics.CoreLowering.OrderedMapping
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.Frontend.SourceCoreDefaultValue
 import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.Core.Correspondence

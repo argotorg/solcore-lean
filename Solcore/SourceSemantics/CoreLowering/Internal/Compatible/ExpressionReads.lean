@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.Frontend.SourceCoreCompatibleDataExpressions
 import Solcore.SourceSemantics.WellFormed
-import Solcore.SourceSemantics.CoreLowering.BasicExpressionCertificates
-import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality

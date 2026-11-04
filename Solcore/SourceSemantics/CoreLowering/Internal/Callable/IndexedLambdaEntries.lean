@@ -1,16 +1,15 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationSize
-import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
-import Solcore.SourceSemantics.CoreLowering.CaptureCopyIndexedTyping
-import Solcore.SourceSemantics.CoreLowering.ImperativeNativePolicyTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
 
 /-!
 # Indexed callables: lambda entries

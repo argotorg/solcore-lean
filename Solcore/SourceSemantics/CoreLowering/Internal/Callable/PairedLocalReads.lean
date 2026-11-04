@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourcePreparedLocalReadTemplateExclusion
-import Solcore.SourceSemantics.CoreLowering.SourceAuthenticatedReferenceOrigin
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.SourcePreparedQualifiedLocalReadTransport
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
-import Solcore.SourceSemantics.CoreLowering.SourceAuthenticatedReferenceForm
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 
 /-!
 # Paired local reads

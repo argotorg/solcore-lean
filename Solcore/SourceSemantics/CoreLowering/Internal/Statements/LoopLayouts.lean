@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.GeneralHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 
 /-! Lexical layouts for generated loop code. Temporary binders change the
 actual closure environment and the generated code together; these relations

@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
-import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 
 /-!
 # Compatible profile: diagnostic origins

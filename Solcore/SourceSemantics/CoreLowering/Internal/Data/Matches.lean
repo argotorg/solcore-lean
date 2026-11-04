@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
-import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
 
 /-!
 # Data: matches

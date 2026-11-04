@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
-import Solcore.SourceSemantics.CoreLowering.FunctionValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries

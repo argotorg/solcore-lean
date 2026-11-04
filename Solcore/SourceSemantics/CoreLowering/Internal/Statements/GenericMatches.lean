@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
-import Solcore.SourceSemantics.CoreLowering.GenericHeap
-import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
-import Solcore.SourceSemantics.CoreLowering.CoreClosedRenaming
 
 /-!
 # Generic matches

@@ -2,15 +2,15 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedPrefixes
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
-import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
-import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
-import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 
 /-!
 # Cell-aware invocations: physical entry

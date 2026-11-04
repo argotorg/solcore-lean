@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
-import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GeneralExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
