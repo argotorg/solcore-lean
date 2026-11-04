@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.PragmaItemsTraceCompletenessProperties
-import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExportSoundness
 
 /-! Complete pragma success traces: raw names and punctuation remain silent. -/
 

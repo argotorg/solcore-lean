@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativePragmaTraceProperties
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.Internal.TypeTrace
-import Solcore.Syntax.Parser.PragmaItemsOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExportSoundness
 
 /-! Exact forward diagnostic suffixes from successful pragma item scans. -/
 

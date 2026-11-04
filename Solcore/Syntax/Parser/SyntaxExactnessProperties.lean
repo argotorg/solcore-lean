@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TopItemExactnessProperties
+import Solcore.Syntax.Parser.Internal.FileProofs
 import Solcore.Syntax.Parser.PublicSourceFileValueProperties
 
 /-! Unconditional complete-file syntax exactness at the executable boundary. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CanonicalParserTotalityProperties
-import Solcore.Syntax.Parser.FileItemsTotalityProperties
+import Solcore.Syntax.Parser.Internal.FileTotality
 import Solcore.Syntax.Parser.SyntaxExactnessProperties
 
 /-! Complete ordinary file-item grammar correspondence at sufficient fuel.

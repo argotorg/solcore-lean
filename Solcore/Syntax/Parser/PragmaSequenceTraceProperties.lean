@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePragmaSequenceTraceProperties
 import Solcore.Syntax.Parser.PragmaDeclarationTraceProperties
-import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
+import Solcore.Syntax.Parser.Internal.ParseProperties
 
 /-! Independent successful pragma sequences determine complete raw file-loop
 traces. Existing reverse prefixes are returned but never parsed or diagnosed. -/

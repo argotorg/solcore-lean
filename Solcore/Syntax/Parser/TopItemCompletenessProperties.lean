@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.CanonicalParserTotalityProperties
-import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.TopItemExactnessProperties
+import Solcore.Syntax.Parser.Internal.OutcomeCompleteness
+import Solcore.Syntax.Parser.Internal.FileProofs
 
 /-! Complete plain and derive-aware top-item grammar correspondence on valid
 states, retaining complete ASTs and declarative success or rejection endpoints. -/

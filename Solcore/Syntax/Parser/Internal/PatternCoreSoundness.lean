@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.PatternSoundness
-import Solcore.Syntax.Parser.NameOperatorDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Internal.ImportProofs
 import Solcore.Syntax.Parser.Internal.TypeSoundness
 import Solcore.Syntax.Parser.Internal.ExpressionTotality
 import Solcore.Syntax.Parser.Internal.PatternProofs

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Pragma
+import Solcore.Syntax.Parser.Internal.ExportProofs
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! Unconditional source-file and full-window frame laws for pragma items.

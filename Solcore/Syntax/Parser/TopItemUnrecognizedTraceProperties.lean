@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.PlainTopItemOutcomePrimitiveProperties
-import Solcore.Syntax.Parser.TopItemRecoveryBoundaryProperties
+import Solcore.Syntax.Parser.Internal.FileProofs
 
 /-! Independent absence of every top-item start selects an unchanged,
 uncommitted rejection before file-level recovery. -/

@@ -11,7 +11,7 @@ import Solcore.Syntax.Parser.Internal.PatternCoreSoundness
 import Solcore.Syntax.Parser.Internal.YulBlockSoundness
 import Solcore.Syntax.Parser.Internal.YulSwitchSoundness
 import Solcore.Syntax.Parser.Internal.StatementTotality
-import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
+import Solcore.Syntax.Parser.Internal.OutcomeCompleteness
 import Solcore.Syntax.Parser.Internal.PublicTermTotality
 
 /-!

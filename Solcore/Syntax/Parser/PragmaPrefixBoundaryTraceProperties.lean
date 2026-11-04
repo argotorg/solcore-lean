@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativePragmaPrefixBoundaryTraceProperties
 import Solcore.Syntax.Parser.PragmaDeclarationContextProperties
 import Solcore.Syntax.Parser.PragmaDeclarationRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
+import Solcore.Syntax.Parser.Internal.ParseProperties
 import Solcore.Syntax.Parser.SourceFileBoundaryStopTraceProperties
 
 /-! Exact raw file results for successful pragma prefixes ending in rejection. -/

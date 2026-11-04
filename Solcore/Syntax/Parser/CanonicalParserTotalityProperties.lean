@@ -1,9 +1,8 @@
-import Solcore.Syntax.Parser.ContractDeclarationTotalityProperties
-import Solcore.Syntax.Parser.Enum
-import Solcore.Syntax.Parser.FileItemTotalityProperties
-import Solcore.Syntax.Parser.FunctionDeclarationTotalityProperties
-import Solcore.Syntax.Parser.Impl
-import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.Parser.Internal.DeclarationTotality
+import Solcore.Syntax.Parser.Internal.EnumProofs
+import Solcore.Syntax.Parser.Internal.FileTotality
+import Solcore.Syntax.Parser.Internal.ImplProofs
+import Solcore.Syntax.Parser.Internal.TraitProofs
 
 /-! Unconditional totality from canonical top-item dispatch to public parsing. -/
 

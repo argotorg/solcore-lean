@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DiagnosticCascadeProperties
-import Solcore.Syntax.Parser.LexedValidation
+import Solcore.Syntax.Parser.Internal.FileProofs
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
 import Solcore.Syntax.Parser.SourceFileSingleRecoveryTraceProperties
 import Solcore.Syntax.Parser.TopItemRecoveryTraceCompletenessProperties

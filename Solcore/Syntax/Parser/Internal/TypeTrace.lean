@@ -4,7 +4,7 @@ import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.TypeBasics
 import Solcore.Syntax.Parser.Internal.FunctionReturnsTrace
 import Solcore.Syntax.Internal.NameTrace
-import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
+import Solcore.Syntax.Parser.Internal.OutcomeCompleteness
 import Solcore.Syntax.Parser.Internal.DelimitedTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTrace
 import Solcore.Syntax.Parser.Internal.TypeFormTotality

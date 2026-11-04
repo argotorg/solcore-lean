@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.CoreSourceFileOrdinarySoundnessProperties
-import Solcore.Syntax.Parser.FileCompleteProperties
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
 
 /-! Concrete ordinary grammar soundness at both public parser boundaries. -/
 

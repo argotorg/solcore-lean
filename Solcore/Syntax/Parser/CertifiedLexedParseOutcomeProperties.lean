@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CertifiedParseProperties
-import Solcore.Syntax.Parser.LexedValidation
+import Solcore.Syntax.Parser.Internal.FileProofs
 import Solcore.Syntax.Parser.ParseLexedErrorProperties
 
 /-! Branch-complete certification of the public token-to-file boundary. -/

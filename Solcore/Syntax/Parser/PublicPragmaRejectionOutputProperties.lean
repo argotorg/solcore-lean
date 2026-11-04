@@ -1,7 +1,7 @@
-import Solcore.Syntax.Parser.LexedValidation
+import Solcore.Syntax.Parser.Internal.FileProofs
 import Solcore.Syntax.Parser.Internal.DiagnosticTrace
 import Solcore.Syntax.Parser.PragmaDeclarationRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
+import Solcore.Syntax.Parser.Internal.ParseProperties
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
 import Solcore.Syntax.Parser.SourceFileBoundaryStopTraceProperties
 

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.PragmaItemsContextProperties
-import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Internal.ExportSoundness
 
 /-! Unconditional file and complete-window frame laws for pragma declarations. -/
 

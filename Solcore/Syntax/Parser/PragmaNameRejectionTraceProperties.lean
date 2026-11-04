@@ -1,5 +1,5 @@
 import Solcore.Syntax.Grammar.Modules
-import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties
+import Solcore.Syntax.Parser.Internal.ParseProperties
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 
 /-! An independently observed missing pragma name fixes the complete

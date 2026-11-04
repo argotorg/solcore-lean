@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TopItemRecoveryCompletenessProperties
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
 
 /-! Exact raw diagnostic effects of standalone top-level recovery. -/
 

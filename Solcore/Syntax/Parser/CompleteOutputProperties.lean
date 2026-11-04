@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.FileCompleteProperties
-import Solcore.Syntax.Parser.PublicDiagnosticValidityProperties
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
 
 /-! Complete provenance contract for successful public parser output. -/
 

@@ -8,10 +8,10 @@ import Solcore.Syntax.Parser.Internal.ParameterBasics
 import Solcore.Syntax.Grammar.Signatures
 import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 import Solcore.Syntax.Parser.Internal.ParameterTotality
-import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
+import Solcore.Syntax.Parser.Internal.OutcomeCompleteness
 import Solcore.Syntax.Parser.Internal.PublicTermTotality
 import Solcore.Syntax.Parser.Internal.DelimitedTotality
-import Solcore.Syntax.Parser.FunctionProperties
+import Solcore.Syntax.Parser.Internal.ExportSoundness
 
 /-!
 Soundness of the parsers of function signatures and predicates: each success and each

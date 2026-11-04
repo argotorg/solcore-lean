@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.FileItemStrictProperties
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
 
 /-! Executable composition for one successful top-level item reaching the end.
 The item reply is an explicit premise, not an independent grammar derivation.

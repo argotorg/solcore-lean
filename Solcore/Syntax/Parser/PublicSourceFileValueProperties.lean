@@ -1,6 +1,6 @@
 import Solcore.Syntax.Internal.SourceFileOutcomes
 import Solcore.Syntax.Parser.PublicSourceFileOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.SourceFileExactnessProperties
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
 
 /-! Public parsed-file value uniqueness; no public remainder or rejection is invented. -/
 
