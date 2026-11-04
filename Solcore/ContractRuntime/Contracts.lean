@@ -1,7 +1,113 @@
-import Solcore.Core.HostSafety
-import Solcore.ContractRuntime.FrameOutcome
+import Solcore.ContractRuntime.WorldState
+import Solcore.Core.Syntax
+import Solcore.ContractRuntime.Driver
+import Solcore.ContractRuntime.StorageDriver
 import Solcore.ContractRuntime.RuntimeScalars
+import Solcore.Core.Primitive
+import Solcore.ContractRuntime.Frames
+import Solcore.Core.HostTyping
+import Solcore.Core.Data
+import Solcore.Core.Typing
+import Solcore.Core.Host
 
+/-!
+# Checked contracts
+
+`CheckedHostCoreWordProgram` is checked code with a Word result. `CoreContractEntryProfile` is the
+completion convention of an entry: how a Core result reads as a returned, reverted or trapped frame.
+`CheckedCoreContract` pairs code with a profile, and `CheckedCoreContract.wordOutcomeV1` and its
+companions build one. `InstalledCheckedCoreContract` says an account holds a contract, and
+`TopLevelInvocation` describes a call. `CheckedCoreWordOutcome` is a decoded Word outcome, and
+`CheckedCoreWordLog` a log.
+
+`CheckedContractRegistry` resolves contracts by address, `CheckedCreationTemplateRegistry` holds
+creation templates, `CreationAddressPolicy` derives new addresses, and `ExecutionEnvironment` fixes
+those three for one execution.
+-/
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedHostCoreWordProgram
+/-! Checker-accepted host-aware Core programs with Word result type. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/-- A checked host-aware program whose declared result is exactly Word. -/
+structure CheckedHostCoreWordProgram where
+  code : CheckedHostCoreProgram
+  resultType_eq_word : code.program.resultType = .word
+
+namespace CheckedHostCoreWordProgram
+
+/-- Refine checked code exactly when its declared result type is Word. -/
+def ofChecked? (code : CheckedHostCoreProgram) :
+    Option CheckedHostCoreWordProgram :=
+  if resultTypeEq : code.program.resultType = .word then
+    some ⟨code, resultTypeEq⟩
+  else
+    none
+
+/-- Check host admission and the Word result refinement together. -/
+def ofProgram? (program : Core.Program) :
+    Option CheckedHostCoreWordProgram := do
+  let code ← CheckedHostCoreProgram.ofProgram? program
+  ofChecked? code
+
+end CheckedHostCoreWordProgram
+
+end Solcore.ContractRuntime
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.CheckedHostCoreWordProgramProperties`
+-/
+
+/-! Admission and projection laws for checked Word-result programs. -/
+
+set_option autoImplicit false
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.CheckedHostCoreWordProgramExecution`
+-/
+
+/-! Storage-backed execution specialized to checked Word-result programs. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+universe u v
+
+namespace CheckedHostCoreWordProgram
+
+/-- Run checked Word-result code with one immutable storage-host input. -/
+def runWithStorage
+    {RollbackState : Type u} {TraceState : Type v}
+    (code : CheckedHostCoreWordProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel : Nat) :
+    HostDriverResult
+      (HostStorageDriver.Context RollbackState TraceState) :=
+  code.code.runWithStorage context inputs fuel
+
+/-- Project the successful Word branch while keeping raw execution separate. -/
+def runWithStorageReturnedFrameCompletion?
+    {RollbackState : Type u} {TraceState : Type v}
+    (code : CheckedHostCoreWordProgram)
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel : Nat) :
+    Option (WordReturnedFrameCompletion RollbackState TraceState) :=
+  (code.runWithStorage context inputs fuel).toWordReturnedFrameCompletion?
+
+end CheckedHostCoreWordProgram
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCoreContractEntryProfile
 /-! Typed completion conventions for syntax-independent checked Core contracts. -/
 
 set_option autoImplicit false
@@ -53,20 +159,6 @@ def ofWordTupleType? : Core.Ty → Option Nat
   | .product .word rest => (ofWordTupleType? rest).map (· + 1)
   | _ => none
 
-@[simp] theorem ofWordTupleType?_wordTupleType (count : Nat) :
-    ofWordTupleType? (wordTupleType count) = some count := by
-  induction count with
-  | zero => rfl
-  | succ count ih => simp [wordTupleType, ofWordTupleType?, ih]
-
-@[simp] theorem wordTupleType_inj {left right : Nat} :
-    wordTupleType left = wordTupleType right ↔ left = right := by
-  constructor
-  · intro equal
-    simpa using congrArg ofWordTupleType? equal
-  · intro equal
-    rw [equal]
-
 /-- The longest returned `bytes` value of the bounded convention: two Words. -/
 def boundedBytesLimit : Nat := 64
 
@@ -101,28 +193,6 @@ def ofEnumPayloadType? (type : Core.Ty) : Option EnumPayload :=
   else if type = enumPayloadType .boundedBytes then some .boundedBytes
   else none
 
-@[simp] theorem ofEnumPayloadType?_enumPayloadType (payload : EnumPayload) :
-    ofEnumPayloadType? (enumPayloadType payload) = some payload := by
-  cases payload <;> rfl
-
-@[simp] theorem enumPayloadType_inj {payload other : EnumPayload} :
-    enumPayloadType payload = enumPayloadType other ↔ payload = other := by
-  constructor
-  · intro equal
-    simpa using congrArg ofEnumPayloadType? equal
-  · rintro rfl
-    rfl
-
-/-- Every constructor's value is a product, never the unit of an empty `bytes`
-value. -/
-@[simp] theorem enumPayloadType_ne_unit (payload : EnumPayload) :
-    enumPayloadType payload ≠ .unit := by
-  cases payload <;> simp [enumPayloadType]
-
-@[simp] theorem unit_ne_enumPayloadType (payload : EnumPayload) :
-    Core.Ty.unit ≠ enumPayloadType payload :=
-  (enumPayloadType_ne_unit payload).symm
-
 /-- The right-nested sum of an enum's constructor values, in declaration order. -/
 def enumType (first : EnumPayload) : List EnumPayload → Core.Ty
   | [] => enumPayloadType first
@@ -136,20 +206,6 @@ def ofEnumType? : Core.Ty → Option (EnumPayload × List EnumPayload)
       let (next, rest) ← ofEnumType? right
       return (first, next :: rest)
   | type => (ofEnumPayloadType? type).map (·, [])
-
-@[simp] theorem ofEnumType?_enumType (first : EnumPayload) (rest : List EnumPayload) :
-    ofEnumType? (enumType first rest) = some (first, rest) := by
-  induction rest generalizing first with
-  | nil => cases first <;> rfl
-  | cons next rest ih => simp [enumType, ofEnumType?, ih]
-
-@[simp] theorem enumType_inj {first other : EnumPayload} {rest others : List EnumPayload} :
-    enumType first rest = enumType other others ↔ first = other ∧ rest = others := by
-  constructor
-  · intro equal
-    simpa using congrArg ofEnumType? equal
-  · rintro ⟨rfl, rfl⟩
-    rfl
 
 /-- The bytes a constructor's fields take in the head of the enum's body: a
 `bytes` value takes its offset Word. -/
@@ -178,10 +234,6 @@ def rawBytesType (extraWords : Nat) : Core.Ty :=
 def ofRawBytesType? : Core.Ty → Option Nat
   | .product .unit (.product .word words) => ofWordTupleType? words
   | _ => none
-
-@[simp] theorem ofRawBytesType?_rawBytesType (extraWords : Nat) :
-    ofRawBytesType? (rawBytesType extraWords) = some extraWords := by
-  simp [rawBytesType, ofRawBytesType?]
 
 /-- The data bytes of `extraWords + 1` Words. -/
 def rawBytesCapacity (extraWords : Nat) : Nat := 32 * (extraWords + 1)
@@ -656,3 +708,458 @@ def decodeTyped
 end CoreContractEntryProfile
 
 end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedCoreContract
+/-! Checked Core code with a fixed contract-level completion convention. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/-- Checker-accepted Core code whose result type matches its entry convention. -/
+structure CheckedCoreContract where
+  code : CheckedHostCoreProgram
+  entryProfile : CoreContractEntryProfile
+  resultType_eq :
+    code.program.resultType = entryProfile.resultType
+
+namespace CheckedCoreContract
+
+/-- Reuse the established checked-Word refinement as a return-Word contract. -/
+def returnWord (code : CheckedHostCoreWordProgram) : CheckedCoreContract :=
+  ⟨code.code, .returnWord, code.resultType_eq_word⟩
+
+/-- Bind checked code with the exact typed three-way Word outcome convention. -/
+def wordOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (resultType_eq :
+      code.program.resultType =
+        CoreContractEntryProfile.wordOutcomeV1.resultType) :
+    CheckedCoreContract :=
+  ⟨code, .wordOutcomeV1, resultType_eq⟩
+
+/-- Bind checked code with the static tuple convention of `extraWords + 2` Words. -/
+def wordTupleOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.wordTupleOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .wordTupleOutcomeV1 extraWords, resultType_eq⟩
+
+/-- Bind checked code with the bounded `bytes` convention of at most 64 bytes. -/
+def boundedBytesOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (resultType_eq :
+      code.program.resultType =
+        CoreContractEntryProfile.boundedBytesOutcomeV1.resultType) :
+    CheckedCoreContract :=
+  ⟨code, .boundedBytesOutcomeV1, resultType_eq⟩
+
+/-- Bind checked code with the enum convention of the given constructors' fields. -/
+def enumOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (first second : EnumPayload) (rest : List EnumPayload)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.enumOutcomeV1 first second rest).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .enumOutcomeV1 first second rest, resultType_eq⟩
+
+/-- Bind checked code with the raw-bytes convention of `extraWords + 1` data Words. -/
+def rawBytesOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.rawBytesOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .rawBytesOutcomeV1 extraWords, resultType_eq⟩
+
+/-- Bind checked code with the raw convention of `extraWords + 1` data Words on
+both its returned and reverted sides. -/
+def rawOutcomeV1
+    (code : CheckedHostCoreProgram)
+    (extraWords : Nat)
+    (resultType_eq :
+      code.program.resultType =
+        (CoreContractEntryProfile.rawOutcomeV1 extraWords).resultType) :
+    CheckedCoreContract :=
+  ⟨code, .rawOutcomeV1 extraWords, resultType_eq⟩
+
+/-- Admit checked code only when its result type has a supported entry profile. -/
+def ofCode? (code : CheckedHostCoreProgram) : Option CheckedCoreContract := do
+  let profile ← CoreContractEntryProfile.ofResultType? code.program.resultType
+  if compatible : code.program.resultType = profile.resultType then
+    some ⟨code, profile, compatible⟩
+  else
+    none
+
+/-- Execute the contract-owned decoder before using runtime typing to totalize it. -/
+def decodeCompletion?
+    (contract : CheckedCoreContract)
+    (value : Core.Value) : Option (FrameOutcome Core.Word) :=
+  contract.entryProfile.decode? value
+
+/-- Decode an exact typed completion using the convention owned by the contract. -/
+def decodeCompletion
+    (contract : CheckedCoreContract)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    (typing :
+      Core.HostRuntimeValueHasType world value
+        contract.code.program.resultType
+        contract.code.program.dataDefinitions) :
+    FrameOutcome Core.Word :=
+  (contract.decodeCompletion? value).get (by
+    apply contract.entryProfile.decode?_isSome_of_hasType
+    rw [← contract.resultType_eq]
+    exact typing)
+
+end CheckedCoreContract
+
+/-- Evidence that the exact checked contract code is installed in the input world. -/
+structure InstalledCheckedCoreContract
+    (initialWorld : WorldState)
+    (target : Address)
+    (contract : CheckedCoreContract) where
+  account : Account
+  account_present : initialWorld.account? target = some account
+  code_present : account.code? = some contract.code
+
+/-- Immutable inputs for the initial direct top-level invocation profile. -/
+structure TopLevelInvocation where
+  target : Address
+  caller : Address
+  callValue : Core.Word
+  inputData : HostStorageDriver.InputData
+
+namespace TopLevelInvocation
+
+/-- Derive every immutable driver input for a direct call to the target. -/
+def executionInputs
+    (invocation : TopLevelInvocation) :
+    HostStorageDriver.ExecutionInputs := {
+  codeAddress := invocation.target
+  callValue := invocation.callValue
+  callerAddress := invocation.caller
+  inputData := invocation.inputData
+  currentAddress := invocation.target
+}
+
+end TopLevelInvocation
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedCoreWordOutcome
+/-! Word-preserving completion decoding for checked Core contract profiles. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/--
+The exact Word payload carried by every one-Word checked-Core completion
+convention.
+-/
+inductive CheckedCoreWordOutcome where
+  | returned (data : Core.Word)
+  | reverted (data : Core.Word)
+  | trapped (reason : Core.Word)
+  deriving Repr, BEq, DecidableEq
+
+namespace CheckedCoreWordOutcome
+
+/-- Forget only the Word-level view, retaining the canonical byte encoding. -/
+def toFrameOutcome : CheckedCoreWordOutcome → FrameOutcome Core.Word
+  | .returned data => .returned (encodeWordBytesBE data)
+  | .reverted data => .reverted (encodeWordBytesBE data)
+  | .trapped reason => .trapped reason
+
+end CheckedCoreWordOutcome
+
+namespace CoreContractEntryProfile
+
+/-- Decode a runtime value while retaining its exact Word payload. A Word tuple
+has no one-Word view and never decodes here. -/
+def decodeWordOutcome?
+    (profile : CoreContractEntryProfile)
+    (value : Core.Value) : Option CheckedCoreWordOutcome :=
+  match profile, value with
+  | .returnWord, .word word =>
+      some (.returned word)
+  | .wordOutcomeV1, .inLeft (.sum .word .word) (.word word) =>
+      some (.returned word)
+  | .wordOutcomeV1, .inRight .word (.inLeft .word (.word word)) =>
+      some (.reverted word)
+  | .wordOutcomeV1, .inRight .word (.inRight .word (.word reason)) =>
+      some (.trapped reason)
+  | _, _ => none
+
+/-- A value of a one-Word profile's result type always has an exact Word outcome. -/
+theorem decodeWordOutcome?_ne_none_of_hasType
+    (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing :
+      Core.HostRuntimeValueHasType world value profile.resultType definitions) :
+    profile.decodeWordOutcome? value ≠ none := by
+  cases profile with
+  | wordTupleOutcomeV1 _ => cases oneWord
+  | boundedBytesOutcomeV1 => cases oneWord
+  | enumOutcomeV1 _ _ _ => cases oneWord
+  | rawBytesOutcomeV1 _ => cases oneWord
+  | rawOutcomeV1 _ => cases oneWord
+  | returnWord =>
+      cases typing with
+      | word => simp [decodeWordOutcome?]
+  | wordOutcomeV1 =>
+      cases typing with
+      | inLeft payloadTyping =>
+          cases payloadTyping with
+          | word => simp [decodeWordOutcome?]
+      | inRight payloadTyping =>
+          cases payloadTyping with
+          | inLeft innerTyping =>
+              cases innerTyping with
+              | word => simp [decodeWordOutcome?]
+          | inRight innerTyping =>
+              cases innerTyping with
+              | word => simp [decodeWordOutcome?]
+
+/-- The executable Word decoder is populated for every typed one-Word value. -/
+theorem decodeWordOutcome?_isSome_of_hasType
+    (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing :
+      Core.HostRuntimeValueHasType world value profile.resultType definitions) :
+    (profile.decodeWordOutcome? value).isSome = true :=
+  Option.isSome_iff_ne_none.mpr
+    (profile.decodeWordOutcome?_ne_none_of_hasType oneWord typing)
+
+/-- Decode a typed one-Word value without an invalid-value fallback branch. -/
+def decodeWordOutcome
+    (profile : CoreContractEntryProfile)
+    (oneWord : profile.returnsOneWord = true)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    {definitions : Core.DataEnvironment}
+    (typing :
+      Core.HostRuntimeValueHasType world value profile.resultType definitions) :
+    CheckedCoreWordOutcome :=
+  (profile.decodeWordOutcome? value).get
+    (profile.decodeWordOutcome?_isSome_of_hasType oneWord typing)
+
+end CoreContractEntryProfile
+
+namespace CheckedCoreContract
+
+/-- Run the contract-owned decoder while retaining its exact Word payload. -/
+def decodeWordOutcome?
+    (contract : CheckedCoreContract)
+    (value : Core.Value) : Option CheckedCoreWordOutcome :=
+  contract.entryProfile.decodeWordOutcome? value
+
+/-- Decode a one-Word checked contract result without an invalid-value fallback. -/
+def decodeWordOutcome
+    (contract : CheckedCoreContract)
+    (oneWord : contract.entryProfile.returnsOneWord = true)
+    {world : Core.StoreTyping}
+    {value : Core.Value}
+    (typing :
+      Core.HostRuntimeValueHasType world value
+        contract.code.program.resultType
+        contract.code.program.dataDefinitions) :
+    CheckedCoreWordOutcome :=
+  contract.entryProfile.decodeWordOutcome oneWord (by
+    rw [← contract.resultType_eq]
+    exact typing)
+
+end CheckedCoreContract
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.CheckedCoreWordLog
+/-! ABI-independent word logs emitted by checked Core execution. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/--
+One internal checked-Core log observation.
+
+The active execution context supplies `emitter`; Core supplies only the raw
+word-sized topic and payload. ABI interpretation is deliberately separate.
+-/
+structure CheckedCoreWordLog where
+  emitter : Address
+  topic : Core.Word
+  payload : Core.Word
+  deriving Repr, BEq, DecidableEq
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedContractRegistry
+/-! Dynamic resolution of registered checked contracts in a WorldState. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/-- Internal checked contracts indexed by their semantic address. -/
+structure CheckedContractRegistry where
+  lookup : Address → Option CheckedCoreContract
+
+namespace CheckedContractRegistry
+
+/-- A checked contract together with evidence that it is installed now. -/
+abbrev Resolution
+    (currentWorld : WorldState)
+    (target : Address) :=
+  Sigma fun contract =>
+    InstalledCheckedCoreContract currentWorld target contract
+
+private theorem checkedCode_eq_of_program_eq
+    {left right : CheckedHostCoreProgram}
+    (programEq : left.program = right.program) :
+    left = right := by
+  cases left with
+  | mk leftProgram leftChecked =>
+      cases right with
+      | mk rightProgram rightChecked =>
+          simp only at programEq
+          subst rightProgram
+          rfl
+
+/--
+Resolve only when the registry entry still names the exact checked code stored in
+the current world. The returned evidence is indexed by that current world.
+-/
+def resolve?
+    (registry : CheckedContractRegistry)
+    (currentWorld : WorldState)
+    (target : Address) : Option (Resolution currentWorld target) :=
+  match registry.lookup target with
+  | none => none
+  | some contract =>
+      match accountEntry : currentWorld.account? target with
+      | none => none
+      | some account =>
+          match codeEntry : account.code? with
+          | none => none
+          | some installedCode =>
+              if exactCode :
+                  installedCode.program = contract.code.program then
+                let codeEq := checkedCode_eq_of_program_eq exactCode
+                some ⟨contract, {
+                  account := account
+                  account_present := accountEntry
+                  code_present := codeEntry.trans (congrArg some codeEq)
+                }⟩
+              else
+                none
+
+end CheckedContractRegistry
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedCreationTemplateRegistry
+/-! Checked initializer/runtime pairs selected by immutable creation identifiers. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/-- Checker-accepted initializer code and the runtime code it may install. -/
+structure CheckedCreationTemplate where
+  initializer : CheckedCoreContract
+  runtime : CheckedCoreContract
+
+/-- Immutable checked creation templates indexed by a full Core Word. -/
+structure CheckedCreationTemplateRegistry where
+  lookup : Core.Word → Option CheckedCreationTemplate
+
+namespace CheckedCreationTemplateRegistry
+
+/-- The registry in which no creation template is available. -/
+def empty : CheckedCreationTemplateRegistry := {
+  lookup := fun _ => none
+}
+
+end CheckedCreationTemplateRegistry
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.CreationAddressPolicy
+/-! Injected address derivation for contract creation. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/--
+Policy boundary for deriving a created contract address from its creator and
+the creator's pre-increment nonce. Concrete hashing remains outside semantics.
+-/
+structure CreationAddressPolicy where
+  derive : Address → Core.Word → Address
+
+end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsExecutionEnvironment
+/-! Immutable registries and address derivation fixed for one execution. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/-- Every external capability whose replacement could change execution meaning. -/
+structure ExecutionEnvironment where
+  callRegistry : CheckedContractRegistry
+  creationTemplates : CheckedCreationTemplateRegistry
+  creationAddressPolicy : CreationAddressPolicy
+
+namespace ExecutionEnvironment
+
+/-- A deterministic inert policy for executions that cannot create contracts. -/
+def inertCreationAddressPolicy : CreationAddressPolicy := {
+  derive := fun _creator _nonce => ⟨0, by decide⟩
+}
+
+/--
+Enable checked calls while disabling root creation. The empty template registry
+makes every root creation request return the stable `unavailable` failure; the
+inert address policy is consequently never consulted by creation preflight.
+-/
+def callsOnly
+    (callRegistry : CheckedContractRegistry) : ExecutionEnvironment := {
+  callRegistry := callRegistry
+  creationTemplates := .empty
+  creationAddressPolicy := inertCreationAddressPolicy
+}
+
+end ExecutionEnvironment
+
+end Solcore.ContractRuntime
+end

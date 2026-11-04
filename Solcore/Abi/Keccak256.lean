@@ -1,5 +1,11 @@
 import Solcore.ContractRuntime.RuntimeScalars
 
+/-!
+# Keccak-256
+
+`Abi.V1.Keccak256.hash`, Ethereum-compatible Keccak-256 over runtime bytes.
+-/
+
 /-! Ethereum-compatible Keccak-256 over runtime bytes. -/
 
 set_option autoImplicit false

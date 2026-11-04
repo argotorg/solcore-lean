@@ -1,87 +1,54 @@
 import Solcore.ContractRuntime.RuntimeScalars
-import Solcore.ContractRuntime.AddressBytesBE
-import Solcore.ContractRuntime.AddressRepresentationCoherence
-import Solcore.ContractRuntime.AddressWordBridge
-import Solcore.ContractRuntime.FrameOutcome
-import Solcore.ContractRuntime.FrameStateResolution
-import Solcore.ContractRuntime.FrameRun
-import Solcore.ContractRuntime.FrameEffectJournal
-import Solcore.ContractRuntime.FrameTrace
-import Solcore.ContractRuntime.FrameContinuationContext
-import Solcore.ContractRuntime.FrameResolutionResult
-import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
-import Solcore.ContractRuntime.ParentIndexedFrameTrapRollback
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionView
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
-import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
-import Solcore.ContractRuntime.RuntimeScalars.TextProperties
-import Solcore.ContractRuntime.RuntimeScalars.WordBytesProperties
-import Solcore.ContractRuntime.CheckedCoreProgram
-import Solcore.ContractRuntime.CheckedHostCoreProgram
-import Solcore.ContractRuntime.CheckedHostCoreWordProgram
-import Solcore.ContractRuntime.CheckedHostCoreWordCodeSelection
-import Solcore.ContractRuntime.HostStorageInputData
-import Solcore.ContractRuntime.HostStorageExecutionInputs
-import Solcore.ContractRuntime.HostStorageContext
-import Solcore.ContractRuntime.HostDriver
-import Solcore.ContractRuntime.WordReturnedFrameCompletion
-import Solcore.ContractRuntime.HostStorageHandler
-import Solcore.ContractRuntime.HostStorageDriver
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuation
 import Solcore.ContractRuntime.WorldState
-import Solcore.ContractRuntime.Account
-import Solcore.ContractRuntime.WorldStateBalanceProperties
-import Solcore.ContractRuntime.WorldStateNonceProperties
-import Solcore.ContractRuntime.CreationAddressPolicy
-import Solcore.ContractRuntime.CheckedCreationTemplateRegistry
-import Solcore.ContractRuntime.ExecutionEnvironment
-import Solcore.ContractRuntime.CheckedCoreContract
-import Solcore.ContractRuntime.CheckedAccountCreation
-import Solcore.ContractRuntime.CheckedCreationPreflight
-import Solcore.ContractRuntime.BalanceTransfer
-import Solcore.ContractRuntime.WorldStateCode
-import Solcore.ContractRuntime.WorldStateWordCodeSelection
-import Solcore.ContractRuntime.SelectedCheckedWordExecution
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecution
-import Solcore.ContractRuntime.WorldStateStorageRead
-import Solcore.ContractRuntime.FrameCheckpointSnapshot
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPair
-import Solcore.ContractRuntime.ParentIndexedFrameInitialization
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
-import Solcore.ContractRuntime.ParentIndexedSelectedExecution
-import Solcore.ContractRuntime.FrameContinuationContextFromCheckpointedWorkingPair
-import Solcore.ContractRuntime.CoreContractEntryProfile
-import Solcore.ContractRuntime.CoreContractEntryProfileProperties
-import Solcore.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.CoreLanguageResult
-import Solcore.ContractRuntime.TopLevelStorageDelta
-import Solcore.ContractRuntime.ContractCallFailure
-import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.CheckedCoreWordOutcome
-import Solcore.ContractRuntime.CheckedCoreWordLog
-import Solcore.ContractRuntime.TransactionJournal
-import Solcore.ContractRuntime.TransactionHostStorage
-import Solcore.ContractRuntime.CheckedContractRegistry
-import Solcore.ContractRuntime.NestedWordCall
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.HostStorageAccountPresence
-import Solcore.ContractRuntime.OneLevelNestedTransitionSystem
-import Solcore.ContractRuntime.OneLevelNestedExecution
-import Solcore.ContractRuntime.CallResumeExecution
-import Solcore.ContractRuntime.CallChainExecution
-import Solcore.ContractRuntime.CallChoiceExecution
-import Solcore.ContractRuntime.BalancedTopLevelExecution
+import Solcore.ContractRuntime.Frames
+import Solcore.ContractRuntime.Driver
+import Solcore.ContractRuntime.StorageDriver
+import Solcore.ContractRuntime.Contracts
+import Solcore.ContractRuntime.Transactions
+import Solcore.ContractRuntime.TopLevel
+import Solcore.ContractRuntime.Creation
+import Solcore.ContractRuntime.NestedExecution
+import Solcore.ContractRuntime.BalancedExecution
+import Solcore.ContractRuntime.CallPhases
+import Solcore.ContractRuntime.Internal.ScalarLaws
+import Solcore.ContractRuntime.Internal.ScalarText
+import Solcore.ContractRuntime.Internal.AddressBytes
+import Solcore.ContractRuntime.Internal.CheckedCoreProgram
+import Solcore.ContractRuntime.Internal.WorldStateLaws
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
+import Solcore.ContractRuntime.Internal.FrameLaws
+import Solcore.ContractRuntime.Internal.DriverLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.ContractRuntime.Internal.EntryOutcomeLaws
+import Solcore.ContractRuntime.Internal.TransactionLaws
+import Solcore.ContractRuntime.Internal.TopLevelLaws
+import Solcore.ContractRuntime.Internal.CreationLaws
+import Solcore.ContractRuntime.Internal.NestedLaws
+import Solcore.ContractRuntime.Internal.BalancedLaws
+import Solcore.ContractRuntime.Internal.CallPhaseLaws
+import Solcore.ContractRuntime.Internal.CodeExecution
+import Solcore.ContractRuntime.Internal.ParentIndexedFrames
+import Solcore.ContractRuntime.Internal.ParentIndexedExecution
+import Solcore.ContractRuntime.Internal.SelectedWordExecution
 
 /-!
-Umbrella module for checked-Core contract execution. It exposes contract
-accounts and world state, host-request handling, transaction and frame state,
-nested calls and creation, commit/rollback, and top-level observations together
-with their proofs.
+# Contract runtime
 
-This layer is distinct from `Solcore.Core`'s local evaluator and
-`Solcore.SourceSemantics`'s source-language judgments.
+Checked Core contract execution: accounts and world state, host requests, frames and transactions,
+nested calls and creation, commit and rollback, and top-level observations. This layer is distinct
+from `Solcore.Core`'s local evaluator and from the source-language judgments of
+`Solcore.SourceSemantics`. Read in this order. `docs/review/contract-runtime.md` lists every file.
+
+1. **State.** `RuntimeScalars`, then `WorldState`.
+2. **One frame.** `Frames` holds its outcomes and checkpoints.
+3. **Host requests.** `Driver` is the generic loop, and `StorageDriver` the real handler.
+4. **Contracts.** `Contracts` holds completion conventions, checked contracts and the environment.
+5. **One transaction.** `Transactions`, then `TopLevel`.
+6. **Nested execution.** `Creation`, `NestedExecution`, then `BalancedExecution`, the public entry.
+7. **Call phases.** `CallPhases`.
+
+The front holds definitions, and the main theorems of each stage: see `Driver`, `TopLevel`,
+`NestedExecution`, `BalancedExecution` and `CallPhases`. The laws are in `Internal/`, by family.
+`Internal/` also holds the refinement layers that only tests use.
 -/

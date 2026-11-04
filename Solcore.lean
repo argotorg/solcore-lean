@@ -12,4 +12,6 @@ import Solcore.SourceSemantics
 /-!
 The public umbrella module for the executable Solcore specification and
 source-language frontend.
+
+Each area's umbrella is its reading guide, and `docs/review/` holds a reviewer's guide per area.
 -/

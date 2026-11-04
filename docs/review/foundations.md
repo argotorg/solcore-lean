@@ -1,7 +1,8 @@
 # Reviewer's guide: foundations
 
 The small areas under the compiler: the source type system, resolved expressions, the workspace
-kernel, and shared utilities. Each has a short front, and its umbrella gives the reading order.
+kernel, the ABI layer, and shared utilities. Each has a short front, and its umbrella gives the
+reading order.
 
 ## Main definitions and theorems
 
@@ -19,8 +20,9 @@ dependencies, and these decided the front:
 | `Workspace` | Validation decides the judgments | `Workspace.Validation.validate_sound`, `Workspace.Validation.validate_complete`, `Workspace.validates_or_rejects` | the umbrella's "correspondence theorems"; roots of the dependencies |
 | `Workspace` | Validation depends only on the inputs that matter | `Workspace.validate_equivalent` | the largest closure in the area |
 
-`Util` has no main theorem of its own. `Util.FixedRadix.decodeNat_encodeNat_of_lt` and
-`Util.FixedHex.encodeText_injective` are its top results.
+`Abi` and `Util` have no main theorem of their own. The top of `Abi` is
+`Abi.V1.MethodTable.dispatchProgram_checked` and `Abi.V1.StaticWordContract.checkedCore_eq`, and the
+top of `Util` is `Util.FixedRadix.decodeNat_encodeNat_of_lt` and `Util.FixedHex.encodeText_injective`.
 
 ## TypeSystem
 
@@ -48,9 +50,8 @@ first-order inference. It stays separate from the closed monomorphic Core types 
 | [`SchemeLaws`](../../Solcore/TypeSystem/Internal/SchemeLaws.lean) | Small laws of substitutions and schemes, and correlated rigid instances |
 | [`InferenceLaws`](../../Solcore/TypeSystem/Internal/InferenceLaws.lean) | Laws of the inference state |
 
-`Unification` and `Scheme` keep their proofs, because those unfold private helpers. `SchemeLaws` and
-`InferenceLaws` are separate because `SchemeLaws` holds `@[simp]` lemmas about substitutions, and
-about 500 modules see `InferenceLaws` without seeing it.
+`SchemeLaws` and `InferenceLaws` are separate because `SchemeLaws` holds `@[simp]` lemmas about
+substitutions, and about 500 modules see `InferenceLaws` without seeing it.
 
 ## Resolved
 
@@ -98,9 +99,18 @@ validation, independent judgments, and their correspondence. It does not resolve
 | Dichotomy | `Workspace.validates_or_rejects`, `Workspace.Validates.not_rejected` | [`Properties`](../../Solcore/Workspace/Properties.lean) | a raw workspace validates or is rejected, and never both |
 | Invariance | `Workspace.validate_equivalent`, `Workspace.validate_preserves_sourceFiles`, `Workspace.validate_preserves_sourceBytes` | [`Properties`](../../Solcore/Workspace/Properties.lean) | equivalent inputs give the same result, and sources keep their bytes |
 
-`Workspace` has no `Internal/`: it was already six files, all of them front. `Properties` holds
-supporting lemmas with the main theorems, because most of them name private helpers, and `private` is
-per file.
+`Workspace` has no `Internal/`: it was already six files, all of them front.
+
+## Abi
+
+Solcore's executable ABI layer, for methods that take and return one Word.
+
+| File | Main declarations |
+| --- | --- |
+| [`Keccak256`](../../Solcore/Abi/Keccak256.lean) | `Abi.V1.Keccak256.hash` |
+| [`StaticWord`](../../Solcore/Abi/StaticWord.lean) | `Abi.V1.MethodMetadata`, `Abi.V1.Selector`, `Abi.V1.StaticWordCall`, `Abi.V1.MethodTable`, `Abi.V1.MethodTable.dispatchProgram`, `Abi.V1.StaticWordContract`, `Abi.V1.StaticWordContract.run` |
+
+`Abi` has no `Internal/`.
 
 ## Util
 
@@ -111,3 +121,17 @@ Generic representation and codec helpers. They define no source syntax, typing o
 | [`FixedRadix`](../../Solcore/Util/FixedRadix.lean) | `Util.FixedRadix.encodeNat`, `Util.FixedRadix.decodeNat` |
 | [`FixedHex`](../../Solcore/Util/FixedHex.lean) | `Util.FixedHex.encodeText` |
 | [`Json`](../../Solcore/Util/Json.lean) | helpers shared by the codecs |
+
+## What stays mixed
+
+These areas were not split into definitions and laws as Core and ContractRuntime were, so their front
+files hold proofs. `private` is per file, and a theorem that names a private helper has to stay with it.
+
+| File | Why it stays mixed |
+| --- | --- |
+| `TypeSystem/Unification`, `TypeSystem/Scheme` | Most of their theorems name private helpers: about 1,100 of 1,265 proof lines, and 400 of 500 |
+| `Workspace/Properties` | About 1,170 of 1,750 proof lines name private helpers |
+| `Workspace/Path`, `Workspace/Validation` | Most of their proofs name private helpers |
+| `Abi/StaticWord` | About half of its proofs name private helpers |
+| `Abi/Keccak256`, `Util/FixedRadix`, `Util/FixedHex` | Most of their proofs name private helpers |
+| `TypeSystem/Type`, `Workspace/Syntax`, `Workspace/Judgment`, `Workspace/Error`, the `Resolved` front | A choice, not a constraint: many of these laws could leave, but the files are short, and it would add files without shortening much |

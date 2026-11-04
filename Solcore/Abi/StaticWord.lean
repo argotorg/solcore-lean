@@ -6,6 +6,18 @@ import Solcore.ContractRuntime.CheckedCoreContract
 import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-!
+# Static Word ABI
+
+Methods that take and return one Word, from metadata to execution. `Abi.V1.MethodMetadata` and
+`Abi.V1.Selector` name a method, and `Abi.V1.StaticWordCall` is a decoded call. `Abi.V1.MethodTable`
+validates a list of `Abi.V1.Method`s, and `Abi.V1.MethodTable.dispatchProgram` generates the
+dispatcher. `Abi.V1.StaticWordContract` is a contract built from a table, and
+`Abi.V1.StaticWordContract.run` runs it.
+
+The proofs stay in this file: about half of them name private helpers.
+-/
+
+/-!
 Executable ABI support for statically described word methods, from metadata
 and codecs through method-table dispatch and contract execution.
 -/

@@ -1,6 +1,66 @@
+import Solcore.Core.Syntax
+import Solcore.Core.Host
+import Solcore.Core.HostRunner
 import Solcore.ContractRuntime.RuntimeScalars
-import Solcore.ContractRuntime.CheckedHostCoreProgram
 
+/-!
+# Accounts and world state
+
+`CheckedHostCoreProgram` is code that passed the host-aware checker, which is what an account
+holds. `Account` holds code, a balance, a nonce and sparse storage, and `WorldState` maps addresses
+to accounts. Their constructors and fields are private, so the laws that unfold them stay in this
+file.
+
+The operations are `WorldState.account?`, `WorldState.putAccount`, `WorldState.readStorage?`,
+`WorldState.writeStorage?`, `WorldState.balance?`, `WorldState.writeBalance?`, `WorldState.nonce?`,
+`WorldState.writeNonce?`, `WorldState.code?`, `WorldState.writeCode?`, `WorldState.runCode?` and
+`Account.incrementNonce?`. `WorldStateDelta` records what changed between two worlds.
+-/
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsCheckedHostCoreProgram
+/-! Checker-accepted Core programs under the fixed host capability context. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+structure CheckedHostCoreProgram where
+  program : Core.Program
+  checked : program.checkHost = true
+
+namespace CheckedHostCoreProgram
+
+def ofProgram? (program : Core.Program) : Option CheckedHostCoreProgram :=
+  if checked : program.checkHost = true then
+    some ⟨program, checked⟩
+  else
+    none
+
+end CheckedHostCoreProgram
+
+end Solcore.ContractRuntime
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.CheckedHostCoreProgramExecution`
+-/
+
+/-! Interactive execution for programs checked in the fixed host context. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime.CheckedHostCoreProgram
+
+def runStateful
+    (code : CheckedHostCoreProgram)
+    (fuel : Nat) : Core.HostRunResult :=
+  code.program.runHostStateful fuel
+
+end Solcore.ContractRuntime.CheckedHostCoreProgram
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.WorldState
 set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
@@ -790,3 +850,217 @@ theorem WorldState.writeStorage?_zero_deletes
   · exact Account.storageValue?_storageWrite_zero account slot
 
 end Solcore.ContractRuntime
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsAccount
+/-! Account code, balance, nonce, and sparse-storage laws. -/
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.AccountCodeProperties`
+-/
+
+/-! Checked-code observations and storage preservation for Account. -/
+
+set_option autoImplicit false
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.AccountBalanceProperties`
+-/
+
+/-! Balance observations and preservation laws for Account updates. -/
+
+set_option autoImplicit false
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.AccountNonceProperties`
+-/
+
+/-! Nonce observations and preservation laws for Account updates. -/
+
+set_option autoImplicit false
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.AccountNonceIncrement`
+-/
+
+/-! Checked, non-wrapping account nonce increment. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime.Account
+
+/-- Increment the nonce exactly once, failing instead of wrapping at 2^256. -/
+def incrementNonce? (account : Account) : Option Account := do
+  let next ← Core.Word.ofNat? (account.nonce.val + 1)
+  some (account.withNonce next)
+
+end Solcore.ContractRuntime.Account
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsWorldStateStorageRead
+/-! Conditional storage reads over explicit WorldState account presence. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime.WorldState
+
+/-- Read a slot only when its Account is explicitly present. -/
+def readStorage?
+    (state : WorldState)
+    (address : Address)
+    (slot : Core.Word) : Option Core.Word := do
+  let account ← state.account? address
+  some (account.storageRead slot)
+
+end Solcore.ContractRuntime.WorldState
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsWorldStateCode
+/-! Address-selected checked code lookup in explicit WorldState. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime.WorldState
+
+/-- Select host-checker-accepted code from the Account at one Address. -/
+def code?
+    (state : WorldState)
+    (codeAddress : Address) : Option CheckedHostCoreProgram := do
+  let account ← state.account? codeAddress
+  account.code?
+
+end Solcore.ContractRuntime.WorldState
+
+/-!
+## Consolidated module: `Solcore.ContractRuntime.WorldStateCodeExecution`
+-/
+
+/-! Address-selected execution until the first host boundary. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime.WorldState
+
+/-- Execute selected host-aware code until completion or its first boundary. -/
+def runCode?
+    (state : WorldState)
+    (codeAddress : Address)
+    (fuel : Nat) : Option Core.HostRunResult :=
+  (state.code? codeAddress).map fun code => code.runStateful fuel
+
+end Solcore.ContractRuntime.WorldState
+end
+
+section
+-- leanmerge: from Solcore.ContractRuntime.Internal.DefsWorldStateDelta
+/-! Exact, queryable endpoint observations for arbitrary WorldState transitions. -/
+
+set_option autoImplicit false
+
+namespace Solcore.ContractRuntime
+
+/--
+An exact observation of one transition between two WorldState endpoints.
+
+WorldState is function-valued, so this carrier deliberately exposes pointwise
+queries instead of claiming that changed accounts or slots can be enumerated.
+-/
+inductive WorldStateDelta (initialWorld finalWorld : WorldState) : Type where
+  /-- The canonical exact observation for the indexed endpoint worlds. -/
+  | exact : WorldStateDelta initialWorld finalWorld
+
+namespace WorldStateDelta
+
+/-- The unchanged transition, represented by the same canonical observation. -/
+def identity (world : WorldState) : WorldStateDelta world world :=
+  .exact
+
+/-- Observe exact account presence and contents at one address. -/
+def accountEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Account × Option Account :=
+  (initialWorld.account? address, finalWorld.account? address)
+
+/--
+Observe exact storage reads at one address and slot.
+
+Each endpoint remains optional: `none` means that the account is absent, while
+`some Core.Word.zero` means that the account is present and the slot reads zero.
+-/
+def storageEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (slot : Core.Word) : Option Core.Word × Option Core.Word :=
+  (initialWorld.readStorage? address slot,
+    finalWorld.readStorage? address slot)
+
+/--
+Observe exact balance endpoints at one address.
+
+`none` denotes an absent account and `some Core.Word.zero` denotes a present
+zero-balance account, so creation-era presence remains observable.
+-/
+def balanceEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Core.Word × Option Core.Word :=
+  (initialWorld.balance? address, finalWorld.balance? address)
+
+/-- Observe exact creation-nonce endpoints at one address. -/
+def nonceEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Core.Word × Option Core.Word :=
+  (initialWorld.nonce? address, finalWorld.nonce? address)
+
+/-- Observe exact checked-code endpoints at one address. -/
+def codeEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) :
+    Option CheckedHostCoreProgram × Option CheckedHostCoreProgram :=
+  (initialWorld.code? address, finalWorld.code? address)
+
+/-- Report exactly an absent-to-present Account transition. -/
+def createdAccount?
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Bool :=
+  match initialWorld.account? address, finalWorld.account? address with
+  | none, some _ => true
+  | _, _ => false
+
+/-- Return exact old/new storage endpoints only when the observation changed. -/
+def slotChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (slot : Core.Word) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.storageEndpoints address slot
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+/-- Return exact old/new balance endpoints only when the observation changed. -/
+def balanceChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.balanceEndpoints address
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+/-- Return exact old/new nonce endpoints only when the observation changed. -/
+def nonceChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.nonceEndpoints address
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+end WorldStateDelta
+
+end Solcore.ContractRuntime
+end
