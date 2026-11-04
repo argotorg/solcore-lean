@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellReadMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees

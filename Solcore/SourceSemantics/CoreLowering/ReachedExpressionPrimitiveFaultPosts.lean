@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexFaultPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 
 /-! Finite converters retain the actual primitive read or index witness.
 The owning Source trace and key occurrence remain authentic inputs. -/

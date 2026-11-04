@@ -1,11 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingTerminalDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceConcretePreparation
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticCoverage
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTyping

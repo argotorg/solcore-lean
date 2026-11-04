@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-!
 # Owned callables: function values and state

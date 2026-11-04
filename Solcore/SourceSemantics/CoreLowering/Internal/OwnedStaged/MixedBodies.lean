@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentDiagnosticAuthority
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardTerminals

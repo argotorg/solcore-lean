@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualMissingDiagnosticObservations
 
 /-! A reached unavailable mapping supplies the receiving metadata and canonical
 mapping view from its own fields. Its exact specialization and issued reason

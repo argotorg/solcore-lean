@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjectedBitNot
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
-import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads

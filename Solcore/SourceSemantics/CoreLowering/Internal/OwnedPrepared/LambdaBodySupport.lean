@@ -20,7 +20,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.TerminalStatementOrigins
 

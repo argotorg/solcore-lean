@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexTerminal
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies

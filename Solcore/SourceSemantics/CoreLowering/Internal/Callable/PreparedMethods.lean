@@ -1,13 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.RuntimeProfileFactories

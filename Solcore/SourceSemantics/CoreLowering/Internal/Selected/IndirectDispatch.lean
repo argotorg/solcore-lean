@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.SourceBodyTemplateScope
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatalog

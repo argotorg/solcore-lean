@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeAssignments
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics

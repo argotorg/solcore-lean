@@ -17,8 +17,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts

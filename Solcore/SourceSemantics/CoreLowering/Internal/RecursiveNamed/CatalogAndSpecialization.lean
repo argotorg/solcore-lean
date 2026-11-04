@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValue
 import Solcore.SourceSemantics.SourceStageAnalysisSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-!
 # Recursive named rows: the catalog and specialization

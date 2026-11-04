@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareWordModifier
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 
 /-!
 # Protected contracts: staged projected writes

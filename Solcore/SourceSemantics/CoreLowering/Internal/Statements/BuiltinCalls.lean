@@ -1,10 +1,8 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
-import Solcore.SourceSemantics.CoreLowering.CompatibleBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallProtocol
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 
 /-!
 # Builtin calls

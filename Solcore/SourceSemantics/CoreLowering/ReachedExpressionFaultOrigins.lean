@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadFaultPolicies
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingView
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 
 /-! The initial concrete sum covers ordinary local

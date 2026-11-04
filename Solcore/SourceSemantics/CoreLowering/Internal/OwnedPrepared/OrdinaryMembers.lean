@@ -2,20 +2,17 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambd
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectApplication
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
-import Solcore.SourceSemantics.CoreLowering.CompatibleBuiltinMeaning
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadSource
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadFaultPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-!
 # Prepared callables: ordinary members

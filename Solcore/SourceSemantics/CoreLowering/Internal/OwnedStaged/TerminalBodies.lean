@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures

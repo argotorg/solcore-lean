@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambd
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState

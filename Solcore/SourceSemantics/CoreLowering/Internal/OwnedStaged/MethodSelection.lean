@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

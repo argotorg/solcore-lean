@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCa
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators

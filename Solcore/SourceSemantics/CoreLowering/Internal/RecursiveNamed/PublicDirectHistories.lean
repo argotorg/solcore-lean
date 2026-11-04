@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectClosureApplications
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFuncti
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectApplications
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 
 /-!
 # Recursive named public results: direct histories

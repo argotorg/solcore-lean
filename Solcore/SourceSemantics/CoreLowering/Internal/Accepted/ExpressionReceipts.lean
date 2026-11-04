@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexExtraction
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 
 /-!
 # Accepted expression receipts

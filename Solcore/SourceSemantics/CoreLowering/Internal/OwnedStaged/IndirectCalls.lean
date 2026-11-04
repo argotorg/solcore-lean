@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CallRejection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualStoredCalls
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenOrdinaryCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations

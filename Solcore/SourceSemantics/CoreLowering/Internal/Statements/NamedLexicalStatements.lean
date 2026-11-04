@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedScopedControl
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 

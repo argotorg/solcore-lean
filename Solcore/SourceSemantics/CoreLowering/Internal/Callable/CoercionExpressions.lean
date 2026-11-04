@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-!
 # Coercions: expressions

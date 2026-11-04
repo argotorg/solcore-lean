@@ -4,11 +4,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadSource
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadFaultPolicies
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectApplication

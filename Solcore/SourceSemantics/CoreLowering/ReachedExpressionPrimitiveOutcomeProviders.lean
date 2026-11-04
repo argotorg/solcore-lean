@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionPrimitiveFaultPosts
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexTerminal
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 
 /-! Primitive fault posts come from the actual finite read or index terminal.
 The existing diagnostic core selects its own witness. Public issuer and receiver

@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.FiniteClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.FiniteCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 

@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
-import Solcore.SourceSemantics.CoreLowering.CompatiblePayloadMembers
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingEncoding
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission

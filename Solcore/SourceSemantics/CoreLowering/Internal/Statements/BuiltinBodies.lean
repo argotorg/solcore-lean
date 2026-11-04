@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls

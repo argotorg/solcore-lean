@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyIndexed
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.Core.LocalLoop
 import Solcore.Core.Renaming

@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionScalarNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
 import Solcore.SourceSemantics.CoreLowering.CaptureCopyIndexedTyping
 import Solcore.SourceSemantics.CoreLowering.ImperativeNativePolicyTyping
 

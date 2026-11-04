@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCallExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 

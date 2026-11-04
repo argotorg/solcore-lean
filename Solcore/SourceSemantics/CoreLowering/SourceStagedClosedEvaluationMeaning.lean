@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceCoreElaboration
-import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 
 set_option autoImplicit false
 set_option maxHeartbeats 2000000

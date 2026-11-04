@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 
 /-! The existing literal meanings exclude faults at their real certificates.

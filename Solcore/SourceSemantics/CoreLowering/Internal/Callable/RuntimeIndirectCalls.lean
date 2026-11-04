@@ -7,7 +7,7 @@ import Solcore.Frontend.SourceCoreCallableContracts
 import Solcore.SourceSemantics.CoreLowering.CallStageBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.Frontend.SourceCoreCallableFaultSites
-import Solcore.SourceSemantics.CoreLowering.CompatibleMemberCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.Graph
 import Solcore.Frontend.SourceInference.TypedIRProperties

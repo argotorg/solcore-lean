@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhil
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments
 

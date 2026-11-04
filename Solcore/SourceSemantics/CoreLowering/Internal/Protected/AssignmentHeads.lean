@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-!

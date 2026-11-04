@@ -1,12 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ForFinite
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-!

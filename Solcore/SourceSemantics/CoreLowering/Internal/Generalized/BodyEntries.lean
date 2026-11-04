@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgume
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinarySequenceCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.Frontend.SourceCoreFailurePreservationReceipts

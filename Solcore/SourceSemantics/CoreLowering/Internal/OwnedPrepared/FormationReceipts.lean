@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysica
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 
 /-!
 # Prepared callables: formation receipts

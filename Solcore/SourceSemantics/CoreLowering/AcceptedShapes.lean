@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 
 /-!

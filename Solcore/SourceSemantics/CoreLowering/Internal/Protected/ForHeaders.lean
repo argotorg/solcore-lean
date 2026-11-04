@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LoopStatements
-import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations

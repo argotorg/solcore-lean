@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSp
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ExpressionHeads
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCertificateNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.NativeExpressionContextSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
@@ -10,13 +10,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhil
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
-import Solcore.SourceSemantics.CoreLowering.BuiltinCallProtocol
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCallExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.Staging.RecursiveTrace

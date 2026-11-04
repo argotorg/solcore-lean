@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 
 /-!

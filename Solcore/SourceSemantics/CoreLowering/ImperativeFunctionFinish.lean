@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 
 /-! The actual function finish helper preserves returned values, Unit

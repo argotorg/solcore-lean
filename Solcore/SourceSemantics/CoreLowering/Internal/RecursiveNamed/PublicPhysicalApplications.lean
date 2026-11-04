@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectApplications
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls

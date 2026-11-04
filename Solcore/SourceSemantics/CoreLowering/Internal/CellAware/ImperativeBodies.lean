@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.PublicSupport

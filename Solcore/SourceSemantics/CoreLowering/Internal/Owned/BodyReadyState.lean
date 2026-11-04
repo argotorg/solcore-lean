@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.Frontend.SourceCoreUnifiedCompilation
-import Solcore.SourceSemantics.CoreLowering.CompatibleCatalogClosedSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries

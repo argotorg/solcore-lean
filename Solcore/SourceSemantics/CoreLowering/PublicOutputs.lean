@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.PublicSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicSessionSteps
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.PublicSessionOutcomes
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry

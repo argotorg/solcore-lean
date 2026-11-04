@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativ
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 

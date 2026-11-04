@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjected
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellBareAssignmentCommit
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareWordModifier
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 
 /-! A bare assignment runs its RHS through the same staged relation.

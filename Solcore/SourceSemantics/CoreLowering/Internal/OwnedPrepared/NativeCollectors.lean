@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambd
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads

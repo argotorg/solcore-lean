@@ -1,6 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates

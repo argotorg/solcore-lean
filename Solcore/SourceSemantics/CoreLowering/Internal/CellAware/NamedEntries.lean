@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.CellAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission

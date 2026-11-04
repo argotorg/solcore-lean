@@ -15,7 +15,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellIndexTerminal
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageMeaning
 
 /-!

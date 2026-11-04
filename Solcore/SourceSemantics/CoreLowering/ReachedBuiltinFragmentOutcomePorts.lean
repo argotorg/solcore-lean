@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
 import Solcore.SourceSemantics.CoreLowering.ReachedGeneralFragmentOutcomePorts
 

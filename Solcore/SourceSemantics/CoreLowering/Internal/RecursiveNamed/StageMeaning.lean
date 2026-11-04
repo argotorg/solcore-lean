@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.Staging.RecursiveErasure
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCompletion
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 
 /-!
 # The recursive staged profile: primitives, tuples and mappings

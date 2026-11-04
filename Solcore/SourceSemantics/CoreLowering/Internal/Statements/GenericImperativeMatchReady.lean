@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchContextFactory
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaderTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts

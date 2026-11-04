@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualConditionals
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-!
 # Coercions: raw named calls

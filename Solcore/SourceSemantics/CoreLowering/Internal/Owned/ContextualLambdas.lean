@@ -2,8 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTypin
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingTerminalDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticCoverage
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTypingOrigins

@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForMeaning
-import Solcore.SourceSemantics.CoreLowering.NativeExpressionRenamingSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 
 /-!

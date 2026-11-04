@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTermin
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 
 /-!

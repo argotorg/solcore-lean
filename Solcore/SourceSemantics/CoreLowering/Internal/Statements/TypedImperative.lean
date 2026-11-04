@@ -1,8 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementHeadMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
-import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementTree
 
 /-!
 # Typed imperative statements

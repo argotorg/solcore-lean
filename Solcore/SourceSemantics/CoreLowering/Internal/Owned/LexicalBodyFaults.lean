@@ -1,12 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedLexicalBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions

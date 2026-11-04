@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.AcceptedPackets

@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMemberMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.ReachedScalarExpressionFaultPaths
 import Solcore.SourceSemantics.CoreLowering.ReachedLiteralOutcomePorts
 

@@ -23,7 +23,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.LambdaBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors

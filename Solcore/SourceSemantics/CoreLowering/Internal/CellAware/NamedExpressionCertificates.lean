@@ -5,10 +5,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.DiagnosticOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.DecodedCallFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission

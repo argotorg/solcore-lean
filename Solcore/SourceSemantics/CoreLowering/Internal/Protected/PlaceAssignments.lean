@@ -2,15 +2,13 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignm
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceResolution
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceLayout
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceRhs
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceResolution
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceWriteback
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceFaults
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 
 /-!
 # Protected contracts: place assignments

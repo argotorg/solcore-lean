@@ -1,11 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StatePlaceAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
 
 /-!
 # Recursive named rows: expression heads

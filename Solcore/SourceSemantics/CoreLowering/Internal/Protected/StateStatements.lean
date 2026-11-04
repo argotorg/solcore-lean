@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 
 /-!

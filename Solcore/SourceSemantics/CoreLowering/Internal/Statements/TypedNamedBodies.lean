@@ -1,8 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyCompilation
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedStatements
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
-import Solcore.SourceSemantics.CoreLowering.CompatibleNamedBodyIndexed
 
 /-!
 # Typed named bodies

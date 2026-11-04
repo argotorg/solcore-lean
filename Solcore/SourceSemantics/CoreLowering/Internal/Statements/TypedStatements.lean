@@ -1,9 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualTyped
-import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.ScalarStatementViews
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleStatementMixedMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts
 
 /-!

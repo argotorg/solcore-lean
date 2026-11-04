@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSp
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.LambdaSourceAlignment
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries

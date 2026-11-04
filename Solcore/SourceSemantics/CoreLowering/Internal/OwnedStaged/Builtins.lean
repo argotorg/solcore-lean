@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.WellFormed
@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 
 /-!
 # Staged bounds: builtin calls

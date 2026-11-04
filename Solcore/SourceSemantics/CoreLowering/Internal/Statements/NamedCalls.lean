@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalCont
 import Solcore.Frontend.SourceCoreCallableIndexedPrograms
 import Solcore.Frontend.SourceCoreCompatibleOutputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
 
 /-!
 # Named calls

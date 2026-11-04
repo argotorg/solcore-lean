@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementCertificates
 
 /-!
 # Typed for headers

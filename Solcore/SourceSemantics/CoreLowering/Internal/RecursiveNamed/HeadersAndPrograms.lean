@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeCo
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.Core.Correspondence

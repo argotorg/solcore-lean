@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedLiteralSites
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchReady
 
 /-!

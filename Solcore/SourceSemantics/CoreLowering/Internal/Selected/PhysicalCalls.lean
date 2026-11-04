@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission

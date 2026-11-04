@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 
 /-! A singleton function body adds one genuine Source edge to the actual
 builtin expression path. Its native child and body completions keep the same

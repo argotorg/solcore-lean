@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjected

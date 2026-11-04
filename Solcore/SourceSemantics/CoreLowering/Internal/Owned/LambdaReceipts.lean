@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.DecodedCallFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins

@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualDiagnosticObservations
 
 /-! A reached local read retains its literal binder and Source occurrence.
 Actual issuer selection and table rebuilding supply the same diagnostic token.

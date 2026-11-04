@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellBitNotStatementMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
@@ -7,18 +7,14 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductSource
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellReadCompletion
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellReadMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadSource
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedLiteralEvidence
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedExpressions
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
@@ -29,7 +25,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 
 /-!

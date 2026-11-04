@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionRecursiveMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.ReachedScalarFragmentOutcomePorts
 
 /-! Recursive support derives its literal, read and Members providers internally.

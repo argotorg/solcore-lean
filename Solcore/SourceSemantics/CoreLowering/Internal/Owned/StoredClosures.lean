@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorNativeTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies

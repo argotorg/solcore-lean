@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotTail
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceLayout
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceBitNot
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.CoreContinuationAgreement
 import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize

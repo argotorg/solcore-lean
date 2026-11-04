@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardTerminals
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedBodyCompiler
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues

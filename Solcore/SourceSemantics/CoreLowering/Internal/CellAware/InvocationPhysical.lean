@@ -3,10 +3,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedPrefixe
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects

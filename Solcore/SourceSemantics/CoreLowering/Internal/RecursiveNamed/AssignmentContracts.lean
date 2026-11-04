@@ -1,11 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTailReflection
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceSuccess
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNotNative
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 
 /-!

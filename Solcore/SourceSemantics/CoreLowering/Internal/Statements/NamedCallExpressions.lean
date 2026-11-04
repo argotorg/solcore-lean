@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 
 /-!

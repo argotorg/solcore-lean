@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticOrigins
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
 
 /-! Diagnostic plans retain the genuine local heads and scoped child indices

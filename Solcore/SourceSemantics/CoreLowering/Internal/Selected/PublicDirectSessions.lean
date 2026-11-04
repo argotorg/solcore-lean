@@ -7,12 +7,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActual
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.Staging.SelectedRecursivePreservation
 import Solcore.Frontend.SourceCoreFailurePreservationReceipts
 

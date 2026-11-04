@@ -1,16 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignments
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchSelectionPrefix
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeForTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchPreservation
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchContextFactory
 
 /-!
 # Generic imperative matches: meaning

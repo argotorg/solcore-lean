@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleGeneralIndexMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.DiagnosticOrigins
 
 /-! Concrete finite terminal and Source joins are derived internally. The
 fragment retains its genuine independent meaning until its original fold is

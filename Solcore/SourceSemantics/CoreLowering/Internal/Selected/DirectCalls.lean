@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndexBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls

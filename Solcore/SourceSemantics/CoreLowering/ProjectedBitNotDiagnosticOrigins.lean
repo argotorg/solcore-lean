@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeFor
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationCoverage
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 
 /-! Projected unary sites reuse the actual unary occurrence grammar. Their
 owning statement supplies the same place diagnostic inventory as compilation. -/

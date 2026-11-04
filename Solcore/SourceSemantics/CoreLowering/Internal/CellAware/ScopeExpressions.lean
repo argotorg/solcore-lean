@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpress
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
-import Solcore.SourceSemantics.CoreLowering.CompatibleCellIndexTerminal
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts

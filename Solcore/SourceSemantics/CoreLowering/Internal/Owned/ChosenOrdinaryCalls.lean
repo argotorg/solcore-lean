@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.PublicExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads

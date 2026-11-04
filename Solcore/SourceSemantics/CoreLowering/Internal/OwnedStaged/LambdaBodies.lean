@@ -4,8 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedBodyCompiler
-import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchAmbientLowering
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState

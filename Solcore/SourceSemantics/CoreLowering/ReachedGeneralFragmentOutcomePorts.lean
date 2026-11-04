@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped
 import Solcore.SourceSemantics.CoreLowering.ReachedRecursiveFragmentOutcomePorts
 
 /-! The General fragment obtains every primitive provider from the actual

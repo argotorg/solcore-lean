@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductSource
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 
 /-! Finite post transport uses the actual scalar Source form and layout.
 It keeps the same token and final tuple and evaluates no expression. -/

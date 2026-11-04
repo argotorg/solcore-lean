@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedForHeaders
-import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative

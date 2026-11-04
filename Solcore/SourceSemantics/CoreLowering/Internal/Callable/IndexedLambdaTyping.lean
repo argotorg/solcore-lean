@@ -6,7 +6,7 @@ import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.SourceSemantics.CoreLowering.CaptureCopiesMarked
 import Solcore.SourceSemantics.CoreLowering.FunctionCallBody
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews

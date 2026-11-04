@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.MaterializedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions

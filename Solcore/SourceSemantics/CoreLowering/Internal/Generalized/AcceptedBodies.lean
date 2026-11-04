@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilati
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.EmptySourceSubstitution
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState

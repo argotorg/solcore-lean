@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
 
 /-!
 # Protected contracts: state and allocation

@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRecursive
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenOrdinaryCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds

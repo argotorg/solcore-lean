@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
-import Solcore.SourceSemantics.CoreLowering.CompatibleStatementBindingCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
-import Solcore.SourceSemantics.CoreLowering.CompatibleStatementInitializedTree
 import Solcore.SourceSemantics.CoreLowering.PreparedAssignmentReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
@@ -16,10 +15,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationMatches
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeChildrenExtension
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationLoops
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationAssignments
 

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.FunctionCallBody
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreLambdaTemplates

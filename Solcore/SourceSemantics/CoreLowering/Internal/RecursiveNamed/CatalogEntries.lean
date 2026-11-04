@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.NamedCallExpressions
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeForTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
@@ -8,7 +8,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.LexicalStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning

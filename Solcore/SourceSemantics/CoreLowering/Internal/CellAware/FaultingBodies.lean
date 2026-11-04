@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees

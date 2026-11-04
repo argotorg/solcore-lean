@@ -8,16 +8,16 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputR
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.GeneralHeapFrame
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
-import Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
-import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 
 /-!
 # Cell-aware public histories

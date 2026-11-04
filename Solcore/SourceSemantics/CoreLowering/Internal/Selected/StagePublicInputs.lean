@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicSessionSteps
 import Solcore.SourceSemantics.CoreLowering.PublicSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageCalls

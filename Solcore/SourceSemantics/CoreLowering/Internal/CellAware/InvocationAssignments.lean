@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.PreparedProjectedDiagnosticFields
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReceiptOperations
-import Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatementHead
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.BitNotStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost

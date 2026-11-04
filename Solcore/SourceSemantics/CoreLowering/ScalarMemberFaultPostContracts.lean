@@ -1,5 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ScalarConstructorFaultPostContracts
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMemberTree
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 
 /-! Member fault transport retains the selected parent, child and layout. -/
 set_option autoImplicit false
