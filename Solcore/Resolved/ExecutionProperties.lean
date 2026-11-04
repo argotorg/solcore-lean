@@ -2,6 +2,14 @@ import Solcore.Resolved.Typing
 import Solcore.Resolved.Eval
 import Solcore.Core.Safety
 
+/-!
+# Execution of resolved expressions
+
+Main theorems: `Resolved.Lowers.evaluates_iff_run_done` connects evaluation to a Core machine run,
+`Resolved.Lowers.closed_run_never_faults` excludes machine faults, and
+`Resolved.HasType.closed_run_has_sufficient_fuel` gives a typed closed expression enough fuel.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Resolved

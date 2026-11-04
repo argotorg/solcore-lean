@@ -1,58 +1,54 @@
+import Solcore.Core.Syntax
 import Solcore.Core.Data
-import Solcore.Core.Safety
-import Solcore.Core.DefinitionExtension
-import Solcore.Core.RuntimeStoreSafety
-import Solcore.Core.BoundedSafety
-import Solcore.Core.LanguageResult
-import Solcore.Core.OptionalCell
-import Solcore.Core.LocalSequence
-import Solcore.Core.LocalControl
-import Solcore.Core.LocalPrimitiveResults
-import Solcore.Core.LocalLoop
-import Solcore.Core.TaggedFunction
-import Solcore.Core.CallableContract
-import Solcore.Core.FirstOrderWeakening
-import Solcore.Core.Check
-import Solcore.Core.ExactFuelProperties
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Core.LocalFragment
-import Solcore.Core.Host
-import Solcore.Core.HostSafety
-import Solcore.Core.HostMachine
-import Solcore.Core.ContractCallWordResultProperties
-import Solcore.Core.HostStateSafety
-import Solcore.Core.HostCoreTransitionSafety
-import Solcore.Core.HostTransitionSafety
-import Solcore.Core.HostProgress
-import Solcore.Core.HostRunner
 import Solcore.Core.Primitive
-import Solcore.Core.Renaming
-import Solcore.Core.Derived
-import Solcore.Core.Conversions
-import Solcore.Core.UnaryPrimitives
-import Solcore.Core.CountLeadingZeros
-import Solcore.Core.ByteSelection
-import Solcore.Core.ArithmeticShift
-import Solcore.Core.SignExtension
-import Solcore.Core.ModularExponentiation
-import Solcore.Core.UnsignedDivision
-import Solcore.Core.SignedDivision
-import Solcore.Core.LogicalShifts
-import Solcore.Core.ModularArithmetic
-import Solcore.Core.TernaryModularArithmetic
-import Solcore.Core.BitwiseLogic
-import Solcore.Core.DirectWordComparisons
-import Solcore.Core.SignedComparison
-import Solcore.Core.ShortCircuit
-
-import Solcore.Core.LocalAssignment
-import Solcore.Core.IntegerAssignment
-import Solcore.Core.WordMapping
-
-import Solcore.Core.OrderedMapping
+import Solcore.Core.Typing
+import Solcore.Core.Check
+import Solcore.Core.Eval
+import Solcore.Core.Machine
+import Solcore.Core.Host
+import Solcore.Core.HostMachine
+import Solcore.Core.RuntimeTyping
+import Solcore.Core.HostTyping
+import Solcore.Core.Correspondence
+import Solcore.Core.Fuel
+import Solcore.Core.Safety
+import Solcore.Core.HostRunner
+import Solcore.Core.LanguageResult
+import Solcore.Core.Conventions
+import Solcore.Core.Mappings
+import Solcore.Core.Internal.EvaluationLaws
+import Solcore.Core.Internal.MachineLaws
+import Solcore.Core.Internal.Simulation
+import Solcore.Core.Internal.Preservation
+import Solcore.Core.Internal.Renaming
+import Solcore.Core.Internal.ByteSelection
+import Solcore.Core.Internal.WordComparisons
+import Solcore.Core.Internal.PrimitiveLaws
+import Solcore.Core.Internal.DerivedForms
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Core.Internal.HostLaws
+import Solcore.Core.Internal.HostPreservation
+import Solcore.Core.Internal.ConventionLaws
+import Solcore.Core.Internal.MappingLaws
 
 /-!
-Umbrella module for the Semantic Core syntax, declarative judgments, explicit
-local-store semantics, primitive algebra, CEK machine, executable runners,
-detailed checker, and correspondence/safety theorems.
+# Core
+
+The typed language every program compiles to, its semantics, and its safety proofs. Read in this
+order. `docs/review/core.md` lists every file.
+
+1. **Language.** `Syntax`, `Data` and `Primitive`, then `Typing`. `Check` is the same check with
+   diagnostics.
+2. **Semantics.** `Eval` is the big-step relation and `Machine` the CEK machine. `Host` and
+   `HostMachine` add host requests.
+3. **Typing of states.** `RuntimeTyping` and `HostTyping` hold the relations the theorems are stated
+   over.
+4. **Main theorems.** `Safety`: type preservation and finite execution safety. `Correspondence`: the
+   evaluator and the machine agree. `Fuel`: exact fuel accounting. `HostRunner`: the same results
+   with host requests. `LanguageResult`: checked programs cannot produce a malformed result.
+5. **Conventions of compiled code.** `LanguageResult`, `Conventions` and `Mappings`: how the compiler
+   encodes source constructs, with no change to the language.
+6. **Wire.** `Wire` is the canonical JSON boundary.
+
+Everything else is in `Internal/`, by topic.
 -/

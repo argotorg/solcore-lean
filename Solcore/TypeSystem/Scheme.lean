@@ -1,4 +1,13 @@
-import Solcore.TypeSystem.SubstitutionProperties
+import Solcore.TypeSystem.Internal.SubstitutionLaws
+
+/-!
+# Type schemes
+
+`TypeSystem.Scheme` is a rank-1 scheme and `TypeSystem.Environment` a table of them.
+`TypeSystem.Scheme.instantiateWithSubstitution` instantiates one, and
+`TypeSystem.Scheme.matchInstance?` matches an instance, with
+`TypeSystem.Scheme.matchInstance?_sound`.
+-/
 
 set_option autoImplicit false
 

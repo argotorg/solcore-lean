@@ -1,5 +1,12 @@
 import Std
 
+/-!
+# Fixed-width radix digits
+
+`Util.FixedRadix.encodeNat` and `Util.FixedRadix.decodeNat`, with
+`Util.FixedRadix.decodeNat_encodeNat_of_lt`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Util.FixedRadix

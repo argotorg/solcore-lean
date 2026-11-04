@@ -1,4 +1,12 @@
-import Solcore.TypeSystem.SubstitutionProperties
+import Solcore.TypeSystem.Internal.SubstitutionLaws
+
+/-!
+# Unification
+
+`TypeSystem.Unification.unify` solves a list of `TypeSystem.Constraint`s. Main theorems:
+`TypeSystem.Unification.unify_sound_of_below` and `TypeSystem.Unification.unify_domain_origin`. The
+proofs stay here, because they unfold its private helpers.
+-/
 
 set_option autoImplicit false
 

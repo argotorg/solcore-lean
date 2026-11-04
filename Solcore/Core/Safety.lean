@@ -1,860 +1,30 @@
+import Solcore.Core.Internal.Preservation
+import Solcore.Core.RuntimeTyping
 import Solcore.Core.Correspondence
+import Solcore.Core.Fuel
+
+/-!
+# Type preservation and finite execution safety
+
+Main theorems. `evaluation_preserves_type` is preservation for `Evaluates`. `transition_preserves_state_type`
+and `state_progress` are preservation and progress for the machine, and `Steps.preserve_state_type`
+and `well_typed_state_never_faults` follow.
+
+For a program that passes `Program.check`, with any fuel: `Program.checked_run_never_faults` and
+`Program.checked_runStateful_never_faults` exclude `MachineFault`,
+`Program.checked_run_preserves_result_type` gives the value its type,
+`Program.checked_runStateful_has_type` covers every result, including fuel checkpoints, and
+`well_typed_runStateful_resume_has_type` covers resuming one. `Program.checked_run_completes` and
+`Program.checked_run_has_sufficient_fuel` turn an evaluation into a completed run.
+-/
+
+section
+-- leanmerge: from Solcore.Core.Safety
+/-! ## Preservation for the state-threaded evaluator -/
 
 set_option autoImplicit false
 
 namespace Solcore.Core
-
-/-! ## Structural value typing -/
-
-mutual
-
-  inductive ValueHasType :
-      Value → Ty → (definitions : DataEnvironment := []) → Prop where
-    | unit {definitions : DataEnvironment} : ValueHasType .unit .unit definitions
-    | bool {definitions : DataEnvironment} {value : Bool} :
-        ValueHasType (.bool value) .bool definitions
-    | word {definitions : DataEnvironment} {value : Word} :
-        ValueHasType (.word value) .word definitions
-    | integer {definitions : DataEnvironment} {value : Int} :
-        ValueHasType (.integer value) .integer definitions
-    | pair
-        {definitions : DataEnvironment}
-        {left right : Value} {leftType rightType : Ty} :
-        ValueHasType left leftType definitions →
-        ValueHasType right rightType definitions →
-        ValueHasType (.pair left right) (.product leftType rightType) definitions
-    | inLeft
-        {definitions : DataEnvironment}
-        {payload : Value} {leftType rightType : Ty} :
-        ValueHasType payload leftType definitions →
-        ValueHasType (.inLeft rightType payload) (.sum leftType rightType)
-          definitions
-    | inRight
-        {definitions : DataEnvironment}
-        {payload : Value} {leftType rightType : Ty} :
-        ValueHasType payload rightType definitions →
-        ValueHasType (.inRight leftType payload) (.sum leftType rightType)
-          definitions
-    | closure
-        {definitions : DataEnvironment}
-        {parameterType resultType : Ty} {body : Expr}
-        {environment : Environment} {context : Context} :
-        EnvironmentHasTypes environment context definitions →
-        HasType (parameterType :: context) body resultType definitions →
-        ValueHasType
-          (.closure parameterType resultType body environment)
-          (.function parameterType resultType)
-          definitions
-    | cellRef
-        {definitions : DataEnvironment} {elementType : Ty} {location : Location} :
-        ValueHasType (.cellRef elementType location) (.cell elementType) definitions
-    | constructed
-        {definitions : DataEnvironment}
-        {constructor : ConstructorId} {payload : Value} {payloadType : Ty} :
-        definitions.lookupConstructorPayloadType? constructor = some payloadType →
-        ValueHasType payload payloadType definitions →
-        ValueHasType (.constructed constructor payload)
-          (.namedData constructor.owner) definitions
-
-  inductive EnvironmentHasTypes :
-      Environment → Context → (definitions : DataEnvironment := []) → Prop where
-    | nil {definitions : DataEnvironment} : EnvironmentHasTypes [] [] definitions
-    | cons
-        {definitions : DataEnvironment}
-        {value : Value} {type : Ty}
-        {environment : Environment} {context : Context} :
-        ValueHasType value type definitions →
-        EnvironmentHasTypes environment context definitions →
-        EnvironmentHasTypes (value :: environment) (type :: context) definitions
-
-end
-
-theorem EnvironmentHasTypes.lookup
-    {definitions : DataEnvironment}
-    {environment : Environment} {context : Context}
-    (hasTypes : EnvironmentHasTypes environment context definitions)
-    {index : Nat} {type : Ty}
-    (typeLookup : context[index]? = some type) :
-    ∃ value,
-      environment[index]? = some value ∧ ValueHasType value type definitions := by
-  induction hasTypes using EnvironmentHasTypes.rec
-      (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
-  | constructed =>
-      exact True.intro
-  | nil => simp at typeLookup
-  | cons valueTyping _ _ tailIH =>
-      cases index with
-      | zero =>
-          simp at typeLookup
-          cases typeLookup
-          exact ⟨_, rfl, valueTyping⟩
-      | succ index =>
-          simp at typeLookup
-          obtain ⟨value, valueLookup, valueTyping⟩ := tailIH typeLookup
-          exact ⟨value, by simpa using valueLookup, valueTyping⟩
-
-theorem ValueHasType.bool_shape
-    {definitions : DataEnvironment}
-    {value : Value}
-    (typing : ValueHasType value .bool definitions) :
-    ∃ decision, value = .bool decision := by
-  cases typing with
-  | bool => exact ⟨_, rfl⟩
-
-theorem ValueHasType.type_eq
-    {definitions : DataEnvironment}
-    {value : Value} {type : Ty}
-    (typing : ValueHasType value type definitions) :
-    value.type = type := by
-  induction typing using ValueHasType.rec
-      (motive_2 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | closure | cellRef | constructed => rfl
-  | pair _ _ leftIH rightIH => simp [Value.type, leftIH, rightIH]
-  | inLeft _ payloadIH => simp [Value.type, payloadIH]
-  | inRight _ payloadIH => simp [Value.type, payloadIH]
-  | nil | cons => exact True.intro
-
-theorem unary_apply_result_has_type
-    {op : UnaryOp} {operand result : Value}
-    (applied : op.apply operand = some result)
-    (definitions : DataEnvironment := []) :
-    ValueHasType result op.resultType definitions := by
-  have resultType := UnaryOp.apply_result_type applied
-  clear applied operand
-  cases op <;> cases result <;>
-    simp [Value.type, UnaryOp.resultType] at resultType
-  all_goals constructor
-
-theorem binary_apply_result_has_type
-    {op : BinaryOp} {left right result : Value}
-    (applied : op.apply left right = some result)
-    (definitions : DataEnvironment := []) :
-    ValueHasType result op.resultType definitions := by
-  have resultType := BinaryOp.apply_result_type applied
-  clear applied left right
-  cases op <;> cases result <;>
-    simp [Value.type, BinaryOp.resultType] at resultType
-  all_goals constructor
-
-theorem ternary_apply_result_has_type
-    {op : TernaryOp} {first second third result : Value}
-    (applied : op.apply first second third = some result)
-    (definitions : DataEnvironment := []) :
-    ValueHasType result op.resultType definitions := by
-  have resultType := TernaryOp.apply_result_type applied
-  clear applied first second third
-  cases op <;> cases result <;>
-    simp [Value.type, TernaryOp.resultType] at resultType
-  all_goals constructor
-
-/-! ## Worlds, runtime typing, and typed stores -/
-
-def WorldExtends (initial future : StoreTyping) : Prop :=
-  ∃ suffix, future = initial ++ suffix
-
-namespace WorldExtends
-
-theorem refl (world : StoreTyping) : WorldExtends world world :=
-  ⟨[], by simp⟩
-
-theorem trans
-    {first second third : StoreTyping}
-    (firstSecond : WorldExtends first second)
-    (secondThird : WorldExtends second third) :
-    WorldExtends first third := by
-  obtain ⟨middleSuffix, rfl⟩ := firstSecond
-  obtain ⟨finalSuffix, rfl⟩ := secondThird
-  exact ⟨middleSuffix ++ finalSuffix, by simp [List.append_assoc]⟩
-
-theorem lookup
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future)
-    {location : Location} {type : Ty}
-    (found : initial[location]? = some type) :
-    future[location]? = some type := by
-  obtain ⟨suffix, rfl⟩ := extension
-  have inBounds : location < initial.length :=
-    (List.getElem?_eq_some_iff.mp found).1
-  rw [List.getElem?_append_left (l₂ := suffix) inBounds]
-  exact found
-
-theorem length_le
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future) :
-    initial.length ≤ future.length := by
-  obtain ⟨suffix, rfl⟩ := extension
-  simp
-
-end WorldExtends
-
-mutual
-
-  inductive RuntimeValueHasType
-      (world : StoreTyping) :
-      Value → Ty → (definitions : DataEnvironment := []) → Prop where
-    | unit {definitions : DataEnvironment} :
-        RuntimeValueHasType world .unit .unit definitions
-    | bool {definitions : DataEnvironment} {value : Bool} :
-        RuntimeValueHasType world (.bool value) .bool definitions
-    | word {definitions : DataEnvironment} {value : Word} :
-        RuntimeValueHasType world (.word value) .word definitions
-    | integer {definitions : DataEnvironment} {value : Int} :
-        RuntimeValueHasType world (.integer value) .integer definitions
-    | pair
-        {definitions : DataEnvironment}
-        {left right : Value} {leftType rightType : Ty} :
-        RuntimeValueHasType world left leftType definitions →
-        RuntimeValueHasType world right rightType definitions →
-        RuntimeValueHasType world (.pair left right) (.product leftType rightType)
-          definitions
-    | inLeft
-        {definitions : DataEnvironment}
-        {payload : Value} {leftType rightType : Ty} :
-        RuntimeValueHasType world payload leftType definitions →
-        RuntimeValueHasType world
-          (.inLeft rightType payload) (.sum leftType rightType) definitions
-    | inRight
-        {definitions : DataEnvironment}
-        {payload : Value} {leftType rightType : Ty} :
-        RuntimeValueHasType world payload rightType definitions →
-        RuntimeValueHasType world
-          (.inRight leftType payload) (.sum leftType rightType) definitions
-    | closure
-        {definitions : DataEnvironment}
-        {parameterType resultType : Ty} {body : Expr}
-        {environment : Environment} {context : Context} :
-        RuntimeEnvironmentHasTypes world environment context definitions →
-        HasType (parameterType :: context) body resultType definitions →
-        RuntimeValueHasType world
-          (.closure parameterType resultType body environment)
-          (.function parameterType resultType)
-          definitions
-    | cellRef
-        {definitions : DataEnvironment}
-        {elementType : Ty} {location : Location} :
-        world[location]? = some elementType →
-        RuntimeValueHasType world
-          (.cellRef elementType location) (.cell elementType) definitions
-    | constructed
-        {definitions : DataEnvironment}
-        {constructor : ConstructorId} {payload : Value} {payloadType : Ty} :
-        definitions.lookupConstructorPayloadType? constructor = some payloadType →
-        RuntimeValueHasType world payload payloadType definitions →
-        RuntimeValueHasType world (.constructed constructor payload)
-          (.namedData constructor.owner) definitions
-
-  inductive RuntimeEnvironmentHasTypes
-      (world : StoreTyping) :
-      Environment → Context → (definitions : DataEnvironment := []) → Prop where
-    | nil {definitions : DataEnvironment} :
-        RuntimeEnvironmentHasTypes world [] [] definitions
-    | cons
-        {definitions : DataEnvironment}
-        {value : Value} {type : Ty}
-        {environment : Environment} {context : Context} :
-        RuntimeValueHasType world value type definitions →
-        RuntimeEnvironmentHasTypes world environment context definitions →
-        RuntimeEnvironmentHasTypes world
-          (value :: environment) (type :: context) definitions
-
-end
-
-theorem RuntimeEnvironmentHasTypes.lookup
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {environment : Environment} {context : Context}
-    (hasTypes : RuntimeEnvironmentHasTypes world environment context definitions)
-    {index : Nat} {type : Ty}
-    (typeLookup : context[index]? = some type) :
-    ∃ value,
-      environment[index]? = some value ∧
-        RuntimeValueHasType world value type definitions := by
-  induction hasTypes using RuntimeEnvironmentHasTypes.rec
-      (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
-  | constructed =>
-      exact True.intro
-  | nil => simp at typeLookup
-  | cons valueTyping _ _ tailIH =>
-      cases index with
-      | zero =>
-          simp at typeLookup
-          cases typeLookup
-          exact ⟨_, rfl, valueTyping⟩
-      | succ index =>
-          simp at typeLookup
-          obtain ⟨value, valueLookup, valueTyping⟩ := tailIH typeLookup
-          exact ⟨value, by simpa using valueLookup, valueTyping⟩
-
-theorem RuntimeValueHasType.erase
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {value : Value} {type : Ty}
-    (typing : RuntimeValueHasType world value type definitions) :
-    ValueHasType value type definitions := by
-  apply RuntimeValueHasType.rec
-      (world := world)
-      (motive_1 := fun value type relationDefinitions _ =>
-        ValueHasType value type relationDefinitions)
-      (motive_2 := fun environment context relationDefinitions _ =>
-        EnvironmentHasTypes environment context relationDefinitions)
-      (t := typing)
-  case unit => intros; exact .unit
-  case bool => intros; exact .bool
-  case word => intros; exact .word
-  case integer => intros; exact .integer
-  case pair =>
-    intro _ _ _ _ _ _ _ leftIH rightIH
-    exact .pair leftIH rightIH
-  case inLeft =>
-    intro _ _ _ _ _ payloadIH
-    exact .inLeft payloadIH
-  case inRight =>
-    intro _ _ _ _ _ payloadIH
-    exact .inRight payloadIH
-  case closure =>
-    intro _ _ _ _ _ _ _ bodyTyping environmentIH
-    exact .closure environmentIH bodyTyping
-  case cellRef => intros; exact .cellRef
-  case constructed =>
-    intro _ _ _ _ lookup _ payloadIH
-    exact .constructed lookup payloadIH
-  case nil => intros; exact .nil
-  case cons =>
-    intro _ _ _ _ _ _ _ valueIH environmentIH
-    exact .cons valueIH environmentIH
-
-theorem RuntimeEnvironmentHasTypes.erase
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {environment : Environment} {context : Context}
-    (typing : RuntimeEnvironmentHasTypes world environment context definitions) :
-    EnvironmentHasTypes environment context definitions := by
-  apply RuntimeEnvironmentHasTypes.rec
-      (world := world)
-      (motive_1 := fun value type relationDefinitions _ =>
-        ValueHasType value type relationDefinitions)
-      (motive_2 := fun environment context relationDefinitions _ =>
-        EnvironmentHasTypes environment context relationDefinitions)
-      (t := typing)
-  case unit => intros; exact .unit
-  case bool => intros; exact .bool
-  case word => intros; exact .word
-  case integer => intros; exact .integer
-  case pair =>
-    intro _ _ _ _ _ _ _ leftIH rightIH
-    exact .pair leftIH rightIH
-  case inLeft =>
-    intro _ _ _ _ _ payloadIH
-    exact .inLeft payloadIH
-  case inRight =>
-    intro _ _ _ _ _ payloadIH
-    exact .inRight payloadIH
-  case closure =>
-    intro _ _ _ _ _ _ _ bodyTyping environmentIH
-    exact .closure environmentIH bodyTyping
-  case cellRef => intros; exact .cellRef
-  case constructed =>
-    intro _ _ _ _ lookup _ payloadIH
-    exact .constructed lookup payloadIH
-  case nil => intros; exact .nil
-  case cons =>
-    intro _ _ _ _ _ _ _ valueIH environmentIH
-    exact .cons valueIH environmentIH
-
-theorem RuntimeValueHasType.type_eq
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {value : Value} {type : Ty}
-    (typing : RuntimeValueHasType world value type definitions) :
-    value.type = type :=
-  typing.erase.type_eq
-
-/-- Deep runtime-environment typing determines the same shallow type tags used
-by executable entry guards. -/
-theorem RuntimeEnvironmentHasTypes.type_tags
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {environment : Environment} {context : Context}
-    (typing : RuntimeEnvironmentHasTypes world environment context definitions) :
-    environment.map Value.type = context := by
-  induction typing using RuntimeEnvironmentHasTypes.rec
-      (motive_1 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
-  | constructed =>
-      trivial
-  | nil => rfl
-  | cons head _ _ tailIH =>
-      simp only [List.map_cons, head.type_eq, tailIH]
-
-theorem RuntimeValueHasType.bool_shape
-    {definitions : DataEnvironment}
-    {world : StoreTyping} {value : Value}
-    (typing : RuntimeValueHasType world value .bool definitions) :
-    ∃ decision, value = .bool decision := by
-  cases typing with
-  | bool => exact ⟨_, rfl⟩
-
-theorem RuntimeValueHasType.weaken
-    {definitions : DataEnvironment}
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future)
-    {value : Value} {type : Ty}
-    (typing : RuntimeValueHasType initial value type definitions) :
-    RuntimeValueHasType future value type definitions := by
-  apply RuntimeValueHasType.rec
-      (world := initial)
-      (motive_1 := fun value type relationDefinitions _ =>
-        RuntimeValueHasType future value type relationDefinitions)
-      (motive_2 := fun environment context relationDefinitions _ =>
-        RuntimeEnvironmentHasTypes future environment context relationDefinitions)
-      (t := typing)
-  case unit => intros; exact .unit
-  case bool => intros; exact .bool
-  case word => intros; exact .word
-  case integer => intros; exact .integer
-  case pair =>
-    intro _ _ _ _ _ _ _ leftIH rightIH
-    exact .pair leftIH rightIH
-  case inLeft =>
-    intro _ _ _ _ _ payloadIH
-    exact .inLeft payloadIH
-  case inRight =>
-    intro _ _ _ _ _ payloadIH
-    exact .inRight payloadIH
-  case closure =>
-    intro _ _ _ _ _ _ _ bodyTyping environmentIH
-    exact .closure environmentIH bodyTyping
-  case cellRef =>
-    intro _ _ _ found
-    exact .cellRef (extension.lookup found)
-  case constructed =>
-    intro _ _ _ _ lookup _ payloadIH
-    exact .constructed lookup payloadIH
-  case nil => intros; exact .nil
-  case cons =>
-    intro _ _ _ _ _ _ _ valueIH environmentIH
-    exact .cons valueIH environmentIH
-
-theorem RuntimeEnvironmentHasTypes.weaken
-    {definitions : DataEnvironment}
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future)
-    {environment : Environment} {context : Context}
-    (typing : RuntimeEnvironmentHasTypes initial environment context definitions) :
-    RuntimeEnvironmentHasTypes future environment context definitions := by
-  apply RuntimeEnvironmentHasTypes.rec
-      (world := initial)
-      (motive_1 := fun value type relationDefinitions _ =>
-        RuntimeValueHasType future value type relationDefinitions)
-      (motive_2 := fun environment context relationDefinitions _ =>
-        RuntimeEnvironmentHasTypes future environment context relationDefinitions)
-      (t := typing)
-  case unit => intros; exact .unit
-  case bool => intros; exact .bool
-  case word => intros; exact .word
-  case integer => intros; exact .integer
-  case pair =>
-    intro _ _ _ _ _ _ _ leftIH rightIH
-    exact .pair leftIH rightIH
-  case inLeft =>
-    intro _ _ _ _ _ payloadIH
-    exact .inLeft payloadIH
-  case inRight =>
-    intro _ _ _ _ _ payloadIH
-    exact .inRight payloadIH
-  case closure =>
-    intro _ _ _ _ _ _ _ bodyTyping environmentIH
-    exact .closure environmentIH bodyTyping
-  case cellRef =>
-    intro _ _ _ found
-    exact .cellRef (extension.lookup found)
-  case constructed =>
-    intro _ _ _ _ lookup _ payloadIH
-    exact .constructed lookup payloadIH
-  case nil => intros; exact .nil
-  case cons =>
-    intro _ _ _ _ _ _ _ valueIH environmentIH
-    exact .cons valueIH environmentIH
-
-
-/-- Every location is typed against the same world. References are checked by
-world lookup rather than by recursively following the store. -/
-structure RuntimeStoreHasTypes
-    (world : StoreTyping) (store : Store)
-    (definitions : DataEnvironment := []) : Prop where
-  length_eq : world.length = store.length
-  lookup :
-    ∀ {location : Location} {elementType : Ty},
-      world[location]? = some elementType →
-      ∃ value,
-        store.read? location = some value ∧
-        RuntimeValueHasType world value elementType definitions
-
-namespace RuntimeStoreHasTypes
-
-theorem nil (definitions : DataEnvironment := []) :
-    RuntimeStoreHasTypes [] [] definitions where
-  length_eq := rfl
-  lookup := by simp
-
-theorem read
-    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
-    (typing : RuntimeStoreHasTypes world store definitions)
-    {location : Location} {elementType : Ty}
-    (found : world[location]? = some elementType) :
-    ∃ value,
-      store.read? location = some value ∧
-      RuntimeValueHasType world value elementType definitions :=
-  typing.lookup found
-
-theorem location_lt
-    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
-    (typing : RuntimeStoreHasTypes world store definitions)
-    {location : Location} {elementType : Ty}
-    (found : world[location]? = some elementType) :
-    location < store.length := by
-  have bound := (List.getElem?_eq_some_iff.mp found).1
-  simpa [← typing.length_eq] using bound
-
-/-- A fixed store determines its world without traversing referenced cells. -/
-theorem world_eq
-    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
-    (typing : RuntimeStoreHasTypes world store definitions) :
-    world = store.map Value.type := by
-  apply List.ext_getElem (by simpa using typing.length_eq)
-  intro index worldBound storeBound
-  obtain ⟨value, found, valueTyped⟩ := typing.lookup
-    (List.getElem?_eq_getElem worldBound)
-  have read : store[index]? = some value := found
-  have inBounds : index < store.length := by simpa using storeBound
-  have valueEq : store[index] = value :=
-    Option.some.inj ((List.getElem?_eq_getElem inBounds).symm.trans read)
-  simpa [valueEq] using valueTyped.type_eq.symm
-
-theorem allocate
-    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
-    (typing : RuntimeStoreHasTypes world store definitions)
-    {elementType : Ty} {value : Value}
-    (valueTyping : RuntimeValueHasType world value elementType definitions) :
-    RuntimeStoreHasTypes (world ++ [elementType])
-      (store.allocate value).1 definitions := by
-  have extension : WorldExtends world (world ++ [elementType]) :=
-    ⟨[elementType], rfl⟩
-  constructor
-  · simp [typing.length_eq]
-  · intro location storedType foundType
-    by_cases old : location < world.length
-    · have oldType : world[location]? = some storedType := by
-        rw [List.getElem?_append_left (l₂ := [elementType]) old] at foundType
-        exact foundType
-      obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup oldType
-      have storeOld : location < store.length := by
-        simpa [← typing.length_eq] using old
-      exact ⟨oldValue,
-        (Store.allocate_old_lookup store value storeOld).trans oldLookup,
-        oldTyping.weaken extension⟩
-    · have locationEq : location = world.length := by
-        have bound := (List.getElem?_eq_some_iff.mp foundType).1
-        have upper : location ≤ world.length := by
-          apply Nat.lt_succ_iff.mp
-          simpa using bound
-        exact Nat.le_antisymm upper (Nat.le_of_not_gt old)
-      subst location
-      have storedTypeEq : storedType = elementType := by
-        exact (Option.some.inj (by simpa using foundType)).symm
-      subst storedType
-      exact ⟨value,
-        by simpa [← typing.length_eq] using Store.allocate_fresh_lookup store value,
-        valueTyping.weaken extension⟩
-
-theorem write
-    {definitions : DataEnvironment} {world : StoreTyping}
-    {store updatedStore : Store}
-    (typing : RuntimeStoreHasTypes world store definitions)
-    {location : Location} {elementType : Ty} {value : Value}
-    (found : world[location]? = some elementType)
-    (valueTyping : RuntimeValueHasType world value elementType definitions)
-    (written : store.write? location value = some updatedStore) :
-    RuntimeStoreHasTypes world updatedStore definitions := by
-  constructor
-  · rw [Store.write?_preserves_length written]
-    exact typing.length_eq
-  · intro otherLocation otherType otherFound
-    obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup otherFound
-    by_cases same : otherLocation = location
-    · subst otherLocation
-      have typeEq := Option.some.inj (found.symm.trans otherFound)
-      subst otherType
-      exact ⟨value, Store.write?_reads_written written, valueTyping⟩
-    · exact ⟨oldValue,
-        (Store.write?_preserves_other written same).trans oldLookup, oldTyping⟩
-
-theorem write_exists
-    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
-    (typing : RuntimeStoreHasTypes world store definitions)
-    {location : Location} {elementType : Ty} {value : Value}
-    (found : world[location]? = some elementType) :
-    ∃ updatedStore, store.write? location value = some updatedStore :=
-  (Store.write?_success_iff store location value).2 (typing.location_lt found)
-
-end RuntimeStoreHasTypes
-
-
-structure StoreHasTypes (world : StoreTyping) (store : Store) : Prop where
-  length_eq : world.length = store.length
-  lookup :
-    ∀ {location : Location} {elementType : Ty},
-      world[location]? = some elementType →
-      ∃ value,
-        store.read? location = some value ∧
-        CellPayload elementType ∧
-        ValueHasType value elementType
-
-namespace StoreHasTypes
-
-theorem nil : StoreHasTypes [] [] where
-  length_eq := rfl
-  lookup := by simp
-
-theorem read
-    {world : StoreTyping} {store : Store}
-    (typing : StoreHasTypes world store)
-    {location : Location} {elementType : Ty}
-    (found : world[location]? = some elementType) :
-    ∃ value,
-      store.read? location = some value ∧
-      CellPayload elementType ∧
-      ValueHasType value elementType :=
-  typing.lookup found
-
-theorem location_lt
-    {world : StoreTyping} {store : Store}
-    (typing : StoreHasTypes world store)
-    {location : Location} {elementType : Ty}
-    (found : world[location]? = some elementType) :
-    location < store.length := by
-  have worldBound : location < world.length :=
-    (List.getElem?_eq_some_iff.mp found).1
-  simpa [← typing.length_eq] using worldBound
-
-theorem allocate
-    {world : StoreTyping} {store : Store}
-    (typing : StoreHasTypes world store)
-    {elementType : Ty} {value : Value}
-    (payload : CellPayload elementType)
-    (valueTyping : ValueHasType value elementType) :
-    StoreHasTypes (world ++ [elementType]) (store.allocate value).1 := by
-  constructor
-  · simp [typing.length_eq]
-  · intro location storedType foundType
-    by_cases old : location < world.length
-    · have oldType : world[location]? = some storedType := by
-        rw [List.getElem?_append_left (l₂ := [elementType]) old] at foundType
-        exact foundType
-      obtain ⟨oldValue, oldLookup, oldPayload, oldTyping⟩ := typing.lookup oldType
-      have storeOld : location < store.length := by
-        simpa [← typing.length_eq] using old
-      exact ⟨oldValue,
-        (Store.allocate_old_lookup store value storeOld).trans oldLookup,
-        oldPayload, oldTyping⟩
-    · have locationEq : location = world.length := by
-        have bound : location < (world ++ [elementType]).length :=
-          (List.getElem?_eq_some_iff.mp foundType).1
-        have upper : location ≤ world.length := by
-          apply Nat.lt_succ_iff.mp
-          simpa using bound
-        exact Nat.le_antisymm upper (Nat.le_of_not_gt old)
-      subst location
-      have storedTypeEq : storedType = elementType := by
-        have equality : some elementType = some storedType := by
-          simpa using foundType
-        exact (Option.some.inj equality).symm
-      subst storedType
-      exact ⟨value,
-        by simpa [← typing.length_eq] using
-          Store.allocate_fresh_lookup store value,
-        payload, valueTyping⟩
-
-theorem write
-    {world : StoreTyping} {store updatedStore : Store}
-    (typing : StoreHasTypes world store)
-    {location : Location} {elementType : Ty} {value : Value}
-    (found : world[location]? = some elementType)
-    (valueTyping : ValueHasType value elementType)
-    (written : store.write? location value = some updatedStore) :
-    StoreHasTypes world updatedStore := by
-  constructor
-  · rw [Store.write?_preserves_length written]
-    exact typing.length_eq
-  · intro otherLocation otherType otherFound
-    obtain ⟨oldValue, oldLookup, payload, oldTyping⟩ := typing.lookup otherFound
-    by_cases same : otherLocation = location
-    · subst otherLocation
-      have typeEq : elementType = otherType :=
-        Option.some.inj (found.symm.trans otherFound)
-      subst typeEq
-      exact ⟨value, Store.write?_reads_written written, payload, valueTyping⟩
-    · exact ⟨oldValue,
-        (Store.write?_preserves_other written same).trans oldLookup,
-        payload, oldTyping⟩
-
-theorem write_exists
-    {world : StoreTyping} {store : Store}
-    (typing : StoreHasTypes world store)
-    {location : Location} {elementType : Ty} {value : Value}
-    (found : world[location]? = some elementType) :
-    ∃ updatedStore, store.write? location value = some updatedStore :=
-  (Store.write?_success_iff store location value).2 (typing.location_lt found)
-
-end StoreHasTypes
-
-theorem CellPayload.valueHasType_rebase
-    {elementType : Ty}
-    (payload : CellPayload elementType)
-    {sourceDefinitions targetDefinitions : DataEnvironment}
-    {value : Value}
-    (typing : ValueHasType value elementType sourceDefinitions) :
-    ValueHasType value elementType targetDefinitions := by
-  induction payload generalizing value with
-  | unit => cases typing; exact .unit
-  | bool => cases typing; exact .bool
-  | word => cases typing; exact .word
-  | integer => cases typing; exact .integer
-  | product leftPayload rightPayload leftIH rightIH =>
-      cases typing with
-      | pair leftTyping rightTyping =>
-          exact .pair (leftIH leftTyping) (rightIH rightTyping)
-  | sum leftPayload rightPayload leftIH rightIH =>
-      cases typing with
-      | inLeft payloadTyping => exact .inLeft (leftIH payloadTyping)
-      | inRight payloadTyping => exact .inRight (rightIH payloadTyping)
-
-theorem CellPayload.runtimeValueHasType
-    {elementType : Ty}
-    (payload : CellPayload elementType)
-    {world : StoreTyping} {value : Value}
-    (typing : ValueHasType value elementType)
-    (definitions : DataEnvironment := []) :
-    RuntimeValueHasType world value elementType definitions := by
-  induction payload generalizing value with
-  | unit => cases typing; exact .unit
-  | bool => cases typing; exact .bool
-  | word => cases typing; exact .word
-  | integer => cases typing; exact .integer
-  | product leftPayload rightPayload leftIH rightIH =>
-      cases typing with
-      | pair leftTyping rightTyping =>
-          exact .pair (leftIH leftTyping) (rightIH rightTyping)
-  | sum leftPayload rightPayload leftIH rightIH =>
-      cases typing with
-      | inLeft payloadTyping => exact .inLeft (leftIH payloadTyping)
-      | inRight payloadTyping => exact .inRight (rightIH payloadTyping)
-
-/-- Existing first-order stores embed without changing their locations. -/
-theorem StoreHasTypes.toRuntime
-    {world : StoreTyping} {store : Store}
-    (typing : StoreHasTypes world store)
-    (definitions : DataEnvironment := []) :
-    RuntimeStoreHasTypes world store definitions where
-  length_eq := typing.length_eq
-  lookup := by
-    intro location elementType found
-    obtain ⟨value, read, payload, valueTyping⟩ := typing.lookup found
-    exact ⟨value, read, payload.runtimeValueHasType valueTyping definitions⟩
-
-
-theorem unary_apply_result_has_runtime_type
-    {world : StoreTyping} {op : UnaryOp} {operand result : Value}
-    (applied : op.apply operand = some result)
-    (definitions : DataEnvironment := []) :
-    RuntimeValueHasType world result op.resultType definitions := by
-  apply CellPayload.runtimeValueHasType
-    (elementType := op.resultType)
-    (definitions := definitions)
-    (typing := unary_apply_result_has_type applied (definitions := []))
-  cases op <;> constructor
-
-theorem binary_apply_result_has_runtime_type
-    {world : StoreTyping} {op : BinaryOp} {left right result : Value}
-    (applied : op.apply left right = some result)
-    (definitions : DataEnvironment := []) :
-    RuntimeValueHasType world result op.resultType definitions := by
-  apply CellPayload.runtimeValueHasType
-    (elementType := op.resultType)
-    (definitions := definitions)
-    (typing := binary_apply_result_has_type applied (definitions := []))
-  cases op <;> constructor
-
-theorem ternary_apply_result_has_runtime_type
-    {world : StoreTyping} {op : TernaryOp}
-    {first second third result : Value}
-    (applied : op.apply first second third = some result)
-    (definitions : DataEnvironment := []) :
-    RuntimeValueHasType world result op.resultType definitions := by
-  apply CellPayload.runtimeValueHasType
-    (elementType := op.resultType)
-    (definitions := definitions)
-    (typing := ternary_apply_result_has_type applied (definitions := []))
-  cases op <;> constructor
-
-theorem BranchesHaveType.lookup
-    {definitions : DataEnvironment}
-    {context : Context} {resultType : Ty}
-    {payloadTypes : List Ty} {branches : List Expr}
-    (typing :
-      BranchesHaveType context resultType payloadTypes branches definitions)
-    {index : Nat} {payloadType : Ty} {branch : Expr}
-    (payloadLookup : payloadTypes[index]? = some payloadType)
-    (branchLookup : branches[index]? = some branch) :
-    HasType (payloadType :: context) branch resultType definitions := by
-  induction typing using BranchesHaveType.rec
-      (motive_1 := fun _ _ _ _ _ => True) generalizing index with
-  | unit | bool | word | integer | var | pair | first | second | lambda | apply
-  | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
-  | matchData | unary | binary | ternary | letE | ifE =>
-      exact True.intro
-  | nil => simp at payloadLookup
-  | cons headTyping _ _ tailIH =>
-      cases index with
-      | zero =>
-          simp at payloadLookup branchLookup
-          cases payloadLookup
-          cases branchLookup
-          exact headTyping
-      | succ index =>
-          apply tailIH
-          · simpa using payloadLookup
-          · simpa using branchLookup
-
-theorem BranchesHaveType.length_eq
-    {definitions : DataEnvironment}
-    {context : Context} {resultType : Ty}
-    {payloadTypes : List Ty} {branches : List Expr}
-    (typing :
-      BranchesHaveType context resultType payloadTypes branches definitions) :
-    payloadTypes.length = branches.length := by
-  induction typing using BranchesHaveType.rec
-      (motive_1 := fun _ _ _ _ _ => True) with
-  | unit | bool | word | integer | var | pair | first | second | lambda | apply
-  | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
-  | matchData | unary | binary | ternary | letE | ifE =>
-      exact True.intro
-  | nil => rfl
-  | cons _ _ _ tailIH => simp [tailIH]
-
-theorem BranchesHaveType.branch_exists
-    {definitions : DataEnvironment}
-    {context : Context} {resultType : Ty}
-    {payloadTypes : List Ty} {branches : List Expr}
-    (typing :
-      BranchesHaveType context resultType payloadTypes branches definitions)
-    {index : Nat} {payloadType : Ty}
-    (payloadLookup : payloadTypes[index]? = some payloadType) :
-    ∃ branch, branches[index]? = some branch := by
-  have payloadBound : index < payloadTypes.length :=
-    (List.getElem?_eq_some_iff.mp payloadLookup).1
-  have branchBound : index < branches.length := by
-    simpa [← typing.length_eq] using payloadBound
-  exact ⟨branches[index], List.getElem?_eq_getElem _⟩
-
-/-! ## Preservation for the state-threaded evaluator -/
 
 theorem evaluation_preserves_type
     {definitions : DataEnvironment}
@@ -1276,261 +446,6 @@ theorem closed_well_typed_run_has_sufficient_fuel
         typing evaluation
   exact ⟨required, value, valueTyping.erase, fun fuel enough => by
     simp [run, completes fuel enough, StatefulRunResult.erase]⟩
-
-/-! ## Typed CEK states -/
-
-inductive FrameHasType
-    (world : StoreTyping) :
-    Frame → Ty → Ty → (definitions : DataEnvironment := []) → Prop where
-  | unaryApply {definitions : DataEnvironment} {op : UnaryOp} :
-      FrameHasType world (.unaryApply op) op.operandType op.resultType definitions
-  | binaryRight
-      {definitions : DataEnvironment}
-      {op : BinaryOp} {right : Expr} {environment : Environment}
-      {context : Context} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context right op.rightType definitions →
-      FrameHasType world (.binaryRight op right environment)
-        op.leftType op.resultType definitions
-  | binaryApply
-      {definitions : DataEnvironment} {op : BinaryOp} {leftValue : Value} :
-      RuntimeValueHasType world leftValue op.leftType definitions →
-      FrameHasType world (.binaryApply op leftValue)
-        op.rightType op.resultType definitions
-  | ternarySecond
-      {definitions : DataEnvironment} {op : TernaryOp}
-      {second third : Expr} {environment : Environment} {context : Context} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context second op.secondType definitions →
-      HasType context third op.thirdType definitions →
-      FrameHasType world (.ternarySecond op second third environment)
-        op.firstType op.resultType definitions
-  | ternaryThird
-      {definitions : DataEnvironment} {op : TernaryOp}
-      {firstValue : Value} {third : Expr} {environment : Environment}
-      {context : Context} :
-      RuntimeValueHasType world firstValue op.firstType definitions →
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context third op.thirdType definitions →
-      FrameHasType world (.ternaryThird op firstValue third environment)
-        op.secondType op.resultType definitions
-  | ternaryApply
-      {definitions : DataEnvironment} {op : TernaryOp}
-      {firstValue secondValue : Value} :
-      RuntimeValueHasType world firstValue op.firstType definitions →
-      RuntimeValueHasType world secondValue op.secondType definitions →
-      FrameHasType world (.ternaryApply op firstValue secondValue)
-        op.thirdType op.resultType definitions
-  | pairRight
-      {definitions : DataEnvironment}
-      {right : Expr} {environment : Environment} {context : Context}
-      {leftType rightType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context right rightType definitions →
-      FrameHasType world (.pairRight right environment)
-        leftType (.product leftType rightType) definitions
-  | pairApply
-      {definitions : DataEnvironment}
-      {leftValue : Value} {leftType rightType : Ty} :
-      RuntimeValueHasType world leftValue leftType definitions →
-      FrameHasType world (.pairApply leftValue)
-        rightType (.product leftType rightType) definitions
-  | firstApply {definitions : DataEnvironment} {leftType rightType : Ty} :
-      FrameHasType world .firstApply (.product leftType rightType) leftType
-        definitions
-  | secondApply {definitions : DataEnvironment} {leftType rightType : Ty} :
-      FrameHasType world .secondApply (.product leftType rightType) rightType
-        definitions
-  | inLeftApply
-      {definitions : DataEnvironment} {leftType rightType : Ty} :
-      FrameHasType world (.inLeftApply rightType)
-        leftType (.sum leftType rightType) definitions
-  | inRightApply
-      {definitions : DataEnvironment} {leftType rightType : Ty} :
-      FrameHasType world (.inRightApply leftType)
-        rightType (.sum leftType rightType) definitions
-  | caseBranches
-      {definitions : DataEnvironment}
-      {leftBranch rightBranch : Expr} {environment : Environment}
-      {context : Context} {leftType rightType resultType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType (leftType :: context) leftBranch resultType definitions →
-      HasType (rightType :: context) rightBranch resultType definitions →
-      FrameHasType world
-        (.caseBranches leftBranch rightBranch environment)
-        (.sum leftType rightType) resultType definitions
-  | newCellApply {definitions : DataEnvironment} {elementType : Ty} :
-      FrameHasType world (.newCellApply elementType)
-        elementType (.cell elementType) definitions
-  | loadCellApply {definitions : DataEnvironment} {elementType : Ty} :
-      FrameHasType world .loadCellApply (.cell elementType) elementType definitions
-  | storeCellValue
-      {definitions : DataEnvironment}
-      {valueExpr : Expr} {environment : Environment} {context : Context}
-      {elementType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context valueExpr elementType definitions →
-      FrameHasType world (.storeCellValue valueExpr environment)
-        (.cell elementType) .unit definitions
-  | storeCellApply
-      {definitions : DataEnvironment} {elementType : Ty} {location : Location} :
-      world[location]? = some elementType →
-      FrameHasType world (.storeCellApply elementType location)
-        elementType .unit definitions
-  | constructApply
-      {definitions : DataEnvironment}
-      {constructor : ConstructorId} {payloadType : Ty} :
-      definitions.lookupConstructorPayloadType? constructor = some payloadType →
-      FrameHasType world (.constructApply constructor) payloadType
-        (.namedData constructor.owner) definitions
-  | matchDataApply
-      {definitions : DataEnvironment}
-      {dataType : DataTypeId} {definition : DataDefinition}
-      {branches : List Expr} {environment : Environment} {context : Context}
-      {resultType : Ty} :
-      definitions.lookupDataType? dataType = some definition →
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      BranchesHaveType context resultType definition.constructorPayloadTypes
-        branches definitions →
-      FrameHasType world (.matchDataApply dataType branches environment)
-        (.namedData dataType) resultType definitions
-  | applyArgument
-      {definitions : DataEnvironment}
-      {argument : Expr} {environment : Environment} {context : Context}
-      {parameterType resultType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context argument parameterType definitions →
-      FrameHasType world (.applyArgument argument environment)
-        (.function parameterType resultType) resultType definitions
-  | applyClosure
-      {definitions : DataEnvironment}
-      {parameterType resultType : Ty} {body : Expr}
-      {environment : Environment} {context : Context} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType (parameterType :: context) body resultType definitions →
-      FrameHasType world
-        (.applyClosure parameterType resultType body environment)
-        parameterType resultType definitions
-  | letBody
-      {definitions : DataEnvironment}
-      {body : Expr} {environment : Environment} {context : Context}
-      {inputType outputType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType (inputType :: context) body outputType definitions →
-      FrameHasType world (.letBody body environment) inputType outputType
-        definitions
-  | ifBranches
-      {definitions : DataEnvironment}
-      {thenBranch elseBranch : Expr} {environment : Environment}
-      {context : Context} {outputType : Ty} :
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context thenBranch outputType definitions →
-      HasType context elseBranch outputType definitions →
-      FrameHasType world
-        (.ifBranches thenBranch elseBranch environment) .bool outputType definitions
-
-inductive ContinuationHasType
-    (world : StoreTyping) :
-    List Frame → Ty → Ty → (definitions : DataEnvironment := []) → Prop where
-  | nil {definitions : DataEnvironment} {type : Ty} :
-      ContinuationHasType world [] type type definitions
-  | cons
-      {definitions : DataEnvironment}
-      {frame : Frame} {continuation : List Frame}
-      {inputType middleType outputType : Ty} :
-      FrameHasType world frame inputType middleType definitions →
-      ContinuationHasType world continuation middleType outputType definitions →
-      ContinuationHasType world (frame :: continuation) inputType outputType
-        definitions
-
-theorem FrameHasType.weaken
-    {definitions : DataEnvironment}
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future)
-    {frame : Frame} {inputType outputType : Ty}
-    (typing : FrameHasType initial frame inputType outputType definitions) :
-    FrameHasType future frame inputType outputType definitions := by
-  cases typing with
-  | unaryApply => exact .unaryApply
-  | binaryRight environmentTyping rightTyping =>
-      exact .binaryRight (environmentTyping.weaken extension) rightTyping
-  | binaryApply leftTyping =>
-      exact .binaryApply (leftTyping.weaken extension)
-  | ternarySecond environmentTyping secondTyping thirdTyping =>
-      exact .ternarySecond (environmentTyping.weaken extension)
-        secondTyping thirdTyping
-  | ternaryThird firstTyping environmentTyping thirdTyping =>
-      exact .ternaryThird (firstTyping.weaken extension)
-        (environmentTyping.weaken extension) thirdTyping
-  | ternaryApply firstTyping secondTyping =>
-      exact .ternaryApply (firstTyping.weaken extension)
-        (secondTyping.weaken extension)
-  | pairRight environmentTyping rightTyping =>
-      exact .pairRight (environmentTyping.weaken extension) rightTyping
-  | pairApply leftTyping =>
-      exact .pairApply (leftTyping.weaken extension)
-  | firstApply => exact .firstApply
-  | secondApply => exact .secondApply
-  | inLeftApply => exact .inLeftApply
-  | inRightApply => exact .inRightApply
-  | caseBranches environmentTyping leftTyping rightTyping =>
-      exact .caseBranches (environmentTyping.weaken extension)
-        leftTyping rightTyping
-  | newCellApply => exact .newCellApply
-  | loadCellApply => exact .loadCellApply
-  | storeCellValue environmentTyping valueTyping =>
-      exact .storeCellValue (environmentTyping.weaken extension)
-        valueTyping
-  | storeCellApply found =>
-      exact .storeCellApply (extension.lookup found)
-  | constructApply lookup => exact .constructApply lookup
-  | matchDataApply definitionLookup environmentTyping branchesTyping =>
-      exact .matchDataApply definitionLookup
-        (environmentTyping.weaken extension) branchesTyping
-  | applyArgument environmentTyping argumentTyping =>
-      exact .applyArgument (environmentTyping.weaken extension) argumentTyping
-  | applyClosure environmentTyping bodyTyping =>
-      exact .applyClosure (environmentTyping.weaken extension) bodyTyping
-  | letBody environmentTyping bodyTyping =>
-      exact .letBody (environmentTyping.weaken extension) bodyTyping
-  | ifBranches environmentTyping thenTyping elseTyping =>
-      exact .ifBranches (environmentTyping.weaken extension)
-        thenTyping elseTyping
-
-theorem ContinuationHasType.weaken
-    {definitions : DataEnvironment}
-    {initial future : StoreTyping}
-    (extension : WorldExtends initial future)
-    {continuation : List Frame} {inputType outputType : Ty}
-    (typing :
-      ContinuationHasType initial continuation inputType outputType definitions) :
-    ContinuationHasType future continuation inputType outputType definitions := by
-  induction typing with
-  | nil => exact .nil
-  | cons frameTyping _ tailIH =>
-      exact .cons (frameTyping.weaken extension) tailIH
-
-inductive StateHasType :
-    State → Ty → (definitions : DataEnvironment := []) → Prop where
-  | eval
-      {definitions : DataEnvironment}
-      {world : StoreTyping} {expr : Expr} {environment : Environment}
-      {context : Context} {continuation : List Frame} {store : Store}
-      {controlType resultType : Ty} :
-      RuntimeStoreHasTypes world store definitions →
-      RuntimeEnvironmentHasTypes world environment context definitions →
-      HasType context expr controlType definitions →
-      ContinuationHasType world continuation controlType resultType definitions →
-      StateHasType
-        ⟨.eval expr environment, continuation, store⟩ resultType definitions
-  | ret
-      {definitions : DataEnvironment}
-      {world : StoreTyping} {value : Value} {continuation : List Frame}
-      {store : Store} {controlType resultType : Ty} :
-      RuntimeStoreHasTypes world store definitions →
-      RuntimeValueHasType world value controlType definitions →
-      ContinuationHasType world continuation controlType resultType definitions →
-      StateHasType ⟨.ret value, continuation, store⟩ resultType definitions
 
 theorem transition_preserves_state_type
     {definitions : DataEnvironment}
@@ -2372,3 +1287,135 @@ theorem Program.checked_run_never_faults
   exact closed_well_typed_run_never_faults wellTyped.bodyHasType
 
 end Solcore.Core
+end
+
+section
+-- leanmerge: from Solcore.Core.BoundedSafety
+/-! Safety of every finite execution, including genuine fuel checkpoints. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+/-- Every typed transition retains the current world or allocates a fresh
+location at its end. World equality is recovered from the actual shared store. -/
+theorem transition_preserves_store_world
+    {definitions : DataEnvironment} {state next : State} {type : Ty}
+    {world : StoreTyping}
+    (typing : StateHasType state type definitions)
+    (stored : RuntimeStoreHasTypes world state.store definitions)
+    (transition : Transition state next) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future next.store definitions := by
+  cases transition <;> try exact ⟨world, .refl world, stored⟩
+  case applyNewCell =>
+    cases typing with
+    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
+        have same : actualWorld = world :=
+          actualStored.world_eq.trans stored.world_eq.symm
+        subst actualWorld
+        cases continuationTyped with
+        | cons frame _ =>
+            cases frame with
+            | newCellApply =>
+                exact ⟨_, ⟨[_], rfl⟩, stored.allocate valueTyped⟩
+  case applyStoreCell =>
+    rename_i written
+    cases typing with
+    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
+        have same : actualWorld = world :=
+          actualStored.world_eq.trans stored.world_eq.symm
+        subst actualWorld
+        cases continuationTyped with
+        | cons frame _ =>
+            cases frame with
+            | storeCellApply found =>
+                exact ⟨world, .refl world, stored.write found valueTyped written⟩
+
+theorem Steps.preserve_store_world
+    {definitions : DataEnvironment} {start finish : State} {type : Ty}
+    {world : StoreTyping} {steps : Nat}
+    (path : Steps steps start finish)
+    (typing : StateHasType start type definitions)
+    (stored : RuntimeStoreHasTypes world start.store definitions) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future finish.store definitions := by
+  induction path generalizing world with
+  | refl => exact ⟨world, .refl world, stored⟩
+  | cons transition tail ih =>
+      obtain ⟨middle, extension, middleStored⟩ :=
+        transition_preserves_store_world typing stored transition
+      obtain ⟨future, further, finalStored⟩ :=
+        ih (transition_preserves_state_type typing transition) middleStored
+      exact ⟨future, extension.trans further, finalStored⟩
+
+theorem well_typed_runStateful_preserves_checkpoint_world
+    {definitions : DataEnvironment} {fuel : Nat} {start checkpoint : State}
+    {type : Ty} {world : StoreTyping}
+    (typing : StateHasType start type definitions)
+    (stored : RuntimeStoreHasTypes world start.store definitions)
+    (exhausted : runStateful fuel start = .outOfFuel checkpoint) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future checkpoint.store definitions :=
+  (runStateful_outOfFuel_sound exhausted).1.preserve_store_world typing stored
+
+/-- Completion has a typed value and store; exhaustion retains a typed state.
+An internal machine fault is not an admissible typed outcome. -/
+def StatefulRunResult.HasType
+    (result : StatefulRunResult) (type : Ty)
+    (definitions : DataEnvironment := []) : Prop :=
+  match result with
+  | .done value store =>
+      ∃ world,
+        RuntimeStoreHasTypes world store definitions ∧ RuntimeValueHasType world value type definitions
+  | .outOfFuel checkpoint => StateHasType checkpoint type definitions
+  | .fault _ _ => False
+
+/-- The actual exhaustion checkpoint has the same result type as the start. -/
+theorem well_typed_runStateful_preserves_checkpoint_type
+    {definitions : DataEnvironment} {fuel : Nat}
+    {start checkpoint : State} {type : Ty}
+    (typing : StateHasType start type definitions)
+    (exhausted : runStateful fuel start = .outOfFuel checkpoint) :
+    StateHasType checkpoint type definitions :=
+  (runStateful_outOfFuel_sound exhausted).1.preserve_state_type typing
+
+/-- Finite safety needs no termination assumption or sufficient-fuel bound. -/
+theorem well_typed_runStateful_has_type
+    {definitions : DataEnvironment} {state : State} {type : Ty}
+    (typing : StateHasType state type definitions) (fuel : Nat) :
+    (runStateful fuel state).HasType type definitions := by
+  cases result : runStateful fuel state with
+  | done value store =>
+      exact well_typed_runStateful_preserves_result_type typing result
+  | outOfFuel checkpoint =>
+      exact well_typed_runStateful_preserves_checkpoint_type typing result
+  | fault error faultState =>
+      exact False.elim (well_typed_runStateful_never_faults typing result)
+
+/-- Resume the retained typed state, preserving the complete outcome invariant. -/
+theorem well_typed_runStateful_resume_has_type
+    {definitions : DataEnvironment} {spent : Nat}
+    {start checkpoint : State} {type : Ty}
+    (typing : StateHasType start type definitions)
+    (exhausted : runStateful spent start = .outOfFuel checkpoint)
+    (additional : Nat) :
+    (runStateful additional checkpoint).HasType type definitions ∧
+      runStateful additional checkpoint = runStateful (spent + additional) start :=
+  ⟨well_typed_runStateful_has_type
+      (well_typed_runStateful_preserves_checkpoint_type typing exhausted) additional,
+    runStateful_resume exhausted additional⟩
+
+theorem Program.checked_runStateful_has_type
+    {program : Program} (checked : program.check = true) (fuel : Nat) :
+    (program.runStateful fuel).HasType program.resultType program.dataDefinitions :=
+  well_typed_runStateful_has_type
+    (initial_state_has_type (Program.check_full_sound checked).bodyHasType) fuel
+
+end Solcore.Core
+end
+
+section
+-- leanmerge: from Solcore.Core.RuntimeStoreSafety
+/-! World-indexed store typing and preservation, re-exported from Core safety. -/
+end

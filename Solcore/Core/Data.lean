@@ -1,5 +1,13 @@
 import Solcore.Core.Syntax
 
+/-!
+# Named data
+
+`DataEnvironment.lookupDataType?` and `DataEnvironment.lookupConstructorPayloadType?` look up the
+data definitions of a program. `Ty.WellFormed` and `DataEnvironment.WellFormed` say when a type and
+a table are well formed, and `Ty.isWellFormed` and `DataEnvironment.isWellFormed` decide it.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Core

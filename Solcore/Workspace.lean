@@ -6,9 +6,12 @@ import Solcore.Workspace.Validation
 import Solcore.Workspace.Properties
 
 /-!
-The public umbrella module for the Workspace Identity Kernel.
+# Workspace
 
-This boundary provides canonical logical identities, structural validation,
-independent judgments, and their correspondence theorems. It does not provide
-module or name resolution.
+The Workspace Identity Kernel: canonical logical identities, structural validation, independent
+judgments, and their correspondence theorems. It does not resolve modules or names.
+`docs/review/foundations.md` lists every file.
+
+Read `Path` and `Syntax` for the identities, `Error` and `Judgment` for the specification, and
+`Validation` for the algorithm. `Properties` holds the main theorems.
 -/

@@ -1,6 +1,13 @@
 import Solcore.TypeSystem.Scheme
 import Solcore.TypeSystem.Unification
 
+/-!
+# Inference
+
+`TypeSystem.InferState` is the state of first-order inference and `TypeSystem.Inference.infer` the
+algorithm. Its laws are in `Internal/InferenceLaws`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.TypeSystem

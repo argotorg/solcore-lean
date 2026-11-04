@@ -1,5 +1,12 @@
 import Solcore.Core.Syntax
 
+/-!
+# Wire syntax
+
+The canonical syntax of the Core wire boundary. `Wire.Ty`, `Wire.Expr` and `Wire.Program` are the
+forms the JSON codecs read and write, and `Wire.Ty.toCore` and its companions map them to Core.
+-/
+
 /-! Canonical syntax for the Semantic Core wire boundary. -/
 
 set_option autoImplicit false

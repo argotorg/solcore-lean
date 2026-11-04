@@ -1,5 +1,13 @@
 import Solcore.Workspace.Path
 
+/-!
+# Workspace syntax
+
+`Workspace.RawWorkspace` is the input as supplied. `Workspace.ValidatedUserWorkspace` and
+`Workspace.WorkspaceFile` are the result of validation, and `Workspace.SourceId` and
+`Workspace.ModuleId` the logical identities.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

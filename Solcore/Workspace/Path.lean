@@ -1,5 +1,12 @@
 import Std
 
+/-!
+# Canonical paths
+
+`Workspace.CanonicalSourcePath`, `Workspace.ModulePath` and `Workspace.ExternalLibraryName` are
+validated names with a parser and a total order.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

@@ -1,4 +1,13 @@
-import Solcore.Core.BoundedSafety
+import Solcore.Core.Safety
+
+/-!
+# Language results
+
+A language failure is an ordinary Core sum: `LanguageResult.resultType`, `LanguageResult.success`,
+`LanguageResult.failure` and `LanguageResult.bind` build it, and `LanguageResult.decode?` and
+`LanguageResult.run` read it back. Main theorems: `LanguageResult.checked_completion_decodes`,
+`LanguageResult.checked_run_ne_invalidCarrier` and `LanguageResult.checked_run_ne_internalFault`.
+-/
 
 /-! Language results represented by ordinary Core sums. Failure is a returned
 word reason; the machine continues to distinguish completion, suspension, and

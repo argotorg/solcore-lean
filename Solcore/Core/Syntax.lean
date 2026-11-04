@@ -1,3 +1,14 @@
+
+
+/-!
+# Core syntax
+
+The language every program compiles to. `Ty` is a type, `Expr` an expression, `Value` a runtime
+value, and `Program` a body with its result type and data definitions. `UnaryOp`, `BinaryOp` and
+`TernaryOp` list the operators, whose meaning is in `Primitive`. `HostFunction` lists the
+capabilities a host provides, which `Host` binds.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Core

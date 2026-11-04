@@ -3,8 +3,8 @@ import Solcore.Util.FixedHex
 import Solcore.Util.Json
 
 /-!
-The public umbrella module for generic representation and codec utilities.
+# Utilities
 
-These modules provide low-level helpers shared by runtime and wire layers;
-they do not define source-language syntax, typing, or semantics.
+Generic representation and codec helpers shared by the runtime and wire layers. They define no
+source syntax, typing or semantics.
 -/

@@ -1,5 +1,11 @@
 import Solcore.Workspace.Path
 
+/-!
+# Validation errors
+
+`Workspace.ValidationError` lists every way a workspace can be rejected, with a canonical order.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

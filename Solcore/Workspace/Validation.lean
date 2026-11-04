@@ -1,6 +1,12 @@
 import Solcore.Workspace.Syntax
 import Solcore.Workspace.Error
 
+/-!
+# Executable validation
+
+`Workspace.Validation.validate` is the algorithm the judgments describe.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

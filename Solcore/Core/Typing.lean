@@ -1,6 +1,15 @@
 import Solcore.Core.Data
 import Solcore.Core.Primitive
 
+/-!
+# Typing
+
+`HasType` is the typing judgment and `infer?` the executable check. `Program.WellTyped` and
+`Program.check` lift them to a whole program. `Program.check_sound` and `typing_deterministic` are
+the results a reader will want first. The proofs that `infer?` agrees with `HasType` stay here,
+because they unfold its private helpers.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Core

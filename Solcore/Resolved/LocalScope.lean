@@ -1,5 +1,12 @@
 import Solcore.Resolved.Identity
 
+/-!
+# Local scopes
+
+`LocalScope` is a table of identities with first-match lookup, `LocalScope.Lookup` and
+`LocalScope.IndexOf`. It chooses no shadowing rule and allocates nothing.
+-/
+
 /-! Generic local identity tables with explicit first-match behavior, even
 when an input table repeats an identity. This does not choose source-language
 shadowing rules or allocate fresh identities. -/

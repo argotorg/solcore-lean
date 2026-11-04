@@ -1,5 +1,11 @@
 import Lean.Data.Json
 
+/-!
+# JSON helpers
+
+Helpers shared by the codecs.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Util

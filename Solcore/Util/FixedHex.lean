@@ -1,5 +1,11 @@
 import Solcore.Util.FixedRadix
 
+/-!
+# Fixed-width hexadecimal text
+
+`Util.FixedHex.encodeText` and its digits, with `Util.FixedHex.encodeText_injective`.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Util.FixedHex

@@ -1,6 +1,14 @@
 import Solcore.Workspace.Syntax
 import Solcore.Workspace.Error
 
+/-!
+# Workspace judgments
+
+The independent specification. `Workspace.Validates` says a raw workspace validates to a result,
+`Workspace.Rejects` that it is rejected with a list of errors, and `Workspace.RawWorkspace.Equivalent` that
+two inputs differ only in what validation ignores.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

@@ -1,6 +1,17 @@
 import Solcore.Workspace.Judgment
 import Solcore.Workspace.Validation
 
+/-!
+# Validation against the judgments
+
+Main theorems: `Workspace.Validation.validate_sound`, `Workspace.Validation.validate_complete`,
+`Workspace.Validation.validate_errors_sound` and `Workspace.Validation.validate_errors_complete`
+relate `Workspace.Validation.validate` to `Workspace.Validates` and `Workspace.Rejects`.
+`Workspace.validates_or_rejects` says one holds, and `Workspace.Validates.not_rejected` that they
+exclude each other. `Workspace.validate_equivalent`, `Workspace.validate_preserves_sourceFiles` and
+`Workspace.validate_preserves_sourceBytes` are what callers use.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Workspace

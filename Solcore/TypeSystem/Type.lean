@@ -1,5 +1,12 @@
 import Solcore.Resolved.Identity
 
+/-!
+# Source types
+
+`TypeSystem.Ty` is the source type language, in front of the concrete `Core.Ty`. It separates
+flexible inference variables from rigid generic parameters.
+-/
+
 /-! A small source-level type language.
 
 `Core.Ty` remains the concrete runtime type language.  This language lives in

@@ -1,5 +1,12 @@
 import Solcore.TypeSystem.Type
 
+/-!
+# Substitutions
+
+`TypeSystem.Substitution` maps flexible variables to types. `TypeSystem.Substitution.apply` applies
+one and `TypeSystem.Substitution.compose` composes two.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.TypeSystem

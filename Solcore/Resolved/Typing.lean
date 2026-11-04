@@ -1,8 +1,13 @@
 import Solcore.Resolved.Expr
 import Solcore.Core.Typing
 import Solcore.Resolved.LocalScope
-import Solcore.Resolved.LoweringProperties
-import Solcore.Resolved.LocalFragmentProperties
+
+/-!
+# Typing of resolved expressions
+
+`Resolved.HasType` is the typing judgment. `Resolved.Lowers.typing_iff` says lowering preserves and
+reflects it.
+-/
 
 set_option autoImplicit false
 

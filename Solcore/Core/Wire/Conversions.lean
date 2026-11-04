@@ -1,5 +1,13 @@
 import Solcore.Core.Wire.Syntax
 
+/-!
+# Wire conversions
+
+`Wire.Expr.toCore` and `Wire.Program.toCore` are total, and `Wire.Expr.ofCore?` and
+`Wire.Program.ofCore?` are defined on what the wire can express. `Wire.Program.toCore_injective`
+makes equality on the wire the equality of Core.
+-/
+
 /-! Total Wire-to-Core maps and selectively defined Core-to-Wire projections. -/
 
 set_option autoImplicit false

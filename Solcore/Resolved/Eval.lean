@@ -1,8 +1,14 @@
 import Solcore.Resolved.Expr
 import Solcore.Core.Eval
 import Solcore.Resolved.LocalScope
-import Solcore.Resolved.LocalFragmentProperties
 import Solcore.Core.LocalFragment
+
+/-!
+# Evaluation of resolved expressions
+
+`Resolved.Evaluates` is the evaluation relation. `Resolved.Lowers.evaluates_iff` says lowering
+preserves and reflects it.
+-/
 
 set_option autoImplicit false
 

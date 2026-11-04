@@ -1,6 +1,15 @@
 import Solcore.Core.Check
-import Solcore.Core.Host
+import Solcore.Core.Internal.HostLaws
 import Solcore.Core.Wire.Conversions
+
+/-!
+# Wire checking
+
+`Wire.Program.check` and `Wire.Program.checkDetailed` check a wire program under the canonical host
+table. Main theorems: `Wire.Program.check_full_sound`, `Wire.Program.check_complete`,
+`Wire.Program.check_iff_wellTyped`, `Wire.Program.checkDetailed_full_sound` and
+`Wire.Program.checkDetailed_complete`.
+-/
 
 /-! The canonical host boundary used to check Semantic Core wire programs. -/
 

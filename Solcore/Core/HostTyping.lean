@@ -1,6 +1,120 @@
+import Solcore.Core.RuntimeTyping
+import Solcore.Core.Host
 import Solcore.Core.HostMachine
-import Solcore.Core.HostSafety
 
+/-!
+# Typing with host capabilities
+
+The relations of `RuntimeTyping` with host functions as values: `HostRuntimeValueHasType`,
+`HostRuntimeEnvironmentHasTypes`, `HostStoreHasTypes`, `HostFrameHasType`,
+`HostContinuationHasType`, `HostStateHasType` and `HostSuspensionHasType`.
+-/
+
+section
+-- leanmerge: from Solcore.Core.Internal.HostValueTyping
+/-! Runtime value typing extended additively with fixed host capabilities. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+mutual
+
+  /-- Store-aware value typing that additionally admits host functions. -/
+  inductive HostRuntimeValueHasType
+      (world : StoreTyping) :
+      Value → Ty → (definitions : DataEnvironment := []) → Prop where
+    | unit {definitions : DataEnvironment} :
+        HostRuntimeValueHasType world .unit .unit definitions
+    | bool {definitions : DataEnvironment} {value : Bool} :
+        HostRuntimeValueHasType world (.bool value) .bool definitions
+    | word {definitions : DataEnvironment} {value : Word} :
+        HostRuntimeValueHasType world (.word value) .word definitions
+    | integer {definitions : DataEnvironment} {value : Int} :
+        HostRuntimeValueHasType world (.integer value) .integer definitions
+    | hostFunction
+        {definitions : DataEnvironment} {function : HostFunction} :
+        HostRuntimeValueHasType world
+          (.hostFunction function) function.functionType definitions
+    | pair
+        {definitions : DataEnvironment}
+        {left right : Value} {leftType rightType : Ty} :
+        HostRuntimeValueHasType world left leftType definitions →
+        HostRuntimeValueHasType world right rightType definitions →
+        HostRuntimeValueHasType world
+          (.pair left right) (.product leftType rightType) definitions
+    | inLeft
+        {definitions : DataEnvironment}
+        {payload : Value} {leftType rightType : Ty} :
+        HostRuntimeValueHasType world payload leftType definitions →
+        HostRuntimeValueHasType world
+          (.inLeft rightType payload) (.sum leftType rightType) definitions
+    | inRight
+        {definitions : DataEnvironment}
+        {payload : Value} {leftType rightType : Ty} :
+        HostRuntimeValueHasType world payload rightType definitions →
+        HostRuntimeValueHasType world
+          (.inRight leftType payload) (.sum leftType rightType) definitions
+    | closure
+        {definitions : DataEnvironment}
+        {parameterType resultType : Ty} {body : Expr}
+        {environment : Environment} {context : Context} :
+        HostRuntimeEnvironmentHasTypes world environment context definitions →
+        HasType (parameterType :: context) body resultType definitions →
+        HostRuntimeValueHasType world
+          (.closure parameterType resultType body environment)
+          (.function parameterType resultType) definitions
+    | cellRef
+        {definitions : DataEnvironment}
+        {elementType : Ty} {location : Location} :
+        world[location]? = some elementType →
+        HostRuntimeValueHasType world
+          (.cellRef elementType location) (.cell elementType) definitions
+    | constructed
+        {definitions : DataEnvironment}
+        {constructor : ConstructorId} {payload : Value} {payloadType : Ty} :
+        definitions.lookupConstructorPayloadType? constructor = some payloadType →
+        HostRuntimeValueHasType world payload payloadType definitions →
+        HostRuntimeValueHasType world
+          (.constructed constructor payload) (.namedData constructor.owner)
+          definitions
+
+  /-- Positional typing for environments that may contain host functions. -/
+  inductive HostRuntimeEnvironmentHasTypes
+      (world : StoreTyping) :
+      Environment → Context → (definitions : DataEnvironment := []) → Prop where
+    | nil {definitions : DataEnvironment} :
+        HostRuntimeEnvironmentHasTypes world [] [] definitions
+    | cons
+        {definitions : DataEnvironment}
+        {value : Value} {type : Ty}
+        {environment : Environment} {context : Context} :
+        HostRuntimeValueHasType world value type definitions →
+        HostRuntimeEnvironmentHasTypes world environment context definitions →
+        HostRuntimeEnvironmentHasTypes world
+          (value :: environment) (type :: context) definitions
+
+end
+
+/-- The Core-local store may hold closures that capture host capabilities.
+Cell references are checked against the world without recursively following them,
+so this relation also supports cycles through cells. -/
+structure HostStoreHasTypes
+    (world : StoreTyping) (store : Store)
+    (definitions : DataEnvironment := []) : Prop where
+  length_eq : world.length = store.length
+  lookup :
+    ∀ {location : Location} {elementType : Ty},
+      world[location]? = some elementType →
+      ∃ value,
+        store.read? location = some value ∧
+        HostRuntimeValueHasType world value elementType definitions
+
+end Solcore.Core
+end
+
+section
+-- leanmerge: from Solcore.Core.Internal.HostStateTyping
 /-! Typing for CEK states that may carry fixed host capabilities. -/
 
 set_option autoImplicit false
@@ -139,46 +253,6 @@ inductive HostContinuationHasType
       HostContinuationHasType world (frame :: continuation)
         inputType outputType definitions
 
-theorem HostFrameHasType.weaken {definitions : DataEnvironment}
-    {initial future : StoreTyping} (extension : WorldExtends initial future)
-    {frame : Frame} {inputType outputType : Ty}
-    (typing : HostFrameHasType initial frame inputType outputType definitions) :
-    HostFrameHasType future frame inputType outputType definitions := by
-  cases typing with
-  | unaryApply => exact .unaryApply
-  | binaryRight env expr => exact .binaryRight (env.weaken extension) expr
-  | binaryApply value => exact .binaryApply (value.weaken extension)
-  | ternarySecond env second third => exact .ternarySecond (env.weaken extension) second third
-  | ternaryThird first env third => exact .ternaryThird (first.weaken extension) (env.weaken extension) third
-  | ternaryApply first second => exact .ternaryApply (first.weaken extension) (second.weaken extension)
-  | pairRight env right => exact .pairRight (env.weaken extension) right
-  | pairApply left => exact .pairApply (left.weaken extension)
-  | firstApply => exact .firstApply
-  | secondApply => exact .secondApply
-  | inLeftApply => exact .inLeftApply
-  | inRightApply => exact .inRightApply
-  | caseBranches env left right => exact .caseBranches (env.weaken extension) left right
-  | newCellApply => exact .newCellApply
-  | loadCellApply => exact .loadCellApply
-  | storeCellValue env value => exact .storeCellValue (env.weaken extension) value
-  | storeCellApply found => exact .storeCellApply (extension.lookup found)
-  | constructApply lookup => exact .constructApply lookup
-  | matchDataApply lookup env branches => exact .matchDataApply lookup (env.weaken extension) branches
-  | applyArgument env argument => exact .applyArgument (env.weaken extension) argument
-  | applyClosure env body => exact .applyClosure (env.weaken extension) body
-  | hostApply => exact .hostApply
-  | letBody env body => exact .letBody (env.weaken extension) body
-  | ifBranches env thenType elseType => exact .ifBranches (env.weaken extension) thenType elseType
-
-theorem HostContinuationHasType.weaken {definitions : DataEnvironment}
-    {initial future : StoreTyping} (extension : WorldExtends initial future)
-    {continuation : List Frame} {inputType outputType : Ty}
-    (typing : HostContinuationHasType initial continuation inputType outputType definitions) :
-    HostContinuationHasType future continuation inputType outputType definitions := by
-  induction typing with
-  | nil => exact .nil
-  | cons frame _ tail => exact .cons (frame.weaken extension) tail
-
 inductive HostStateHasType :
     State → Ty → (definitions : DataEnvironment := []) → Prop where
   | eval {definitions : DataEnvironment} {world : StoreTyping} {expr : Expr}
@@ -207,57 +281,5 @@ inductive HostSuspensionHasType :
         resultType definitions →
       HostSuspensionHasType ⟨request, continuation, store⟩ resultType definitions
 
-theorem HostRequest.responseValue_hasType
-    (request : HostRequest) (response : request.Response)
-    (world : StoreTyping) (definitions : DataEnvironment := []) :
-    HostRuntimeValueHasType world (request.responseValue response)
-      request.responseType definitions := by
-  cases request with
-  | storageRead => exact .word
-  | storageWrite => exact .unit
-  | storageAddress => exact .word
-  | codeAddress => exact .word
-  | callValue => exact .word
-  | callerAddress => exact .word
-  | inputDataByte? =>
-      cases response with
-      | none => exact .inLeft .unit
-      | some => exact .inRight .word
-  | inputDataSize => exact .word
-  | inputDataWordBE? =>
-      cases response with
-      | none => exact .inLeft .unit
-      | some => exact .inRight .word
-  | currentAddress => exact .word
-  | callContractWord =>
-      cases response with
-      | returned => exact .inLeft .word
-      | reverted => exact .inRight (.inLeft .word)
-      | trapped => exact .inRight (.inRight (.inLeft .word))
-      | failed => exact .inRight (.inRight (.inRight .word))
-  | callContractWordWithValue =>
-      cases response with
-      | returned => exact .inLeft .word
-      | reverted => exact .inRight (.inLeft .word)
-      | trapped => exact .inRight (.inRight (.inLeft .word))
-      | failed => exact .inRight (.inRight (.inRight .word))
-  | createContractWord =>
-      cases response with
-      | returned => exact .inLeft .word
-      | reverted => exact .inRight (.inLeft .word)
-      | trapped => exact .inRight (.inRight (.inLeft .word))
-      | failed => exact .inRight (.inRight (.inRight .word))
-  | emitLogWord => exact .unit
-
-theorem HostSuspensionHasType.resume {definitions : DataEnvironment}
-    {suspension : HostSuspension} {resultType : Ty}
-    (typing : HostSuspensionHasType suspension resultType definitions)
-    (response : suspension.request.Response) :
-    HostStateHasType (suspension.resume response) resultType definitions := by
-  cases typing with
-  | intro storeTyping continuationTyping =>
-      exact .ret storeTyping
-        (HostRequest.responseValue_hasType _ response _ definitions)
-        continuationTyping
-
 end Solcore.Core
+end

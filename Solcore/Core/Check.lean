@@ -1,5 +1,14 @@
 import Solcore.Core.Typing
 
+/-!
+# Checker with diagnostics
+
+`inferDetailed` and `Program.checkDetailed` report a `CheckError` with its `CheckPath`, where
+`infer?` and `Program.check` report only failure. `inferDetailed_iff_typing`,
+`Program.checkDetailed_iff_typing`, `Program.checkDetailed_sound` and
+`Program.checkDetailed_complete` show that they decide the same judgment.
+-/
+
 set_option autoImplicit false
 
 namespace Solcore.Core

@@ -1,6 +1,62 @@
-import Solcore.Core.IntegerPrimitives
 import Solcore.Core.Syntax
 
+/-!
+# Primitive operators
+
+The meaning of every operator: word arithmetic such as `Word.add` and `Word.sdiv`, then
+`UnaryOp.apply`, `BinaryOp.apply` and `TernaryOp.apply`. Also the integer operations `Integer.divide`
+and `Integer.modulo`, and the derived expressions built from primitives, such as `Expr.wordLt` and
+`Expr.boolAnd`.
+-/
+
+section
+-- leanmerge: from Solcore.Core.IntegerPrimitives
+/-! Mathematical integer operations used by native Core primitives. These
+pure definitions keep zero-divisor and infinite two's-complement behavior
+explicit. Integer-to-Word conversion remains the existing modulo conversion. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Core.Integer
+
+def divide (left right : Int) : Int :=
+  if right = 0 then 0 else left / right
+
+def modulo (left right : Int) : Int :=
+  if right = 0 then 0 else left % right
+
+def bitAnd : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left &&& right)
+  | .ofNat left, .negSucc right => .ofNat (left ^^^ (left &&& right))
+  | .negSucc left, .ofNat right => .ofNat (right ^^^ (right &&& left))
+  | .negSucc left, .negSucc right => .negSucc (left ||| right)
+
+def bitOr : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left ||| right)
+  | .ofNat left, .negSucc right => .negSucc (right ^^^ (right &&& left))
+  | .negSucc left, .ofNat right => .negSucc (left ^^^ (left &&& right))
+  | .negSucc left, .negSucc right => .negSucc (left &&& right)
+
+def bitXor : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left ^^^ right)
+  | .ofNat left, .negSucc right => .negSucc (left ^^^ right)
+  | .negSucc left, .ofNat right => .negSucc (left ^^^ right)
+  | .negSucc left, .negSucc right => .ofNat (left ^^^ right)
+
+@[simp] theorem divide_zero (left : Int) : divide left 0 = 0 := by simp [divide]
+@[simp] theorem modulo_zero (left : Int) : modulo left 0 = 0 := by simp [modulo]
+
+theorem divide_nonzero (left right : Int) (nonzero : right ≠ 0) :
+    divide left right = left / right := by simp [divide, nonzero]
+
+theorem modulo_nonzero (left right : Int) (nonzero : right ≠ 0) :
+    modulo left right = left % right := by simp [modulo, nonzero]
+
+end Solcore.Core.Integer
+end
+
+section
+-- leanmerge: from Solcore.Core.Primitive
 set_option autoImplicit false
 
 namespace Solcore.Core
@@ -414,3 +470,25 @@ def wordGeFlag (left right : Expr) : Expr :=
 end Expr
 
 end Solcore.Core
+end
+
+section
+-- leanmerge: from Solcore.Core.Internal.ShortCircuitDefs
+/-! Derived short-circuit boolean expressions and their proof interface. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Core
+
+namespace Expr
+
+def boolAnd (left right : Expr) : Expr :=
+  .ifE left right (.bool false)
+
+def boolOr (left right : Expr) : Expr :=
+  .ifE left (.bool true) right
+
+end Expr
+
+end Solcore.Core
+end

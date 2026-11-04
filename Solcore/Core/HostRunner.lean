@@ -1,6 +1,13 @@
-import Solcore.Core.HostMachine
-import Solcore.Core.HostTransitionSafety
-import Solcore.Core.HostProgress
+import Solcore.Core.Internal.HostLaws
+import Solcore.Core.Internal.HostPreservation
+
+/-!
+# Execution with host requests
+
+`hostRun` runs to a `HostRunResult`, which may be a suspension, and `HostSteps` is the path it
+takes. Main theorems: `hostRun_done_sound`, `hostRun_done_complete` and their companions relate the
+two, and `hostRun_hasType` and `hostRun_never_faults` give safety.
+-/
 
 /-! Fuelled execution that preserves suspension state and remaining fuel. -/
 
