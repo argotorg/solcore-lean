@@ -50,7 +50,10 @@ these results are the specification.
 - Rust reads an uninitialized local as zero, also through a capture. Lean
   faults on every read of an uninitialized local (`uninitializedLocal`); this
   is an existing difference that does not depend on captures, and capture by
-  value keeps it.
+  value keeps it. Lean keeps this fault by decision rather than defining a
+  zero value for every type. Lean and Rust therefore disagree on any program
+  that reads a local before assigning it, directly or through a capture, and
+  such a program is not a comparison case.
 - Rust rejects a polymorphic local lambda used at two types (`SC0201`), so
   Lean's generalized local closures have no Rust counterpart. They follow the
   same rule.
