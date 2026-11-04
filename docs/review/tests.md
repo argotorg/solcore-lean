@@ -120,6 +120,36 @@ Covers [`Solcore/Frontend`](../../Solcore/Frontend): checked programs, runtime f
 
 | File | Tests | Old modules |
 | --- | --- | ---: |
+| [`ClosedSourceBodies`](../../Solcore/Test/Frontend/ClosedSourceBodies.lean) | Closed source body tests | 23 |
+| [`ClosedSourceData`](../../Solcore/Test/Frontend/ClosedSourceData.lean) | Closed source data tests | 14 |
+| [`ClosedStrictWords`](../../Solcore/Test/Frontend/ClosedStrictWords.lean) | Closed strict word tests | 13 |
+| [`ComputationOwners`](../../Solcore/Test/Frontend/ComputationOwners.lean) | Computation owner tests | 25 |
+| [`ComputationRuntime`](../../Solcore/Test/Frontend/ComputationRuntime.lean) | Computation runtime tests | 13 |
+| [`DeepGroupedConditionals`](../../Solcore/Test/Frontend/DeepGroupedConditionals.lean) | Deep grouped conditional tests | 10 |
+| [`ExpectedDataImages`](../../Solcore/Test/Frontend/ExpectedDataImages.lean) | Expected data image tests | 12 |
+| [`ExpectedLambdas`](../../Solcore/Test/Frontend/ExpectedLambdas.lean) | Expected lambda tests | 22 |
+| [`ExpectedPairedBridges`](../../Solcore/Test/Frontend/ExpectedPairedBridges.lean) | Expected paired bridge tests | 2 |
+| [`GroupedConditionals`](../../Solcore/Test/Frontend/GroupedConditionals.lean) | Grouped conditional tests | 14 |
+| [`LambdaDepth`](../../Solcore/Test/Frontend/LambdaDepth.lean) | Lambda depth tests | 18 |
+| [`LocalApplicationGroups`](../../Solcore/Test/Frontend/LocalApplicationGroups.lean) | Local application wrapper tests | 22 |
+| [`LocalExpressions`](../../Solcore/Test/Frontend/LocalExpressions.lean) | Local expression tests | 21 |
+| [`LocalFunctions`](../../Solcore/Test/Frontend/LocalFunctions.lean) | Local function tests | 20 |
+| [`MatchCounts`](../../Solcore/Test/Frontend/MatchCounts.lean) | Match tests | 22 |
+| [`OwnerExpressions`](../../Solcore/Test/Frontend/OwnerExpressions.lean) | Owner expression tests | 15 |
+| [`Programs`](../../Solcore/Test/Frontend/Programs.lean) | Whole program tests | 13 |
+| [`PublicBoundary`](../../Solcore/Test/Frontend/PublicBoundary.lean) | Frontend public boundary tests | 2 |
+| [`RecursiveComputations`](../../Solcore/Test/Frontend/RecursiveComputations.lean) | Recursive computation tests | 10 |
+| [`RecursiveConditionals`](../../Solcore/Test/Frontend/RecursiveConditionals.lean) | Recursive conditional tests | 3 |
+| [`RecursiveEntries`](../../Solcore/Test/Frontend/RecursiveEntries.lean) | Recursive entry tests | 15 |
+| [`RecursiveFunctions`](../../Solcore/Test/Frontend/RecursiveFunctions.lean) | Recursive function tests | 2 |
+| [`RecursiveLazy`](../../Solcore/Test/Frontend/RecursiveLazy.lean) | Recursive lazy tests | 4 |
+| [`RecursiveRuntimeEntries`](../../Solcore/Test/Frontend/RecursiveRuntimeEntries.lean) | Recursive runtime entry tests | 2 |
+| [`RecursiveTypedLetEntries`](../../Solcore/Test/Frontend/RecursiveTypedLetEntries.lean) | Recursive typed let entry tests | 2 |
+| [`RecursiveUnary`](../../Solcore/Test/Frontend/RecursiveUnary.lean) | Recursive unary tests | 3 |
+| [`ReturnBodies`](../../Solcore/Test/Frontend/ReturnBodies.lean) | Return body tests | 13 |
+| [`RuntimeFunctions`](../../Solcore/Test/Frontend/RuntimeFunctions.lean) | Runtime function tests | 17 |
+| [`RuntimeParameters`](../../Solcore/Test/Frontend/RuntimeParameters.lean) | Runtime parameter tests | 22 |
+| [`RuntimeValues`](../../Solcore/Test/Frontend/RuntimeValues.lean) | Runtime value tests | 17 |
 | [`Source/CompilationPlan`](../../Solcore/Test/Frontend/Source/CompilationPlan.lean) | Compilation plan tests | 2 |
 | [`Source/Compiler`](../../Solcore/Test/Frontend/Source/Compiler.lean) | Source compiler tests | 15 |
 | [`Source/CompilerFeatureSupport`](../../Solcore/Test/Frontend/Source/CompilerFeatureSupport.lean) | Source compiler test support | 1 |
@@ -128,6 +158,23 @@ Covers [`Solcore/Frontend`](../../Solcore/Frontend): checked programs, runtime f
 | [`Source/Staged`](../../Solcore/Test/Frontend/Source/Staged.lean) | Staged source tests | 9 |
 | [`Source/StagedIntegers`](../../Solcore/Test/Frontend/Source/StagedIntegers.lean) | Staged integer tests | 6 |
 | [`Source/TypedRuntime`](../../Solcore/Test/Frontend/Source/TypedRuntime.lean) | Typed runtime tests | 4 |
+| [`StructuralForms`](../../Solcore/Test/Frontend/StructuralForms.lean) | Structural form tests | 24 |
+| [`SymbolicDepth`](../../Solcore/Test/Frontend/SymbolicDepth.lean) | Data depth and self-application tests | 7 |
+| [`TerminalBodies`](../../Solcore/Test/Frontend/TerminalBodies.lean) | Terminal body tests | 13 |
+| [`TerminalTreeInvariance`](../../Solcore/Test/Frontend/TerminalTreeInvariance.lean) | Terminal tree invariance tests | 2 |
+| [`TerminalTreeRunner`](../../Solcore/Test/Frontend/TerminalTreeRunner.lean) | Terminal tree runner tests | 2 |
+| [`TypedLetBodies`](../../Solcore/Test/Frontend/TypedLetBodies.lean) | Typed let body tests | 10 |
+| [`TypedLetBodyRunner`](../../Solcore/Test/Frontend/TypedLetBodyRunner.lean) | Typed let body runner tests | 2 |
+| [`TypedLetBodyStore`](../../Solcore/Test/Frontend/TypedLetBodyStore.lean) | Typed let body store tests | 2 |
+| [`TypedLetTrees/Evaluation`](../../Solcore/Test/Frontend/TypedLetTrees/Evaluation.lean) | Typed let tree evaluation tests | 2 |
+| [`TypedLetTrees/Evaluator`](../../Solcore/Test/Frontend/TypedLetTrees/Evaluator.lean) | Typed let tree evaluator tests | 2 |
+| [`TypedLetTrees/Owner`](../../Solcore/Test/Frontend/TypedLetTrees/Owner.lean) | Typed let tree owner tests | 2 |
+| [`TypedLetTrees/RawOwner`](../../Solcore/Test/Frontend/TypedLetTrees/RawOwner.lean) | Typed let tree raw owner tests | 2 |
+| [`TypedLetTrees/Runner`](../../Solcore/Test/Frontend/TypedLetTrees/Runner.lean) | Typed let tree runner tests | 2 |
+| [`TypedLetTrees/Store`](../../Solcore/Test/Frontend/TypedLetTrees/Store.lean) | Typed let tree store tests | 2 |
+| [`TypedLetTrees/Trees`](../../Solcore/Test/Frontend/TypedLetTrees/Trees.lean) | Typed let tree tests | 2 |
+| [`TypedLetTrees/TypeExtension`](../../Solcore/Test/Frontend/TypedLetTrees/TypeExtension.lean) | Typed let tree type extension tests | 2 |
+| [`WordOperators`](../../Solcore/Test/Frontend/WordOperators.lean) | Word operator tests | 25 |
 
 ### Frontend/RustHull
 
@@ -176,6 +223,22 @@ Covers [`Solcore/Synthesis`](../../Solcore/Synthesis): generators, emitters, gol
 | [`Storage`](../../Solcore/Test/Synthesis/Storage.lean) | Storage profile tests | 16 |
 | [`Traits`](../../Solcore/Test/Synthesis/Traits.lean) | Trait profile tests | 5 |
 
+## Why some files are small
+
+A few neighbouring groups cannot share a file, because a merge would change a declaration. Each split
+runs along a feature of its own:
+
+- **Recursive helpers.** A definition by well-founded recursion has a compiled twin, `f._unsafe_rec`, that
+  names itself, so renaming a differing private copy changes the twin. Each feature of typed let trees has
+  its own `certify`, so the features are separate files in `Frontend/TypedLetTrees`. The same holds for
+  `TypedLetBodyRunner`, `TypedLetBodyStore`, `TerminalTreeInvariance`, `TerminalTreeRunner`,
+  `RecursiveRuntimeEntries` and `RecursiveTypedLetEntries`.
+- **Matchers.** Inside a file Lean reuses a matcher even when its bound names differ, and the equations
+  `f.eq_i` take their variable names from it. This keeps `RecursiveFunctions`, `RecursiveConditionals`,
+  `RecursiveLazy`, `RecursiveUnary` and `SymbolicDepth` apart from their neighbours.
+- **Binder annotations.** Lean also reuses an auxiliary proof whose binders differ only in annotations.
+  This keeps `ExpectedPairedBridges` apart from `ExpectedDataImages`.
+
 ## A file that stays where it is
 
 [`Solcore/Test/SourceCallReturnGolden.lean`](../../Solcore/Test/SourceCallReturnGolden.lean) keeps its path
@@ -184,4 +247,4 @@ for its golden rows, so it can neither move nor share a file with other tuples o
 
 ## Not merged yet
 
-2205 old modules are still flat in `Solcore/Test`.
+1711 old modules are still flat in `Solcore/Test`.
