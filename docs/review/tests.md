@@ -207,6 +207,7 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 
 | File | Tests | Old modules |
 | --- | --- | ---: |
+| [`Builtin`](../../Solcore/Test/SourceSemantics/CoreLowering/Builtin.lean) | Builtin lowering tests | 25 |
 | [`Callable/Ancestry`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Ancestry.lean) | Callable ancestry tests | 24 |
 | [`Callable/Coercion`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Coercion.lean) | Callable coercion tests | 18 |
 | [`Callable/Indexed`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Indexed.lean) | Indexed callable tests | 23 |
@@ -214,12 +215,22 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Callable/LambdaViews`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/LambdaViews.lean) | Lambda view tests | 14 |
 | [`Callable/Paired`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Paired.lean) | Paired callable tests | 22 |
 | [`Callable/Prepared`](../../Solcore/Test/SourceSemantics/CoreLowering/Callable/Prepared.lean) | Prepared callable tests | 12 |
+| [`Canonical/Formation`](../../Solcore/Test/SourceSemantics/CoreLowering/Canonical/Formation.lean) | Canonical formation tests | 18 |
+| [`Canonical/Scoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Canonical/Scoped.lean) | Canonical scoped tests | 26 |
 | [`Captured/Assignments`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Assignments.lean) | Captured closure assignment tests | 36 |
 | [`Captured/Branches`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Branches.lean) | Captured closure branch tests | 26 |
 | [`Captured/Locals`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Locals.lean) | Captured local tests | 28 |
 | [`Captured/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Loops.lean) | Captured closure loop tests | 26 |
 | [`Captured/Mappings`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Mappings.lean) | Captured mapping tests | 14 |
 | [`Captured/Nested`](../../Solcore/Test/SourceSemantics/CoreLowering/Captured/Nested.lean) | Nested capture tests | 19 |
+| [`Chosen/Admission`](../../Solcore/Test/SourceSemantics/CoreLowering/Chosen/Admission.lean) | Chosen ordinary admission tests | 18 |
+| [`Chosen/Bodies`](../../Solcore/Test/SourceSemantics/CoreLowering/Chosen/Bodies.lean) | Chosen ordinary body tests | 16 |
+| [`Chosen/OuterBodies`](../../Solcore/Test/SourceSemantics/CoreLowering/Chosen/OuterBodies.lean) | Chosen ordinary outer body tests | 9 |
+| [`Chosen/PublicOutcomes`](../../Solcore/Test/SourceSemantics/CoreLowering/Chosen/PublicOutcomes.lean) | Chosen ordinary public tests | 9 |
+| [`Closed/Admitted`](../../Solcore/Test/SourceSemantics/CoreLowering/Closed/Admitted.lean) | Closed admitted tests | 5 |
+| [`Closed/Owned`](../../Solcore/Test/SourceSemantics/CoreLowering/Closed/Owned.lean) | Closed owned tests | 14 |
+| [`ClosureDirect`](../../Solcore/Test/SourceSemantics/CoreLowering/ClosureDirect.lean) | Direct closure tests | 17 |
+| [`CoercionPublic`](../../Solcore/Test/SourceSemantics/CoreLowering/CoercionPublic.lean) | Public coercion tests | 26 |
 | [`Compatible/Ambient`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Ambient.lean) | Compatible ambient tests | 17 |
 | [`Compatible/Encoding`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Encoding.lean) | Compatible encoding tests | 5 |
 | [`Compatible/Expressions`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Expressions.lean) | Compatible expression tests | 15 |
@@ -227,10 +238,27 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Compatible/Matches`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Matches.lean) | Compatible match tests | 15 |
 | [`Compatible/Payloads`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Payloads.lean) | Compatible payload tests | 2 |
 | [`Compatible/Statements`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Statements.lean) | Compatible statement tests | 14 |
+| [`Constructor`](../../Solcore/Test/SourceSemantics/CoreLowering/Constructor.lean) | Constructor call tests | 22 |
+| [`Data/Places`](../../Solcore/Test/SourceSemantics/CoreLowering/Data/Places.lean) | Data place tests | 21 |
+| [`Data/Values`](../../Solcore/Test/SourceSemantics/CoreLowering/Data/Values.lean) | Data value tests | 18 |
+| [`Direct/Calls`](../../Solcore/Test/SourceSemantics/CoreLowering/Direct/Calls.lean) | Direct call tests | 32 |
+| [`Direct/Linking`](../../Solcore/Test/SourceSemantics/CoreLowering/Direct/Linking.lean) | Direct linking tests | 1 |
 | [`Evidence/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Closure.lean) | Closure evidence tests | 20 |
 | [`Evidence/Direct`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Direct.lean) | Direct evidence tests | 16 |
 | [`Evidence/Method`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Method.lean) | Method evidence tests | 16 |
 | [`Evidence/Scoped`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Scoped.lean) | Scoped evidence tests | 18 |
+| [`Foundations/EntryPoints`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/EntryPoints.lean) | Lowering entry point tests | 20 |
+| [`Foundations/Execution`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean) | Lowering execution tests | 25 |
+| [`Foundations/Heaps`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Heaps.lean) | Heap and allocation tests | 18 |
+| [`Foundations/ReachableDiagnostics`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/ReachableDiagnostics.lean) | Reachable statement tests | 19 |
+| [`Foundations/Snapshots`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Snapshots.lean) | Snapshot tests | 2 |
+| [`Foundations/Stages`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Stages.lean) | Stage contract tests | 3 |
+| [`Foundations/Statements`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Statements.lean) | Basic statement tests | 37 |
+| [`Generalized/Body`](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Body.lean) | Generalized body tests | 28 |
+| [`Generalized/Export`](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Export.lean) | Generalized export tests | 34 |
+| [`GenericDirect`](../../Solcore/Test/SourceSemantics/CoreLowering/GenericDirect.lean) | Generic direct call tests | 16 |
+| [`LexicalFailure`](../../Solcore/Test/SourceSemantics/CoreLowering/LexicalFailure.lean) | Lexical failure tests | 25 |
+| [`LexicalFailureForward`](../../Solcore/Test/SourceSemantics/CoreLowering/LexicalFailureForward.lean) | Lexical failure forward tests | 8 |
 | [`Method/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/Closure.lean) | Method closure tests | 20 |
 | [`Method/DirectEvidence`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/DirectEvidence.lean) | Direct method evidence tests | 23 |
 | [`Method/GenericSubstitution`](../../Solcore/Test/SourceSemantics/CoreLowering/Method/GenericSubstitution.lean) | Generic substitution tests | 23 |
@@ -248,6 +276,9 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Named/Branches`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Branches.lean) | Named branch tests | 36 |
 | [`Named/Loops`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Loops.lean) | Named loop tests | 26 |
 | [`Named/Operators`](../../Solcore/Test/SourceSemantics/CoreLowering/Named/Operators.lean) | Named operator tests | 17 |
+| [`NestedFormation`](../../Solcore/Test/SourceSemantics/CoreLowering/NestedFormation.lean) | Nested formation tests | 20 |
+| [`OperatorCalls`](../../Solcore/Test/SourceSemantics/CoreLowering/OperatorCalls.lean) | Operator call tests | 13 |
+| [`Protected`](../../Solcore/Test/SourceSemantics/CoreLowering/Protected.lean) | Protected statement tests | 14 |
 | [`Recursive/Formation`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Formation.lean) | Recursive formation tests | 19 |
 | [`Recursive/Index`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/Index.lean) | Recursive index tests | 27 |
 | [`Recursive/NamedCatalog`](../../Solcore/Test/SourceSemantics/CoreLowering/Recursive/NamedCatalog.lean) | Recursive named catalog tests | 20 |
@@ -264,6 +295,10 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`Selected/Profiles`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Profiles.lean) | Selected profile tests | 22 |
 | [`Selected/ProfilesControl`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/ProfilesControl.lean) | Selected control profile tests | 11 |
 | [`Selected/Projected`](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Projected.lean) | Selected projected tests | 17 |
+| [`TypedStatements`](../../Solcore/Test/SourceSemantics/CoreLowering/TypedStatements.lean) | Typed statement tests | 17 |
+| [`UnifiedCorpus`](../../Solcore/Test/SourceSemantics/CoreLowering/UnifiedCorpus.lean) | Unified corpus tests | 8 |
+| [`UnifiedCorpusSupport`](../../Solcore/Test/SourceSemantics/CoreLowering/UnifiedCorpusSupport.lean) | Unified corpus test support | 1 |
+| [`UnifiedOperatorCorpus`](../../Solcore/Test/SourceSemantics/CoreLowering/UnifiedOperatorCorpus.lean) | Unified operator corpus tests | 1 |
 
 ### Synthesis
 
@@ -302,14 +337,14 @@ runs along a feature of its own:
   `RecursiveLazy`, `RecursiveUnary` and `SymbolicDepth` apart from their neighbours.
 - **Binder annotations.** Lean also reuses an auxiliary whose binders differ only in annotations. This
   keeps `ExpectedPairedBridges` apart from `ExpectedDataImages`, and is why `Selected/OperatorAlias`,
-  `Selected/GeneralizedSource` and `Foundations/Snapshots` are files of their own.
+  `Selected/GeneralizedSource`, `Foundations/Snapshots` and `Chosen/OuterBodies` are files of their own.
+
+Two more splits keep public names of a test out of a neighbour's reach. `LexicalFailureForward` keeps the
+names of the initial failure namespace from `Selected/Faulting`, which opens that namespace, and
+`UnifiedOperatorCorpus` keeps the public `Compiled` of the unified compilation tests from `Callable/Prepared`.
 
 ## A file that stays where it is
 
 [`Solcore/Test/SourceCallReturnGolden.lean`](../../Solcore/Test/SourceCallReturnGolden.lean) keeps its path
 and stays alone. `scripts/test-semantic-call-differential.py` reads it by path and scans it with a regex
 for its golden rows, so it can neither move nor share a file with other tuples of strings.
-
-## Not merged yet
-
-586 old modules are still flat in `Solcore/Test`.

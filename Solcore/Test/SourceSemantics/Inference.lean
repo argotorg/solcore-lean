@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathFaults
 import Solcore.Frontend.SourceRuntimeValues
 import Solcore.SourceSemantics.CoreLowering.LegacyClosureBoundary
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Frontend.SourceInference.Types
 import Solcore.Frontend.SourceInference.TypedIRProperties
 import Solcore.Frontend.SourceSpecialization

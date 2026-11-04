@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogBodyFinishBounds
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogFiniteCompletion

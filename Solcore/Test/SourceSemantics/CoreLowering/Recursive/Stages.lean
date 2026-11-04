@@ -4,7 +4,7 @@ import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Frontend.ProgramChecking
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinNativeTyping
 import Solcore.SourceSemantics.CoreLowering.RecursiveGlobalInitializationMeaning
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins

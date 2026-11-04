@@ -1,5 +1,4 @@
-import Solcore.Test.SourceCoreSelectedLexicalFailureMeaning
-import Solcore.Test.SourceCoreDirectFailurePublicExecution
+import Solcore.Test.SourceSemantics.CoreLowering.LexicalFailure
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionIssuance
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfiledPublicSessionDirectFailures
 import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches

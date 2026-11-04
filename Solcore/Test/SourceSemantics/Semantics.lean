@@ -5,8 +5,8 @@ import Solcore.SourceSemantics
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Heap
 import Solcore.SourceSemantics.CoreLowering.IntegerBitNotSnapshot
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
-import Solcore.Test.SourceCoreIntegerAssignments
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints
 import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Program
 

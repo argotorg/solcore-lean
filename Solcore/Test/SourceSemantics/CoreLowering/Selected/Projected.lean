@@ -5,7 +5,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedOutputForward
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Core.UnaryPrimitives
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicInitialData
 

@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedDirect
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedOutputForward
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
-import Solcore.Test.SourceCoreCoercionPublicFixture
+import Solcore.Test.SourceSemantics.CoreLowering.CoercionPublic
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationClosedCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallAdmission
 import Solcore.Test.SourceSemantics.CoreLowering.Selected.GeneralizedSource
@@ -24,12 +24,11 @@ import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNextStart
 import Solcore.SourceSemantics.CoreLowering.CellAwareSelectedPublicSessionState
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedContinuation
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicNamedObservedOutput
-import Solcore.Test.SourceCoreSelectedLexicalFailureMeaning
-import Solcore.Test.SourceCoreDirectIssuedSequence
+import Solcore.Test.SourceSemantics.CoreLowering.LexicalFailure
+import Solcore.Test.SourceSemantics.CoreLowering.Direct.Calls
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionIssuance
-import Solcore.Test.SourceCoreSelectedLexicalSourceStart
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSourceCallOutcomes
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 
 /-!
 # Generalized selected tests

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
 import Solcore.SourceSemantics.CoreLowering.ForHeaderNativeBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderParameterProjections

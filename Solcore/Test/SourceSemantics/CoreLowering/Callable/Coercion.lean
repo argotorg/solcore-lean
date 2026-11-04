@@ -17,9 +17,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourcePathMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSpineEvaluation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCatalogAdmission
-import Solcore.Test.SourceCoreCoercionPublicCatalog
-import Solcore.Test.SourceCoreCoercionPublicKeepCompilerSupport
-import Solcore.Test.SourceCoreCoercionPublicCommon
+import Solcore.Test.SourceSemantics.CoreLowering.CoercionPublic
 
 /-!
 # Callable coercion tests

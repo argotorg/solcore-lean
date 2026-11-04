@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 
 /-!

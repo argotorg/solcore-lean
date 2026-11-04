@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicWordResultMeaning
-import Solcore.Test.SourceCoreOperatorCallsSource
+import Solcore.Test.SourceSemantics.CoreLowering.OperatorCalls
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts

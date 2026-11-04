@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDataInputs
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootArguments

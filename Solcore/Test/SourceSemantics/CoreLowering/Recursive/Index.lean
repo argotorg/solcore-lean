@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreDirectCallsSource
+import Solcore.Test.SourceSemantics.CoreLowering.Direct.Calls
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedSourceScopeReceipts

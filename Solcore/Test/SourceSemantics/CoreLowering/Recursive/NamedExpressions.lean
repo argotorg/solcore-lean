@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedAssignmentNativeCertificates
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentReflection

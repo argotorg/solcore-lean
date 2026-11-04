@@ -26,7 +26,7 @@ import Solcore.SourceSemantics.Staging.RecursiveErasure
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageProjection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStagedCalls
 import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning

@@ -1,5 +1,5 @@
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
-import Solcore.Test.SourceCoreAssignmentEntries
+import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints
 import Solcore.Frontend.SourceCoreCompiler
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.Frontend.SourceRuntimeDeepValidation

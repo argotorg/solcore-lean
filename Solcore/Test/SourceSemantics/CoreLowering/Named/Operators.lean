@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfiles
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates

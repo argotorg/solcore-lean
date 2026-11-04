@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
-import Solcore.Test.SourceCoreUnifiedOperatorCorpus
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedOperatorCorpus
 import Solcore.Test.SourceSemantics.CoreLowering.Callable.Coercion
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodCatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeMeaning

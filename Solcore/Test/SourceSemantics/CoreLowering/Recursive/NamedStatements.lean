@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.NamedLoopStatements
-import Solcore.Test.SourceCoreUnifiedCorpusSupport
+import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
 import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedExpressions
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalControlBounds
