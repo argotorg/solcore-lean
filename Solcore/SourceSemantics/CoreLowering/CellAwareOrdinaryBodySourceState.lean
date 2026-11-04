@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalBodyExpressions
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadProductLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalInversion
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageScopedTerminalInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 
 /-! Ordinary Source lifting uses actual lexical and heap typing. These facts
 come from the genuine closure and its parameter allocation; native evaluation

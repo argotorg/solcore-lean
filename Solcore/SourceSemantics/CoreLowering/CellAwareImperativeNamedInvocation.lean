@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedEntry
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeNamedBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareOwnedBodyRestoration

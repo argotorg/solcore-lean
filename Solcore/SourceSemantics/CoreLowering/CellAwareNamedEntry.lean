@@ -1,13 +1,11 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedParameterEntry
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCellAllocationProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalParameterAdmission
 import Solcore.SourceSemantics.CoreLowering.NamedCallMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 
 /-! The actual named hook installs its authenticated seed and allocates the real
 parameters in the mixed heap. Its continuation restores the saved physical

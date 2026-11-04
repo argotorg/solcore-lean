@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedPackedApplication
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicPackedInputs
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyCompiler
 

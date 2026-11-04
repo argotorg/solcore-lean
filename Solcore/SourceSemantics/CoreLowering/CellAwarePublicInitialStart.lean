@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicInitialArguments
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionInitial
+import Solcore.SourceSemantics.CoreLowering.PublicSessions
 
 /-! The actual bootstrap and public input encoding produce the initial mixed
 heap, caller, diagnostic receiver and parameter representation. -/

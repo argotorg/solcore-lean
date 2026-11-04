@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowLiftBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageScopedTerminalInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 
 /-! Actual break and continue statements have the same independent Source
 and staged control outcome, with no heap or physical history change. -/

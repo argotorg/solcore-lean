@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNamedBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping

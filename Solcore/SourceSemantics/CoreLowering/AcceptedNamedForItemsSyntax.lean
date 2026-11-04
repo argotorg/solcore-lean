@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedStatementSyntaxFacts
 

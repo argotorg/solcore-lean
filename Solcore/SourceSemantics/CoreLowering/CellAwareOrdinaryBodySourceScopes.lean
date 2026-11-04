@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourcePrefixes
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageDiscardInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementMeaning
 
 /-! Exact ordinary Source lifting restores lexical environments at each block

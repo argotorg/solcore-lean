@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedAbsentPrefix
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! An original uninitialized declaration lifts through its actual absent

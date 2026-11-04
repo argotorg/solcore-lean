@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageWhileSequenceLifting
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageWhileMatch
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceWhileLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareLoopHeads
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowReadiness

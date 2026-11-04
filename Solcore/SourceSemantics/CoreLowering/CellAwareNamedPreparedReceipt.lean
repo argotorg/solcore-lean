@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedInvocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedBodyReceipt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures

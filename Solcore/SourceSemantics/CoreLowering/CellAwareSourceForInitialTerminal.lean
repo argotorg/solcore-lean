@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForInitialBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowReadiness
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceWhileLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForLiftBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeForPostBounds
 
 /-! Independent Source for-loop headers use the same reached mixed state as

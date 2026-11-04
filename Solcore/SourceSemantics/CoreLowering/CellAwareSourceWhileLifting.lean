@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowReadiness
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageWhileLifting
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageWhileMatch
 
 /-! Independent Source while execution follows the actual mixed continuation.
 Repeated and continued iterations retain all descriptor bundles; a genuine

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftSequence
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence

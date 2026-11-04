@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicPackedInputs
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedRetainedEntries
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 

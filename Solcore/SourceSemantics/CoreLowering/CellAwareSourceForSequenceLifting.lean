@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForSequenceLifting
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForInitialBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeForInitialBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceWhileLifting

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceSequenceLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceReadLifting

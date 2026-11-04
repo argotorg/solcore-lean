@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedMaterialization
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalReachedMaterialization
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPreparedRuntimeFacts
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 
 /-! The existing Snapshot supplies reached body correspondence. The real read
 recovers the same Code, captures and Materialization with the body relation

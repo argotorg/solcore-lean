@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedTerminals
+import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationReachedReads
 
 /-! Actual accepted return and tail-expression compiler branches consume the

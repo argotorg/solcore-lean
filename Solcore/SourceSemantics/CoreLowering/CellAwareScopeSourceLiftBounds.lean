@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopePhysical
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 
 /-! Ordinary Source execution is lifted at the actual mixed physical state.
 A genuine stage rejection retains its reached prefix; all other outcomes

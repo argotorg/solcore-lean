@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedInstances
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalReadReceipts
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationLocalOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 
 /-! The actual compiler catalog supplies candidate origins at creation and at
 a later read. Snapshot formation uses the same Packet, captured environment

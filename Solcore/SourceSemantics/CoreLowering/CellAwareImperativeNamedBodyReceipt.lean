@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CellAwareImperativeBodyProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
 
 /-! The actual public preparation and named header produce the bounded mixed

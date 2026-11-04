@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceSequenceLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedTargetInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeProjectedAssignmentResolution
 
 set_option autoImplicit false

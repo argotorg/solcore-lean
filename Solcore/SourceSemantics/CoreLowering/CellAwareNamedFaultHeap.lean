@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 
 /-! Actual parameter allocation and the reached staged fault determine deep

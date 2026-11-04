@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceBodyLiftBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageTerminalInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 
 /-! A real return or tail expression preserves the ordinary Source outcome,
 or propagates its actual earlier stage rejection. -/

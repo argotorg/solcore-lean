@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentReflection
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceGetterReflection
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceTargetKeys
 import Solcore.SourceSemantics.CoreLowering.CompatibleCellReadCompletion
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedTarget
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence
 
 /-! Staged keys retain their original failure and reached heap. The native

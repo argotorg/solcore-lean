@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowLiftBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageDiscardInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! A real return or tail expression preserves the ordinary Source outcome,

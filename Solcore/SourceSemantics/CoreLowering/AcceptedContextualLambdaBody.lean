@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualLambdaReceipt
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 
 /-! A reached ordinary lambda retains its complete accepted body. Its source
 position, enclosing body shape and the number of other lambdas are unrestricted.

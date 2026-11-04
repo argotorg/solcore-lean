@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicReturnedValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicPhysicalHistory
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicHistoryArgumentsReceiving
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions
 import Solcore.SourceSemantics.CoreLowering.CellAwarePhysicalFunctionOrigins
 
 /-! Public history is instantiated directly with positive physical closure

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowLiftBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageScopedSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeFlowBounds
 

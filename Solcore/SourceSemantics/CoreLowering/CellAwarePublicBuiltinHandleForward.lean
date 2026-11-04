@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedInputMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinPackedApplication
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicPackedInputs
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBuiltin
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 
 /-! Actual history and input encoding supply direct callable arguments.
 The retained builtin keeps its genuine compiler identity. Source and host raw

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 
 /-! The ordinary Source declaration copies its environment, captures one
 principal descriptor over the copies and allocates it once. Its compiler-supported direct lambda excludes the genuine

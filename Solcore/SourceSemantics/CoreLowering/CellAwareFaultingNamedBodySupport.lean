@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedInitializerProfiles
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNativeBodyCollectors
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 
 /-! The selected named body obtains its bounded mixed-cell tree from its
 original accepted compiler action. All row checks inspect the unchanged local

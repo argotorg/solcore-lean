@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeBareAssignmentHeads
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageAssignments
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! Independent Source assignment first resolves the original root, then

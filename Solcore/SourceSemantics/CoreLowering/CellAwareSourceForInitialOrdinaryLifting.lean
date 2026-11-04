@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceForInitialBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedOrdinaryPrefix
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! A real ordinary Source initializer is lifted before allocation. A failed

@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourcePrefixLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalSourceApplicationLifting
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBodyCompiler
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageApplicationArity
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSuccessfulArgumentTyping
 
 /-! Original indirect calls lift through the actual generalized local value.

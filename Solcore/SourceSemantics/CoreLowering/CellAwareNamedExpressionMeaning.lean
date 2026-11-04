@@ -1,5 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareBuiltinValueOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedBodyProducer

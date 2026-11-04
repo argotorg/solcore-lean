@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNamedInvocation
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedPreparedReceipt
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNamedBodyReceipt

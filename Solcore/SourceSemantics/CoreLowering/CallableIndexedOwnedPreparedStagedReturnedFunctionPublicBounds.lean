@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstrapGlobalReferences
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedValues
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedSessionInputs
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedArgumentsReceiving
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
 
 /-! An actual successful public call supplies the closure and the reached

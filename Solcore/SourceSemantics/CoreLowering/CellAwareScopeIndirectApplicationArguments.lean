@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedArgumentRows
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalClosureArgumentRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 
 /-! Actual successful argument rows are aligned with the materialized closure.
 The selected physical count supplies Source arity independently of packed types. -/

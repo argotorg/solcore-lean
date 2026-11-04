@@ -3,6 +3,19 @@ import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedCall
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalCallPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableBodyMetadataViews
 
+/-!
+# Actual body invocations
+
+One body invocation of the compiler: a named cache row or a materialized contextual
+closure. The accepted-body theorems are stated over this index.
+
+Main declarations:
+- `ActualBodyInvocation.Index`, the index, with its `compilation`, `source` and `policy`;
+- `ActualBodyInvocation.BodyRelation`, which relates a body to its Source;
+- `ActualBodyInvocation.ReachedView` and `ActualBodyInvocation.Frame`, what a reached
+  statement sees.
+-/
+
 /-! One body index retains its actual compiler action and invocation origin.
 Named cache calls and materialized local calls share the body interface. The
 independently substituted Source is related to runtime metadata by `Pair`;

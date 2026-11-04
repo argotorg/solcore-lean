@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationResidualEntry
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedReadMaterialization
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 
 /-! Both actual invocation forms consume the same stored Snapshot and return
 scope evidence for the next body. The code and saved frame remain unchanged. -/

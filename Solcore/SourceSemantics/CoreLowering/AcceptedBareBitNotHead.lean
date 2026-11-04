@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedBareBitNotReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 
 /-! The accepted compiler action supplies the complete bare bit-not head.
 Its original target equality and independent Source typing determine the

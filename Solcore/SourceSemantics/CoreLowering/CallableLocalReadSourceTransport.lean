@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.SourcePreparedLocalReadTemplateExclusion
 import Solcore.SourceSemantics.CoreLowering.SourceAuthenticatedReferenceOrigin
 import Solcore.SourceSemantics.CoreLowering.CallableAncestryPairedValidation
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCachedSources
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 
 /-! Local binder selection ignores requirement rewriting and commutes with
 actual type substitution. These facts keep the real read factory connected

@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicPackedInputs
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.CellAwareMaterializedRetainedEntries
 import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 
 /-! The actual current public input and retained callee supply the deep heap
 typing needed after a measured faulting materialized call. -/

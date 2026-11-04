@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalLambdaCompilation
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 
 /-! A contextual instance packet already contains its successful body compiler
 call. Recover the complete body tree from that call without a lexical scanner

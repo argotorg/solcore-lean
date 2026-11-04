@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalSourceTreeLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedExpressionSourceLifting
 import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedBodySupport

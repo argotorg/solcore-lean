@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 
 /-! Whole-program clients reuse the selected compilation producer. Their
 existing validity receipt supplies the selected body facts internally. -/

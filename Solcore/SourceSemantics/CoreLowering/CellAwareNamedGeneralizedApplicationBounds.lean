@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedArgumentTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalApplicationMeaning
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeApplicationBounds
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 
 /-! The scoped call port is discharged from the actual materialized compiler,
 Source closure frame and issued public diagnostics. No body execution law is

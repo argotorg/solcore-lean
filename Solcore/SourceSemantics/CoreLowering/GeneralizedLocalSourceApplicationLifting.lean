@@ -2,9 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalOrdinaryBodyAdmissio
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedProvenance
 import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourceLifting
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosureSourceTrace
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageNamedInvocationLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPhysicalProgramSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageClosures
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 
 /-! Independent Source calls enter the actual parameter allocation and lift
 through the complete finite lexical body extracted from contextual compilation.

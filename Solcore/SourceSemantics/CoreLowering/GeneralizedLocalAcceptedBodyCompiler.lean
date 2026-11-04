@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalAcceptedMaterialization
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 
 /-! Materialization enters the same complete accepted lambda body. Its actual

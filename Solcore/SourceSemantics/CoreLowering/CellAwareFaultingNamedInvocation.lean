@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSupport
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedEntry
 import Solcore.SourceSemantics.CoreLowering.CellAwareFaultingNamedBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CellAwareOwnedBodyRestoration

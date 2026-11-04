@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceFlowLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeProjectedAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.CellAwareSourceProjectedResolutionLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedAssignmentInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageAssignments
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping
 
 /-! Independent projected assignment lifts the actual ordered keys, getter,

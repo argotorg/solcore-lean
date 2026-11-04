@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareNamedGeneralizedPrefix
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageBodyLiftBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
 
 /-! Body lifting starts from independent ordinary Source execution at the actual
 mixed physical scope. It records the exact reached prefix of a stage rejection. -/

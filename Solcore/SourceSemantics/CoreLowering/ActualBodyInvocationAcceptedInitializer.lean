@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationInitializerReceipt
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationInitializerRows
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
 
 /-! The actual reached initialized statement supplies the existing accepted
 bundle receipt, including empty bundles and contextual invocations. -/

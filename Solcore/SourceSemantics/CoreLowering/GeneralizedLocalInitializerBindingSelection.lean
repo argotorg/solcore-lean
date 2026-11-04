@@ -1,7 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationBindingOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocationResidualEntry
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalBinderMetadata
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCachedSources
 
 /-! The native binder and initializer selectors are tied to the same original
 statement. Source ownership identifies a binder's initializer; the occurrence

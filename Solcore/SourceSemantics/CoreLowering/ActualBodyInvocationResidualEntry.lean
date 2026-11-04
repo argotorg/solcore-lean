@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationLocalReadMaterialization
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.NamedInvocationResidualEntry
 import Solcore.SourceSemantics.SourceSpecializationLocalLexicalSubstitutionChildren
 

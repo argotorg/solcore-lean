@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyCompletion
 
 /-! Completion is indexed by the original result type. The grammar receipt

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationReadAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareReadMeaningEffects
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeExpressionBounds
 

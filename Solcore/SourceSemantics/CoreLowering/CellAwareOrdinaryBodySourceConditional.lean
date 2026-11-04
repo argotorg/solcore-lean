@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwareOrdinaryBodySourceScopes
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageConditionalSourceInversion
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 
 /-! Original Source conditions select the same branch. Actual expression
 preservation excludes non-Boolean conditions and supplies the reached heap

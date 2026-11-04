@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CellAwarePhysicalFunctionOrigins
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicInitialArguments
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicCells
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalInstanceValues
 

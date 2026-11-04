@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.GeneralizedLocalMaterializedAssociation
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 
 /-! Positive callable leaves for heaps containing generalized descriptors.
 A materialized local keeps its actual read wrapper and Source instantiation;

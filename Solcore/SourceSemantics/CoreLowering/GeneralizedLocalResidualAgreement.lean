@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SourceResidualNodeSubstitutionAgreement
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationResidualScopes
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.CallableBodyViewSubstitution
 
 /-! Actual residual validation reduces a node's substitution agreement to its

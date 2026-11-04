@@ -1,6 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCallableOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeSourceCalleeLifting
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageIndirectSourceTrace
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageClosures
 import Solcore.SourceSemantics.CoreLowering.CellAwareScopeIndirectValuesPrefix
 
 /-! The original ordinary indirect call reaches either its exact staged

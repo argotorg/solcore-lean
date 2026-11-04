@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationPairBounds
 import Solcore.SourceSemantics.CoreLowering.CellAwareInvocationExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.SelectedStagedPostAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 
 /-! Invocation tuple heads retain the actual ordered child certificate
