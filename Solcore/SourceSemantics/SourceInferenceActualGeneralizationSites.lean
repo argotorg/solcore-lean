@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.SourceInferenceActualCallProperties
 import Solcore.SourceSemantics.SourceInferenceActualGeneralizationOrigins
 import Solcore.SourceSemantics.SourceInferenceGeneralizationReceiptCalls
-import Solcore.SourceSemantics.SourceInferenceGeneralizationReceiptUniqueness
+import Solcore.SourceSemantics.Internal.Compiled.Origins
 
 /-! A site identifies an actual initialized declaration call. Its only child
 is the exact initializer whose result supplied the generalized quantifiers. -/

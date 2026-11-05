@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeBinary
 import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeIndex
 import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeConditional
 import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeCallSteps
-import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeLambda
+import Solcore.SourceSemantics.Internal.Compiled.OperationalState
 
 /-! Events in actual expression children survive their parent's remaining
 inference steps. Every prefix and continuation comes from the recorded call. -/
