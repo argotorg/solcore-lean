@@ -4,17 +4,14 @@ import Solcore.SourceSemantics.Staging.Materialization
 import Solcore.SourceSemantics
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Heap
-import Solcore.SourceSemantics.CoreLowering.IntegerBitNotSnapshot
-import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
-import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints
 import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Program
 
 /-!
 # Source semantics tests
 
-Whole-program admission and execution in the source semantics: captures, faults, generalized closures,
-local schemes and integers.
+Whole-program admission and execution in the source semantics: captures, faults, generalized closures
+and local schemes.
 -/
 
 section
@@ -1152,74 +1149,6 @@ example {first middle last : Heap} {location : Location} {cell : Cell}
   left.trans right location cell read
 
 end Solcore.Test.SourceSemanticsGeneralizedClosureTyping
-end
-
-section
--- leanmerge: from Solcore.Test.SourceSemanticsIntegerBitNot
-#check_failure Solcore.Frontend.SourceTypedRuntime.run
-#check_failure Solcore.Frontend.SourceTypedRuntime.runTrusted
-
-/-! Integer bit-not has two deliberately distinct admission boundaries. The closed
-unary fixture `~5` is checker accepted; compound `value ~=` is currently rejected. The
-retained IR is lowered to ordinary Core assignment and compared with the
-independent Integer primitive. No checker receipt is asserted for the edited IR. -/
-set_option autoImplicit false
-namespace Tests.SourceSemanticsIntegerBitNot
-open Solcore Solcore.Frontend SourceInference
-open SourceCoreUnifiedCorpusSupport
-
-private def workspace (text : String) : Workspace.RawWorkspace :=
-  { entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := text}] }
-
-private def checkTrustedRetained (value : Int) : IO Unit := do
-  let program ← get "retained baseline checked source" (checkProgram (workspace
-    "function retained(value: integer) returns (integer) { return value; }"))
-  let owner ← key program "retained"
-  let plan ← match SourceSpecializationWorklist.run program [⟨owner.declaration, []⟩] 64 with
-    | .ok (.complete plan) => pure plan
-    | other => throw (IO.userError s!"retained baseline worklist failed: {reprStr other}")
-  let specialized ← get "retained entry" (SourceCompilationPlan.exactSpecialization plan owner)
-  let input ← match specialized.function.typedBody.inputs with
-    | [binder] => pure binder
-    | _ => throw (IO.userError "retained entry input missing")
-  let statementId : StatementId := ⟨⟨owner.declaration, 100000⟩⟩
-  let assignment : AssignmentResolution := { target := { root := input.id, projections := [], type := .integer } }
-  let statement : StatementNode := {
-    id := statementId
-    span := { source := {origin := .main, path := "main.solc"}, startByte := 0, endByte := 1 }
-    type := .unit
-    form := .assignBitNot assignment
-  }
-  let source := { specialized.function.typedBody with
-    roots := .statement statementId :: specialized.function.typedBody.roots
-    nodes := .statement statement :: specialized.function.typedBody.nodes }
-  let scope : SourceCoreLocalCell.Scope := [(input.id, .integer)]
-  let body ← get "native retained Integer ~= lowering" (SourceCoreAssignments.assignBitNot source scope assignment .integer
-    (Core.OptionalCell.read .integer (.var 0) Core.Word.zero) Core.Word.zero)
-  assertTrue (Core.infer? (SourceCoreLocalCell.coreContext scope) body == some (Core.LanguageResult.resultType .integer))
-    "native retained Integer ~= checker failed"
-  let initial := Core.State.initial body [.cellRef (Core.OptionalCell.cellType .integer) 0] [.inRight .unit (.integer value)]
-  let expected := Core.StatefulRunResult.done (.inRight .word (.integer (~~~value))) [.inRight .unit (.integer (~~~value))]
-  assertTrue (Core.runStateful 1000 initial == expected) "retained Integer ~= result/store differed from its source primitive"
-  match Core.runStateful 2 initial with
-  | .outOfFuel checkpoint => assertTrue (Core.runStateful 1000 checkpoint == expected) "native retained Integer ~= resume changed"
-  | other => throw (IO.userError s!"native retained Integer ~= expected checkpoint: {reprStr other}")
-
-def run : IO Unit := do
-  match checkProgram (workspace "function rejected(value: integer) returns (integer) { value ~=; return value; }") with
-  | .error [.inference _] => pure ()
-  | result => throw (IO.userError s!"Integer ~= source admission changed: {reprStr result}")
-  let compiled ← prepare "Integer unary bit-not" "function unary() returns (integer) { return ~5; }" ["unary"]
-  discard <| expect compiled "unary" [] (.integer (-6)) 2
-  for value in [-7, 0, 5, -(Int.ofNat (2^300))] do
-    have _sourcePrimitive := SourceSemantics.Dynamic.BitNotSnapshot.integer value
-    have _finiteNative := SourceSemantics.CoreLowering.IntegerBitNotSnapshot.native_success value
-      (environment := [.inRight .unit (.integer value)]) (snapshot := .var 0) (rhs := .unit) (.var (index := 0) rfl)
-      none ([] : Core.Store) Core.Word.zero
-    checkTrustedRetained value
-  IO.println "Integer bit-not checked unary/compound rejection and retained Core assignment/source primitive GREEN"
-
-end Tests.SourceSemanticsIntegerBitNot
 end
 
 section

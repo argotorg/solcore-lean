@@ -1,6 +1,7 @@
 import Solcore.Resolved.Expr
 import Solcore.Core.Typing
 import Solcore.Resolved.LocalScope
+import Solcore.Resolved.Internal.LocalFragmentLaws
 
 /-!
 # Typing of resolved expressions

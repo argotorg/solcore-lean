@@ -77,6 +77,7 @@ source resolver or a complete source-to-Core pipeline.
 | Internal file | Topic |
 | --- | --- |
 | [`ScopeLaws`](../../Solcore/Resolved/Internal/ScopeLaws.lean) | Well-scoped expressions, weakening, uniform renaming, and the word less-than builder |
+| [`LocalFragmentLaws`](../../Solcore/Resolved/Internal/LocalFragmentLaws.lean) | `Resolved.Lowers.localFragment`: lowering produces only the local Core fragment |
 
 ## Workspace
 

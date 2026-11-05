@@ -5,6 +5,7 @@ import Solcore.Resolved.Typing
 import Solcore.Resolved.Eval
 import Solcore.Resolved.ExecutionProperties
 import Solcore.Resolved.Internal.ScopeLaws
+import Solcore.Resolved.Internal.LocalFragmentLaws
 
 /-!
 # Resolved expressions
@@ -16,5 +17,6 @@ pipeline, and it does not enable a canonical tuple adapter. `docs/review/foundat
 file.
 
 Read `Identity`, `LocalScope`, `Expr`, `Typing` and `Eval`. `ExecutionProperties` holds the main
-theorems, and `Internal/ScopeLaws` scope and renaming.
+theorems, `Internal/ScopeLaws` scope and renaming, and `Internal/LocalFragmentLaws` the bridge to
+the local Core fragment.
 -/

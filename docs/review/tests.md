@@ -187,7 +187,8 @@ Covers [`Solcore/Frontend/RustHull`](../../Solcore/Frontend/RustHull): the impor
 | [`Correspondence`](../../Solcore/Test/Frontend/RustHull/Correspondence.lean) | Hull correspondence tests | 13 |
 | [`Creation`](../../Solcore/Test/Frontend/RustHull/Creation.lean) | Hull creation tests | 11 |
 | [`Effects`](../../Solcore/Test/Frontend/RustHull/Effects.lean) | Hull effect correspondence tests | 10 |
-| [`Runtime`](../../Solcore/Test/Frontend/RustHull/Runtime.lean) | Hull runtime tests | 8 |
+| [`Runtime`](../../Solcore/Test/Frontend/RustHull/Runtime.lean) | Hull runtime tests | 7 |
+| [`YulPrimitives`](../../Solcore/Test/Frontend/RustHull/YulPrimitives.lean) | Yul primitive tests | 1 |
 
 ### SourceSemantics
 
@@ -197,7 +198,8 @@ Covers [`Solcore/SourceSemantics`](../../Solcore/SourceSemantics): source semant
 | --- | --- | ---: |
 | [`CompiledOrigins`](../../Solcore/Test/SourceSemantics/CompiledOrigins.lean) | Compiled origin tests | 22 |
 | [`Inference`](../../Solcore/Test/SourceSemantics/Inference.lean) | Source inference tests | 6 |
-| [`Semantics`](../../Solcore/Test/SourceSemantics/Semantics.lean) | Source semantics tests | 9 |
+| [`IntegerBitNot`](../../Solcore/Test/SourceSemantics/IntegerBitNot.lean) | Integer bit-not tests | 1 |
+| [`Semantics`](../../Solcore/Test/SourceSemantics/Semantics.lean) | Source semantics tests | 8 |
 | [`SemanticsBoundary`](../../Solcore/Test/SourceSemantics/SemanticsBoundary.lean) | Source semantics boundary tests | 3 |
 | [`SemanticsSubstitution`](../../Solcore/Test/SourceSemantics/SemanticsSubstitution.lean) | Source substitution tests | 1 |
 
@@ -233,14 +235,14 @@ Covers [`Solcore/SourceSemantics/CoreLowering`](../../Solcore/SourceSemantics/Co
 | [`CoercionPublic`](../../Solcore/Test/SourceSemantics/CoreLowering/CoercionPublic.lean) | Public coercion tests | 26 |
 | [`Compatible/Ambient`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Ambient.lean) | Compatible ambient tests | 17 |
 | [`Compatible/Encoding`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Encoding.lean) | Compatible encoding tests | 5 |
-| [`Compatible/Expressions`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Expressions.lean) | Compatible expression tests | 15 |
+| [`Compatible/Expressions`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Expressions.lean) | Compatible expression tests | 16 |
 | [`Compatible/General`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/General.lean) | Compatible general tests | 20 |
 | [`Compatible/Matches`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Matches.lean) | Compatible match tests | 15 |
 | [`Compatible/Payloads`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Payloads.lean) | Compatible payload tests | 2 |
 | [`Compatible/Statements`](../../Solcore/Test/SourceSemantics/CoreLowering/Compatible/Statements.lean) | Compatible statement tests | 14 |
 | [`Constructor`](../../Solcore/Test/SourceSemantics/CoreLowering/Constructor.lean) | Constructor call tests | 22 |
 | [`Data/Places`](../../Solcore/Test/SourceSemantics/CoreLowering/Data/Places.lean) | Data place tests | 21 |
-| [`Data/Values`](../../Solcore/Test/SourceSemantics/CoreLowering/Data/Values.lean) | Data value tests | 18 |
+| [`Data/Values`](../../Solcore/Test/SourceSemantics/CoreLowering/Data/Values.lean) | Data value tests | 17 |
 | [`Direct/Calls`](../../Solcore/Test/SourceSemantics/CoreLowering/Direct/Calls.lean) | Direct call tests | 32 |
 | [`Direct/Linking`](../../Solcore/Test/SourceSemantics/CoreLowering/Direct/Linking.lean) | Direct linking tests | 1 |
 | [`Evidence/Closure`](../../Solcore/Test/SourceSemantics/CoreLowering/Evidence/Closure.lean) | Closure evidence tests | 20 |

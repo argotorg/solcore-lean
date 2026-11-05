@@ -57,6 +57,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedHeaders
 import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedExpressions
 import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedPublic
 import Solcore.Test.SourceSemantics.Semantics
+import Solcore.Test.SourceSemantics.IntegerBitNot
 import Solcore
 import Solcore.Test.TypeSystem.Inference
 import Solcore.Test.SourceSemantics.SemanticsSubstitution
@@ -194,6 +195,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Evidence.Scoped
 import Solcore.Test.SourceSemantics.CoreLowering.Method.PublicSequences
 import Solcore.Test.SourceSemantics.CoreLowering.CoercionPublic
 import Solcore.Test.Frontend.RustHull.Runtime
+import Solcore.Test.Frontend.RustHull.YulPrimitives
 import Solcore.Test.Frontend.RustHull.Effects
 import Solcore.Test.Frontend.RustHull.Correspondence
 import Solcore.Test.Frontend.RustHull.Accounts
