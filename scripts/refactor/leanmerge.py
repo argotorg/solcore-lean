@@ -943,11 +943,13 @@ def cmd_consolidate(args):
     out = subprocess.run(["git", "-C", repo.root, "ls-files", "-c", "-o", "--exclude-standard", "-z"],
                          check=True, capture_output=True).stdout.decode()
     files = [p for p in out.split("\0") if p.endswith(exts) and os.path.exists(os.path.join(repo.root, p))]
-    pats = []
-    for m, f in sorted(final.items(), key=lambda kv: -len(kv[0])):
-        old_p, new_p = module_to_path(m), module_to_path(f)
-        pats.append((re.compile(r"(?<![\w.-])" + re.escape(old_p) + r"(?![\w])"), new_p, old_p))
-        pats.append((re.compile(r"(?<![\w.])" + re.escape(m) + r"(?![\w'!?])(?!\.[\w«])"), f, m))
+    # One pass per file over candidate tokens, with the boundaries one pattern per module would have: a module
+    # name only as a whole dotted name, and a path only as a whole `.lean` path or a suffix of one that starts at a
+    # `/`, the longest suffix first.
+    moved_paths = {module_to_path(m): module_to_path(f) for m, f in final.items()}
+    path_rx = re.compile(r"(?<![\w.-])(?:\w+/)*\w+\.lean(?![\w])")
+    module_rx = re.compile(r"(?<![\w.])\w+(?:\.\w+)+")
+    anchor_rx = re.compile(r"(?::\d+|#L\d+)")
     anchor_warn = []
     for p in files:
         full = os.path.join(repo.root, p)
@@ -956,12 +958,31 @@ def cmd_consolidate(args):
         except UnicodeDecodeError:
             continue
         t0, count = t, 0
-        for rx, new, old in pats:
-            if old.endswith(".lean"):
-                for mm in re.finditer(re.escape(old) + r"(?::\d+|#L\d+)", t):
-                    anchor_warn.append(f"{p}: {mm.group()} (line anchor now stale)")
-            t, k = rx.subn(new, t)
-            count += k
+
+        def on_path(mm, p=p):
+            nonlocal count
+            parts = mm.group().split("/")
+            for k in range(len(parts)):
+                old = "/".join(parts[k:])
+                if old in moved_paths:
+                    anchor = anchor_rx.match(mm.string, mm.end())
+                    if anchor:
+                        anchor_warn.append(f"{p}: {old}{anchor.group()} (line anchor now stale)")
+                    count += 1
+                    return "/".join(parts[:k] + [moved_paths[old]])
+            return mm.group()
+
+        def on_module(mm):
+            nonlocal count
+            name = mm.group()
+            after = mm.string[mm.end():mm.end() + 2]
+            if name in final and after[:1] not in ("'", "!", "?") and after != ".«":
+                count += 1
+                return final[name]
+            return name
+
+        t = path_rx.sub(on_path, t)
+        t = module_rx.sub(on_module, t)
         if t != t0:
             print(f"{'would update' if dry else 'updated'} {count} reference(s) in {p}")
             if not dry:
