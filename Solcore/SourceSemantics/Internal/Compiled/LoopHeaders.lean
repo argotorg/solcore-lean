@@ -2,11 +2,10 @@ import Solcore.SourceSemantics.Internal.Prepared.TemplateInventory
 import Solcore.SourceSemantics.Internal.Compiled.Finalization
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
-import Solcore.SourceSemantics.SourceInferenceSelectedBuiltinCall
-import Solcore.SourceSemantics.SourceInferenceGeneralizationReceiptCalls
+import Solcore.SourceSemantics.Internal.Selected.Children
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
 import Solcore.SourceSemantics.Internal.Compiled.PrivateDescent
-import Solcore.SourceSemantics.SourceInferenceForActiveStages
-import Solcore.SourceSemantics.SourceInferenceForBodySuffixPrivacy
+import Solcore.SourceSemantics.Internal.Privacy.Active
 
 /-!
 # Loop headers and builtin calls

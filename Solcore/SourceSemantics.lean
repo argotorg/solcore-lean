@@ -24,11 +24,10 @@ import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.SourceSemantics.TraitSubstitutionProperties
-import Solcore.SourceSemantics.SourceInferenceSoundness
-import Solcore.SourceSemantics.SourceInferenceExpressionSoundness
-import Solcore.SourceSemantics.SourceInferenceBodyTypingBridge
+import Solcore.SourceSemantics.Internal.Inference.Soundness
+import Solcore.SourceSemantics.Internal.Inference.ExpressionInduction
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
-import Solcore.SourceSemantics.SourceInferenceCheckedBodyTypingBridge
+import Solcore.SourceSemantics.InferenceSoundness
 import Solcore.SourceSemantics.Dynamic
 import Solcore.SourceSemantics.Staging
 import Solcore.SourceSemantics.SourceStageAnalysisSoundness

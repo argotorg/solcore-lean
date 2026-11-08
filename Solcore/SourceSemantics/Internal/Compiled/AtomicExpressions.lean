@@ -1,8 +1,7 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceActualLocalExpression
-import Solcore.SourceSemantics.SourceInferenceSelectedDeclaration
-import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
+import Solcore.SourceSemantics.Internal.Selected.Expressions
+import Solcore.SourceSemantics.Internal.Selected.Operators
 
 /-!
 # Atomic, group and tuple expressions

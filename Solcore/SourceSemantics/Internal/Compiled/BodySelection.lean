@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.Internal.Compiled.Finalization
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
-import Solcore.SourceSemantics.SourceInferenceActualCallGraph
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 

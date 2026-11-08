@@ -1,10 +1,9 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceSelectedConstructorInstantiation
-import Solcore.SourceSemantics.SourceInferenceSelectedIndirectCall
+import Solcore.SourceSemantics.Internal.Selected.Calls
 import Solcore.SourceSemantics.Internal.Compiled.InitializerOccurrences
-import Solcore.SourceSemantics.SourceInferenceSelectedCandidateCall
-import Solcore.SourceSemantics.SourceInferenceSelectedOperatorMetadata
+import Solcore.SourceSemantics.Internal.Selected.Candidates
+import Solcore.SourceSemantics.Internal.Selected.OperatorMetadata
 
 /-!
 # Named and indirect calls

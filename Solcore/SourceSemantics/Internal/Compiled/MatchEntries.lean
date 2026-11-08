@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
-import Solcore.SourceSemantics.SourceInferenceGeneralizedPatternState
+import Solcore.SourceSemantics.Internal.Inference.StatementDispatch
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceGeneralizedMatchState
+import Solcore.SourceSemantics.Internal.Inference.RootedSoundness
 import Solcore.SourceSemantics.Internal.Compiled.InitializerOccurrences
 import Solcore.SourceSemantics.Internal.Compiled.PrivateDescent
 import Solcore.Frontend.SourceInference.Internal.Continuations
-import Solcore.SourceSemantics.SourceInferenceStatementsSoundness
+import Solcore.SourceSemantics.Internal.Inference.StatementSequences
 import Solcore.SourceSemantics.Internal.Prepared.CallEdges
 
 /-!

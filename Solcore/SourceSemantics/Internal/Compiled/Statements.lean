@@ -1,12 +1,12 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
+import Solcore.SourceSemantics.Internal.Privacy.Lifetimes
 import Solcore.SourceSemantics.Internal.Compiled.OperationalState
 import Solcore.SourceSemantics.Internal.Compiled.Expressions
-import Solcore.SourceSemantics.SourceInferenceAssignedValueActualPrefix
-import Solcore.SourceSemantics.SourceInferenceSelectedAssignmentChildren
-import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
-import Solcore.SourceSemantics.SourceInferencePrivacyScopeRetention
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
+import Solcore.SourceSemantics.Internal.Selected.Statements
+import Solcore.SourceSemantics.Internal.Selected.StatementReferences
+import Solcore.SourceSemantics.Internal.Privacy.Active
 import Solcore.SourceSemantics.Internal.Compiled.LifetimeSeeds
 
 /-!

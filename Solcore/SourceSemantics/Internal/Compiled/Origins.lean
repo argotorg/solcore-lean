@@ -4,7 +4,7 @@ import Solcore.Frontend.SourceInference.Internal.DirectCallInference
 import Solcore.Frontend.SourceInference.Internal.LocalGeneralization
 import Solcore.Frontend.SourceInference.Internal.LocalGeneralizationBounds
 import Solcore.Frontend.SourceInference.Internal.LocalReadOrigins
-import Solcore.SourceSemantics.SourceInferenceActualCallGraph
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
 import Solcore.Frontend.SourceInference.Internal.LocalReadScopes
 
 /-!

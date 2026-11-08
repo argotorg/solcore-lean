@@ -1,10 +1,7 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.InitializerPrivacy
-import Solcore.SourceSemantics.SourceInferenceSoundness
-import Solcore.SourceSemantics.SourceInferenceLiveStatementPosition
-import Solcore.SourceSemantics.SourceInferencePrivacyScopeRetention
-import Solcore.SourceSemantics.SourceInferenceActiveScopePrivacy
-import Solcore.SourceSemantics.SourceInferenceActiveBlockState
+import Solcore.SourceSemantics.Internal.Inference.Soundness
+import Solcore.SourceSemantics.Internal.Privacy.Active
 
 /-!
 # Privacy through blocks and branches

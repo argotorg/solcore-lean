@@ -1,6 +1,6 @@
 import Solcore.Frontend.SourceStageAnalysis
 import Solcore.SourceSemantics.Staging.Classification
-import Solcore.SourceSemantics.SourceInferenceSoundness
+import Solcore.SourceSemantics.Internal.Inference.Soundness
 
 /-!
 # Soundness of executable source-stage classification

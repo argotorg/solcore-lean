@@ -1,12 +1,12 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceRetainedInitializerState
-import Solcore.SourceSemantics.SourceInferenceSelectedLetCoverage
-import Solcore.SourceSemantics.SourceInferenceGeneralizationReceiptCalls
+import Solcore.SourceSemantics.Internal.Inference.StatementDispatch
+import Solcore.SourceSemantics.Internal.Selected.Lets
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
 import Solcore.SourceSemantics.Internal.Compiled.Origins
-import Solcore.SourceSemantics.SourceInferenceSelectedAttachedChild
-import Solcore.SourceSemantics.SourceInferenceSelectedExpressionState
-import Solcore.SourceSemantics.SourceInferenceExpressionDispatchSoundness
+import Solcore.SourceSemantics.Internal.Selected.Children
+import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Inference.ExpressionDispatch
 
 /-!
 # Initializer occurrences

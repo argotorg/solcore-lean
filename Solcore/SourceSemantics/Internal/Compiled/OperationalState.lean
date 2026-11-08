@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.Internal.Compiled.Calls
-import Solcore.SourceSemantics.SourceInferenceSelectedLambdaPrefix
-import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimes
+import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Privacy.LifetimeContinuations
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceSelectedPlaceSoundness
+import Solcore.SourceSemantics.Internal.Selected.Children
 
 /-!
 # Operational state of generalized checking

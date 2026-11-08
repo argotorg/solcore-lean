@@ -1,16 +1,14 @@
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Calls
-import Solcore.SourceSemantics.SourceInferenceSelectedOperatorRecording
-import Solcore.SourceSemantics.SourceInferenceSelectedBinarySoundness
+import Solcore.SourceSemantics.Internal.Selected.Operators
+import Solcore.SourceSemantics.Internal.Selected.ExpressionSoundness
 import Solcore.SourceSemantics.Internal.Compiled.OperationalState
-import Solcore.SourceSemantics.SourceInferenceExpressionCallProvenance
+import Solcore.SourceSemantics.Internal.Inference.ExpressionRetained
 import Solcore.SourceSemantics.Internal.Compiled.LoopHeaders
 import Solcore.SourceSemantics.Internal.Compiled.InitializerOccurrences
-import Solcore.SourceSemantics.SourceInferenceSelectedOrdinaryRecorder
-import Solcore.SourceSemantics.SourceInferenceSelectedExpressionState
-import Solcore.SourceSemantics.SourceInferenceSelectedExpressionList
-import Solcore.SourceSemantics.SourceInferenceSelectedChildSoundness
+import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Selected.Children
 import Solcore.SourceSemantics.Internal.Compiled.AtomicExpressions
 
 /-!

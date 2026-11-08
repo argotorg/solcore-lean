@@ -1,15 +1,12 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.PrivateDescent
-import Solcore.SourceSemantics.SourceInferenceRetainedInitializerState
-import Solcore.SourceSemantics.SourceInferenceActualRootedContracts
-import Solcore.SourceSemantics.SourceInferenceActualCallGraph
-import Solcore.SourceSemantics.SourceInferenceSelectedExpressionState
-import Solcore.SourceSemantics.SourceInferenceExpressionDispatchSoundness
-import Solcore.SourceSemantics.SourceInferenceSelectedForItemTransport
-import Solcore.SourceSemantics.SourceInferenceSelectedExpressionListState
-import Solcore.SourceSemantics.SourceInferenceActiveHeaderPrivacy
-import Solcore.SourceSemantics.SourceInferenceGeneralizedPatternState
-import Solcore.SourceSemantics.SourceInferenceHeaderReturnPrivacy
+import Solcore.SourceSemantics.Internal.Inference.StatementDispatch
+import Solcore.SourceSemantics.Internal.Inference.RootedContracts
+import Solcore.SourceSemantics.Internal.Execution.CallGraph
+import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Inference.ExpressionDispatch
+import Solcore.SourceSemantics.Internal.Selected.Loops
+import Solcore.SourceSemantics.Internal.Privacy.Active
 
 /-!
 # Contracts of generalized checking

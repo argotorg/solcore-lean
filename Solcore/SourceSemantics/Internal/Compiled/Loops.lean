@@ -1,13 +1,13 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Expressions
 import Solcore.SourceSemantics.Internal.Compiled.OperationalState
-import Solcore.SourceSemantics.SourceInferenceSelectedAnnotatedForItems
+import Solcore.SourceSemantics.Internal.Selected.Lets
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
 import Solcore.SourceSemantics.Internal.Compiled.Statements
 import Solcore.SourceSemantics.Internal.Compiled.InitializerOccurrences
-import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
-import Solcore.SourceSemantics.SourceInferenceStatementForLoopChildProgress
-import Solcore.SourceSemantics.SourceInferenceSelectedForLoopCoverage
+import Solcore.SourceSemantics.Internal.Privacy.Lifetimes
+import Solcore.SourceSemantics.Internal.Inference.StatementControl
+import Solcore.SourceSemantics.Internal.Selected.Loops
 
 /-!
 # For and while statements

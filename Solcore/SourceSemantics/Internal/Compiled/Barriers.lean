@@ -1,10 +1,10 @@
-import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimes
+import Solcore.SourceSemantics.Internal.Privacy.LifetimeContinuations
 import Solcore.SourceSemantics.Internal.Compiled.InitializerPrivacy
 import Solcore.SourceSemantics.Internal.Compiled.Expressions
 import Solcore.SourceSemantics.Internal.Prepared.TemplateScope
 import Solcore.SourceSemantics.Internal.Prepared.CallEdges
 import Solcore.SourceSemantics.Internal.Compiled.LifetimeSeeds
-import Solcore.SourceSemantics.SourceInferenceActualLocalReadCutoff
+import Solcore.SourceSemantics.Internal.Execution.CallInputs
 import Solcore.SourceSemantics.Internal.Compiled.ActualEntries
 import Solcore.SourceSemantics.Internal.Compiled.OperationalState
 import Solcore.SourceSemantics.Internal.Compiled.BodyAssembly

@@ -36,7 +36,8 @@ The rest are body-level steps that those families build on.
 
 ## Front
 
-47 files, about 43,000 lines. Merged modules keep their old paths as shims until consolidation.
+47 files, about 44,000 lines. Merged modules keep their old paths as shims until consolidation.
+[Dynamic](../../Solcore/SourceSemantics/Dynamic.lean) and [Staging](../../Solcore/SourceSemantics/Staging.lean) are umbrellas, and each module doc is a reading guide.
 
 ### Static semantics
 
@@ -98,7 +99,7 @@ The rest are body-level steps that those families build on.
 | [TraitResolutionSoundness](../../Solcore/SourceSemantics/TraitResolutionSoundness.lean) | `resolve_success_evidenceValid` |
 | [SourceProgramCheckingSoundness](../../Solcore/SourceSemantics/SourceProgramCheckingSoundness.lean) | `programWellFormed_ofCheckProgram_deep`, `programWellFormed_ofCheckProgram_statements` |
 | [SourceStageAnalysisSoundness](../../Solcore/SourceSemantics/SourceStageAnalysisSoundness.lean) | `SourceStageAnalysisSoundness.analyzeFunction_success_hasStages_of_wellFormed` |
-| `InferenceSoundness` | `programHasStages_ofCheckProgram_and_analysis` and its premise |
+| [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean) | `programHasStages_ofCheckProgram_and_analysis` and its premise |
 | [CompiledBodies](../../Solcore/SourceSemantics/CompiledBodies.lean) | `SourceCompiledActualInitializerBarriers.compile_cached_bodies` |
 
 ## Reading order
@@ -125,7 +126,7 @@ The rest are body-level steps that those families build on.
    `Preservation`.
 5. **The executable frontend.**
    [SourceProgramCheckingSoundness](../../Solcore/SourceSemantics/SourceProgramCheckingSoundness.lean),
-   then `InferenceSoundness`.
+   then [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean).
 6. **Actual compilation.** [CompiledBodies](../../Solcore/SourceSemantics/CompiledBodies.lean).
 
 ## Main theorems
@@ -141,22 +142,22 @@ Premises matter here. Several results are stated conditionally on purpose, and t
 | `Staging.Recursive.SelectedPreservation.statements` | `Preservation` | The same for a registry of selected bodies, which needs no whole-program validity |
 | `Dynamic.FunctionInstantiates.hasType` | `TraitLaws` | An instantiated function body has its substituted type |
 | `programWellFormed_ofCheckProgram_statements` | [SourceProgramCheckingSoundness](../../Solcore/SourceSemantics/SourceProgramCheckingSoundness.lean) | Checker success and statement typing of every body give `ProgramWellFormed` |
-| `SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound` | `InferenceSoundness` | The same, with one premise left: `SourceInferenceSoundness.InferStatementsFuelSoundness`, the recursive soundness of statement inference. It is not discharged here |
-| `programHasStages_ofCheckProgram_and_analysis` | `InferenceSoundness` | With that premise and a successful stage analysis of every body, the program has stages. Static checking alone gives no staging conclusion |
+| `SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound` | [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean) | The same, with one premise left: `SourceInferenceSoundness.InferStatementsFuelSoundness`, the recursive soundness of statement inference. It is not discharged here |
+| `programHasStages_ofCheckProgram_and_analysis` | [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean) | With that premise and a successful stage analysis of every body, the program has stages. Static checking alone gives no staging conclusion |
 | `resolve_success_evidenceValid` | [TraitResolutionSoundness](../../Solcore/SourceSemantics/TraitResolutionSoundness.lean) | A successful resolution gives valid evidence |
-| `SourceInferenceSoundness.actualInferExprFuelRootedSoundness_selected` | `ExpressionSoundness` | Selected inference is sound for every successful expression |
+| `SourceInferenceSoundness.actualInferExprFuelRootedSoundness_selected` | [ExpressionSoundness](../../Solcore/SourceSemantics/Internal/Selected/ExpressionSoundness.lean) | Selected inference is sound for every successful expression |
 | `SourceCompiledActualInitializerBarriers.compile_cached_bodies` | [CompiledBodies](../../Solcore/SourceSemantics/CompiledBodies.lean) | A successful public compilation with an artifact gives validity of every original cached body, including late ordinary functions and implementation methods. Its only premises are the compilation and the artifact |
 
 ## Internal
 
 | Directory | Files | Lines | Topic |
 | --- | ---: | ---: | --- |
-| `Internal/Inference` | 19 | 62,000 | Typing soundness of inference: finalization, expressions, statements, ledgers and let certificates |
-| `Internal/Privacy` | 10 | 20,000 | Scheme quantifiers stay private through inference, and generalization lifetimes |
-| `Internal/Selected` | 13 | 20,000 | The selected route: soundness for retained children and generalized initializers |
-| [Internal/Compiled](../../Solcore/SourceSemantics/Internal/Compiled) | 19 | 25,000 | What the actual compiler's selected bodies keep, and their recursive typing |
-| `Internal/Execution` | 10 | 14,000 | The call tree of successful inference: calls, inputs, reads, binders, shapes and progress |
-| `Internal/Formation` | 7 | 8,000 | Types and requirements are well formed under the final substitution |
+| [Internal/Inference](../../Solcore/SourceSemantics/Internal/Inference) | 22 | 62,000 | Typing soundness of inference: finalization, expressions, statements, ledgers and let certificates |
+| [Internal/Privacy](../../Solcore/SourceSemantics/Internal/Privacy) | 10 | 20,000 | Scheme quantifiers stay private through inference, and generalization lifetimes |
+| [Internal/Selected](../../Solcore/SourceSemantics/Internal/Selected) | 14 | 20,000 | The selected route: soundness for retained children and generalized initializers |
+| [Internal/Compiled](../../Solcore/SourceSemantics/Internal/Compiled) | 19 | 26,000 | What the actual compiler's selected bodies keep, and their recursive typing |
+| [Internal/Execution](../../Solcore/SourceSemantics/Internal/Execution) | 10 | 14,000 | The call tree of successful inference: calls, inputs, reads, binders, shapes and progress |
+| [Internal/Formation](../../Solcore/SourceSemantics/Internal/Formation) | 7 | 8,000 | Types and requirements are well formed under the final substitution |
 | [Internal/Prepared](../../Solcore/SourceSemantics/Internal/Prepared) | 7 | 5,000 | Prepared plans: call edges, qualified reads and template scope |
 | `Internal/Substitution` | 3 | 15,000 | Structural and trait substitution preserve typing |
 | `Internal/Checking` | 1 | 1,000 | Typing certificates of selected bodies |
@@ -168,24 +169,32 @@ The families follow the namespaces of the base: `SourceInferenceExecution`, `Sou
 
 ## Why some files are apart
 
-Each row was forced by a check. Undoing one needs that check again.
+Each row comes from a check. Only the row on public theorems failed a build first; the others come from a
+predictor, so a row may be stricter than it has to be. Undoing one needs that check again.
 
 | Cause | Split |
 | --- | --- |
-| Shadowing: bare `Context` must keep meaning `Frontend.SourceInference.Context` | `Internal/Execution/Reads` and its neighbours stay below [Context](../../Solcore/SourceSemantics/Context.lean), and [Context](../../Solcore/SourceSemantics/Context.lean) keeps its own file |
-| Private names that differ | `Internal/Formation/NormalizedLambdas` apart from `NormalizedCalls`; `Internal/Privacy/SelectedReferences`, `SelectedCalls` and `SelectedInference` |
+| Shadowing: bare `Context` must keep meaning `Frontend.SourceInference.Context` | [Internal/Execution/Reads](../../Solcore/SourceSemantics/Internal/Execution/Reads.lean) stays below [Context](../../Solcore/SourceSemantics/Context.lean) |
+| Private names that differ, in text or only in a doc comment | `Internal/Inference/ExpressionInduction` apart from `ExpressionDispatch`, whose private copies of `recordExpressionWithExpected_success_nodesPrefix` differ only in their doc comment; `Internal/Formation/NormalizedLambdas` apart from `NormalizedCalls`; `Internal/Privacy/SelectedReferences`, `SelectedCalls` and `SelectedInference` |
 | Height: a low body must not reach a high import | `Internal/Execution/ExpressionProgress` sits above the compiled body layer, and `StatementProgress` below it |
+| Two proofs of one public theorem. A third file may see both copies, but Lean refuses a new declaration of a visible public name | [ExpressionLedgers](../../Solcore/SourceSemantics/Internal/Inference/ExpressionLedgers.lean) and [LedgerFamilies](../../Solcore/SourceSemantics/Internal/Inference/LedgerFamilies.lean) both declare `RecursiveLedgerInvariant.fresh`; [StatementReferences](../../Solcore/SourceSemantics/Internal/Selected/StatementReferences.lean) and [Children](../../Solcore/SourceSemantics/Internal/Selected/Children.lean) both declare `SubtreePreserved.directChild`. Neither file of a pair may reach the other |
 | `simp` lemmas of one import | `Internal/Inference/CoercionFitting` alone, because only it needs the selected coercion plan lemmas; `Internal/Inference/ShapeClosure`; `Internal/Formation/CoercionTargets` |
-| The frontend imports these | [CaptureBinders](../../Solcore/SourceSemantics/CaptureBinders.lean) and [Classification](../../Solcore/SourceSemantics/Staging/Classification.lean) take nothing from above |
+
+Two choices were not forced. [CaptureBinders](../../Solcore/SourceSemantics/CaptureBinders.lean) and
+[Classification](../../Solcore/SourceSemantics/Staging/Classification.lean) are imported by the frontend, so they
+take nothing from above, although a check would allow it. [Context](../../Solcore/SourceSemantics/Context.lean)
+keeps its own file because the CoreLowering layout constraints name it.
 
 ## What stays mixed
 
-- **Two files stay long.** `Soundness`
+- **Two files stay long.** [Soundness](../../Solcore/SourceSemantics/Internal/Inference/Soundness.lean)
   has 26,295 lines and `StructuralLaws`
-  12,986. Each is one module of the base. `private` helpers span almost all of each, so no cut is
-  legal: `list_eq_singleton_of_length_eq_one` runs for 16,895 lines of the first. Making a helper
-  public to cut a file is not allowed.
-- **Front files hold proofs.** The front files were not split into definitions and laws. About 7,800
-  of their 43,000 lines are proofs that could leave. The most are in
+  12,986. Each is one module of the base, and the layout rule lets an existing file keep its length:
+  no merge made them long. They cannot be cut either. `private` is per file, a few `private` helpers
+  are used across almost all of each, and `list_eq_singleton_of_length_eq_one` runs for 16,895 lines
+  of the first. Cutting one would mean making a helper public, which this refactor does not do.
+- **Front files hold proofs.** The front files were not split into definitions and laws. The 37
+  specification files have about 28,000 lines, and about 7,500 of those are proofs that `private`
+  would let leave. The most are in
   [Graph](../../Solcore/SourceSemantics/Graph.lean), [Dynamic/Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean)
   and [Static](../../Solcore/SourceSemantics/Static.lean).

@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.Internal.Compiled.Origins
-import Solcore.SourceSemantics.SourceInferenceSoundness
+import Solcore.SourceSemantics.Internal.Inference.Soundness
 import Solcore.Frontend.SourceInference.Internal.DirectCallInference
 import Solcore.Frontend.SourceInference.Internal.DirectCallPredicates
-import Solcore.SourceSemantics.SourceInferenceGeneralizedInitializerContext
-import Solcore.SourceSemantics.SourceInferenceSelectedStatementReferences
+import Solcore.SourceSemantics.Internal.Inference.GeneralizationBarriers
+import Solcore.SourceSemantics.Internal.Selected.StatementReferences
 import Solcore.Frontend.Internal.CheckingProperties
-import Solcore.SourceSemantics.SourceInferenceNormalizedInference
+import Solcore.SourceSemantics.Internal.Formation.NormalizedCalls
 import Lean
 import Solcore.SourceSemantics.SubstitutionProperties
 

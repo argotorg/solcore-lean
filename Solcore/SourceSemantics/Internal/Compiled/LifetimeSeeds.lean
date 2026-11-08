@@ -1,15 +1,13 @@
-import Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimes
+import Solcore.SourceSemantics.Internal.Privacy.LifetimeContinuations
 import Solcore.SourceSemantics.Internal.Prepared.TemplateScope
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.InitializerOccurrences
-import Solcore.SourceSemantics.SourceInferenceNewQuantifierFrame
-import Solcore.SourceSemantics.SourceInferenceGeneralizedInitializerState
+import Solcore.SourceSemantics.Internal.Privacy.ProtectedInference
+import Solcore.SourceSemantics.Internal.Inference.StatementDispatch
 import Solcore.SourceSemantics.Internal.Compiled.Contracts
-import Solcore.SourceSemantics.SourceInferenceGeneralizedStatementRecording
-import Solcore.SourceSemantics.SourceInferenceClosedLeftUnificationPrivacy
-import Solcore.SourceSemantics.SourceInferenceActiveQuantifierOrigins
-import Solcore.SourceSemantics.SourceInferenceHeaderReturnPrivacy
-import Solcore.SourceSemantics.SourceInferenceStatementPrivacyResume
+import Solcore.SourceSemantics.Internal.Privacy.Lifetimes
+import Solcore.SourceSemantics.Internal.Privacy.LifetimeMatches
+import Solcore.SourceSemantics.Internal.Privacy.Active
 import Solcore.SourceSemantics.Internal.Compiled.LoopHeaders
 
 /-!

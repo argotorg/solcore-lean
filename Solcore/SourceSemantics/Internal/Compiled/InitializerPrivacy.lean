@@ -1,14 +1,12 @@
 import Solcore.SourceSemantics.Internal.Compiled.BodySelection
 import Solcore.SourceSemantics.Internal.Compiled.Finalization
 import Solcore.Frontend.SourceInference.Internal.Continuations
-import Solcore.SourceSemantics.SourceInferenceRetainedRequirementFormation
-import Solcore.SourceSemantics.SourceInferenceSelectedPrivacyFinalization
-import Solcore.SourceSemantics.SourceInferenceSelectedMonomorphicGeneralization
-import Solcore.SourceSemantics.SourceInferenceStatementPrivacyContinuation
-import Solcore.SourceSemantics.SourceInferenceGeneralizedPrivacyBoundary
-import Solcore.SourceSemantics.SourceInferenceBackedStatementPrivacy
-import Solcore.SourceSemantics.SourceInferenceActiveStatementPosition
-import Solcore.SourceSemantics.SourceInferenceNormalizedRequirementFormation
+import Solcore.SourceSemantics.Internal.Formation.NormalizedCoercions
+import Solcore.SourceSemantics.Internal.Privacy.SelectedCalls
+import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Privacy.Active
+import Solcore.SourceSemantics.Internal.Inference.GeneralizationBarriers
+import Solcore.SourceSemantics.Internal.Formation.NormalizedCalls
 
 /-!
 # Privacy of initialized declarations
