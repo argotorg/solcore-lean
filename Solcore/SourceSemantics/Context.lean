@@ -4,6 +4,14 @@ import Solcore.Resolved.LocalScope
 import Solcore.TypeSystem.Scheme
 
 /-!
+# The static context
+
+The context of every static judgment. Main declarations: `Context`, `Context.ofSignatures`,
+`Context.withLocal`, `Context.forDeclaration`. This file stays apart because lower CoreLowering
+modules mean `Core.Context` through an `open`, and must not see this name.
+-/
+
+/-!
 Contexts for the declarative source semantics.
 
 This module deliberately contains no lookup or inference algorithm.  A context

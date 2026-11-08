@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Context
 
 /-!
+# Well-formed types and schemes
+
+Scoping and formation of source types, predicates and schemes. Main declarations: `TypeWellScoped`,
+`TypeWellFormed`, `TypeAdmissible`, `SchemeWellFormed`, `PredicateWellFormed`.
+-/
+
+/-!
 Algorithm-independent well-formedness for source types.
 
 The judgment treats flexible inference variables and rigid declaration

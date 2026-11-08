@@ -3,6 +3,13 @@ import Solcore.SourceSemantics.Traits
 import Solcore.SourceSemantics.WellFormed
 
 /-!
+# References and solved requirements
+
+The raw typing of references and the validity of solved requirements. Main declarations:
+`ReferenceHasRawType`, `ReferenceExpressionHasRawType`, `SolvedRequirementValid`.
+-/
+
+/-!
 Initial declarative typing judgments for resolved source occurrences.
 
 The judgments in this module validate semantic choices already carried by the

@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Requirements
 
 /-!
+# Ownership of local identities and templates
+
+Which declaration owns each local, template and requirement. Main declarations:
+`LocalIdentityOwnership`, `LocalSchemeTemplateOwnership`, `RequirementOwnership`, `definedLocalIds`.
+-/
+
+/-!
 Whole-source ownership of stable local and requirement identities.
 
 The typed occurrence graph contains several mirrors of the same evidence

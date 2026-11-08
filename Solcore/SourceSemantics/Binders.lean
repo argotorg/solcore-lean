@@ -2,6 +2,13 @@ import Solcore.SourceSemantics.Types
 import Solcore.Frontend.SourceInference.TypedIR
 
 /-!
+# Binders and local schemes
+
+How a binder extends a context. Main declarations: `BinderWellFormed`, `BinderExtends`,
+`BindersExtend`, `MonoBindersExtend`, `LocalSchemeRequirementsWellFormed`.
+-/
+
+/-!
 Declarative lexical-binder formation and context extension.
 -/
 

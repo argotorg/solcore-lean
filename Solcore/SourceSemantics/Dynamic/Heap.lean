@@ -2,6 +2,14 @@ import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.CaptureBinders
 
 /-!
+# Heaps and environments
+
+Cells, reads, writes and allocation. Main declarations: `Dynamic.Cell`, `Dynamic.Heap`,
+`Dynamic.Heap.Reads`, `Dynamic.Heap.Allocates`, `Dynamic.HeapMetadataExtend`,
+`Dynamic.EnvironmentCopies`.
+-/
+
+/-!
 Declarative environment and heap operations for source evaluation.
 
 The relations below are structural specifications.  They do not invoke the

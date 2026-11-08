@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Staging.CallGuard
 import Solcore.SourceSemantics.Dynamic.Fault
 
+/-!
+# Call boundaries
+
+A staged extension of the indirect-call boundary. Main declarations: `Staging.CallBoundary.Frame`,
+`Staging.CallBoundary.Executes`.
+-/
+
 /-! An explicit staged extension of the indirect-call boundary. The plain
 Dynamic judgments are unchanged. Child expressions, argument coercions and
 callable application use their independent Dynamic judgments. Consequently this

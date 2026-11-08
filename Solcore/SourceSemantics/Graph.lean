@@ -1,8 +1,15 @@
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Ownership
-import Solcore.SourceSemantics.Substitution
+import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.Binders
 import Solcore.Frontend.SourceInference.TypedIRProperties
+
+/-!
+# Closure of the occurrence graph
+
+Reachability and scoping over the occurrence graph. Main declarations: `Reachable`,
+`OccurrenceGraphClosed`, `OccurrenceGraphAcyclic`, `TemplateScopeCovered`.
+-/
 
 /-!
 Reachability and acyclicity of resolved source occurrence graphs.

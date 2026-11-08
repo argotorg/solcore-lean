@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.UnificationFormation
+import Solcore.SourceSemantics.Internal.Substitution.Unification
 import Solcore.Frontend.SourceInference.Resolution
 
 /-!

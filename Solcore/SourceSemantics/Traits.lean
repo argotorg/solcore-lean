@@ -2,6 +2,13 @@ import Solcore.SourceSemantics.Instantiation
 import Solcore.Frontend.SourceInference.Types
 
 /-!
+# Trait evidence
+
+Implementation heads and evidence for predicates. Main declarations: `ImplHeadInstantiates`,
+`TraitEvidence`, `EvidenceValid`, `RetainedEvidenceValid`.
+-/
+
+/-!
 Declarative source-level trait entailment and retained-evidence validity.
 
 Implementation-head instantiation is witnessed by exact simultaneous

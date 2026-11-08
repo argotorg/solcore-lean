@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.Internal.Selected.StatementReferences
 import Solcore.Frontend.Internal.CheckingProperties
 import Solcore.SourceSemantics.Internal.Formation.NormalizedCalls
 import Lean
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
 
 /-!
 # Finalization of selected bodies

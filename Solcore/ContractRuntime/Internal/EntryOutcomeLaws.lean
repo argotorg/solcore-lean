@@ -5,7 +5,7 @@ import Solcore.ContractRuntime.Contracts
 # Laws of entry profiles and outcomes
 
 Exact recognition and decoding of each `CoreContractEntryProfile`, and decoded Word outcomes. These
-stay apart from `ContractLaws`, because about 200 modules reach that file and not this one.
+stay apart from `ContractLaws`, because many modules reach that file and not this one.
 -/
 
 section

@@ -2,7 +2,18 @@ import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.SourceSemantics.Staging.Program
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
+import Solcore.SourceSemantics.Dynamic.Fault
 
+/-!
+# Whole-program execution
+
+The admitted entry of a program, its outcome, and the preservation of a whole run. Main
+declarations: `Dynamic.ProgramEntry`, `Dynamic.ProgramEvaluates`, `Dynamic.ProgramFaults`,
+`Dynamic.ProgramOutcome`. Main theorem: `Dynamic.ProgramEvaluates.preserves`.
+-/
+
+section
+-- leanmerge: from Solcore.SourceSemantics.Dynamic.Program
 /-!
 Whole-program entry and execution for the declarative resolved-source
 semantics.
@@ -143,3 +154,67 @@ theorem preserves
 end ProgramEvaluates
 
 end Solcore.SourceSemantics.Dynamic
+end
+
+section
+-- leanmerge: from Solcore.SourceSemantics.Dynamic.ProgramOutcome
+/-! Admitted program observations include language failures and their exact
+final heap. This source relation uses the independent body fault semantics;
+it makes no claim that every well-typed invocation terminates. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.Dynamic
+open Frontend.SourceInference TypeSystem
+
+inductive ProgramFaults (program : Program) (entry : ProgramEntry) :
+    Heap → SemanticFault → Heap → Prop where
+  | run {initial final : Heap} {reason : SemanticFault} {bodyInstance : BodyInstance}
+      (admitted : Staging.ProgramHasStages program)
+      (entry_valid : ProgramEntryValid program entry initial bodyInstance)
+      (faults : BodyFaults program bodyInstance entry.evidence initial entry.arguments reason final) :
+      ProgramFaults program entry initial reason final
+
+namespace ProgramFaults
+
+theorem program_has_stages {program : Program} {entry : ProgramEntry}
+    {initial final : Heap} {reason : SemanticFault}
+    (faults : ProgramFaults program entry initial reason final) :
+    Staging.ProgramHasStages program := by
+  cases faults with
+  | run admitted => exact admitted
+
+theorem program_well_formed {program : Program} {entry : ProgramEntry}
+    {initial final : Heap} {reason : SemanticFault}
+    (faults : ProgramFaults program entry initial reason final) :
+    ProgramWellFormed program :=
+  faults.program_has_stages.staticallyValid
+
+end ProgramFaults
+
+inductive ProgramOutcome (program : Program) (entry : ProgramEntry) :
+    Heap → ExpressionOutcome → Heap → Prop where
+  | value {initial final : Heap} {result : Value}
+      (evaluates : ProgramEvaluates program entry initial result final) :
+      ProgramOutcome program entry initial (.value result) final
+  | fault {initial final : Heap} {reason : SemanticFault}
+      (faults : ProgramFaults program entry initial reason final) :
+      ProgramOutcome program entry initial (.fault reason) final
+
+namespace ProgramOutcome
+
+theorem program_has_stages {program : Program} {entry : ProgramEntry}
+    {initial final : Heap} {outcome : ExpressionOutcome}
+    (execution : ProgramOutcome program entry initial outcome final) :
+    Staging.ProgramHasStages program := by
+  cases execution with
+  | value evaluated => exact evaluated.program_has_stages
+  | fault faults => exact faults.program_has_stages
+
+theorem program_well_formed {program : Program} {entry : ProgramEntry}
+    {initial final : Heap} {outcome : ExpressionOutcome}
+    (execution : ProgramOutcome program entry initial outcome final) :
+    ProgramWellFormed program :=
+  execution.program_has_stages.staticallyValid
+
+end ProgramOutcome
+end Solcore.SourceSemantics.Dynamic
+end

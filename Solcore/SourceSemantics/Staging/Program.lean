@@ -2,6 +2,12 @@ import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.Staging.Classification
 
 /-!
+# Whole-program staging
+
+Main declarations: `Staging.ProgramHasStages`, `Staging.BodyDefinitionHasStages`.
+-/
+
+/-!
 Whole-program staging for the declarative source semantics.
 
 `Classification` states the occurrence-level rules.  This module lifts those

@@ -1,12 +1,20 @@
-import Solcore.SourceSemantics.Dynamic.Default
+import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
-import Solcore.SourceSemantics.Dynamic.Pattern
+import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.Dynamic.Place
-import Solcore.SourceSemantics.Dynamic.EvidenceSubstitutionProperties
-import Solcore.SourceSemantics.Dynamic.LocalSchemes
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
+import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.Evaluation
-import Solcore.SourceSemantics.Operators
-import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.Expressions
+
+/-!
+# Preservation of each construct
+
+The preservation statements and the cases that need no recursion. Main declarations:
+`Dynamic.WholeLanguagePreservation`, `Dynamic.SourceRuntimeValid`,
+`Dynamic.ExpressionEvaluationPreserved`, `Dynamic.StatementEvaluationPreserved`,
+`Dynamic.BodyInvocationPreserved`.
+-/
 
 /-!
 Type-preservation lemmas for the proof-facing source dynamics.

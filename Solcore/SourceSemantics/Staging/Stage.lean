@@ -1,6 +1,13 @@
 import Solcore.TypeSystem.Type
 
 /-!
+# Stages
+
+The declarative stage lattice. Main declarations: `Staging.Stage`, `Staging.StagesJoin`,
+`Staging.ComptimeOnlyType`.
+-/
+
+/-!
 Declarative source-stage lattice.
 
 These judgments are owned by the source semantics.  They do not mention the

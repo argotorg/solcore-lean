@@ -3,6 +3,13 @@ import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Static
 
 /-!
+# Whole programs
+
+A source program and its validity. Main declarations: `Program`, `Program.ofChecked`,
+`BodyDefinition`, `FunctionDefinition`, `MethodDefinition`, `ProgramWellFormed`.
+-/
+
+/-!
 Declarative resolved-source declaration bodies and whole programs.
 
 The carriers in this file are forgeable semantic inputs.  Their validity is

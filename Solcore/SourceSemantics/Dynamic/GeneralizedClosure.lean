@@ -1,7 +1,15 @@
 import Solcore.SourceSemantics.Dynamic.Value
-import Solcore.SourceSemantics.Substitution
+import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.Binders
 import Solcore.SourceSemantics.WellFormed
+
+/-!
+# Generalized closures
+
+Closures of generalized local bindings, and what instantiating one means. Main declarations:
+`Dynamic.RuntimeContextFields`, `Dynamic.GeneralizedClosureCaptures`,
+`Dynamic.GeneralizedClosure.instantiate`.
+-/
 
 /-!
 Materialization of one proof-facing generalized direct-lambda closure.

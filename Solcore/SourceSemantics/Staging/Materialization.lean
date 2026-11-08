@@ -6,6 +6,14 @@ import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.SourceSemantics.Staging.Classification
 
 /-!
+# Materialization
+
+The compile-time evaluation boundary and the closed values it may produce. Main declarations:
+`Staging.MaterializedValue`, `Staging.Materializes`, `Staging.ComptimeEvaluationBoundary`,
+`Staging.ComptimeExpressionMaterializes`.
+-/
+
+/-!
 Declarative materialization at the source staging boundary.
 
 The semantic carrier in this module is deliberately independent of the

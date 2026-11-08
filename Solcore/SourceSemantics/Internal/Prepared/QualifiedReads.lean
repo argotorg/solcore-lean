@@ -1,6 +1,6 @@
 import Lean
 import Solcore.SourceSemantics.Internal.Prepared.PlanGrowth
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.Internal.Compiled.Origins
 

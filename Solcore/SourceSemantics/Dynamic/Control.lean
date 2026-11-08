@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Control
 import Solcore.SourceSemantics.Static
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
+
+/-!
+# Runtime control
+
+How control outcomes respect static control summaries. Main declarations: `TypingControlShape`,
+`ControlRuntimeValid`, `BodyTypingControlShape`.
+-/
 
 /-!
 Control-flow facts used by the dynamic source semantics and preservation

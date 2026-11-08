@@ -51,7 +51,7 @@ first-order inference. It stays separate from the closed monomorphic Core types 
 | [`InferenceLaws`](../../Solcore/TypeSystem/Internal/InferenceLaws.lean) | Laws of the inference state |
 
 `SchemeLaws` and `InferenceLaws` are separate because `SchemeLaws` holds `@[simp]` lemmas about
-substitutions, and about 500 modules see `InferenceLaws` without seeing it.
+substitutions, and other modules see `InferenceLaws` without seeing it.
 
 ## Resolved
 

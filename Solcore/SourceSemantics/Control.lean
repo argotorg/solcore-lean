@@ -1,6 +1,13 @@
 import Solcore.TypeSystem.Type
 
 /-!
+# Control summaries
+
+What a statement can do to control flow. Main declarations: `ControlContext`, `ControlSummary`,
+`StatementFacts`, `BodyFacts`.
+-/
+
+/-!
 Static summaries for source-statement control transfer.
 
 The semantic summary is kept separate from the legacy type annotation retained

@@ -1,6 +1,13 @@
 import Solcore.Frontend.SourceInference.TypedIR
 
 /-!
+# The occurrence graph
+
+Nodes and occurrences of typed source. Main declarations: `OccurrenceGraphWellFormed`,
+`ContainsExpression`, `ContainsStatement`, `NodeOccurrencesUnique`.
+-/
+
+/-!
 Declarative occurrence-graph closure for occurrence-addressed typed source.
 
 The predicates in this module describe the source graph independently of the

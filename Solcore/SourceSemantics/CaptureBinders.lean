@@ -1,5 +1,12 @@
 import Solcore.Frontend.SourceInference.TypedIR
 
+/-!
+# Captured binders
+
+Which binders a closure copies. Main declarations: `CaptureBinders.declaredBinders`,
+`CaptureBinders.copiedBinder?`. The native lowering imports this file, so it stays low.
+-/
+
 /-! The bindings a closure copies. A lambda copies its captured cells when it
 is created and again at each call. A binding is copied when its identifier has
 a single declaration in the closure's source and that declaration is

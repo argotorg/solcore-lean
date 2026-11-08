@@ -1,7 +1,15 @@
-import Solcore.SourceSemantics.Dynamic.Default
-import Solcore.SourceSemantics.Dynamic.RuntimeType
+import Solcore.SourceSemantics.Dynamic.Typing
+import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.Dynamic.Primitive
-import Solcore.SourceSemantics.Places
+import Solcore.SourceSemantics.Expressions
+
+/-!
+# Places
+
+Reading and writing through projections. Main declarations: `Dynamic.PlaceResolves`,
+`Dynamic.ProjectionsRead`, `Dynamic.ProjectionsUpdate`, `Dynamic.ResolvedPlaceWrites`,
+`Dynamic.PlaceAssignment`.
+-/
 
 /-!
 Declarative dynamics for mutable source places.

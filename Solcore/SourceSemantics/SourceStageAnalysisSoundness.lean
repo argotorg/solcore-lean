@@ -3,6 +3,14 @@ import Solcore.SourceSemantics.Staging.Classification
 import Solcore.SourceSemantics.Internal.Inference.Soundness
 
 /-!
+# Soundness of stage analysis
+
+The executable stage analysis establishes the declarative stages. Main theorems:
+`SourceStageAnalysisSoundness.analyzeFunction_success_hasStages_of_wellFormed`,
+`SourceStageAnalysisSoundness.checkFunctionBody_analysis_success_hasStages`.
+-/
+
+/-!
 # Soundness of executable source-stage classification
 
 This module relates the executable three-point classifier and its lexical

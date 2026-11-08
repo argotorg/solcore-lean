@@ -3,6 +3,13 @@ import Solcore.Frontend.TraitResolutionProperties
 import Solcore.SourceSemantics.Traits
 
 /-!
+# Soundness of trait resolution
+
+A successful resolution gives valid evidence. Main theorems: `resolve_success_evidenceValid`,
+`resolve_success_entails`, `resolve_success_retainedEvidenceValid`.
+-/
+
+/-!
 Soundness bridge from the executable typed implementation-head matcher to the
 declarative source-level implementation-head instantiation judgment.
 

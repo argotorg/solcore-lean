@@ -1,6 +1,15 @@
 import Solcore.Frontend.ProgramChecking
 import Solcore.SourceSemantics.Program
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
+
+/-!
+# Soundness of the program checker
+
+What `Frontend.checkProgram` establishes before any body is proved. Main declarations:
+`CheckedProgramWellFormedConditions`. Main theorems:
+`CheckedProgramWellFormedConditions.programWellFormedOfCheckProgram`,
+`SignatureCatalogWellFormed.ofCheckProgram`.
+-/
 
 /-!
 Conditional bridge from executable whole-program checking results to the

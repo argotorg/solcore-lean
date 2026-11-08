@@ -1,10 +1,14 @@
 import Solcore.SourceSemantics.Binders
-import Solcore.SourceSemantics.Calls
+import Solcore.SourceSemantics.Expressions
 import Solcore.SourceSemantics.Control
-import Solcore.SourceSemantics.Literals
-import Solcore.SourceSemantics.Operators
-import Solcore.SourceSemantics.Patterns
-import Solcore.SourceSemantics.Places
+
+/-!
+# Static semantics
+
+The typing judgments of every expression and statement form. Main declarations: `ExpressionHasType`,
+`StatementHasType`, `StatementsHaveType`, `BodyHasType`, `MatchExhaustive`,
+`ExpressionRequirementPlan`.
+-/
 
 /-!
 Complete declarative typing of the resolved source occurrence language.

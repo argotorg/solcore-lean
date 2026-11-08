@@ -1,29 +1,23 @@
 import Solcore.SourceSemantics.Context
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Instantiation
-import Solcore.SourceSemantics.Substitution
-import Solcore.SourceSemantics.SubstitutionCorrespondence
+import Solcore.SourceSemantics.Internal.Substitution.Unification
 import Solcore.SourceSemantics.Graph
 import Solcore.SourceSemantics.Traits
 import Solcore.SourceSemantics.TraitResolutionSoundness
 import Solcore.SourceSemantics.Typing
 import Solcore.SourceSemantics.Requirements
-import Solcore.SourceSemantics.Coercions
 import Solcore.SourceSemantics.Types
 import Solcore.SourceSemantics.Binders
-import Solcore.SourceSemantics.Literals
-import Solcore.SourceSemantics.Operators
-import Solcore.SourceSemantics.Calls
-import Solcore.SourceSemantics.Patterns
-import Solcore.SourceSemantics.Places
+import Solcore.SourceSemantics.Expressions
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Control
 import Solcore.SourceSemantics.Static
 import Solcore.SourceSemantics.StaticValidation
 import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.ProgramCheckingSoundness
-import Solcore.SourceSemantics.SubstitutionProperties
-import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
 import Solcore.SourceSemantics.Internal.Inference.Soundness
 import Solcore.SourceSemantics.Internal.Inference.ExpressionInduction
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
@@ -49,4 +43,27 @@ successful runs in structurally instantiated contexts whose rigid and lexical
 flexible binders are closed while residual inference admission remains open. Structural and
 trait substitution preservation close generic bodies and their evidence
 without making the executable frontend authoritative.
+
+## Reading order
+
+1. **Static semantics.** `Context`, `Types`, `Binders`, then `Expressions` and `Static`, which
+   assembles the construct rules. `Program` ends with `ProgramWellFormed`.
+2. **Dynamic semantics.** `Dynamic.Value`, `Dynamic.Heap`, `Dynamic.Evaluation` and `Dynamic.Fault`.
+3. **Source type preservation.** The statement is in `Dynamic.Preservation`, and the proof in
+   `Dynamic.WholeLanguagePreservation`.
+4. **Staging.** `Staging.Classification`, `Staging.RecursiveProfile`, `Staging.Erasure` and
+   `Staging.Preservation`.
+5. **The executable frontend.** `SourceProgramCheckingSoundness`, then `InferenceSoundness`.
+6. **Actual compilation.** `CompiledBodies`.
+
+## Main theorems
+
+- `ProgramWellFormed.wholeLanguagePreservation`, in `Dynamic.WholeLanguagePreservation`.
+- `Dynamic.ProgramEvaluates.preserves`, in `Dynamic.Program`.
+- `programWellFormed_ofCheckProgram_statements`, in `SourceProgramCheckingSoundness`.
+- `SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound`, in
+  `InferenceSoundness`. Its premise is the recursive soundness of statement inference.
+- `SourceCompiledActualInitializerBarriers.compile_cached_bodies`, in `CompiledBodies`.
+
+The reviewer's guide is `docs/review/source-semantics.md`.
 -/

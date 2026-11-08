@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Types
 
 /-!
+# Static validation
+
+An executable validator for scoping and type parameters, with its correctness. Main declarations:
+`StaticValidationError`, `validateTypeParameterBinders`, `validateTypesWellScopedWith`.
+-/
+
+/-!
 Executable validation for the type-formation fragment of the declarative
 source semantics.
 

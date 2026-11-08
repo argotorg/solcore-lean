@@ -1,6 +1,13 @@
 import Solcore.SourceSemantics.Staging.Stage
 import Solcore.Frontend.SourceInference.TypedIR
 
+/-!
+# Call guards
+
+Runtime guards on the stage of a call. Main declarations: `Staging.CallGuard.Frame`,
+`Staging.CallGuard.Accepts`, `Staging.CallGuard.Rejects`.
+-/
+
 /-! Independent runtime call-stage guards. The frame contains retained caller
 facts and occurrence stages; its authenticity is a separate static obligation.
 These rules do not call the executable guard, run source code, or inspect Core.

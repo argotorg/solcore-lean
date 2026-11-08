@@ -2,7 +2,7 @@ import Solcore.Frontend.SourceInference.Internal.ProgramProperties
 import Solcore.Frontend.SourceInference.Internal.RequirementProperties
 import Solcore.Frontend.SourceInference.Expression
 import Solcore.SourceSemantics.ProgramCheckingSoundness
-import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
 import Solcore.SourceSemantics.TraitResolutionSoundness
 
 /-!

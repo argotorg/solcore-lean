@@ -16,7 +16,7 @@ it rests on 665 declarations of the area.
 | Finite execution safety | `Program.checked_run_never_faults`, `Program.checked_runStateful_has_type`, `well_typed_runStateful_resume_has_type` | README; roots of the dependencies |
 | The evaluator and the machine agree | `run_evaluation_sound`, `evaluation_run_complete` | roots of the dependencies; the big-step relation is what the source-to-Core work targets |
 | The checker decides the judgment | `Program.check_sound`, `Program.check_complete`, `Program.checkDetailed_sound`, `Program.checkDetailed_complete` | roots of the dependencies; every theorem above starts from `Program.check` |
-| Exact fuel | `runStateful_resume`, `Steps.resumed_done_iff` | 128 modules outside the area import this file |
+| Exact fuel | `runStateful_resume`, `Steps.resumed_done_iff` | used outside the area |
 | Safety with host requests | `hostRun_hasType`, `hostRun_never_faults` | roots of the dependencies; `ContractRuntime` builds on them |
 
 The definitions in the front are what those statements mention: the closure of their types, followed
@@ -154,10 +154,9 @@ Below these sit the results a reader may want while checking a proof: `advance_n
 - **Files that look like one topic are separate on purpose.**
   - `PrimitiveLaws`, `WordComparisons`, `ByteSelection` and `DerivedForms` are one topic in four
     files, because of `@[simp]`. A `@[simp]` lemma reaches every module that imports any part of
-    its file. `PrimitiveLaws` reaches about 70 modules, `ByteSelection` about 4,200,
-    `WordComparisons` and `DerivedForms` about 6,400, and merging them would change what `simp` does
-    in the difference. The same goes for `LocalLoopCorrespondence`, about 200 modules, and
-    `ConventionLaws`, about 6,200.
+    its file. `PrimitiveLaws` reaches few modules, and the other three about half of the repository,
+    each a different set, so merging them would change what `simp` does in the difference. The same
+    goes for `LocalLoopCorrespondence`, which few modules reach, and `ConventionLaws`.
   - `HostRunner` holds its own definitions, and `Wire/Conversions` stays apart from `Wire/Syntax`.
     Moving either changes which matcher Lean reuses, so the binder names in the equation lemmas of
     `HostRunResult.HasType`, or of `Wire.Expr.toCore`, would change.

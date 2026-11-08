@@ -5,7 +5,7 @@ import Solcore.ContractRuntime.WorldState
 # Laws of balances, nonces and deltas
 
 Balance and nonce lookup under account updates, and the endpoint queries of `WorldStateDelta`. These
-stay apart from `WorldStateLaws` because about 300 modules reach that file and not this one.
+stay apart from `WorldStateLaws` because many modules reach that file and not this one.
 -/
 
 section

@@ -1,6 +1,15 @@
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.Control
-import Solcore.SourceSemantics.Dynamic.ControlTransferFacts
+import Solcore.SourceSemantics.Dynamic.Internal.ControlTransfer
+
+/-!
+# Whole-language preservation
+
+Source type preservation. `ProgramWellFormed.wholeLanguagePreservation` gives
+`Dynamic.WholeLanguagePreservation` from `ProgramWellFormed` alone.
+`Dynamic.FunctionStatementsExecute.preserved` and
+`Dynamic.FunctionStatementsExecute.noEscapedControl` are the forms that function bodies use.
+-/
 
 /-!
 # Constructive whole-language preservation

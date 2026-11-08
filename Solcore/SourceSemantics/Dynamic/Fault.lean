@@ -2,6 +2,14 @@ import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 
 /-!
+# Faults
+
+The positive evidence of failure, which is not a total complement of success. Main declarations:
+`Dynamic.ExpressionFaults`, `Dynamic.StatementFaults`, `Dynamic.BodyFaults`,
+`Dynamic.CallableFaults`, `Dynamic.ExpressionEvaluatesOutcome`.
+-/
+
+/-!
 Declarative faulting big-step dynamics for resolved source programs.
 
 This module deliberately complements, rather than changes, `Evaluation`.  A

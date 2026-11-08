@@ -2,22 +2,17 @@ import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Heap
 import Solcore.SourceSemantics.Dynamic.Typing
-import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.SourceSemantics.Dynamic.Primitive
-import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Evidence
-import Solcore.SourceSemantics.Dynamic.EvidenceSubstitutionProperties
-import Solcore.SourceSemantics.Dynamic.LocalSchemes
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
 import Solcore.SourceSemantics.Dynamic.Evaluation
-import Solcore.SourceSemantics.Dynamic.Initialization
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.Dynamic.Control
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.Dynamic.Program
-import Solcore.SourceSemantics.Dynamic.ProgramOutcome
 
 /-!
 # Declarative source dynamics
@@ -31,4 +26,10 @@ Fault derivations are positive evidence rather than a total complement of
 success. Whole-language preservation concerns successful runs whose rigid
 parameters have been structurally instantiated and whose lexical flexible
 scope is closed; the body-wide residual inference scope remains open.
+
+## Reading order
+
+`Value`, `Heap`, `Typing`, `Primitive`, `Place`, `Evidence`, `Evaluation`, `Fault`, then `Program`.
+`Preservation` states what is preserved, and `WholeLanguagePreservation` proves it. Main theorems:
+`ProgramWellFormed.wholeLanguagePreservation` and `Dynamic.ProgramEvaluates.preserves`.
 -/

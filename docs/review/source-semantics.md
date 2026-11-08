@@ -9,8 +9,6 @@ Read this area from its [umbrella](../../Solcore/SourceSemantics.lean) and the f
 Everything else is in `Internal/`. A namespace names a section of a file, not a file: search for the
 marker `-- leanmerge: from <module>` or for the namespace to find a section.
 
-The layout below is the plan for the whole area. A file named without a link has not landed yet.
-
 ## Main definitions and theorems
 
 | Claim | Theorems | Evidence |
@@ -52,7 +50,7 @@ The rest are body-level steps that those families build on.
 | [Traits](../../Solcore/SourceSemantics/Traits.lean) | `ImplHeadInstantiates`, `TraitEvidence`, `EvidenceValid` |
 | [Typing](../../Solcore/SourceSemantics/Typing.lean) | `ReferenceHasRawType`, `SolvedRequirementValid` |
 | [Requirements](../../Solcore/SourceSemantics/Requirements.lean) | `RequirementLedgerWellFormed`, `RequirementValid`, `CoercionPathValid` |
-| `Expressions` | `IntegerLiteralValid`, `BinaryOperatorHasType`, `DeclarationApplicationValid`, `TypedMatchPatternHasType`, `PlaceHasType` |
+| [Expressions](../../Solcore/SourceSemantics/Expressions.lean) | `IntegerLiteralValid`, `BinaryOperatorHasType`, `DeclarationApplicationValid`, `TypedMatchPatternHasType`, `PlaceHasType` |
 | [Ownership](../../Solcore/SourceSemantics/Ownership.lean) | `LocalIdentityOwnership`, `RequirementOwnership`, `definedLocalIds` |
 | [Graph](../../Solcore/SourceSemantics/Graph.lean) | `Reachable`, `OccurrenceGraphClosed`, `OccurrenceGraphAcyclic` |
 | [Control](../../Solcore/SourceSemantics/Control.lean) | `ControlContext`, `ControlSummary`, `BodyFacts` |
@@ -87,9 +85,9 @@ The rest are body-level steps that those families build on.
 | [Classification](../../Solcore/SourceSemantics/Staging/Classification.lean) | `Staging.FunctionHasStages`, `Staging.BinderGetsStage`, `Staging.StatementAssigns` |
 | [Materialization](../../Solcore/SourceSemantics/Staging/Materialization.lean) | `Staging.Materializes`, `Staging.ComptimeEvaluationBoundary` |
 | [Program](../../Solcore/SourceSemantics/Staging/Program.lean) | `Staging.ProgramHasStages` |
-| `RecursiveProfile` | `Staging.Recursive.Expression`, `Staging.Recursive.Statements`, `Staging.Recursive.Registry` |
-| `Erasure` | `Staging.Recursive.Expression.value_plain` |
-| `Preservation` | The staged preservation theorems of the table above |
+| [RecursiveProfile](../../Solcore/SourceSemantics/Staging/RecursiveProfile.lean) | `Staging.Recursive.Expression`, `Staging.Recursive.Statements`, `Staging.Recursive.Registry` |
+| [Erasure](../../Solcore/SourceSemantics/Staging/Erasure.lean) | `Staging.Recursive.Expression.value_plain` |
+| [Preservation](../../Solcore/SourceSemantics/Staging/Preservation.lean) | The staged preservation theorems of the table above |
 
 ### Checking, inference and compiled bodies
 
@@ -107,7 +105,7 @@ The rest are body-level steps that those families build on.
 1. **Static semantics.** [Context](../../Solcore/SourceSemantics/Context.lean),
    [Types](../../Solcore/SourceSemantics/Types.lean) and
    [Binders](../../Solcore/SourceSemantics/Binders.lean), then
-   `Expressions` and
+   [Expressions](../../Solcore/SourceSemantics/Expressions.lean) and
    [Static](../../Solcore/SourceSemantics/Static.lean), which assembles the construct rules. End with
    [Program](../../Solcore/SourceSemantics/Program.lean).
 2. **Dynamic semantics.** [Value](../../Solcore/SourceSemantics/Dynamic/Value.lean),
@@ -120,10 +118,10 @@ The rest are body-level steps that those families build on.
    [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean),
    and [Program](../../Solcore/SourceSemantics/Dynamic/Program.lean) states it for a whole run.
 4. **Staging.** [Classification](../../Solcore/SourceSemantics/Staging/Classification.lean), then
-   `RecursiveProfile`, which the
+   [RecursiveProfile](../../Solcore/SourceSemantics/Staging/RecursiveProfile.lean), which the
    source-to-Core theorems are stated over. Then
-   `Erasure` and
-   `Preservation`.
+   [Erasure](../../Solcore/SourceSemantics/Staging/Erasure.lean) and
+   [Preservation](../../Solcore/SourceSemantics/Staging/Preservation.lean).
 5. **The executable frontend.**
    [SourceProgramCheckingSoundness](../../Solcore/SourceSemantics/SourceProgramCheckingSoundness.lean),
    then [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean).
@@ -138,9 +136,9 @@ Premises matter here. Several results are stated conditionally on purpose, and t
 | `ProgramWellFormed.wholeLanguagePreservation` | [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean) | A well-formed program gives preservation of every successful expression, statement list and body invocation. Runs are of structurally instantiated contexts, and the residual inference scope stays open |
 | `Dynamic.ProgramEvaluates.preserves` | [Program](../../Solcore/SourceSemantics/Dynamic/Program.lean) | A successful admitted run preserves the instantiated entry body. It says nothing about termination |
 | `Dynamic.FunctionStatementsExecute.noEscapedControl` | [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean) | A complete typed function body cannot leave a break or continue transfer |
-| `Staging.Recursive.FaultPreservation.statements` | `Preservation` | Faulting staged statements preserve heap typing, for a well-formed program |
-| `Staging.Recursive.SelectedPreservation.statements` | `Preservation` | The same for a registry of selected bodies, which needs no whole-program validity |
-| `Dynamic.FunctionInstantiates.hasType` | `TraitLaws` | An instantiated function body has its substituted type |
+| `Staging.Recursive.FaultPreservation.statements` | [Preservation](../../Solcore/SourceSemantics/Staging/Preservation.lean) | Faulting staged statements preserve heap typing, for a well-formed program |
+| `Staging.Recursive.SelectedPreservation.statements` | [Preservation](../../Solcore/SourceSemantics/Staging/Preservation.lean) | The same for a registry of selected bodies, which needs no whole-program validity |
+| `Dynamic.FunctionInstantiates.hasType` | [TraitLaws](../../Solcore/SourceSemantics/Internal/Substitution/TraitLaws.lean) | An instantiated function body has its substituted type |
 | `programWellFormed_ofCheckProgram_statements` | [SourceProgramCheckingSoundness](../../Solcore/SourceSemantics/SourceProgramCheckingSoundness.lean) | Checker success and statement typing of every body give `ProgramWellFormed` |
 | `SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound` | [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean) | The same, with one premise left: `SourceInferenceSoundness.InferStatementsFuelSoundness`, the recursive soundness of statement inference. It is not discharged here |
 | `programHasStages_ofCheckProgram_and_analysis` | [InferenceSoundness](../../Solcore/SourceSemantics/InferenceSoundness.lean) | With that premise and a successful stage analysis of every body, the program has stages. Static checking alone gives no staging conclusion |
@@ -159,10 +157,10 @@ Premises matter here. Several results are stated conditionally on purpose, and t
 | [Internal/Execution](../../Solcore/SourceSemantics/Internal/Execution) | 10 | 14,000 | The call tree of successful inference: calls, inputs, reads, binders, shapes and progress |
 | [Internal/Formation](../../Solcore/SourceSemantics/Internal/Formation) | 7 | 8,000 | Types and requirements are well formed under the final substitution |
 | [Internal/Prepared](../../Solcore/SourceSemantics/Internal/Prepared) | 7 | 5,000 | Prepared plans: call edges, qualified reads and template scope |
-| `Internal/Substitution` | 3 | 15,000 | Structural and trait substitution preserve typing |
-| `Internal/Checking` | 1 | 1,000 | Typing certificates of selected bodies |
-| `Staging/Internal` | 5 | 8,000 | Trace sizes and the cases of staged preservation |
-| `Dynamic/Internal` | 2 | 1,000 | Pattern completeness and control transfers |
+| [Internal/Substitution](../../Solcore/SourceSemantics/Internal/Substitution) | 3 | 15,000 | Structural and trait substitution preserve typing |
+| [Internal/Checking](../../Solcore/SourceSemantics/Internal/Checking) | 1 | 1,000 | Typing certificates of selected bodies |
+| [Staging/Internal](../../Solcore/SourceSemantics/Staging/Internal) | 5 | 8,000 | Trace sizes and the cases of staged preservation |
+| [Dynamic/Internal](../../Solcore/SourceSemantics/Dynamic/Internal) | 2 | 1,000 | Pattern completeness and control transfers |
 
 The families follow the namespaces of the base: `SourceInferenceExecution`, `SourceInferenceSoundness`,
 `SourceInferenceSoundness.ProtectedVariables`, and the two formation namespaces.
@@ -188,7 +186,7 @@ keeps its own file because the CoreLowering layout constraints name it.
 ## What stays mixed
 
 - **Two files stay long.** [Soundness](../../Solcore/SourceSemantics/Internal/Inference/Soundness.lean)
-  has 26,295 lines and `StructuralLaws`
+  has 26,295 lines and [StructuralLaws](../../Solcore/SourceSemantics/Internal/Substitution/StructuralLaws.lean)
   12,986. Each is one module of the base, and the layout rule lets an existing file keep its length:
   no merge made them long. They cannot be cut either. `private` is per file, a few `private` helpers
   are used across almost all of each, and `list_eq_singleton_of_length_eq_one` runs for 16,895 lines
