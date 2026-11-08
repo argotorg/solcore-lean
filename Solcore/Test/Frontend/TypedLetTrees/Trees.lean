@@ -1,5 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 import Solcore.Core.Safety
 import Solcore.Syntax.Parser.Internal.TermBasics
 

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEqual
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.Instantiation
-import Solcore.Frontend.SourceCoreDataCatalog
+import Solcore.Frontend.SourceCore.Data
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps

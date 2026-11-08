@@ -13,8 +13,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirect
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.SourceSemantics.Staging.SelectedRecursivePreservation
-import Solcore.Frontend.SourceCoreFailurePreservationReceipts
+import Solcore.SourceSemantics.Staging.Preservation
+import Solcore.Frontend.SourceCoreExecution
 
 /-!
 # Selected compilations: public direct sessions

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.AssemblyStorageLoopCases
+import Solcore.Synthesis.Internal.Assembly
 
 /-! Native inline Yul storage-loop case boundary. Source generation and replay
 never execute the imported Hull or use stored expected results. The observer

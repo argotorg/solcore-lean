@@ -1,18 +1,12 @@
-import Solcore.ContractRuntime.CoreContractEntryProfileProperties
-import Solcore.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.TopLevelStorageDelta
-import Solcore.Core.ContractCallWordResultProperties
-import Solcore.Core.HostProgress
-import Solcore.ContractRuntime.CheckedContractRegistry
-import Solcore.ContractRuntime.CheckedCoreWordOutcome
-import Solcore.ContractRuntime.ContractCallFailure
-import Solcore.ContractRuntime.HostStorageAccountPresence
-import Solcore.ContractRuntime.HostStorageContext
-import Solcore.ContractRuntime.NestedWordCall
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.OneLevelNestedExecution
-import Solcore.ContractRuntime.BalanceTransfer
-import Solcore.ContractRuntime.HostStorageHandler
+import Solcore.ContractRuntime.Internal.EntryOutcomeLaws
+import Solcore.ContractRuntime.Internal.TopLevelLaws
+import Solcore.Core.Internal.HostPreservation
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.StorageDriver
+import Solcore.ContractRuntime.Internal.NestedLaws
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
+import Solcore.ContractRuntime.Internal.CreationLaws
 
 /-!
 # Value call boundary tests

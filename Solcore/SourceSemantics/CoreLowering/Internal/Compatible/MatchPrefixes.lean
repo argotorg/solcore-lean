@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
-import Solcore.Core.DefinitionExtension
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Compatible matches: prefixes

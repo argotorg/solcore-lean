@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveControlTransferFacts
+import Solcore.SourceSemantics.Staging.RecursiveProfile
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection

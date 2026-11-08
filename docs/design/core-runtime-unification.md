@@ -63,8 +63,8 @@ not another evaluator.
 Use the session returned by a completed call for subsequent calls. Public
 handles carry artifact/session authority; they are not raw Core references or
 serializable source closures. Snapshot and handle restrictions are enforced by
-the API. [Execution tests](../../Solcore/Test/SourceCoreExecution.lean) and
-[snapshot tests](../../Solcore/Test/SourceCoreExecutionSnapshots.lean) provide
+the API. [Execution tests](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean) and
+[snapshot tests](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Snapshots.lean) provide
 current executable usage examples.
 
 `RunOptions` separates input validation, Core execution and output validation
@@ -92,17 +92,17 @@ implementation-method body in the selected compilation cache, including
 later-discovered dependencies. It follows the actual inference calls,
 initializer lifetimes, retained bindings and final substitution:
 
-- [SourceCompiledActualInitializerBarriers.compile_cached_bodies](../../Solcore/SourceSemantics/SourceCompiledActualInitializerBarriers.lean)
+- [SourceCompiledActualInitializerBarriers.compile_cached_bodies](../../Solcore/SourceSemantics/CompiledBodies.lean)
   derives cached-body validity from successful compilation and its artifact.
-- [SelectedCompilationRawPublicReceipt.of_compile](../../Solcore/SourceSemantics/CoreLowering/SelectedCompilationRawPublicReceipt.lean)
+- [SelectedCompilationRawPublicReceipt.of_compile](../../Solcore/SourceSemantics/CoreLowering/PublicSessions.lean)
   retains the actual public compilation and prepared recipe.
-- [Receipt.checker_bodies, checker_profiled and checker_initial_row](../../Solcore/SourceSemantics/CoreLowering/SelectedCompilationCheckerPublicProfile.lean)
+- [Receipt.checker_bodies, checker_profiled and checker_initial_row](../../Solcore/SourceSemantics/CoreLowering/PublicSessions.lean)
   connect that receipt to body validity and the existing profiled public
   session. Initializer barriers and body typing are derived here rather than
   supplied independently. `StaticProfile` remains an explicit premise for
   the latter public connections.
 
-Existing [profiled public sessions](../../Solcore/SourceSemantics/CoreLowering/SelectedCompilationProfiledPublicSession.lean)
+Existing [profiled public sessions](../../Solcore/SourceSemantics/CoreLowering/PublicSessions.lean)
 connect supported source bodies to actual initialization, calls, resumptions
 and retained histories. The broader proof library covers individual expression,
 statement, loop, assignment, mapping and callable connections. Their exact
@@ -112,7 +112,7 @@ all compiler-accepted syntax.
 The general accepted-body route starts from the actual compiler receipt of one
 body invocation, `ActualBodyInvocation.Index`: a named cache row or a
 materialized contextual closure. In
-[CellAwareInvocationAcceptedFlow](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedFlow.lean),
+[CellAwareInvocationAcceptedFlow](../../Solcore/SourceSemantics/CoreLowering/AcceptedStatements.lean),
 `correct` closes the mixed-cell statement flows by induction over the actual
 accepted compiler tree (`AcceptedNamedBodyFlow.Tree`), not over a Source
 recognizer. Each branch uses the compiler's own read, child lowering, fuel,
@@ -132,10 +132,10 @@ rows). Write heads come from the tree's assignment receipts, the compiler's own
 key and right-hand lowerings and the body's actual assignment policy
 (`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`). `for`
 headers are closed by two further inductions over the compiler's header items
-([CellAwareInvocationAcceptedForItems](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedForItems.lean));
+([CellAwareInvocationAcceptedForItems](../../Solcore/SourceSemantics/CoreLowering/AcceptedStatements.lean));
 their declarations are authenticated by the original compilation receipt.
 Matches are closed under the same Source view
-([CellAwareInvocationAcceptedMatches](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedMatches.lean)):
+([CellAwareInvocationAcceptedMatches](../../Solcore/SourceSemantics/CoreLowering/AcceptedStatements.lean)):
 the tree's match receipt supplies the certificate, the scrutinee lowering and
 the finite branch requests; each arm is the compiler's own request at its
 original pattern context with the match's control, typed natively through the
@@ -155,7 +155,7 @@ for named rows) and the body's diagnostic issuer. For this the closure carries
 the compiler's statement sites (`ActualBodyInvocation.Index.Site`) and also
 concludes that every native typing of the emitted code has a Word failure
 component
-([CellAwareInvocationAcceptedNative](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNative.lean));
+([CellAwareInvocationAcceptedNative](../../Solcore/SourceSemantics/CoreLowering/AcceptedStatements.lean));
 that fixes the initializer's native type at its language result.
 `Covered` excludes writes and matches under contextual metadata views, and it
 requires a function-mode fallthrough to have Unit result and a final bare value
@@ -163,7 +163,7 @@ to have the declared result type. The
 closure threads the Source context's signatures through declarations. The
 caller also supplies Core typing of the compiled body, fixed-control checker
 typing and the result projection; for an actual prepared named header,
-[CellAwareInvocationAcceptedNamedHeaders.static_inputs](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedHeaders.lean)
+[CellAwareInvocationAcceptedNamedHeaders.static_inputs](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean)
 derives all three from checker certification and the cached body's Core typing.
 The invocation's physical entry state, the original compilation receipt, and
 the write inputs (`CellAwareInvocationAcceptedInputs.Writes`: fault
@@ -174,12 +174,12 @@ physical entry state and the write inputs for named rows whose accepted
 expressions lie in the first expression subset.
 
 The first expression closure is
-[CellAwareInvocationAcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressions.lean).
+[CellAwareInvocationAcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean).
 `Closed` states the covered subset as a predicate on the actual accepted
 expression receipts: every expression the compiler accepts for the body, at any
 fuel and scope, is a site of the subset (`InSubset`). For a named row these
 sites are `Subset` of
-[CellAwareInvocationAcceptedExpressionTrees](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressionTrees.lean):
+[CellAwareInvocationAcceptedExpressionTrees](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean):
 literals, ordinary local reads, groups, pairs, primitive unary and binary
 operators and conditionals. Each such site has no coercions, has no
 requirements except at an integer literal, is not a generalized initializer and
@@ -190,7 +190,7 @@ body's expression nodes alone. `of_subset` extracts a receipt tree from the
 compiler's own acceptance at its root fuel
 (`GeneralizedLocalInitializerCompilation.named_contextual`), at the reached
 scope and Source context, using the scope declarations of the physical entry.
-[CellAwareInvocationAcceptedExpressionBounds](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedExpressionBounds.lean)
+[CellAwareInvocationAcceptedExpressionBounds](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean)
 closes that tree by structural recursion over the existing invocation-family
 heads for read-product leaves, groups, pairs, operators and conditionals. No
 expression or body execution law is an input. `expressions` turns `Closed` into
@@ -207,7 +207,7 @@ calls, indices, longer tuples, constructors, builtin references, generalized
 reads, lambdas and coercions are also outside the subset.
 
 Direct calls have their own head,
-[CellAwareInvocationAcceptedDirectCalls](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedDirectCalls.lean).
+[CellAwareInvocationAcceptedDirectCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean).
 At a site with the actual compiler receipt, call authority and evidence (the
 plain-heap family's `Receipt`, `Port` and `EvidenceAt`), `preserves` and
 `reflects` close the argument vector with the cell-aware sequence, read the
@@ -221,18 +221,18 @@ rows and argument rows. As in the plain-heap direct head, the caller carrier
 retains every ordinary global slot (`Globals`) and every reached caller retains
 the physical cache. The physical canonical protocol has both. Its bindings,
 administrative transport and ordinary caller carrier already exist, and
-[CellAwareInvocationAcceptedGlobalSlots](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedGlobalSlots.lean)
+[CellAwareInvocationAcceptedGlobalSlots](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 adds its cell producer. The accepted flow and the derived write inputs are
 generic in the protocol, so accepted bodies can run on it. The head also uses
 `ProgramWellFormed`, which the public named support does not carry.
 
-[CellAwareInvocationAcceptedNamedApplication](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedApplication.lean)
+[CellAwareInvocationAcceptedNamedApplication](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 derives that input from the callee's own accepted body. From the receipts of
 the public named root, its `preserves` and `reflects` prove `PreservesAt` and
 `ReflectsAt` of a named row's header. The only expression input is the meaning
 of the body's accepted expressions below the grade on the slot-retaining
 protocol, for every owner key with physical locations. The entry,
-[CellAwareInvocationAcceptedNamedEntry](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedEntry.lean),
+[CellAwareInvocationAcceptedNamedEntry](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean),
 is `CellAwareNamedEntry.prepare_selected` over any instance model of the
 caller's cells. It also returns the parameter spine, and it inverts a sized
 native completion into a strictly smaller body completion through a sized
@@ -246,13 +246,13 @@ expression of the callee lies in the closed subset, so `preserves_closed` and
 induction.
 
 Direct calls enter the expression closure at expression roots.
-[CellAwareInvocationAcceptedCallTrees](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallTrees.lean)
+[CellAwareInvocationAcceptedCallTrees](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 adds them to the first subset (`CallSubset`) when four conditions hold:
 - the call's arguments are first-subset sites;
 - its node has no coercions or requirements;
 - its declaration is monomorphic and the calling row has no evidence
   assumptions (`DirectSite`, whose policy lemmas are in
-  [CellAwareInvocationAcceptedDirectSites](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedDirectSites.lean));
+  [CellAwareInvocationAcceptedDirectSites](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean));
 - the family admits its instantiation.
 
 At such a call the receipt tree (`CallTree`) keeps the compiler's direct-call
@@ -260,27 +260,27 @@ receipt, the authority (`Port`) of the selected header and the subset receipt
 trees of the arguments. `of_call_subset` extracts it from the compiler's
 acceptance; the call authority of the body's receipts is an input (`Ports`),
 as in the older direct families.
-[CellAwareInvocationAcceptedCallBounds](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallBounds.lean)
+[CellAwareInvocationAcceptedCallBounds](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 closes the tree: subset roots use the existing bounds, and calls use the
 direct-call head, with evidence from the call's empty requirements.
-[CellAwareInvocationAcceptedCallExpressions](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallExpressions.lean)
+[CellAwareInvocationAcceptedCallExpressions](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 turns `ClosedCalls` into `Expressions` on the slot-retaining protocol, given
 the application of every admitted callee below the budget.
-[CellAwareInvocationAcceptedCallFamily](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallFamily.lean)
+[CellAwareInvocationAcceptedCallFamily](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 closes a family. Suppose every catalog header with an admitted instantiation
 has the receipts of such a row (`Row`). Then one strong induction on the grade
 gives `Expressions` for every family body, and its `preserves` and `reflects`
 give the application of every admitted header at every grade. A call nested
 inside another expression is not yet covered.
 
-[CellAwareInvocationAcceptedCallAuthority](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallAuthority.lean)
+[CellAwareInvocationAcceptedCallAuthority](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 derives `Ports` from a complete inventory. A call receipt's global slot names
 an indexed function, because the indexed globals are the functions'
 signatures, and the inventory's header for that index gives the `Port`.
-[CellAwareInvocationAcceptedCallEntry](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedCallEntry.lean)
+[CellAwareInvocationAcceptedCallEntry](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 is the body-trace counterpart of the row lemma, packaged as the root's
 `NamedResultAt` with the restored caller's post-admission.
-[CellAwarePublicAcceptedCallRoot](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedCallRoot.lean)
+[CellAwarePublicAcceptedCallRoot](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean)
 gives the preservation theorem of the unchanged public root for a
 call-containing row. The root call runs as before, and the body runs on the
 slot-retaining protocol from the root's physical cache and capture, with the
@@ -289,7 +289,7 @@ at the root, the lifting of original traces of call-containing bodies and a
 one-call instance remain.
 
 The public connection of this subset starts at
-[CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedNamedInvocation.lean).
+[CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean).
 Its `reads` derives `Reads` for a named row from the retained diagnostic issuer
 and the public fault receiver, as `CellAwareNamedReadDiagnostics.uninitialized`
 does for the older named family. Its `writes` derives `Writes` from the issued
@@ -312,14 +312,14 @@ caller. The caller's heap is represented with the profiled instance model of
 the older family. `cell_of_profiled` embeds each of its cells in the accepted
 instance model with the trivial attachment, and the results are stated in that
 model. At an actual prepared header,
-[CellAwarePublicAcceptedNamedRoot](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedNamedRoot.lean)
+[CellAwarePublicAcceptedNamedRoot](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean)
 derives the static inputs (`CellAwareInvocationAcceptedNamedHeaders.static_inputs`),
 the issuer, the issued tables and the prepared assignment table from the public
 diagnostic receipt. Its
 `checkpoint_has_sufficient_fuel_selected` and `checkpoint_reflects_selected`
 relate a staged Source trace of the body to the native completion of the actual
 public start in both directions, through the unchanged public root.
-[CellAwarePublicAcceptedNamedForward](../../Solcore/SourceSemantics/CoreLowering/CellAwarePublicAcceptedNamedForward.lean)
+[CellAwarePublicAcceptedNamedForward](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean)
 `first_value_selected` takes a staged trace that returns a value to a
 successful public resumption (`SourceCoreExecution.Checkpoint.ResumeAt`). The
 resumption carries the exported value and the physical history of the returned
@@ -335,12 +335,12 @@ consumes them, so later public calls do not yet chain from them.
 
 Each of these premises, and the staged trace, can be produced at an actual
 program.
-[CellAwareInvocationAcceptedSubsetCheck](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedSubsetCheck.lean)
+[CellAwareInvocationAcceptedSubsetCheck](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean)
 checks the subset: `nodes?` reads a row's Source nodes and the prepared local
 inventory and returns a proof that every expression node is a `Subset` site. A
 site depends on its row only through the row's key, so `transport` moves the
 proof to every row with that key, and `closed` turns it into `Closed`.
-[CellAwareInvocationAcceptedBodyShape](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedBodyShape.lean)
+[CellAwareInvocationAcceptedBodyShape](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)
 `Shape` recognizes, on the Source, statement lists of value and unit returns,
 monomorphic declarations, bare assignments that the compiler refines
 (`Assignable`), expression statements, blocks and conditionals, with every
@@ -356,12 +356,12 @@ expressions on an actually compiled row.
 `CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original
 compilation receipt from the checked program, its public compilation and the
 issued recipe.
-[CellAwareInvocationAcceptedSourceLifting](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedSourceLifting.lean)
+[CellAwareInvocationAcceptedSourceLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)
 `expression_value` stages every value execution of a subset expression, by
 structural induction on `Subset` with no typing or state input: a subset
 expression contains no call, so each original value rule is the staged rule of
 the same form, and a generalized local read keeps its descriptor.
-[CellAwareInvocationAcceptedStatementLifting](../../Solcore/SourceSemantics/CoreLowering/CellAwareInvocationAcceptedStatementLifting.lean)
+[CellAwareInvocationAcceptedStatementLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)
 `statements` stages every ordinary execution of a shaped list whose expressions
 are subset sites, in both compiler modes, by structural induction on `Shape`:
 declarations allocate the same cell, a bare assignment resolves its target
@@ -373,7 +373,7 @@ execution, and `body` gives the sized staged trace of a function body. Fault
 executions are not lifted.
 
 The test
-[SourceCoreGeneralizedExportAcceptedTick](../../Solcore/Test/SourceCoreGeneralizedExportAcceptedTick.lean)
+[SourceCoreGeneralizedExportAcceptedTick](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Export.lean)
 compiles the existing three-function GeneralizedExport program at runtime and
 takes its `tick` row, whose body returns its Bool parameter. Its
 `accepted_tick` meets every premise of `first_value_selected`,

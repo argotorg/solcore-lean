@@ -1,11 +1,10 @@
 import Solcore.Frontend.SourceCompilationPlan
 import Solcore.Frontend.SourceCore.Lowering
 import Solcore.Frontend.SourceCore.Data
-import Solcore.Core.CallableContract
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.LanguageResult
 import Solcore.Frontend.SourceCore.Internal.FaultSites
 import Solcore.Frontend.SourceCore.DataExpressions
-import Solcore.Core.LocalLoop
 import Solcore.Frontend.SourceCore.Internal.Entries
 import Solcore.Frontend.SourceCore.DataPlaces
 

@@ -1,13 +1,12 @@
 import Solcore.Frontend.SourceCompiler
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSourceCallOutcomes
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedOutputForward
+import Solcore.SourceSemantics.CoreLowering.PublicSessions
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
+import Solcore.SourceSemantics.CoreLowering.PublicOutputs
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
-import Solcore.Core.UnaryPrimitives
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicInitialData
+import Solcore.Core.Internal.PrimitiveLaws
 
 /-!
 # Selected projected tests

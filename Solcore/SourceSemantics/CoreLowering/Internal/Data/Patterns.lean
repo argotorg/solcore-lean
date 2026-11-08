@@ -1,8 +1,8 @@
-import Solcore.Frontend.SourceCoreDataMatches
-import Solcore.SourceSemantics.Dynamic.Pattern
+import Solcore.Frontend.SourceCore.GeneralFunctions
+import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
-import Solcore.Frontend.SourceCoreDataValues
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.Frontend.SourceCore.Internal.Entries
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
 import Solcore.Core.Correspondence
 
 /-!

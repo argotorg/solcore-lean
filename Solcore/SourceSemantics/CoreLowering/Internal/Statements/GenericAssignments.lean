@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.RenamedBareAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedExpressionFaults
-import Solcore.Frontend.SourceCoreCompatibleDataMatches
+import Solcore.Frontend.SourceCore.CompatibleFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PatternsAndArms
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes

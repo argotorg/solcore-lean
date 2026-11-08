@@ -1,7 +1,6 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.ContractRuntime.RuntimeScalars
-import Solcore.Synthesis.Stateful.AccountStorage
 import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute the fixed two-contract value/log protocol from actual linked Hull.

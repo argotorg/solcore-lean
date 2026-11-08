@@ -1,13 +1,9 @@
-import Solcore.ContractRuntime.CheckedCoreProgram
-import Solcore.ContractRuntime.WorldStateWordCodeSelection
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecution
-import Solcore.ContractRuntime.ParentIndexedFrameInitialization
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
-import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
-import Solcore.ContractRuntime.FrameResolutionResult
-import Solcore.ContractRuntime.ParentIndexedSelectedExecution
-import Solcore.ContractRuntime.CheckedHostCoreWordProgram
-import Solcore.ContractRuntime.SelectedCheckedWordExecution
+import Solcore.ContractRuntime.Internal.CheckedCoreProgram
+import Solcore.ContractRuntime.Internal.SelectedWordExecution
+import Solcore.ContractRuntime.Internal.ParentIndexedFrames
+import Solcore.ContractRuntime.Internal.FrameLaws
+import Solcore.ContractRuntime.Internal.ParentIndexedExecution
+import Solcore.ContractRuntime.Internal.ContractLaws
 
 /-!
 # Selected execution tests

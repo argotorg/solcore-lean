@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Syntax.Parser.Internal.TermBasics
 
 /-!

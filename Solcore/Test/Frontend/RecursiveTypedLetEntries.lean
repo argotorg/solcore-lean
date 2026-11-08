@@ -1,5 +1,5 @@
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Syntax.Parser.Internal.TermBasics
 
 /-!

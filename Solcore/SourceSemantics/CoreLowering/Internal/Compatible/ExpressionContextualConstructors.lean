@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.Core.DefinitionExtension
+import Solcore.Core.Internal.Renaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 
 /-!

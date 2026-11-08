@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInv
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
+import Solcore.SourceSemantics.Staging.Erasure
 
 /-!
 # Cell-aware invocations: assignments

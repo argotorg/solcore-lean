@@ -4,16 +4,14 @@ import Solcore.Syntax.Lexer.Properties
 import Solcore
 import Solcore.Syntax.Lexer.Step
 import Solcore.Syntax.Parser
-import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
-import Solcore.Syntax.Parser.IdentifierTraceProperties
-import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.Properties
-import Solcore.Syntax.Parser.Name
-import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.PrimitiveRejectionDiagnosticProperties
-import Solcore.Syntax.Parser.PrimitiveTotalityProperties
-import Solcore.Syntax.Parser.Trivia
+import Solcore.Syntax.Parser.PublicOutputs
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
+import Solcore.Syntax.Parser.Internal.TypeTrace
+import Solcore.Syntax.Parser.Internal.DelimitedSoundness
+import Solcore.Syntax.Parser.Internal.ParseProperties
+import Solcore.Syntax.Parser.Internal.Basics
+import Solcore.Syntax.Parser.Internal.DelimitedTotality
+import Solcore.Syntax.Parser.Internal.TriviaProofs
 
 /-!
 # Lexer, tokens and trivia tests

@@ -1,13 +1,6 @@
-import Solcore.Synthesis.Source.MalformedBytesCases
-import Solcore.Synthesis.Source.AggregateCases
-import Solcore.Synthesis.Core.LongBytes
-import Solcore.Synthesis.Stateful.MalformedBytesExecution
-import Solcore.Synthesis.Source.MalformedCalldataCases
-import Solcore.Synthesis.Core.DynamicArray
-import Solcore.Synthesis.Stateful.MalformedCalldataExecution
-import Solcore.Synthesis.Source.MalformedNestedArrayCases
-import Solcore.Synthesis.Core.NestedArray
-import Solcore.Synthesis.Stateful.MalformedNestedArrayExecution
+import Solcore.Synthesis.Internal.Malformed
+import Solcore.Synthesis.Internal.Aggregates
+import Solcore.Synthesis.Internal.AbiValues
 
 /-!
 # Malformed calldata profile tests

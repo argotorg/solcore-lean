@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceCoreUnifiedCompilation
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.ProgramChecking
 
 /-!

@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceCore.Internal.DirectLinking
 
 /-! End-to-end regressions for validated direct-call specialization linking. -/
 

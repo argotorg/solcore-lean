@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
@@ -13,7 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
-import Solcore.SourceSemantics.Staging.RecursiveFaultPreservationSupport
+import Solcore.SourceSemantics.Staging.Internal.FaultStatements
 
 /-!
 # Staged bounds: indirect calls

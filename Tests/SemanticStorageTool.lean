@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.StorageCases
+import Solcore.Synthesis.Internal.Storage
 
 /-! Native storage-case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

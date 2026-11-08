@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.Fragments.Internal.LocalApplication
 import Solcore.Core.Eval
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence

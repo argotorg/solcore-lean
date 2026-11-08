@@ -1,13 +1,8 @@
-import Solcore.Frontend.FiveLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.Fragments.Internal.ExpectedLambdas
+import Solcore.Frontend.Fragments.Internal.LocalApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
-import Solcore.Frontend.FourLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.SevenLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.SixLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.ThreeOrMoreGroupedExpectedLambdaArgumentApplication
-import Solcore.Frontend.TwoLevelGroupedExpectedLambdaArgumentApplication
 import Solcore.Core.Eval
 
 /-!

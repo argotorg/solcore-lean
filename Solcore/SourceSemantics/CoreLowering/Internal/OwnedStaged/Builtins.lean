@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryMembers

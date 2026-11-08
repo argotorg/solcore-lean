@@ -1,9 +1,8 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.TerminalReturnBody
 
 /-!
 # Recursive runtime entry tests

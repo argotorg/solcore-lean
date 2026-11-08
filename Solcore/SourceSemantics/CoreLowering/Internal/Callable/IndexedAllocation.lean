@@ -1,17 +1,14 @@
-import Solcore.Frontend.SourceCoreCallableIndexedDispatch
+import Solcore.Frontend.SourceCore.Internal.CallableIndexed
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
-import Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Core.Derived
-import Solcore.Frontend.SourceCoreAllocationLayouts
+import Solcore.Core.Internal.DerivedForms
+import Solcore.Frontend.SourceCore.Internal.Allocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
-import Solcore.Frontend.SourceCoreCallableIndexedAncestry
-import Solcore.Frontend.SourceCoreCallableIndexedPrograms
-import Solcore.Frontend.SourceCoreUnifiedRuntime
-import Solcore.SourceSemantics.Dynamic.ProgramOutcome
+import Solcore.Frontend.SourceCoreUnified
+import Solcore.SourceSemantics.Dynamic.Program
 
 /-!
 # Indexed callables: allocation and frames

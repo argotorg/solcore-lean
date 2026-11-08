@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
-import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.EnumReturnCases
+import Solcore.Synthesis.Internal.EnumAbi
 
 /-! Native enum-return case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

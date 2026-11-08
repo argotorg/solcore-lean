@@ -34,7 +34,7 @@ The rest are body-level steps that those families build on.
 
 ## Front
 
-47 files, about 44,000 lines. Merged modules keep their old paths as shims until consolidation.
+47 files, about 44,000 lines.
 [Dynamic](../../Solcore/SourceSemantics/Dynamic.lean) and [Staging](../../Solcore/SourceSemantics/Staging.lean) are umbrellas, and each module doc is a reading guide.
 
 ### Static semantics

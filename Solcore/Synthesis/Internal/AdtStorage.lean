@@ -2,8 +2,8 @@ import Solcore.Abi.Keccak256
 import Solcore.Synthesis.Internal.Storage
 import Solcore.Synthesis.Core.StdDispatch
 import Solcore.Synthesis.Internal.Aggregates
-import Solcore.Core.Wire.Codec.Program
-import Solcore.ContractRuntime.CheckedCoreContract
+import Solcore.Core.Wire.Codec
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.Synthesis.Stateful.Sequence
 
 /-!

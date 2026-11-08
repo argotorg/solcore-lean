@@ -1,9 +1,9 @@
-import Solcore.SourceSemantics.SourcePreparedLocalReadTemplateExclusion
+import Solcore.SourceSemantics.Internal.Prepared.QualifiedReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews
-import Solcore.SourceSemantics.SourcePreparedQualifiedLocalReadTransport
+import Solcore.SourceSemantics.Internal.Prepared.ResidualAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry

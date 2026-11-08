@@ -1,14 +1,10 @@
-import Solcore.Core.CallableContract
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.Check
 import Solcore.Core.Machine
 import Solcore.Core.Safety
-import Solcore.Core.DefinitionExtension
-import Solcore.Core.BoundedSafety
-import Solcore.Core.OptionalCell
-import Solcore.Core.ExactFuelProperties
-import Solcore.SourceSemantics.CoreLowering.OrderedMapping
-import Solcore.Core.TaggedFunction
-import Solcore.SourceSemantics.CoreLowering.WordMapping
+import Solcore.Core.Internal.Renaming
+import Solcore.Core.Fuel
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 
 /-!
 # Core data and cell tests

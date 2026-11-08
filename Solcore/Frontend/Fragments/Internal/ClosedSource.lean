@@ -4,7 +4,7 @@ import Solcore.Frontend.Fragments.Internal.SourceValues
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Frontend.Fragments.Internal.Computation
 import Solcore.Frontend.Fragments.Internal.TypedLet
-import Solcore.Core.LocalFragment
+import Solcore.Core.Internal.LocalFragment
 import Solcore.Resolved.LocalScope
 import Solcore.Frontend.WordLiteral
 

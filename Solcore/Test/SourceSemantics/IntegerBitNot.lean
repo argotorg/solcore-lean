@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.IntegerBitNotSnapshot
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints
 

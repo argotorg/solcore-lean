@@ -1,6 +1,5 @@
 import Solcore.Frontend.RustHull.Decode
 import Solcore.Frontend.RustHull.LinkedContract
-import Solcore.Synthesis.Stateful.AccountStorage
 import Solcore.Synthesis.Stateful.Sequence
 
 /-! Execute a bounded sequence of persistent, zero-value calls on one linked

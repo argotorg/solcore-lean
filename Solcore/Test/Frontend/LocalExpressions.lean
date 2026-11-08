@@ -1,21 +1,16 @@
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Core.BitwiseLogic
-import Solcore.Frontend.LocalExpressionEvaluator
-import Solcore.Frontend.LocalExpressionResumptionProperties
-import Solcore.Core.UnsignedDivision
-import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Core.Internal.PrimitiveLaws
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Core.Machine
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Core.LocalFragment
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.LocalReference
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.ExecutionProperties
 import Solcore.Syntax.Parser.Internal.TermBasics
 import Solcore.Resolved.Eval
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.LocalExpressionExecutionProperties
-import Solcore.Frontend.ReturnBody
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
 
 /-!
 # Local expression tests

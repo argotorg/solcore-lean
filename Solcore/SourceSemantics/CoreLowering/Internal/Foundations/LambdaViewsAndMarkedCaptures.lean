@@ -8,8 +8,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
-import Solcore.Frontend.SourceCoreCallableIndexedAllocationFrames
-import Solcore.Frontend.SourceCoreLocalEvidence
+import Solcore.Frontend.SourceCore.Internal.CallableIndexed
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 

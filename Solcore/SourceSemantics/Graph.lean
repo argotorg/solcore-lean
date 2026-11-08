@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.Binders
-import Solcore.Frontend.SourceInference.TypedIRProperties
+import Solcore.Frontend.SourceInference.Internal.TypedIRProperties
 
 /-!
 # Closure of the occurrence graph

@@ -1,10 +1,7 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
-import Solcore.ContractRuntime.HostStorageDriver
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuation
-import Solcore.ContractRuntime.ParentIndexedFrameInitialization
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
-import Solcore.ContractRuntime.HostStorageHandler
+import Solcore.ContractRuntime.Internal.CodeExecution
+import Solcore.ContractRuntime.Internal.FrameLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.Internal.ParentIndexedFrames
 
 /-!
 # Address-selected host tests

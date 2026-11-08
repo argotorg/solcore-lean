@@ -1,15 +1,8 @@
-import Solcore.Synthesis.Source.CallGraphCases
-import Solcore.Synthesis.Source.CallGraphEmitter
+import Solcore.Synthesis.Internal.CallGraphs
 import Solcore.Core.Machine
-import Solcore.Core.Wire.Codec.Program
-import Solcore.Synthesis.Source.CallGraphLoopCases
-import Solcore.Synthesis.Source.CallGraphLoopEmitter
-import Solcore.Synthesis.Source.LoopEmitter
-import Solcore.Synthesis.Source.NestedCallCases
-import Solcore.Synthesis.Source.NestedCallEmitter
-import Solcore.Synthesis.Stateful.NestedCallExecution
-import Solcore.Synthesis.Source.RecursionCases
-import Solcore.Synthesis.Source.RecursiveLoopCases
+import Solcore.Core.Wire.Codec
+import Solcore.Synthesis.Internal.Loops
+import Solcore.Synthesis.Internal.Calls
 
 /-!
 # Call graph profile tests

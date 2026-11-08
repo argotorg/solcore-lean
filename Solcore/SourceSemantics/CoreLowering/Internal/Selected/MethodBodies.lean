@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedHeads
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
@@ -18,7 +18,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
-import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
+import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NamedHeaderReceipts

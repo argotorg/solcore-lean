@@ -1,12 +1,6 @@
-import Solcore.Synthesis.Source.MemoryArrayCases
-import Solcore.Synthesis.Source.ArrayAbiCases
-import Solcore.Synthesis.Source.ArrayReturnCases
-import Solcore.Synthesis.Source.DynamicArrayCases
-import Solcore.Synthesis.Source.DynamicArrayEmitter
-import Solcore.Synthesis.Stateful.DynamicArrayExecution
-import Solcore.Synthesis.Source.NestedArrayCases
-import Solcore.Synthesis.Source.NestedArrayEmitter
-import Solcore.Synthesis.Stateful.NestedArrayExecution
+import Solcore.Synthesis.Internal.Arrays
+import Solcore.Synthesis.Internal.AbiReturns
+import Solcore.Synthesis.Internal.AbiValues
 
 /-!
 # Array profile tests

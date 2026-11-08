@@ -1,16 +1,14 @@
 import Solcore.Frontend.RustHull.CodeImage
 import Solcore.Core.Machine
-import Solcore.Frontend.RustHull.ContractCodeExecutionCorrespondence
-import Solcore.Frontend.RustHull.RuntimeCodeEffectsSemantics
-import Solcore.Frontend.RustHull.Creation
+import Solcore.Frontend.RustHull.ContractCodeTheorems
+import Solcore.Frontend.RustHull.Semantics.Layers
+import Solcore.Frontend.RustHull.Effects
 import Solcore.Abi.Keccak256
 import Solcore.Frontend.RustHull.Contract
-import Solcore.Frontend.RustHull.CreationPreimage
-import Solcore.Frontend.RustHull.ContractCallModeExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractCallModeSupported
-import Solcore.Frontend.RustHull.ImageComparison
+import Solcore.Frontend.RustHull.Internal.Creation
+import Solcore.Frontend.RustHull.ContractCallTheorems
+import Solcore.Frontend.RustHull.Internal.CallLayout
 import Solcore.Frontend.RustHull.LinkedContract
-import Solcore.Frontend.RustHull.ObjectLinking
 
 /-!
 # Hull creation tests

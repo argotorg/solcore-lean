@@ -1,10 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
-import Solcore.Frontend.SourceCoreBasic
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Frontend.SourceCoreControl
-import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.Staging.CallBoundary
-import Solcore.Frontend.SourceCoreCallableContracts
 
 /-!
 # Basic expressions and call contracts

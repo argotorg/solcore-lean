@@ -5,8 +5,8 @@ import Solcore.Resolved.Typing
 import Solcore.Core.Safety
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Term
-import Solcore.Resolved.Renaming
-import Solcore.Resolved.FreshIdentity
+import Solcore.Resolved.Internal.ScopeLaws
+import Solcore.Resolved.Identity
 
 /-!
 # Local expressions

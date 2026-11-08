@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormation
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.SelectedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies

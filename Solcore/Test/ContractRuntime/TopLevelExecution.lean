@@ -1,16 +1,14 @@
-import Solcore.ContractRuntime.OneLevelNestedExecution
-import Solcore.ContractRuntime.BalancedTopLevelExecution
+import Solcore.ContractRuntime.Internal.NestedLaws
+import Solcore.ContractRuntime.Internal.BalancedLaws
 import Solcore.Test.ContractRuntime.SelectedExecution
-import Solcore.ContractRuntime.ParentIndexedSelectedExecution
-import Solcore.ContractRuntime.CheckedHostCoreProgram
-import Solcore.ContractRuntime.HostStorageDriver
-import Solcore.ContractRuntime.ExecutionEnvironment
+import Solcore.ContractRuntime.Internal.ParentIndexedExecution
+import Solcore.ContractRuntime.Internal.WorldStateLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.Test.ContractRuntime.Creation
 import Solcore.Test.ContractRuntime.NestedExecution
-import Solcore.ContractRuntime.Account
-import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 import Solcore.ContractRuntime.WorldState
-import Solcore.ContractRuntime.CheckedCreationTemplateRegistry
 
 /-!
 # Top-level execution tests

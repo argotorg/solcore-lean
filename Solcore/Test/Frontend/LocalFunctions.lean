@@ -1,16 +1,14 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.LocalComputation
-import Solcore.Frontend.ReturnBody
-import Solcore.Core.LocalFragment
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.LocalComputations
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Core.Internal.LocalFragment
 import Solcore.Core.Safety
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.LocalApplication
-import Solcore.Frontend.RuntimeApplicationFunction
-import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.LocalApplication
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
 
 /-!
 # Local function tests

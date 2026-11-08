@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.Frontend.SourceCoreUnifiedCompilation
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConditionals
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds

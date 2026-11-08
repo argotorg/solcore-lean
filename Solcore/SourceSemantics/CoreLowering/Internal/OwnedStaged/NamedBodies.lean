@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 

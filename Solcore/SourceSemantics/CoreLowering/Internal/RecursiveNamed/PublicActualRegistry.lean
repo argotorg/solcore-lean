@@ -5,18 +5,17 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.InitializedPubl
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
-import Solcore.Frontend.SourceCoreFailurePreservationReceipts
+import Solcore.Frontend.SourceCoreExecution
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
-import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.OrdinarySequenceCallers
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalApplications
-import Solcore.Frontend.SourceCoreExecution
 
 /-!
 # Recursive named public results: the actual registry

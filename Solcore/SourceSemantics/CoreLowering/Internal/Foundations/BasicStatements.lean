@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
-import Solcore.Frontend.SourceCoreBasic
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Core.FirstOrderWeakening
+import Solcore.Core.Internal.Renaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GeneralExpressions
 
 /-!

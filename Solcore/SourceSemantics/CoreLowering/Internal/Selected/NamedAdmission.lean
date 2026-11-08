@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
@@ -20,9 +20,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.OrdinaryLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
-import Solcore.SourceSemantics.SourceInferenceSoundness
+import Solcore.SourceSemantics.Internal.Inference.Soundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
-import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies
 
 /-!

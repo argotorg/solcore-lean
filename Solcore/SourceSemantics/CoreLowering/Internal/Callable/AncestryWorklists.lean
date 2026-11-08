@@ -1,8 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
-import Solcore.Frontend.SourceCoreCallableAncestryReadRecipes
-import Solcore.Frontend.SourceCoreCallableAncestryCache
-import Solcore.Frontend.SourceCoreCallableAncestryPreparation
-import Solcore.Frontend.SourceCoreCallableAncestryPairedPreparation
+import Solcore.Frontend.SourceCore.Internal.CallableAncestry
+import Solcore.Frontend.SourceCore.Internal.CallablePaired
 
 /-!
 # Callable ancestry: active sources and worklists

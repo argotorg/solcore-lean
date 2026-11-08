@@ -4,8 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
-import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
-import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
+import Solcore.SourceSemantics.Staging.Preservation
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries

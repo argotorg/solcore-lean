@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormat
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation

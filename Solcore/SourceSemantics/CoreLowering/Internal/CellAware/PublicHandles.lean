@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
-import Solcore.Core.ExactFuelProperties
+import Solcore.Core.Fuel
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.MaterializedExpressions
-import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.MaterializedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
@@ -18,7 +18,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessio
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.LambdaCompilation
 import Solcore.SourceSemantics.CoreLowering.PublicSessions
-import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalSessions
 import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies

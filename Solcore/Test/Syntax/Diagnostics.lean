@@ -1,16 +1,11 @@
 import Solcore
-import Solcore.Syntax.Parser.TransactionalChoiceDiagnosticTraceProperties
-import Solcore.Syntax.Parser.DiagnosticCascadeProperties
-import Solcore.Syntax.Parser.ParseDiagnosticCascadeStabilityProperties
+import Solcore.Syntax.Parser.Internal.DiagnosticTrace
+import Solcore.Syntax.Parser.Internal.SourceFileTrace
 import Solcore.Syntax.Parser
-import Solcore.Syntax.Parser.ParseDiagnosticCascadeProperties
-import Solcore.Syntax.Parser.UnexpectedDiagnosticCascadeProperties
-import Solcore.Syntax.Parser.Nesting
-import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
-import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
-import Solcore.Syntax.Parser.Expression.Atom
-import Solcore.Syntax.Parser.DelimitedUnrestrictedFuelTotalityProperties
-import Solcore.Syntax.Parser.ExactTokenPrimitiveSuccessTraceProperties
+import Solcore.Syntax.Parser.Internal.FileProofs
+import Solcore.Syntax.Parser.Internal.ExpressionAtomTrace
+import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
+import Solcore.Syntax.Parser.Internal.DelimitedTrace
 
 /-!
 # Parser diagnostics tests

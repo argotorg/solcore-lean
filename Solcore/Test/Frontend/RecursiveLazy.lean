@@ -1,12 +1,8 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Core.ExactFuelProperties
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RuntimeComputationFunction
-import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.LocalComputations
 
 /-!
 # Recursive lazy tests

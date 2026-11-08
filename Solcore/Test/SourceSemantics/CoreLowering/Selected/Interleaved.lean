@@ -1,21 +1,19 @@
 import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.Dynamic.Evaluation
-import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedBodyProducer
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageContracts
-import Solcore.SourceSemantics.CoreLowering.CallableNamedMetadata
-import Solcore.SourceSemantics.CoreLowering.CellAwareLexicalNamedProgramProfiles
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCatalog
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.LexicalBodies
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
+import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.Test.SourceSemantics.Semantics
 import Solcore.SourceSemantics.Dynamic.Preservation
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedSourceTyping
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.Test.SourceSemantics.CoreLowering.Selected.GeneralizedSource
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionState
-import Solcore.SourceSemantics.CoreLowering.CellAwarePublicInitialStart
-import Solcore.SourceSemantics.CoreLowering.CellAwarePublicLexicalForward
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCertifiedPublicSessionInitial
-import Solcore.SourceSemantics.CoreLowering.CellAwarePublicLexicalFailureForward
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHandles
+import Solcore.SourceSemantics.CoreLowering.CellAwarePublicForward
+import Solcore.SourceSemantics.CoreLowering.PublicSessions
 
 /-!
 # Interleaved selected tests

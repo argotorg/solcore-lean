@@ -1,11 +1,11 @@
 import Solcore.Synthesis.Internal.Aggregates
-import Solcore.Core.Wire.Codec.Program
-import Solcore.ContractRuntime.CheckedCoreContract
+import Solcore.Core.Wire.Codec
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.Synthesis.Core.StdDispatch
 import Solcore.Synthesis.Internal.Storage
-import Solcore.ContractRuntime.BalancedTopLevelExecution
+import Solcore.ContractRuntime.Internal.BalancedLaws
 import Solcore.Synthesis.Stateful.Sequence
-import Solcore.ContractRuntime.OneLevelNestedExecution
+import Solcore.ContractRuntime.Internal.NestedLaws
 import Solcore.Abi.Keccak256
 
 /-!

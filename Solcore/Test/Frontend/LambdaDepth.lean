@@ -1,10 +1,6 @@
-import Solcore.Frontend.BoundedCalleeLambdaDepth
-import Solcore.Frontend.BoundedInputsLambdaDepth
-import Solcore.Frontend.ClosedSource
-import Solcore.Frontend.DataCalleeLambdaDepth
-import Solcore.Frontend.DirectDataLambdaDepth
+import Solcore.Frontend.Fragments.Internal.LambdaDepth
+import Solcore.Frontend.Fragments.Internal.ClosedSource
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.SavedDataLambdaDepth
 
 /-!
 # Lambda depth tests

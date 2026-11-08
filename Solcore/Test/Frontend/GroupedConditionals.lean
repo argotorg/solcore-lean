@@ -1,15 +1,9 @@
-import Solcore.Frontend.ConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplication
-import Solcore.Frontend.ThreeOrMoreGroupedExpectedLambdaArgumentApplication
+import Solcore.Frontend.Fragments.Internal.ExpectedLambdas
+import Solcore.Frontend.Fragments.Internal.LocalApplication
 import Solcore.Core.Eval
-import Solcore.Frontend.GroupedExpectedLambdaArgumentApplication
-import Solcore.Frontend.OneLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.ThreeLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.TwoLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.TwoLevelGroupedExpectedLambdaArgumentApplication
 
 /-!
 # Grouped conditional tests

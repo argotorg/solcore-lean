@@ -1,17 +1,14 @@
-import Solcore.Resolved.FreshIdentity
-import Solcore.Resolved.Scope
-import Solcore.Resolved.Renaming
-import Solcore.Core.LocalFragment
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Resolved.Identity
+import Solcore.Resolved.Internal.ScopeLaws
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Core.Fuel
 import Solcore.Resolved.Typing
 import Solcore.Resolved.Eval
 import Solcore.Core.Machine
-import Solcore.Core.ExactFuelProperties
 import Solcore.Core.Safety
 import Solcore.Resolved
-import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Resolved.WordLessWithIds
+import Solcore.Resolved.Internal.LocalFragmentLaws
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Resolved syntax tests

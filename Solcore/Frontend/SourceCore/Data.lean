@@ -1,7 +1,7 @@
 import Solcore.Frontend.SourceCompilationPlan
-import Solcore.Core.CallableContract
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.Data
-import Solcore.Core.OrderedMapping
+import Solcore.Core.Internal.MappingLaws
 
 /-!
 # Data catalog

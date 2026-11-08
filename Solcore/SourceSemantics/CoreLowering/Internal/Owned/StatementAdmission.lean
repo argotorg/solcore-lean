@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForHeaders
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
-import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
+import Solcore.SourceSemantics.Staging.Internal.SelectedContracts
 
 /-!
 # Owned callables: statement admission

@@ -116,10 +116,11 @@ Refinement layers, which tests use and the top-level runners do not:
 
 ## What a reviewer should know
 
-- **Definitions and laws are in separate files.** Old paths such as
-  `Solcore.ContractRuntime.TopLevelExecution` are shims until consolidation, and they lead to the laws,
-  because outside tests use the laws. So the definitions have new file names. Declarations and
-  namespaces did not change: `TopLevelExecution.run` is still called that, and it is in `TopLevel`.
+- **Definitions and laws are in separate files.** An old module such as
+  `Solcore.ContractRuntime.TopLevelExecution` was split: its definitions went to a front file
+  (`TopLevel`) and its laws to `Internal/` (`Internal/TopLevelLaws`). The moves map gives the laws
+  file as the old module's place, because outside tests used the laws. Declarations and namespaces
+  did not change: `TopLevelExecution.run` is still called that, and it is in `TopLevel`.
 - **Three front files keep more proofs, because of `private`.**
   - `WorldState`: the constructors and fields of `Account` and `WorldState` are private, so the 510
     lines of laws that unfold them stay.

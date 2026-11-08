@@ -1,11 +1,10 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedOutputForward
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationHeaderCertificates
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
+import Solcore.SourceSemantics.CoreLowering.PublicOutputs
+import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
+import Solcore.SourceSemantics.CoreLowering.PublicSessions
+import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageClosedInitialForward
 
 /-!
 # Selected control profile tests

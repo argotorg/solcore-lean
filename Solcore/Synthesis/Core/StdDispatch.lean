@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 
 /-!
 # The std dispatcher

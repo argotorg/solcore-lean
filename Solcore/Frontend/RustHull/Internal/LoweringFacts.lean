@@ -1,9 +1,9 @@
 import Solcore.Frontend.RustHull.Contract
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Fuel
 import Solcore.Frontend.RustHull.Semantics
 import Solcore.Frontend.RustHull.LoweringSupport
-import Solcore.Core.Store
-import Solcore.Core.Renaming
+import Solcore.Core.Eval
+import Solcore.Core.Internal.Renaming
 import Solcore.Frontend.RustHull.Safety
 import Solcore.Frontend.RustHull.Effects
 

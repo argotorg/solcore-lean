@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.Fragments.Internal.TypedLet
 
 /-!
 # Typed let tree raw owner tests

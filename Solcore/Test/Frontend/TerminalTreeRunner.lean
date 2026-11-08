@@ -1,10 +1,9 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.TerminalReturnBody
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.Fragments.Internal.TypedLet
 
 /-!
 # Terminal tree runner tests

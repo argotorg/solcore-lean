@@ -1,12 +1,10 @@
 import Solcore.Core.Primitive
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 import Solcore.Synthesis.Internal.Aggregates
 import Solcore.Synthesis.Internal.AbiReturns
 import Solcore.Synthesis.Internal.EnumAbi
 import Solcore.Synthesis.Core.StdDispatch
-import Solcore.ContractRuntime.CallResumeExecution
-import Solcore.ContractRuntime.CallChainExecution
-import Solcore.ContractRuntime.CallChoiceExecution
+import Solcore.ContractRuntime.Internal.CallPhaseLaws
 import Solcore.Synthesis.Internal.Calls
 import Solcore.Synthesis.Stateful.Sequence
 import Solcore.Synthesis.Internal.Storage

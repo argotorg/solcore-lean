@@ -6,13 +6,13 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
-import Solcore.Frontend.SourceCoreUnifiedCompilation
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
-import Solcore.Frontend.SourceRuntimeHeapTyping
+import Solcore.Frontend.Internal.RuntimeValidation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization

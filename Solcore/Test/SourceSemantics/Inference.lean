@@ -1,14 +1,14 @@
-import Solcore.SourceSemantics.SourceInferenceSoundness
-import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
+import Solcore.SourceSemantics.Internal.Inference.Soundness
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.Dynamic.Fault
-import Solcore.SourceSemantics.CoreLowering.CompatiblePathFaults
-import Solcore.Frontend.SourceRuntimeValues
-import Solcore.SourceSemantics.CoreLowering.LegacyClosureBoundary
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
+import Solcore.Frontend.Internal.RuntimeValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Frontend.SourceInference.Types
-import Solcore.Frontend.SourceInference.TypedIRProperties
+import Solcore.Frontend.SourceInference.Internal.TypedIRProperties
 import Solcore.Frontend.SourceSpecialization
-import Solcore.SourceSemantics.Substitution
+import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.TraitResolutionSoundness
 
 /-!

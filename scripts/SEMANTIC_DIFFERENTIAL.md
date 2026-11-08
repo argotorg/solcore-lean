@@ -2976,7 +2976,7 @@ reaches the meaning upstream gave its integer operators: checked `+ - * / %`
 over `uint8` … `uint256` and `int8` … `int256`, which revert with
 `Panic(0x11)` or `Panic(0x12)`, the wrapping instances of
 `unchecked { … }` blocks, and `<<` and `>>` with an unsigned amount of any
-type. Two profiles share one plan module, `Solcore.Synthesis.Core.Integers`,
+type. Two profiles share one plan module, `Solcore.Synthesis.Internal.Integers`,
 each admitting its own plans:
 - `runtime-checked-arithmetic` (contract `SynthesizedCheckedArithmetic`)
   converts the input Word to one integer type, its first input `sc_a0` and up
@@ -3105,7 +3105,7 @@ ABI. An index or slice bound out of range reverts with `Panic(0x32)`, an
 empty `pop` with `Panic(0x31)` and an oversized allocation with
 `Panic(0x41)`. The memory value and memory call profiles still spell their
 Word arrays `memory<DynArray<uint256>>`, which upstream accepts, so two new
-profiles share one plan module, `Solcore.Synthesis.Core.Arrays`, each
+profiles share one plan module, `Solcore.Synthesis.Internal.Arrays`, each
 admitting its own plans:
 - `runtime-memory-arrays` (contract `SynthesizedMemoryArrays`) converts the
   input Word to one to three values of one of the twelve integer types and up
@@ -5387,15 +5387,16 @@ python3 scripts/semantic-suite.py --mode random --profile stateful-malformed-cal
 Plans use `solcore-lean.malformed-calldata-plan.v1` under
 `malformedCalldataPlan`; cases use
 `solcore-lean.semantic-malformed-calldata-case.v1` and histories
-`solcore-lean.malformed-calldata-history.v1`. The std checks take 273 Core
-nodes against the dynamic-array wrapper's 162, so the suite's default budget
-for this profile is 448 nodes, leaving 175 for the step.
-`Solcore/Test/SourceMalformedCalldataGolden.lean` checks the wrapper and
-`stdRejection?` against 35 golden cases written out from the std reading: every
-malformation kind, wrapping offsets and lengths, overlap, and the decode order
-(a wrong selector on short or truncated calldata, a truncated head with a bad
-offset, a wrapping offset with a wrapping length). Each accepted case must
-behave exactly like the canonical dynamic-array contract on the decoded words.
+`solcore-lean.malformed-calldata-history.v1`. The std checks take 273 Core nodes
+against the dynamic-array wrapper's 162, so the suite's default budget for this
+profile is 448 nodes, leaving 175 for the step.
+`Tests.SourceMalformedCalldataGolden` in `Solcore/Test/Synthesis/Malformed.lean`
+checks the wrapper and `stdRejection?` against 35 golden cases written out from
+the std reading: every malformation kind, wrapping offsets and lengths, overlap,
+and the decode order (a wrong selector on short or truncated calldata, a
+truncated head with a bad offset, a wrapping offset with a wrapping length).
+Each accepted case must behave exactly like the canonical dynamic-array contract
+on the decoded words.
 
 The fixed corpus has thirteen scenarios and 36 transactions: eight imported
 plans, which reuse the dynamic-array corpus steps with malformed transactions,
@@ -5460,7 +5461,7 @@ length.
 value. Canonical values have up to four rows of up to three elements, one row
 and one element more than the protocol reads. The shared modules
 `Solcore/Synthesis/Core/StdDispatch.lean` (std's dispatch and head checks in
-Core) and `Solcore/Synthesis/Stateful/StdCalldata.lean` (the byte-level model
+Core) and `Solcore/Synthesis/Stateful/Sequence.lean` (the byte-level model
 and the malformation changes) hold what the profiles share.
 
 Each transaction records `{id, flags, values, malformation, calldata,
@@ -5511,12 +5512,13 @@ nodes inside the step budget. Its 483 nodes of row checks and guards lie
 outside it, as the nested-array guards do. The suite's default budget is 448
 nodes, which leaves 251 for the step.
 
-`Solcore/Test/SourceMalformedNestedArrayGolden.lean` checks the wrapper and
-`stdDecode` against 64 golden cases written out from the std reading: 57
-malformations and seven decode-order cases. They cover every malformation kind
-and wrapping offsets and lengths. They also cover overlaps that std accepts,
-such as a row on its own table Word, a row aliasing another and a row inside
-another row's elements, and overlaps it rejects. The lazy checks are covered:
+`Tests.SourceMalformedNestedArrayGolden` in
+`Solcore/Test/Synthesis/Malformed.lean` checks the wrapper and `stdDecode`
+against 64 golden cases written out from the std reading: 57 malformations and
+seven decode-order cases. They cover every malformation kind and wrapping
+offsets and lengths. They also cover overlaps that std accepts, such as a row on
+its own table Word, a row aliasing another and a row inside another row's
+elements, and overlaps it rejects. The lazy checks are covered:
 - a malformed or cut fourth row is accepted;
 - a cut in the table is rejected;
 - a cut in a read row's skipped element is rejected;
@@ -5629,14 +5631,14 @@ inside the step budget. Its 416 nodes of chunk guards lie outside it, as the
 long-bytes guards do. The suite's default budget is 448 nodes, which leaves 237
 for the step.
 
-`Solcore/Test/SourceMalformedBytesGolden.lean` checks the wrapper and
-`stdDecode` against 40 golden cases written out from the std reading: 34
-malformations and six decode-order cases. They cover every malformation kind
-and std's padding rules: cuts inside the padding and nonzero padding are
-accepted, a cut inside the payload is rejected, and lengths may run into the
-padding. The offset overlaps differ from the array's: offset 0 decodes the
-flags as a two-byte length, and offset 32 decodes the original length Word as
-a 32-byte payload. Each accepted case must behave exactly like the canonical
+`Tests.SourceMalformedBytesGolden` in `Solcore/Test/Synthesis/Malformed.lean`
+checks the wrapper and `stdDecode` against 40 golden cases written out from the
+std reading: 34 malformations and six decode-order cases. They cover every
+malformation kind and std's padding rules: cuts inside the padding and nonzero
+padding are accepted, a cut inside the payload is rejected, and lengths may run
+into the padding. The offset overlaps differ from the array's: offset 0 decodes
+the flags as a two-byte length, and offset 32 decodes the original length Word
+as a 32-byte payload. Each accepted case must behave exactly like the canonical
 long-bytes contract on the decoded payload, except that its result counts the
 actual calldata size.
 
@@ -5743,11 +5745,11 @@ inside the budget. Each method's selector comparison, head check and protocol,
 nodes, which leaves 390 for the steps: 195 nodes per method with two methods
 and 97 with four.
 
-`Solcore/Test/SourceMethodsGolden.lean` checks the wrapper and `stdDispatch`
-against golden cases written out from the std reading. Eight contracts declare
-two, three and four methods with ascending, descending and mixed selectors.
-Their steps add a known constant, so every row follows by hand. The 110
-single calls cover:
+`Tests.SourceMethodsGolden` in `Solcore/Test/Synthesis/Traits.lean` checks the
+wrapper and `stdDispatch` against golden cases written out from the std reading.
+Eight contracts declare two, three and four methods with ascending, descending
+and mixed selectors. Their steps add a known constant, so every row follows by
+hand. The 110 single calls cover:
 - each method with an even input and, if it takes arguments, an odd one;
 - each method with arguments, called without them;
 - each method with an extra Word, which std accepts;
@@ -5840,17 +5842,18 @@ Returned rows must follow the loop protocol on every path:
 A revert is checked by rollback.
 
 Three Lean tests check the profile:
-- `Solcore/Test/SourceStorageLoopGolden.lean` checks the guarded contract and
-  a model of the source loop, a counter over a slot map, against expectations
-  written out by hand. Its steps add a known constant, over masks 0, 1, 3 and
-  7. The rows cover zero, one, two, three and seven iterations, a revert after
-  seven, carries within and across transactions, and wrapping sums.
-- `Solcore/Test/SourceStorageLoopCases.lean` requires the guarded contract to
-  equal the model on 64 generated scenarios, 392 transactions in all. Every
-  case and reduction must replay, and the shell and guard sizes must be those
-  above.
-- `Solcore/Test/SourceStorageLoopCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.SourceStorageLoopGolden` in `Solcore/Test/Synthesis/Loops.lean` checks
+  the guarded contract and a model of the source loop, a counter over a slot
+  map, against expectations written out by hand. Its steps add a known constant,
+  over masks 0, 1, 3 and 7. The rows cover zero, one, two, three and seven
+  iterations, a revert after seven, carries within and across transactions, and
+  wrapping sums.
+- `Tests.SourceStorageLoopCases` in `Solcore/Test/Synthesis/Loops.lean` requires
+  the guarded contract to equal the model on 64 generated scenarios, 392
+  transactions in all. Every case and reduction must replay, and the shell and
+  guard sizes must be those above.
+- `Tests.SourceStorageLoopCorpus` in `Solcore/Test/Synthesis/Loops.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has twelve scenarios and 31 transactions: eight imported
 scenarios, which reuse the storage corpus's six imported steps, and four
@@ -5972,22 +5975,23 @@ the loop protocol on every path:
 A revert is checked by rollback and the log shapes.
 
 Three Lean tests check the profile:
-- `Solcore/Test/SourceKeccakLoopGolden.lean` checks the guarded contract and a
-  model of the source loop against expectations written out by hand. The
-  model is a counter over a slot map with Keccak slots from
-  `Solcore.Abi.V1.Keccak256` and a log list. Its steps add a known constant;
-  the five plans have key masks 0, 1, 3 and 7 and loop masks 0, 3 and 7. The
-  18 rows cover zero to three and five to seven iterations, reverts after one,
-  two, five and seven logged iterations, entries reused within and across
-  transactions, keys from the input's high part and wrapping sums. Every
-  expected slot 0 value, entry and log is written out.
-- `Solcore/Test/SourceKeccakLoopCases.lean` requires the guarded contract to
-  equal the model on 40 generated scenarios, 240 transactions in all, on
-  status, output, the observed slots and every log. Every case and the
-  reductions of four cases must replay, and the shell, closure and guard sizes
-  must be those above.
-- `Solcore/Test/SourceKeccakLoopCorpus.lean` checks the fixed corpus against
-  expected histories, logs included, that the model computed.
+- `Tests.SourceKeccakLoopGolden` in `Solcore/Test/Synthesis/Loops.lean` checks
+  the guarded contract and a model of the source loop against expectations
+  written out by hand. The model is a counter over a slot map with Keccak
+  slots from `Solcore.Abi.V1.Keccak256` and a log list. Its steps add a known
+  constant; the five plans have key masks 0, 1, 3 and 7 and loop masks 0, 3
+  and 7. The 18 rows cover zero to three and five to seven iterations, reverts
+  after one, two, five and seven logged iterations, entries reused within and
+  across transactions, keys from the input's high part and wrapping sums.
+  Every expected slot 0 value, entry and log is written out.
+- `Tests.SourceKeccakLoopCases` in `Solcore/Test/Synthesis/Loops.lean` requires
+  the guarded contract to equal the model on 40 generated scenarios, 240
+  transactions in all, on status, output, the observed slots and every log.
+  Every case and the reductions of four cases must replay, and the shell,
+  closure and guard sizes must be those above.
+- `Tests.SourceKeccakLoopCorpus` in `Solcore/Test/Synthesis/Loops.lean` checks
+  the fixed corpus against expected histories, logs included, that the model
+  computed.
 
 The fixed corpus has 13 scenarios, 33 transactions and 77 committed logs: nine
 imported scenarios, which reuse the storage corpus's six imported steps, and
@@ -6101,25 +6105,24 @@ and the provenance records the parent profile's version as
 candidates, as for the parents.
 
 Six Lean tests check the profiles:
-- `Solcore/Test/SourceAssemblyStorageLoopGolden.lean` and
-  `Solcore/Test/SourceAssemblyKeccakLoopGolden.lean` compare each form's
-  emitted contract with text written out by hand and require the parent's step
-  functions. They reproduce the parents' hand-written rows through cases of
-  every form, and a changed expectation fails.
-- `Solcore/Test/SourceAssemblyStorageLoopCases.lean` and
-  `Solcore/Test/SourceAssemblyKeccakLoopCases.lean` require generation to
-  agree with the parent profile for the same seeds, on 16 storage and 8
-  Keccak scenarios under G0 revisions three and one. They compare the
-  attempts, exclusions, plans, programs, transactions, observed slots and
-  origins. The form must be the seed's, and every form must be drawn. Every
-  case and the reductions of two cases replay in their form. An unknown form,
-  the parents' schemas and a form that the source was not emitted in are
-  refused.
-- `Solcore/Test/SourceAssemblyStorageLoopCorpus.lean` and
-  `Solcore/Test/SourceAssemblyKeccakLoopCorpus.lean` require each fixed corpus
-  to be exactly its construction from the parent corpus. Every entry must
-  replay, and every original Core history must equal the parent's expected
-  history.
+- `Tests.SourceAssemblyStorageLoopGolden` and
+  `Tests.SourceAssemblyKeccakLoopGolden` in `Solcore/Test/Synthesis/Loops.lean`
+  compare each form's emitted contract with text written out by hand and require
+  the parent's step functions. They reproduce the parents' hand-written rows
+  through cases of every form, and a changed expectation fails.
+- `Tests.SourceAssemblyStorageLoopCases` and
+  `Tests.SourceAssemblyKeccakLoopCases` in `Solcore/Test/Synthesis/Loops.lean`
+  require generation to agree with the parent profile for the same seeds, on 16
+  storage and 8 Keccak scenarios under G0 revisions three and one. They compare
+  the attempts, exclusions, plans, programs, transactions, observed slots and
+  origins. The form must be the seed's, and every form must be drawn. Every case
+  and the reductions of two cases replay in their form. An unknown form, the
+  parents' schemas and a form that the source was not emitted in are refused.
+- `Tests.SourceAssemblyStorageLoopCorpus` and
+  `Tests.SourceAssemblyKeccakLoopCorpus` in `Solcore/Test/Synthesis/Loops.lean`
+  require each fixed corpus to be exactly its construction from the parent
+  corpus. Every entry must replay, and every original Core history must equal
+  the parent's expected history.
 
 Each fixed corpus repeats every scenario of the parent's corpus with the same
 plan and transactions:
@@ -6248,21 +6251,21 @@ response carries at most 8 candidates, within the campaign's 4 MiB bound on
 tool output.
 
 Three Lean tests check the profile:
-- `Solcore/Test/SourceAdtStorageGolden.lean` compares the emitted contracts
-  of two shapes, which together use every method, with text written out by
-  hand. It also checks 24 rows of three shapes, written out by hand from the
-  layout, against original Core and the slot-map model; a changed expectation
-  fails.
-- `Solcore/Test/SourceAdtStorageCases.lean` requires original Core to equal
-  the slot-map model on generated scenarios under G0 revisions three and one,
-  and requires every case and the reductions of two cases to replay. It also
-  checks the node counts and that every variant count, enum position, Word
-  type and method is drawn. Keys, fields, variants and methods outside the
-  case, changed observed slots, excluded shapes and methods out of order are
-  refused.
-- `Solcore/Test/SourceAdtStorageCorpus.lean` requires every original Core
-  history of the fixed corpus to equal the model's expected history, and
-  recomputes its coverage.
+- `Tests.SourceAdtStorageGolden` in `Solcore/Test/Synthesis/Storage.lean`
+  compares the emitted contracts of two shapes, which together use every method,
+  with text written out by hand. It also checks 24 rows of three shapes, written
+  out by hand from the layout, against original Core and the slot-map model; a
+  changed expectation fails.
+- `Tests.SourceAdtStorageCases` in `Solcore/Test/Synthesis/Storage.lean`
+  requires original Core to equal the slot-map model on generated scenarios
+  under G0 revisions three and one, and requires every case and the reductions
+  of two cases to replay. It also checks the node counts and that every variant
+  count, enum position, Word type and method is drawn. Keys, fields, variants
+  and methods outside the case, changed observed slots, excluded shapes and
+  methods out of order are refused.
+- `Tests.SourceAdtStorageCorpus` in `Solcore/Test/Synthesis/Storage.lean`
+  requires every original Core history of the fixed corpus to equal the model's
+  expected history, and recomputes its coverage.
 
 The fixed corpus `scripts/semantic-adt-storage-corpus.json` has 22 imported
 scenarios of one to three transactions over five shapes, with steps from the
@@ -6395,21 +6398,23 @@ transactions, lower the arity, reduce the step, then clear flags to their
 parity bit and inputs to their low byte.
 
 Four Lean tests check the convention and the profile:
-- `Solcore/Test/ContractTupleEntryProfile.lean` checks the convention's exact
-  bytes for two, three and four Words against hexadecimal text written out by
-  hand, and its revert and trap branches. Wrong annotations, arities and
+- `Tests.ContractTupleEntryProfile` in
+  `Solcore/Test/ContractRuntime/ContractCalls.lean` checks the convention's
+  exact bytes for two, three and four Words against hexadecimal text written out
+  by hand, and its revert and trap branches. Wrong annotations, arities and
   payloads must not decode. A word call to a registered tuple contract and a
   creation from a tuple initializer must be unavailable, and a tuple root must
   return its whole tuple through the nested executor.
-- `Solcore/Test/SourceTupleReturnGolden.lean` checks the Core contract and a
-  model of the source, a slot map, against rows written out by hand. Its steps
-  add a known constant. The rows cover each arity, both outcomes, carries
-  across a revert and wrapping sums.
-- `Solcore/Test/SourceTupleReturnCases.lean` requires the Core contract to
-  equal the model on 64 generated scenarios, 392 transactions in all. Every
-  case and reduction must replay, and the shell sizes must be those above.
-- `Solcore/Test/SourceTupleReturnCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.SourceTupleReturnGolden` in `Solcore/Test/Synthesis/Bytes.lean` checks
+  the Core contract and a model of the source, a slot map, against rows written
+  out by hand. Its steps add a known constant. The rows cover each arity, both
+  outcomes, carries across a revert and wrapping sums.
+- `Tests.SourceTupleReturnCases` in `Solcore/Test/Synthesis/Bytes.lean` requires
+  the Core contract to equal the model on 64 generated scenarios, 392
+  transactions in all. Every case and reduction must replay, and the shell sizes
+  must be those above.
+- `Tests.SourceTupleReturnCorpus` in `Solcore/Test/Synthesis/Bytes.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has twelve scenarios and 32 transactions: six imported
 scenarios, which reuse the storage corpus's six imported steps, and six
@@ -6551,24 +6556,24 @@ transactions, shorten lengths to zero or half, reduce the step, then clear
 flags to their parity bit and inputs to their low byte.
 
 Four Lean tests check the convention and the profile:
-- `Solcore/Test/ContractBoundedBytesEntryProfile.lean` checks the
-  convention's exact bytes for lengths 0, 1, 31, 32, 33 and 64 against
-  hexadecimal text, with nonzero data bytes after each length, and its revert
-  and trap branches. Wrong annotations and payloads must not decode. A word
-  call to a registered bytes contract and a creation from a bytes initializer
-  must be unavailable, and a bytes root must return its whole encoding through
-  the nested executor.
-- `Solcore/Test/SourceBytesReturnGolden.lean` checks the Core contract and a
-  model of the source against rows written out as hexadecimal text. The model
-  is a slot map and std's copy-and-zero encoder over the method's memory. Its
-  steps add a known constant. The rows cover the bank's seven lengths, both
-  outcomes, carries across a revert and wrapping sums.
-- `Solcore/Test/SourceBytesReturnCases.lean` requires the Core contract to
-  equal the model on 64 generated scenarios, 392 transactions in all. Every
-  case and reduction must replay, generation must draw every bank length, and
-  the shell size must be the one above.
-- `Solcore/Test/SourceBytesReturnCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.ContractBoundedBytesEntryProfile` in
+  `Solcore/Test/ContractRuntime/ContractCalls.lean` checks the convention's
+  exact bytes for lengths 0, 1, 31, 32, 33 and 64 against hexadecimal text, with
+  nonzero data bytes after each length, and its revert and trap branches. Wrong
+  annotations and payloads must not decode. A word call to a registered bytes
+  contract and a creation from a bytes initializer must be unavailable, and a
+  bytes root must return its whole encoding through the nested executor.
+- `Tests.SourceBytesReturnGolden` in `Solcore/Test/Synthesis/Bytes.lean` checks
+  the Core contract and a model of the source against rows written out as
+  hexadecimal text. The model is a slot map and std's copy-and-zero encoder over
+  the method's memory. Its steps add a known constant. The rows cover the bank's
+  seven lengths, both outcomes, carries across a revert and wrapping sums.
+- `Tests.SourceBytesReturnCases` in `Solcore/Test/Synthesis/Bytes.lean` requires
+  the Core contract to equal the model on 64 generated scenarios, 392
+  transactions in all. Every case and reduction must replay, generation must
+  draw every bank length, and the shell size must be the one above.
+- `Tests.SourceBytesReturnCorpus` in `Solcore/Test/Synthesis/Bytes.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has twelve scenarios and 32 transactions: six imported
 scenarios, which reuse the tuple corpus's six imported steps with lengths
@@ -6730,26 +6735,29 @@ tuple, `bytes` and enum returns can be reduced from a synthetic output
 difference. A one-Word output changes exactly as before.
 
 Four Lean tests check the convention and the profile:
-- `Solcore/Test/ContractEnumEntryProfile.lean` checks the convention's exact
-  bytes against hexadecimal text for every field kind in static and dynamic
-  shapes, the padding Words, and `bytes` lengths 0, 1, 31, 32, 33 and 64
-  behind body heads of two and three Words and in first position. It checks
-  the revert and trap branches, that wrong annotations and fields do not
-  decode, that a word call to a registered enum contract and a creation from
-  an enum initializer are unavailable, and that an enum root returns its whole
-  encoding through the nested executor.
-- `Solcore/Test/SourceEnumReturnGolden.lean` checks the Core contract and a
-  model of the source against rows written out as hexadecimal text, with the
-  tags from `cast keccak`. The model is a slot map and std's `abi_encode` of
-  the enum over a byte memory. Its steps add a known constant. The rows cover
-  static and dynamic shapes, every field kind, padding, the bank's seven
-  lengths, both outcomes, carries across a revert and wrapping sums.
-- `Solcore/Test/SourceEnumReturnCases.lean` requires the Core contract to equal
-  the model on the generated scenarios. Every case and reduction must replay,
-  generation must draw every constructor count, field kind, position and bank
-  length and two `bytes` constructors, and the shells must be the sizes above.
-- `Solcore/Test/SourceEnumReturnCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.ContractEnumEntryProfile` in
+  `Solcore/Test/ContractRuntime/ContractCalls.lean` checks the convention's
+  exact bytes against hexadecimal text for every field kind in static and
+  dynamic shapes, the padding Words, and `bytes` lengths 0, 1, 31, 32, 33 and 64
+  behind body heads of two and three Words and in first position. It checks the
+  revert and trap branches, that wrong annotations and fields do not decode,
+  that a word call to a registered enum contract and a creation from an enum
+  initializer are unavailable, and that an enum root returns its whole encoding
+  through the nested executor.
+- `Tests.SourceEnumReturnGolden` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the Core contract and a model of the source against rows written out as
+  hexadecimal text, with the tags from `cast keccak`. The model is a slot map
+  and std's `abi_encode` of the enum over a byte memory. Its steps add a known
+  constant. The rows cover static and dynamic shapes, every field kind, padding,
+  the bank's seven lengths, both outcomes, carries across a revert and wrapping
+  sums.
+- `Tests.SourceEnumReturnCases` in `Solcore/Test/Synthesis/Enums.lean` requires
+  the Core contract to equal the model on the generated scenarios. Every case
+  and reduction must replay, generation must draw every constructor count, field
+  kind, position and bank length and two `bytes` constructors, and the shells
+  must be the sizes above.
+- `Tests.SourceEnumReturnCorpus` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has fifteen scenarios and 38 transactions: nine imported
 scenarios, which reuse the `bytes` corpus's six imported steps with shapes and
@@ -6893,19 +6901,19 @@ one to none, `bytes` to none), reduce the step, then zero the field Words and
 clear flags to their parity bit.
 
 Three Lean tests check the profile:
-- `Solcore/Test/SourceEnumArgumentGolden.lean` checks the Core contract and
-  the Lean model against rows written out as hexadecimal text, with tags and
-  selectors from `cast keccak`, over five shapes: every field kind with the
-  struct, `bytes` lengths 0, 1, 17, 31, 32, 33, 63 and 64, every malformation
-  kind with accepted and rejected entries, and raw calldata for the order of
-  std's checks.
-- `Solcore/Test/SourceEnumArgumentCases.lean` requires the Core contract to
-  equal the model on the generated scenarios under the two rules, every case
-  and reduction to replay, the node counts above for every shape class, and
-  generation to draw every constructor count, field kind, position, bank
-  length, malformation kind and std outcome.
-- `Solcore/Test/SourceEnumArgumentCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.SourceEnumArgumentGolden` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the Core contract and the Lean model against rows written out as hexadecimal
+  text, with tags and selectors from `cast keccak`, over five shapes: every
+  field kind with the struct, `bytes` lengths 0, 1, 17, 31, 32, 33, 63 and 64,
+  every malformation kind with accepted and rejected entries, and raw calldata
+  for the order of std's checks.
+- `Tests.SourceEnumArgumentCases` in `Solcore/Test/Synthesis/Enums.lean`
+  requires the Core contract to equal the model on the generated scenarios under
+  the two rules, every case and reduction to replay, the node counts above for
+  every shape class, and generation to draw every constructor count, field kind,
+  position, bank length, malformation kind and std outcome.
+- `Tests.SourceEnumArgumentCorpus` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has 21 scenarios and 60 transactions: fifteen imported
 scenarios, which reuse the enum-return corpus's nine imported steps with
@@ -7058,18 +7066,18 @@ retag names, narrow fields, reduce the step, then zero the element Words and
 clear flags to their parity bit.
 
 Three Lean tests check the profile:
-- `Solcore/Test/SourceEnumArrayGolden.lean` checks the Core contract and the
-  Lean model against rows written out as hexadecimal text, computed outside
-  Lean by the probe's independent model, with tags and selectors from `cast
-  keccak`, over five shapes, and raw calldata for the order of std's checks
-  and an aliased table entry.
-- `Solcore/Test/SourceEnumArrayCases.lean` requires the Core contract to equal
-  the model on the generated scenarios under the two rules, every case and
-  reduction to replay, the node counts above for every shape class, and
-  generation to draw every constructor count, field kind, element count, read
-  position, bank length, malformation kind and std outcome.
-- `Solcore/Test/SourceEnumArrayCorpus.lean` checks the fixed corpus against
-  expected histories that the model computed.
+- `Tests.SourceEnumArrayGolden` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the Core contract and the Lean model against rows written out as hexadecimal
+  text, computed outside Lean by the probe's independent model, with tags and
+  selectors from `cast keccak`, over five shapes, and raw calldata for the order
+  of std's checks and an aliased table entry.
+- `Tests.SourceEnumArrayCases` in `Solcore/Test/Synthesis/Enums.lean` requires
+  the Core contract to equal the model on the generated scenarios under the two
+  rules, every case and reduction to replay, the node counts above for every
+  shape class, and generation to draw every constructor count, field kind,
+  element count, read position, bank length, malformation kind and std outcome.
+- `Tests.SourceEnumArrayCorpus` in `Solcore/Test/Synthesis/Enums.lean` checks
+  the fixed corpus against expected histories that the model computed.
 
 The fixed corpus has 17 scenarios and 48 transactions: eleven imported
 scenarios, which reuse the enum-argument corpus's four imported steps with
@@ -7454,7 +7462,7 @@ method and decodes its multi-Word return data with std.
 - **Original Core** cannot read return data, since no Core host function
   does. The parent's reference is in continuation-passing form: a call phase
   and a resume phase that the call-and-resume convention in
-  `Solcore/ContractRuntime/CallResumeExecution.lean` runs around the child,
+  `Solcore/ContractRuntime/CallPhases.lean` runs around the child,
   each through the public top-level runner and committing as one
   transaction. The resume phase reads the kept input, the child's status
   Word and its returned or reverted bytes through the input-data requests.
@@ -7613,7 +7621,7 @@ around each call.
   shows only with several calls. Inline `assembly` blocks in user code read
   both builtins, as std's own opcode wrappers do.
 - **Original Core** runs the parent through the call chain in
-  `Solcore/ContractRuntime/CallChainExecution.lean`: the call phase, then a
+  `Solcore/ContractRuntime/CallPhases.lean`: the call phase, then a
   resume phase after each call, each through the public top-level runner and
   committing as one transaction. Every resume phase but the last returns the
   next call's request, and the chain without middle phases is
@@ -7759,7 +7767,7 @@ makes, zero to three.
   read across a conditional call shows only there. The loop's condition reads
   `returndatasize()` in inline Yul as well.
 - **Original Core** runs the parent through the choice chain in
-  `Solcore/ContractRuntime/CallChoiceExecution.lean`. Its phases each request a
+  `Solcore/ContractRuntime/CallPhases.lean`. Its phases each request a
   call or finish, as the first Word of their returned tuple chooses. The call
   chain is its special case of request phases and one last finish phase.
 - **Shared with `stateful-call-sequences`:** the two wrapper names and methods,
@@ -7940,8 +7948,9 @@ committed storage, as its declared slots do.
   `ContractRuntime`'s account keeps the strictly increasing list of exactly
   its present slots beside its storage function, and every write maintains it.
   `Account.mem_storageEntries_iff` proves that an entry is listed exactly when
-  `storageValue?` returns it, and `Account.ext` still holds. The shared module
-  `Solcore.Synthesis.Stateful.AccountStorage` renders the observation for the
+  `storageValue?` returns it, and `Account.ext` still holds. The shared
+  namespace `Solcore.Synthesis.Stateful.AccountStorage`, in
+  `Solcore/Synthesis/Stateful/Sequence.lean`, renders the observation for the
   observers.
 - Imported Hull reports each observed account's committed entries, which a
   revert or incomplete call leaves unchanged. `AccountStorage.canonicalEntries`

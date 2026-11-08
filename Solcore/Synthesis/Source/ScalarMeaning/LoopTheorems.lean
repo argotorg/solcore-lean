@@ -1,5 +1,5 @@
-import Solcore.Core.BitwiseLogic
-import Solcore.Core.DirectWordComparisons
+import Solcore.Core.Internal.PrimitiveLaws
+import Solcore.Core.Internal.WordComparisons
 import Solcore.Synthesis.Internal.Loops
 import Solcore.Synthesis.Source.ScalarMeaning.PureTheorems
 import Solcore.Synthesis.Source.ScalarMeaning.LoopGrammar

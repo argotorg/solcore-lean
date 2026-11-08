@@ -1,27 +1,18 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.RuntimeParameters
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RecursiveComputationFunction
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Core.Fuel
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeArgumentConstruction
-import Solcore.Frontend.LocalTypeInputs
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Test.Frontend.ComputationRuntime
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.WordMatch
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.RuntimeComputationFunction
-import Solcore.Frontend.SourceComputationBody
-import Solcore.Frontend.SourceLambdaEvaluation
-import Solcore.Frontend.LocalReference
+import Solcore.Frontend.Fragments.Internal.Foundations
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Frontend.Fragments.Internal.LocalComputations
+import Solcore.Frontend.Fragments.Internal.SourceValues
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.LocalComputation
-import Solcore.Frontend.RuntimeValue
 
 /-!
 # Computation owner tests

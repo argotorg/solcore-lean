@@ -10,11 +10,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReachedFormatio
 import Solcore.SourceSemantics.CoreLowering.AcceptedTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatalog
-import Solcore.Frontend.ResidualLexicalScopes
+import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.SourceSemantics.CoreLowering.ActualBodyInvocation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
-import Solcore.SourceSemantics.SourceSpecializationLocalLexicalSubstitutionChildren
+import Solcore.SourceSemantics.Internal.Prepared.CallEdges
 
 /-!
 # Accepted programs and contextual lambdas

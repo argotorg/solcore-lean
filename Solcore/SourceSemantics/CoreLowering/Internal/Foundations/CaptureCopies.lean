@@ -1,9 +1,7 @@
-import Solcore.Frontend.SourceCoreSourceCells
-import Solcore.Frontend.SourceCoreFunctions
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
-import Solcore.Frontend.SourceCoreLoops
-import Solcore.Frontend.SourceRuntimeDeepValidation
+import Solcore.Frontend.Internal.RuntimeValidation
 
 /-!
 # Capture copies and function code

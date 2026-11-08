@@ -1,25 +1,11 @@
-import Solcore.Frontend.SourceCoreFunctionEntry
-import Solcore.Frontend.SourceCoreAssignmentFaultSites
-import Solcore.Frontend.SourceCoreAssignments
-import Solcore.Frontend.SourceCorePrimitive
-import Solcore.Frontend.SourceCoreBasic
-import Solcore.Core.BoundedSafety
-import Solcore.Frontend.SourceCoreBasicEntry
-import Solcore.Frontend.SourceCoreCalls
-import Solcore.Frontend.SourceCoreFaultSites
-import Solcore.Frontend.SourceCoreControl
-import Solcore.Frontend.SourceCoreDataCatalog
-import Solcore.Frontend.SourceCoreDataValues
-import Solcore.Frontend.SourceCoreFunctions
-import Solcore.Frontend.SourceCoreRecursiveEntry
-import Solcore.Frontend.SourceCoreGeneralEntry
-import Solcore.Core.LocalSequence
-import Solcore.Frontend.SourceCoreFunctionTypes
-import Solcore.Frontend.SourceCoreAssignmentPolicy
-import Solcore.Frontend.SourceCoreLocalPolymorphism
-import Solcore.Core.ExactFuelProperties
-import Solcore.Frontend.SourceCoreLoops
-import Solcore.Frontend.SourceCoreSession
+import Solcore.Frontend.SourceCore.Internal.Entries
+import Solcore.Frontend.SourceCore.Internal.FaultSites
+import Solcore.Frontend.SourceCore.Lowering
+import Solcore.Core.Safety
+import Solcore.Frontend.SourceCore.Data
+import Solcore.Core.Internal.ConventionLaws
+import Solcore.Frontend.SourceCore.GeneralFunctions
+import Solcore.Core.Fuel
 
 /-!
 # Lowering entry point tests

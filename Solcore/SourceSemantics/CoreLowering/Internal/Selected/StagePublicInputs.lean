@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageCalls
-import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.PublicSessionOutcomes
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions
 

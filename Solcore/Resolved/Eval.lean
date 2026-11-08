@@ -2,7 +2,7 @@ import Solcore.Resolved.Expr
 import Solcore.Core.Eval
 import Solcore.Resolved.LocalScope
 import Solcore.Resolved.Internal.LocalFragmentLaws
-import Solcore.Core.LocalFragment
+import Solcore.Core.Internal.LocalFragment
 
 /-!
 # Evaluation of resolved expressions

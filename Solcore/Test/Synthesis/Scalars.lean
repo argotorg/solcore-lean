@@ -1,21 +1,8 @@
-import Solcore.Synthesis.Source.ComptimeCases
-import Solcore.Synthesis.Source.ComptimeEmitter
+import Solcore.Synthesis.Internal.LanguageFeatures
 import Solcore.Core.Machine
-import Solcore.Synthesis.Source.FunctionCases
-import Solcore.Synthesis.Source.FunctionEmitter
-import Solcore.Core.Wire.Codec.Program
-import Solcore.Synthesis.Source.GenericCases
-import Solcore.Synthesis.Source.GenericEmitter
-import Solcore.Synthesis.Source.InputCases
-import Solcore.Synthesis.Source.InputEmitter
-import Solcore.Synthesis.Source.CheckedArithmeticCases
-import Solcore.Synthesis.Source.ShiftCases
-import Solcore.Synthesis.Source.ModuleCases
-import Solcore.Synthesis.Source.ModuleEmitter
-import Solcore.Synthesis.Source.MutationEmitter
-import Solcore.Synthesis.Source.MutationCases
-import Solcore.Synthesis.Source.PrimitiveCases
-import Solcore.Synthesis.Source.PrimitiveEmitter
+import Solcore.Synthesis.Internal.Functions
+import Solcore.Core.Wire.Codec
+import Solcore.Synthesis.Internal.Integers
 
 /-!
 # Scalar profile tests

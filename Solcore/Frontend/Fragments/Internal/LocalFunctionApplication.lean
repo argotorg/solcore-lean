@@ -1,19 +1,17 @@
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
-import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalFragment
+import Solcore.Resolved.Internal.LocalFragmentLaws
+import Solcore.Core.Internal.LocalFragment
 import Solcore.Resolved.Eval
 import Solcore.Core.Safety
 import Solcore.Core.Correspondence
-import Solcore.Core.ExactFuelProperties
+import Solcore.Core.Fuel
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.Typing
-import Solcore.Resolved.FreshIdentity
+import Solcore.Resolved.Identity
 import Solcore.Resolved.LocalScope
-import Solcore.Resolved.Scope
-import Solcore.Resolved.Renaming
+import Solcore.Resolved.Internal.ScopeLaws
 import Solcore.Core.Machine
-import Solcore.Core.Derived
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Internal.DerivedForms
 import Solcore.Frontend.WordLiteral
 
 /-!

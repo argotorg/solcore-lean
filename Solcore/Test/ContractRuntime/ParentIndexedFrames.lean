@@ -1,13 +1,5 @@
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
-import Solcore.ContractRuntime.FrameTrace
-import Solcore.ContractRuntime.ParentIndexedFrameInitialization
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionView
-import Solcore.ContractRuntime.FrameResolutionResult
-import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
-import Solcore.ContractRuntime.ParentIndexedFrameTrapRollback
+import Solcore.ContractRuntime.Internal.ParentIndexedFrames
+import Solcore.ContractRuntime.Internal.FrameLaws
 
 /-!
 # Parent-indexed frame tests

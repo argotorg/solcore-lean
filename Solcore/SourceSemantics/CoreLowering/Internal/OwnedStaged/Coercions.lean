@@ -4,12 +4,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.DiscardSequence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionMethods
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
-import Solcore.SourceSemantics.Staging.RecursiveErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls

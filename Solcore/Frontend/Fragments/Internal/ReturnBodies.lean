@@ -1,6 +1,6 @@
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Fuel
 
 /-!
 # Return bodies

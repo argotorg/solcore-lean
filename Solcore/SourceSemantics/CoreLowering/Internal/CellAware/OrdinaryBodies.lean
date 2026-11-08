@@ -1,7 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericLexical
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
-import Solcore.Core.LocalLoop
-import Solcore.Core.OptionalCell
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.LanguageResult
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps

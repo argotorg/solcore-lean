@@ -1,6 +1,6 @@
 import Solcore.Synthesis.Internal.Aggregates
-import Solcore.Core.Wire.Codec.Program
-import Solcore.ContractRuntime.CheckedCoreContract
+import Solcore.Core.Wire.Codec
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.Synthesis.Internal.Storage
 import Solcore.Synthesis.Stateful.Sequence
 

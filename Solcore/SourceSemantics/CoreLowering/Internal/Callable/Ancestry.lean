@@ -1,10 +1,9 @@
-import Solcore.Frontend.SourceCoreCallablePrincipals
-import Solcore.Frontend.SourceCoreCallableViews
-import Solcore.Frontend.SourceCoreLambdaTemplates
-import Solcore.Frontend.SourceCoreCallableContextFrames
+import Solcore.Frontend.SourceCore.Internal.CallablePrincipals
+import Solcore.Frontend.SourceCore.Internal.CallableViews
+import Solcore.Frontend.SourceCore.Internal.Carriers
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
-import Solcore.TypeSystem.SubstitutionProperties
+import Solcore.TypeSystem.Internal.SubstitutionLaws
 
 /-!
 # Callable ancestry

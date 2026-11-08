@@ -1,11 +1,9 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Frontend.RuntimeComputationFunction
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.LocalComputations
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Recursive function tests

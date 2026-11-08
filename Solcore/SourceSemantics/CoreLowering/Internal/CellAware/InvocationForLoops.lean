@@ -12,7 +12,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAl
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ControlStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ReadEffects
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationStatements

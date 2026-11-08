@@ -9,8 +9,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndM
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
-import Solcore.SourceSemantics.Staging.SelectedStatementPreservationSupport
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
+import Solcore.SourceSemantics.Staging.Internal.SelectedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.CellPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.PlaceAssignments

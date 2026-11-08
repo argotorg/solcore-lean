@@ -2,7 +2,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Named.Branches
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.StaticValidation
-import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 
 /-!
 # Generalized local source tests

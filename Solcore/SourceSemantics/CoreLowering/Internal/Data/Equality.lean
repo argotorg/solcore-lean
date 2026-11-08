@@ -1,7 +1,7 @@
-import Solcore.Frontend.SourceCoreDataEquality
-import Solcore.SourceSemantics.Dynamic.Pattern
+import Solcore.Frontend.SourceCore.Data
+import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.Core.Correspondence
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Data: equality

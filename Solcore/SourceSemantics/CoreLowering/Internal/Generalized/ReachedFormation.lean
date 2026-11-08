@@ -4,10 +4,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ScopedSourceBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
-import Solcore.SourceSemantics.SourceResidualNodeSubstitutionAgreement
+import Solcore.SourceSemantics.Internal.Prepared.ResidualAgreement
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
-import Solcore.Frontend.ResidualLexicalScopes
+import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.ReadBundles
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.AcceptedBodies

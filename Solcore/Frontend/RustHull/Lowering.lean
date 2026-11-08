@@ -1,4 +1,4 @@
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.Renaming
 import Solcore.Frontend.RustHull.LoweringSupport
 import Solcore.Frontend.RustHull.Effects
 import Solcore.Core.Machine

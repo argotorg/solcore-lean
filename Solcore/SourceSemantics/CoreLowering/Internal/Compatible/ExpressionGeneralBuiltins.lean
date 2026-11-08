@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndices
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
-import Solcore.Core.DefinitionExtension
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Compatible expressions: general forms and builtins

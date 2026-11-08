@@ -1,11 +1,9 @@
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Frontend.Current
-import Solcore.Frontend.SourceCoreUnifiedRuntimeCertificates
-import Solcore.Frontend.SourceCoreUnifiedRuntime
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.ProgramChecking
-import Solcore.Frontend.SourceCoreUnifiedCompilation
-import Solcore.Frontend.SourceCoreRawMetadata
-import Solcore.Frontend.SourceCoreRawMetadataRuntime
+import Solcore.Frontend.SourceCore.RawMetadata
+import Solcore.Frontend.SourceCore.Compatible
 
 /-!
 # Unified corpus tests

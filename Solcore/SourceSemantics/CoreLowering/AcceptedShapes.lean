@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
-import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
+import Solcore.SourceSemantics.Staging.Erasure
 
 /-!
 # Accepted bodies: shapes and lifted traces

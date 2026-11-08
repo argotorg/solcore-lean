@@ -1700,7 +1700,7 @@ proof yet. The definitions were fixed before execution:
   and any new crash goes only to the local questions file.
 
 The profile was implemented at `1d2ea9cef` with the definitions above:
-- `Solcore.Synthesis.Core.AssemblyMemory` (the window model and the Keccak
+- `Solcore.Synthesis.Internal.Assembly` (the window model and the Keccak
   closures), `AssemblyMemoryEmitter` and `AssemblyMemoryCases`, the case-tool
   commands `assembly-memory-generate` and `assembly-memory-emit`, and campaign
   and suite registration. The profile joins the revision-four, acceptance and
@@ -2127,7 +2127,7 @@ method values and `comptime` trait arguments, which the fixtures
 generated.
 
 The profile was implemented at `9fe2cb27f` with the definitions above:
-- `Solcore.Synthesis.Core.TraitPlan` (instance types, values, the trait's
+- `Solcore.Synthesis.Internal.Traits` (instance types, values, the trait's
   impls, helpers and uses, admission, the lowering of std sums, the reached
   instances, the Core reference, the shapes and generation, reusing
   `EnumData`'s declarations, builders and stream and `EnumMatch`'s compilation
@@ -2400,7 +2400,7 @@ method returning its own type parameter also matched and is not generated,
 parameters and method values at closed types are not generated either.
 
 The profile was implemented at `68ead60e4` with the definitions above:
-- `Solcore.Synthesis.Core.HierarchyPlan` (the subclass form, its impls and the
+- `Solcore.Synthesis.Internal.Traits` (the subclass form, its impls and the
   chain's, helpers, uses with their arguments, admission, the lowering of
   receivers and arguments, the reached base and subclass closures, the Core
   reference, the shapes and generation, calling `TraitPlan`'s trait, impls,
@@ -2720,7 +2720,7 @@ execution:
   generating them.
 
 The profile was implemented at `35925b5f8` with the definitions above:
-- `Solcore.Synthesis.Core.MemoryValues` (plans, the scope and admission, the
+- `Solcore.Synthesis.Internal.MemoryValues` (plans, the scope and admission, the
   shapes, the byte-list Core reference with its one Keccak closure and loop
   closures, generation and fitting) and `MemoryValuesShrink` (the plan size
   and reductions); `MemoryValuesEmitter` and `MemoryValuesCases`; the
@@ -3052,7 +3052,7 @@ yet. The definitions were fixed before execution:
   nothing is missing, each plan at all eight inputs. No plan is skipped.
 
 The profile was implemented at `c21a05612` with the definitions above:
-- `Solcore.Synthesis.Core.MemoryCalls` (plans, helpers and admission, the
+- `Solcore.Synthesis.Internal.MemoryCalls` (plans, helpers and admission, the
   shapes, the inlined byte-list Core reference, generation and fitting) and
   `MemoryCallsShrink` (the plan size and reductions); `MemoryCallsEmitter` and
   `MemoryCallsCases`; the case-tool commands `memory-calls-generate` and
@@ -3339,7 +3339,7 @@ has no proof yet. The definitions were fixed before execution:
   seeds within the first 100.
 
 The profile was implemented at `6480ac74b` with the definitions above:
-- `Solcore.Synthesis.Core.RevertData` (plans, helpers, sites and admission,
+- `Solcore.Synthesis.Internal.RevertData` (plans, helpers, sites and admission,
   the shapes, the byte-list Core reference whose right injection is the
   revert data, generation and fitting) and `RevertDataShrink` (the plan size
   and reductions); `RevertDataEmitter` and `RevertDataCases`; the case-tool
@@ -3550,7 +3550,7 @@ definitions were fixed before execution:
 
 The profile was implemented at `dd39b454e` with the definitions above:
 - `runtime-revert-data`'s modules take the halt site additively:
-  `Solcore.Synthesis.Core.RevertData` (the halt payload and its admission,
+  `Solcore.Synthesis.Internal.RevertData` (the halt payload and its admission,
   the halt's right injection in the reference, the halt shapes and their
   orders, and the halt stream), `RevertDataShrink` (the halts' sizes and their
   lowering to inline Yul), `RevertDataEmitter` (the four forms and the Yul
@@ -4812,7 +4812,8 @@ execution:
 Original Core enumerates each account through `Account.storageEntries`. Its
 private slot list is proved sorted and exact, the full build passed with only
 that runtime change, and every existing storage law and `Account.ext` are
-unchanged. `Solcore.Synthesis.Stateful.AccountStorage` renders the observation
+unchanged. `Solcore.Synthesis.Stateful.AccountStorage`, now in
+`Solcore/Synthesis/Stateful/Sequence.lean`, renders the observation
 for the twelve observers and canonicalizes Hull entries, with exactness and
 order theorems. The six Hull runners and both adapters report and compare it,
 and the campaigns fingerprint it. Before each commit the full Lean build
@@ -9184,13 +9185,13 @@ Out of scope:
 
 **Results.** The checks before any matrix:
 - **Convention:** the laws above are proved without `sorry`, axioms or
-  `native_decide`, and no earlier statement changed.
-  `Solcore/Test/ContractCallResume.lean` decodes raw return data as written
-  out, finds a word call to a raw child unavailable, and runs a small parent
-  through the composition: a returned child commits and delivers its bytes, a
-  reverted one leaves the call phase's world and delivers its revert Word, a
-  parent revert commits nothing, a target that does not resolve fails with no
-  data, and the parent's code and every balance stay.
+  `native_decide`, and no earlier statement changed. `Tests.ContractCallResume`
+  in `Solcore/Test/ContractRuntime/ContractCalls.lean` decodes raw return data
+  as written out, finds a word call to a raw child unavailable, and runs a small
+  parent through the composition: a returned child commits and delivers its
+  bytes, a reverted one leaves the call phase's world and delivers its revert
+  Word, a parent revert commits nothing, a target that does not resolve fails
+  with no data, and the parent's code and every balance stay.
 - **Golden tests:** the probe's independent Python model wrote 58 rows as
   hexadecimal text, the 39 raw return data of its bank and 19 canonical
   encodings, five of them decoded as another type: 29 records, 24 rejections
@@ -9526,8 +9527,10 @@ Out of scope:
 - **Convention:**
   - The laws above are proved without `sorry`, axioms beyond `propext` and
     `Quot.sound`, or `native_decide`, and no earlier statement changed.
-  - `Solcore/Test/ContractCallChain.lean` decodes raw returns and reverts as
-    written out, and finds a word call to a raw-outcome child unavailable.
+  - `Tests.ContractCallChain` in
+    `Solcore/Test/ContractRuntime/ContractCalls.lean` decodes raw returns and
+    reverts as written out, and finds a word call to a raw-outcome child
+    unavailable.
   - It runs a two-call parent through the chain:
     - each phase reads only the latest call's data;
     - a reverted child leaves the world of the phase that requested it and
@@ -9880,8 +9883,10 @@ Out of scope:
 - **Convention:**
   - The laws above are proved without `sorry`, axioms beyond `propext` and
     `Quot.sound`, or `native_decide`, and no earlier statement changed.
-  - `Solcore/Test/ContractCallChoice.lean` runs a parent whose call phase and
-    single resume program choose by its input bits how many calls to make:
+  - `Tests.ContractCallChoice` in
+    `Solcore/Test/ContractRuntime/ContractCalls.lean` runs a parent whose call
+    phase and single resume program choose by its input bits how many calls to
+    make:
     - zero calls finish in the call phase;
     - one to three calls run through the same resume program;
     - a resume phase revert commits nothing;
@@ -11619,7 +11624,7 @@ yet. The definitions were fixed before execution:
 **Checked arithmetic, `unchecked` blocks and shifts: results.** `6b2f86b99`
 implements the definitions above, and `927fe89c3` fixes a race in the suite
 that the first random run met:
-- `Solcore.Synthesis.Core.Integers` (the integer types, the plans of both
+- `Solcore.Synthesis.Internal.Integers` (the integer types, the plans of both
   profiles, their admission, the direct interpreter over Lean integers and the
   shapes it reaches, the Core reference over Core's integers whose right
   injection is the revert data, the draws and fitting) and `IntegersShrink`
@@ -11633,7 +11638,8 @@ that the first random run met:
   not G0-based, with budgets up to 2,048 nodes; their coverage is
   `checkedArithmeticCoverage` and `shiftCoverage`. No native tool is added;
   the case tool carries both.
-- A registered Lean test, `Solcore/Test/SourceIntegerCases.lean`, checks:
+- A registered Lean test, `Tests.SourceIntegerCases` in
+  `Solcore/Test/Synthesis/Scalars.lean`, checks:
   - four fixtures' sources against golden texts, and their results on the
     Core reference and on the interpreter, against golden values from the
     corpus validator's Python model, at twelve inputs each. The first takes
@@ -11761,17 +11767,19 @@ then the types.
 
 Shifts are done. `<<`, `>>`, `<<=` and `>>=` on `word` parse from adjacent
 tokens, type, run in the source semantics and lower to Core's `wordShl` and
-`wordShr`. `Solcore/Test/SourceCoreShiftExecution.lean` runs them through the
-public API with the probe's results. Compound assignment at `integer` now
-excludes the shifts in the lowering and in its theorems.
+`wordShr`. `Tests.SourceCoreShiftExecution` in
+`Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean` runs them
+through the public API with the probe's results. Compound assignment at
+`integer` now excludes the shifts in the lowering and in its theorems.
 
 `unchecked` blocks are done except division and remainder. A pass around the
 parser marks `+ - *` and `+= -= *=` in a block as unchecked operators, which
-wrap on `word`, dispatch to `UncheckedAdd`, `UncheckedSub` and `UncheckedMul`
-on declared types, and are rejected on `integer` as upstream rejects them.
-`/ %` and `/= %=` in a block are a load error until Lean has panics.
-`Solcore/Test/SourceCoreUncheckedExecution.lean` runs the blocks through the
-public API.
+wrap on `word`, dispatch to `UncheckedAdd`, `UncheckedSub` and `UncheckedMul` on
+declared types, and are rejected on `integer` as upstream rejects them. `/ %`
+and `/= %=` in a block are a load error until Lean has panics.
+`Tests.SourceCoreUncheckedExecution` in
+`Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean` runs the
+blocks through the public API.
 
 The unit is required and paused here. Panics, then row 1, remain. The
 measured costs and the two comparisons to make first are in the [resume
@@ -12083,7 +12091,7 @@ offset past `~0 / stride`, cannot occur for word-sized elements, so only
 
 **Memory arrays, slices and their panics: results.** `f7ddb6eab` implements
 the definitions above:
-- `Solcore.Synthesis.Core.Arrays` (the plans of both profiles, their static
+- `Solcore.Synthesis.Internal.Arrays` (the plans of both profiles, their static
   scope and admission, the ABI calldata and pinned selectors, the direct
   interpreter over Lean numbers and the shapes it reaches, the Core reference
   over length and element cells whose right injection is the revert data, the
@@ -12105,7 +12113,8 @@ the definitions above:
   after the write and through the other name, and `view` the observation of a
   slice after the write. With them, the memory array corpus took 36 seeds and
   288 cases, two more than the definitions give.
-- A registered Lean test, `Solcore/Test/SourceArrayCases.lean`, checks:
+- A registered Lean test, `Tests.SourceArrayCases` in
+  `Solcore/Test/Synthesis/Arrays.lean`, checks:
   - four fixtures' sources against golden texts, and their results on the
     Core reference and on the interpreter, against golden values from the
     corpus validator's Python model, at twelve inputs each. The first memory

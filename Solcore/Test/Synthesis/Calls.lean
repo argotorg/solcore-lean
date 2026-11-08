@@ -1,13 +1,6 @@
-import Solcore.Synthesis.Source.CallBranchCases
-import Solcore.Synthesis.Source.CallReturnCases
-import Solcore.Synthesis.Source.CallSequenceCases
-import Solcore.Synthesis.Source.CallValueCases
-import Solcore.Synthesis.Source.CallValueEmitter
-import Solcore.Synthesis.Stateful.CallValueExecution
-import Solcore.Synthesis.Source.ConstructorArgumentsCases
-import Solcore.Synthesis.Source.ForwardedCallCases
-import Solcore.Synthesis.Source.ForwardedCallEmitter
-import Solcore.Synthesis.Stateful.ForwardedCallExecution
+import Solcore.Synthesis.Internal.CallReturns
+import Solcore.Synthesis.Internal.Calls
+import Solcore.Synthesis.Internal.ConstructorArguments
 
 /-!
 # Call profile tests

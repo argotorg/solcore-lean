@@ -6,9 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndice
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerPolicies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.WellFormed
-import Solcore.SourceSemantics.Staging.RecursiveTrace
+import Solcore.SourceSemantics.Staging.RecursiveProfile
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures

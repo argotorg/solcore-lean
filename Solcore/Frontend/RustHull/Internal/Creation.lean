@@ -1,6 +1,6 @@
 import Solcore.Frontend.RustHull.AccountRuntime
 import Solcore.Frontend.RustHull.Semantics.Frames
-import Solcore.Core.ByteSelection
+import Solcore.Core.Internal.ByteSelection
 import Solcore.Frontend.RustHull.Internal.Digests
 import Solcore.Frontend.RustHull.Internal.MemoryState
 import Solcore.Frontend.RustHull.Internal.StorageState

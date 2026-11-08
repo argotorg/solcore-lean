@@ -1,6 +1,5 @@
-import Solcore.ContractRuntime.OneLevelNestedExecution
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.OneLevelNestedTransitionSystem
+import Solcore.ContractRuntime.Internal.NestedLaws
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
 import Solcore.Test.ContractRuntime.Creation
 
 /-!

@@ -1,24 +1,15 @@
-import Solcore.Core.ExactFuelProperties
-import Solcore.Core.FirstOrderWeakening
-import Solcore.Core.IntegerAssignment
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Fuel
+import Solcore.Core.Internal.Renaming
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.LanguageResult
-import Solcore.Core.BoundedSafety
-import Solcore.Core.LocalAssignment
-import Solcore.Core.LocalControl
-import Solcore.Core.LocalFragment
-import Solcore.Core.Derived
-import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Resolved.WordLessWithIds
-import Solcore.Core.Machine
 import Solcore.Core.Safety
-import Solcore.Core.LocalFragment.RuntimeSafety
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Core.Internal.DerivedForms
+import Solcore.Resolved.Internal.LocalFragmentLaws
+import Solcore.Resolved.Internal.ScopeLaws
+import Solcore.Core.Machine
 import Solcore.Core.Correspondence
-import Solcore.Core.Renaming
-import Solcore.Core.LocalLoop
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Core.LocalSequence
-import Solcore.Core.RuntimeStoreSafety
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Core local fragment tests

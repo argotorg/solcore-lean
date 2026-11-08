@@ -5,8 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndice
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.Dynamic.Fault
-import Solcore.Frontend.SourceCoreAssignmentFaultSites
-import Solcore.Frontend.SourceCoreProgramFaultSites
+import Solcore.Frontend.SourceCore.Internal.FaultSites
 
 /-!
 # Reached expression faults

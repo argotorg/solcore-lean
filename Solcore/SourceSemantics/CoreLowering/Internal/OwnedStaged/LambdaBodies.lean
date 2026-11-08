@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollect
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaPhysical
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedCanonicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport

@@ -1,5 +1,4 @@
-import Solcore.Frontend.SourceCoreGeneralFunctions
-import Solcore.Frontend.SourceCoreLocalPolymorphism
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AppliedViews

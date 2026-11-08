@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics
-import Solcore.SourceSemantics.SourceInferenceSoundness
+import Solcore.SourceSemantics.Internal.Inference.Soundness
 import Solcore.SourceSemantics.StaticValidation
 
 /-!

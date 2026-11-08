@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionIndice
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
-import Solcore.SourceSemantics.Dynamic.Initialization
+import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings

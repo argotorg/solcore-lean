@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostic
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
-import Solcore.Frontend.SourceInference.TypedIRProperties
+import Solcore.Frontend.SourceInference.Internal.TypedIRProperties
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.RecursiveCallerPolicies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
@@ -20,7 +20,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.Builtins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedBodies

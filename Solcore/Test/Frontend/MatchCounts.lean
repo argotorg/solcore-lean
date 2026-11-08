@@ -1,16 +1,13 @@
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Core.Fuel
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RuntimeComputationFunction
-import Solcore.Frontend.RuntimeArgumentConstruction
-import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.LocalExpressionLookupProperties
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.LocalName
-import Solcore.Resolved.Renaming
+import Solcore.Frontend.Fragments.Internal.LocalComputations
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
+import Solcore.Resolved.Internal.ScopeLaws
 
 /-!
 # Match tests

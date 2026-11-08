@@ -4,7 +4,6 @@ import Solcore.Resolved.Identity
 import Solcore.Syntax.Term
 import Solcore.Resolved.Expr
 import Solcore.Resolved.Typing
-import Solcore.Resolved.LoweringProperties
 import Solcore.Resolved.Eval
 import Solcore.Core.Machine
 import Solcore.Core.Safety

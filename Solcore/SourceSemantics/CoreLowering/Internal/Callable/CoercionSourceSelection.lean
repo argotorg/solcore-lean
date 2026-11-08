@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
-import Solcore.Frontend.SourceInference.FunctionFuelAgreement
-import Solcore.SourceSemantics.SubstitutionCorrespondence
+import Solcore.Frontend.SourceInference.Internal.NodeGraph
+import Solcore.SourceSemantics.Internal.Substitution.Unification
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 
 /-!

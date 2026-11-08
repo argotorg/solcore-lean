@@ -2,7 +2,7 @@ import Solcore.Synthesis.Internal.Storage
 import Solcore.Synthesis.Source.ScalarMeaning.PureTheorems
 import Solcore.Synthesis.Source.ScalarMeaning.LoopTheorems
 import Solcore.Synthesis.Source.ScalarMeaning.StorageGrammar
-import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 import Solcore.Synthesis.Internal.AdtStorage
 
 /-!

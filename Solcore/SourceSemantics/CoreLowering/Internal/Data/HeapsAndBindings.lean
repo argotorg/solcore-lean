@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Frontend.SourceCoreDefaultValue
-import Solcore.SourceSemantics.Dynamic.Default
+import Solcore.Frontend.SourceCore.Data
+import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.Core.Correspondence
 
 /-!

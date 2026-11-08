@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.EventLogCases
+import Solcore.Synthesis.Internal.AdtStorage
 
 /-! Native event-log case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

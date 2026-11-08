@@ -1,7 +1,7 @@
 import Solcore.Frontend.SourceCore.Compatible
 import Solcore.Frontend.SourceCore.Lowering
-import Solcore.Core.DirectWordComparisons
-import Solcore.Core.LocalLoop
+import Solcore.Core.Internal.WordComparisons
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.Frontend.Internal.RuntimeValues
 

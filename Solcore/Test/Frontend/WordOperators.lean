@@ -1,18 +1,12 @@
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Core.BitwiseLogic
-import Solcore.Core.UnaryPrimitives
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Core.Internal.PrimitiveLaws
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.TerminalReturnBody
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.ReturnBody
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
 import Solcore.Frontend.WordLiteral
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Core.ModularArithmetic
-import Solcore.Frontend.LocalExpressionResumptionProperties
-import Solcore.Core.UnsignedDivision
-import Solcore.Core.DirectWordComparisons
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Core.Internal.WordComparisons
+import Solcore.Core.Fuel
 import Solcore.Core.Primitive
 
 /-!

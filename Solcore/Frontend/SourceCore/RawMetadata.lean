@@ -1,4 +1,4 @@
-import Solcore.Core.OrderedMapping
+import Solcore.Core.Internal.MappingLaws
 import Solcore.Frontend.SourceInference.TypedIR
 import Solcore.Core.Syntax
 

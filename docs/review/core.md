@@ -160,6 +160,5 @@ Below these sit the results a reader may want while checking a proof: `advance_n
   - `HostRunner` holds its own definitions, and `Wire/Conversions` stays apart from `Wire/Syntax`.
     Moving either changes which matcher Lean reuses, so the binder names in the equation lemmas of
     `HostRunResult.HasType`, or of `Wire.Expr.toCore`, would change.
-- **`Solcore.Core.Renaming` is a module and a type.** The module is now `Internal/Renaming`. The type
-  `Renaming` keeps its name, as does every declaration: namespaces do not follow files.
-- **Shims.** Old paths that another area imports hold one `import` line and go at consolidation.
+- **`Solcore.Core.Renaming` is a type, and was a module.** The module is now `Internal/Renaming`.
+  The type `Renaming` keeps its name, as does every declaration: namespaces do not follow files.

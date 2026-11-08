@@ -1,30 +1,18 @@
 import Solcore.Synthesis.Core.Generator
-import Solcore.Synthesis.Source.ScalarMeaning.CallGraphEmitter
-import Solcore.Synthesis.Source.ScalarMeaning.FunctionEmitter
-import Solcore.Synthesis.Source.ScalarMeaning.MutationEmitter
-import Solcore.Synthesis.Source.ScalarMeaning.PrimitiveEmitter
+import Solcore.Synthesis.Source.ScalarMeaning.PureTheorems
 import Solcore.Test.Synthesis.CallGraphs
 import Solcore.Test.Synthesis.Scalars
 import Solcore.Test.Synthesis.Generators
-import Solcore.Synthesis.Source.ScalarMeaning.AggregateCallGraphEmitter
 import Solcore.Test.Synthesis.Aggregates
-import Solcore.Synthesis.Source.AggregateCases
-import Solcore.Synthesis.Source.ScalarMeaning.AggregateEmitter
-import Solcore.Synthesis.Source.ScalarMeaning.CallGraphLoopEmitter
-import Solcore.Synthesis.Source.GenericCases
-import Solcore.Synthesis.Source.ScalarMeaning.GenericEmitter
-import Solcore.Synthesis.Source.KeyedStorageCases
-import Solcore.Synthesis.Source.ScalarMeaning.KeyedEmitter
-import Solcore.ContractRuntime.CheckedContractRegistry
-import Solcore.Synthesis.Source.EventLogCases
-import Solcore.Synthesis.Source.ScalarMeaning.LogEmitter
-import Solcore.Synthesis.Source.LoopCases
-import Solcore.Synthesis.Source.ScalarMeaning.LoopEmitter
+import Solcore.Synthesis.Internal.Aggregates
+import Solcore.Synthesis.Source.ScalarMeaning.LoopTheorems
+import Solcore.Synthesis.Internal.LanguageFeatures
+import Solcore.Synthesis.Internal.Storage
+import Solcore.Synthesis.Source.ScalarMeaning.StatefulTheorems
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.Synthesis.Internal.AdtStorage
+import Solcore.Synthesis.Internal.Loops
 import Solcore.Test.Synthesis.Loops
-import Solcore.Synthesis.Source.StorageRollbackCases
-import Solcore.Synthesis.Source.StorageCases
-import Solcore.Synthesis.Source.ScalarMeaning.RollbackEmitter
-import Solcore.Synthesis.Source.ScalarMeaning.StorageEmitter
 
 /-!
 # Source meaning tests

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.KeccakLoopCases
+import Solcore.Synthesis.Internal.StorageLoops
 
 /-! Native Keccak-loop case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

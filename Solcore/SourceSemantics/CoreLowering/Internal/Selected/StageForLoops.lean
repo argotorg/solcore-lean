@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
-import Solcore.SourceSemantics.Staging.RecursiveBareBitNotFacts
+import Solcore.SourceSemantics.Staging.Erasure
 
 /-!
 # Lifting to staged Source: for loops

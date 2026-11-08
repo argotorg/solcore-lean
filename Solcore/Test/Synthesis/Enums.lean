@@ -1,7 +1,5 @@
-import Solcore.Synthesis.Source.EnumArgumentCases
-import Solcore.Synthesis.Source.EnumArrayCases
-import Solcore.Synthesis.Source.EnumCases
-import Solcore.Synthesis.Source.EnumReturnCases
+import Solcore.Synthesis.Internal.EnumAbi
+import Solcore.Synthesis.Internal.Enums
 
 /-!
 # Enum profile tests

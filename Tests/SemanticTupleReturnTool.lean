@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.TupleReturnCases
+import Solcore.Synthesis.Internal.AbiReturns
 
 /-! Native tuple-return case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

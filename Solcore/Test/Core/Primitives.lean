@@ -1,23 +1,11 @@
-import Solcore.Core.ArithmeticShift
+import Solcore.Core.Internal.PrimitiveLaws
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.BitwiseLogic
-import Solcore.Core.ShortCircuit
-import Solcore.Core.ByteSelection
-import Solcore.Core.Derived
-import Solcore.Core.CountLeadingZeros
-import Solcore.Core.DirectWordComparisons
-import Solcore.Core.BoundedSafety
+import Solcore.Core.Internal.ByteSelection
+import Solcore.Core.Internal.DerivedForms
+import Solcore.Core.Internal.WordComparisons
+import Solcore.Core.Safety
 import Solcore.Core.HostRunner
-import Solcore.Core.LogicalShifts
-import Solcore.Core.ModularArithmetic
-import Solcore.Core.ModularExponentiation
-import Solcore.Core.SignExtension
-import Solcore.Core.SignedComparison
-import Solcore.Core.SignedDivision
-import Solcore.Core.TernaryModularArithmetic
-import Solcore.Core.UnaryPrimitives
-import Solcore.Core.UnsignedDivision
 
 /-!
 # Core primitive tests

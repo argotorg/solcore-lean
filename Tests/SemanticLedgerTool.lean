@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.StorageLedgerCases
+import Solcore.Synthesis.Internal.Storage
 
 /-! Native sender-keyed ledger case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

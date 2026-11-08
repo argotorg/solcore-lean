@@ -1,20 +1,15 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeArgumentConstruction
-import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Core.Fuel
 import Solcore.Syntax.Parser.Internal.ParameterSoundness
-import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.StructuralType
-import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
+import Solcore.Frontend.Fragments.Internal.Foundations
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Core.Safety
 
 /-!

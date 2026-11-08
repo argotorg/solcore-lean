@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.NestedArrayCases
+import Solcore.Synthesis.Internal.AbiValues
 
 /-! Native nested-array case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

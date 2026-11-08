@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
-import Solcore.Frontend.SourceCoreDataPlaces
+import Solcore.Frontend.SourceCore.DataPlaces
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings

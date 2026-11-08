@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSele
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.ProgramCheckingSoundness
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.SourceStageAnalysisSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine

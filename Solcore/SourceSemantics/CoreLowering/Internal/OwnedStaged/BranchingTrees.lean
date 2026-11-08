@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryLambd
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
-import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedNamedBodies
 
 /-!

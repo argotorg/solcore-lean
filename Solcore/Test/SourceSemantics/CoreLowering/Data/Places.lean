@@ -1,28 +1,9 @@
-import Solcore.SourceSemantics.CoreLowering.DataPlaceAssignmentSuccess
-import Solcore.SourceSemantics.CoreLowering.Literals
-import Solcore.SourceSemantics.CoreLowering.DataPlaceContinuationReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceGetterTyping
-import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceContinuation
-import Solcore.SourceSemantics.CoreLowering.DataPlaceGetterReflection
-import Solcore.SourceSemantics.CoreLowering.DataPayloadCatalog
-import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
-import Solcore.SourceSemantics.CoreLowering.BasicExpressionCertificates
-import Solcore.SourceSemantics.CoreLowering.DataPlaceLayoutCertificates
-import Solcore.SourceSemantics.CoreLowering.DataPlaceModifier
-import Solcore.SourceSemantics.CoreLowering.DataPlaceModifierReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlacePrefixReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceMemberCertificates
-import Solcore.SourceSemantics.CoreLowering.DataPlaceReadReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceMappingHelpers
-import Solcore.SourceSemantics.CoreLowering.DataMappingHeap
-import Solcore.SourceSemantics.CoreLowering.DataPlaceFaultTree
-import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
-import Solcore.SourceSemantics.CoreLowering.DataPlaceRhsReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceSetterReflection
-import Solcore.SourceSemantics.CoreLowering.DataPlaceWriteBack
-import Solcore.SourceSemantics.CoreLowering.DataPlaceExecution
-import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
+import Solcore.Frontend.SourceCore.GeneralFunctions
 
 /-!
 # Data place tests

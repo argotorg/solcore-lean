@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneral
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalSupport
-import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForItems
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
@@ -16,7 +16,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation

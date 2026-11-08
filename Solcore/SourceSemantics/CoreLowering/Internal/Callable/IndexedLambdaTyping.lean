@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValue
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalWhile
-import Solcore.Frontend.SourceCoreUnifiedCompilation
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths

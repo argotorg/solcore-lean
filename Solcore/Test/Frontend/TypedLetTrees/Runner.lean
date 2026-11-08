@@ -1,8 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 
 /-!
 # Typed let tree runner tests

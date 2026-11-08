@@ -8,7 +8,7 @@ invariant under moving declarations between modules (pure-refactor verification)
 
 Usage (from the worktree root):
 
-    lake env lean --run tools/DeclSnapshot.lean <groups.txt> <out.jsonl> [threads]
+    lake env lean --run scripts/refactor/DeclSnapshot.lean <groups.txt> <out.jsonl> [threads]
 
 `groups.txt` lists module names, one per line. A line `---` starts a new import group.
 Each group is imported on its own (`importModules`, never freed: run large groups in separate

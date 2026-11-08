@@ -1,6 +1,6 @@
-import Solcore.TypeSystem.CorrelatedParameterInstances
+import Solcore.TypeSystem.Internal.SchemeLaws
 import Solcore.Frontend.SourceSpecialization
-import Solcore.TypeSystem.SubstitutionProperties
+import Solcore.TypeSystem.Internal.SubstitutionLaws
 
 /-!
 # Specialization properties

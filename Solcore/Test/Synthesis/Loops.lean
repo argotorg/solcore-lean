@@ -1,16 +1,9 @@
-import Solcore.Synthesis.Source.AssemblyCases
-import Solcore.Synthesis.Source.AssemblyKeccakLoopCases
-import Solcore.Synthesis.Source.AssemblyLoopCases
-import Solcore.Synthesis.Source.AssemblyMemoryCases
-import Solcore.Synthesis.Core.StorageMapping
+import Solcore.Synthesis.Internal.Assembly
+import Solcore.Synthesis.Internal.Storage
 import Solcore.Abi.Keccak256
-import Solcore.Synthesis.Source.AssemblyStorageLoopCases
-import Solcore.Synthesis.Source.KeccakLoopCases
-import Solcore.Synthesis.Source.LoopCases
-import Solcore.Synthesis.Source.LoopEmitter
+import Solcore.Synthesis.Internal.StorageLoops
+import Solcore.Synthesis.Internal.Loops
 import Solcore.Core.Machine
-import Solcore.Synthesis.Source.NestedLoopCases
-import Solcore.Synthesis.Source.StorageLoopCases
 
 /-!
 # Loop profile tests

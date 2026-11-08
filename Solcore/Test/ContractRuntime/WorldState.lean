@@ -1,19 +1,15 @@
-import Solcore.ContractRuntime.Account
-import Solcore.ContractRuntime.CreationAddressPolicy
-import Solcore.ContractRuntime.AddressBytesBE
-import Solcore.ContractRuntime.AddressWordBridge
+import Solcore.ContractRuntime.Internal.WorldStateLaws
+import Solcore.ContractRuntime.Contracts
+import Solcore.ContractRuntime.Internal.AddressBytes
+import Solcore.ContractRuntime.Internal.ScalarLaws
 import Solcore.ContractRuntime.RuntimeScalars
 import Solcore.Core.Primitive
-import Solcore.ContractRuntime.BalanceTransfer
-import Solcore.ContractRuntime.CheckedHostCoreWordProgram
+import Solcore.ContractRuntime.Internal.CreationLaws
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.ContractRuntime.WorldState
-import Solcore.ContractRuntime.WorldStateBalanceProperties
-import Solcore.ContractRuntime.CheckedCoreProgram
-import Solcore.ContractRuntime.WorldStateCode
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
+import Solcore.ContractRuntime.Internal.CheckedCoreProgram
 import Solcore.Test.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.WorldStateNonceProperties
-import Solcore.ContractRuntime.WorldStateStorageRead
 
 /-!
 # World state tests

@@ -1,11 +1,5 @@
-import Solcore.Synthesis.Source.BytesReturnCases
-import Solcore.Synthesis.Source.DynamicBytesCases
-import Solcore.Synthesis.Source.DynamicBytesEmitter
-import Solcore.Synthesis.Stateful.DynamicBytesExecution
-import Solcore.Synthesis.Source.LongBytesCases
-import Solcore.Synthesis.Source.LongBytesEmitter
-import Solcore.Synthesis.Stateful.LongBytesExecution
-import Solcore.Synthesis.Source.TupleReturnCases
+import Solcore.Synthesis.Internal.AbiReturns
+import Solcore.Synthesis.Internal.AbiValues
 
 /-!
 # Bytes profile tests

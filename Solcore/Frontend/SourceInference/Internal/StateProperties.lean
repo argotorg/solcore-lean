@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceInference.Types
-import Solcore.TypeSystem.InferenceProperties
+import Solcore.TypeSystem.Internal.InferenceLaws
 
 /-!
 # Typed state laws

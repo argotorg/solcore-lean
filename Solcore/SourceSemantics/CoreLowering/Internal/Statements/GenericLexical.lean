@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpression
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.ReachableContinuations
 import Solcore.SourceSemantics.Dynamic.Control
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 
 /-!

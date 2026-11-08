@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.ProgramAdmiss
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.EligibleSelected
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
-import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
+import Solcore.SourceSemantics.Staging.Erasure
 
 /-!
 # Certified public sessions over recursive named rows

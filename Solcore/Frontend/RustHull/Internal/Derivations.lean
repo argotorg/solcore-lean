@@ -4,7 +4,7 @@ import Solcore.Frontend.RustHull.Internal.LoweringFacts
 import Solcore.Frontend.RustHull.Internal.StorageState
 import Solcore.Frontend.RustHull.Internal.Statements
 import Solcore.Frontend.RustHull.Internal.PublicFunctions
-import Solcore.Core.LocalLoopCorrespondence
+import Solcore.Core.Internal.LocalLoopCorrespondence
 import Solcore.Frontend.RustHull.Safety
 import Solcore.Frontend.RustHull.Semantics.Frames
 

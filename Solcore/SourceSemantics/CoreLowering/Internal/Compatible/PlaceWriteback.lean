@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
-import Solcore.Frontend.SourceCoreCompatibleDataPlaces
+import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 
 /-!

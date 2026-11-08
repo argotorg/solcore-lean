@@ -1,5 +1,5 @@
 import Solcore.Synthesis.Core.Generator
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 
 /-!
 # Enum plans

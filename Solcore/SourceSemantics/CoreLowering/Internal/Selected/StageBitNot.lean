@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageExpressions
-import Solcore.SourceSemantics.Staging.RecursiveBareBitNotFacts
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.StageForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins

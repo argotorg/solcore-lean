@@ -1,5 +1,5 @@
 import Solcore.Synthesis.Internal.Aggregates
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 
 /-!
 # Profiles: closures, comptime, generics, modules

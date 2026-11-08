@@ -1,6 +1,6 @@
 import Solcore.Synthesis.Core.EnumData
 import Solcore.Frontend.RustHull.Precompiles
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 import Solcore.Synthesis.Source.Emitter
 import Solcore.Synthesis.Internal.Enums
 

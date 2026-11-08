@@ -1,21 +1,12 @@
-import Solcore.Frontend.LocalExpressionEvaluator
-import Solcore.Frontend.LocalExpressionLookupProperties
-import Solcore.Frontend.LocalExpressionResumptionProperties
-import Solcore.Frontend.LocalExpressionFuelBound
-import Solcore.Frontend.LocalExpressionStoreProperties
-import Solcore.Frontend.TypeName
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.TypedLetReturnBody
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.LocalOwnerRenaming
-import Solcore.Frontend.RuntimeParameters
-import Solcore.Frontend.StructuralType
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.Foundations
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
 import Solcore.Core.Safety
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 import Solcore.Syntax.Parser.Internal.ParameterSoundness
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.LocalExpressionRenaming
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
 
 /-!
 # Structural form tests

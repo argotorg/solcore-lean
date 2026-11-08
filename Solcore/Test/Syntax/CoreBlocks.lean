@@ -1,26 +1,11 @@
-import Solcore.Syntax.DeclarativeCoreBlockCascadeProperties
-import Solcore.Syntax.DeclarativeCoreBlockRejectionTraceProperties
-import Solcore.Syntax.DeclarativeCoreBlockTailCascadeProperties
-import Solcore.Syntax.DeclarativeCoreBlockTailTraceProperties
-import Solcore.Syntax.DeclarativeCoreBlockTraceExactnessProperties
-import Solcore.Syntax.DeclarativeCoreBlockTraceProperties
-import Solcore.Syntax.CoreTermValidity
-import Solcore.Syntax.DeclarativeIsolatedBlockTraceErasureProperties
-import Solcore.Syntax.DeclarativeIsolatedBlockTraceProperties
-import Solcore.Syntax.Parser.CoreTypeCompletenessProperties
-import Solcore.Syntax.Parser.CoreLambdaParameterCompletenessProperties
-import Solcore.Syntax.Parser.CoreBlockPublicCompletenessProperties
-import Solcore.Syntax.Parser.CoreBlockClosingTraceProperties
-import Solcore.Syntax.Parser.CoreBlockPublicIsolationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.CoreBlockIsolationTraceProperties
-import Solcore.Syntax.Parser.CoreBlockRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.CoreBlockTraceCompletenessProperties
-import Solcore.Syntax.Parser.CoreDeclarationExactnessProperties
-import Solcore.Syntax.Parser.CorePublicParseOrdinarySoundnessProperties
-import Solcore.Syntax.Parser.CoreBlockPublicExactnessProperties
-import Solcore.Syntax.Parser.CoreTermPublicCompletenessProperties
-import Solcore.Syntax.Parser.IsolatedBlockDiagnosticTraceProperties
-import Solcore.Syntax.Parser.IsolatedBlockTraceCompletenessProperties
+import Solcore.Syntax.Internal.BlockTrace
+import Solcore.Syntax.Validity
+import Solcore.Syntax.Parser.Internal.Completeness
+import Solcore.Syntax.Parser.Internal.SignatureSoundness
+import Solcore.Syntax.Parser.Internal.TermSoundness
+import Solcore.Syntax.Parser.Internal.BlockTrace
+import Solcore.Syntax.Parser.Internal.ContractOutcomeSoundness
+import Solcore.Syntax.Parser.Correctness
 
 /-!
 # Core block tests

@@ -1,5 +1,5 @@
 import Solcore.Frontend.ProgramSignatureFormation
-import Solcore.TypeSystem.SubstitutionProperties
+import Solcore.TypeSystem.Internal.SubstitutionLaws
 import Solcore.Frontend.TraitResolution
 
 /-!

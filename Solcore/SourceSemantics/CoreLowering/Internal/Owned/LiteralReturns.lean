@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndStat
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOperators
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
-import Solcore.SourceSemantics.Staging.RecursiveBareTarget
+import Solcore.SourceSemantics.Staging.RecursiveProfile
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodLambdas
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation

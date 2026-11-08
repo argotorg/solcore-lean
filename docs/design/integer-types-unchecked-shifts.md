@@ -470,8 +470,9 @@ The unit is required, and it is paused after row 3 and part of row 2
 - Row 2 without division and remainder:
   [unchecked blocks as implemented](#unchecked-blocks-as-implemented-without-division).
 
-The public-API tests are `Solcore/Test/SourceCoreShiftExecution.lean` and
-`Solcore/Test/SourceCoreUncheckedExecution.lean`.
+The public-API tests are `Tests.SourceCoreShiftExecution` and
+`Tests.SourceCoreUncheckedExecution` in
+`Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean`.
 
 **Remaining, in order.**
 

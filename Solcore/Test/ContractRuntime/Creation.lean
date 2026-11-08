@@ -1,13 +1,10 @@
-import Solcore.ContractRuntime.CheckedAccountCreation
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.CheckedCreationPreflight
-import Solcore.Core.HostProgress
-import Solcore.ContractRuntime.ContractCallFailure
-import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.HostStorageHandler
-import Solcore.ContractRuntime.ExecutionEnvironment
-import Solcore.ContractRuntime.CheckedCoreWordOutcome
-import Solcore.ContractRuntime.OneLevelNestedExecution
+import Solcore.ContractRuntime.Internal.CreationLaws
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
+import Solcore.Core.Internal.HostPreservation
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.ContractRuntime.Internal.EntryOutcomeLaws
+import Solcore.ContractRuntime.Internal.NestedLaws
 
 /-!
 # Contract creation tests

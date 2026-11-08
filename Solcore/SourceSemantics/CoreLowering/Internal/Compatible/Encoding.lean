@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
-import Solcore.Frontend.SourceCoreCompatibleValues
+import Solcore.Frontend.SourceCore.Compatible
 
 /-!
 # Compatible profile: encoding

@@ -1,5 +1,5 @@
-import Solcore.Frontend.SourceCoreCompatibleDataMatches
-import Solcore.SourceSemantics.Dynamic.Pattern
+import Solcore.Frontend.SourceCore.CompatibleFunctions
+import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
@@ -7,12 +7,12 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimit
 import Solcore.Core.Correspondence
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
+import Solcore.SourceSemantics.Dynamic.Internal.PatternCompleteness
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
-import Solcore.SourceSemantics.Patterns
+import Solcore.SourceSemantics.Expressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 

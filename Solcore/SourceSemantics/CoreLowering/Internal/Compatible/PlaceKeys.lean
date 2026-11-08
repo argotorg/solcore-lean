@@ -1,11 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
-import Solcore.SourceSemantics.Dynamic.Initialization
+import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
-import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
+import Solcore.Frontend.SourceCore.Compatible
 
 /-!
 # Compatible places: keys and resolution

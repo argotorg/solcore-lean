@@ -1,8 +1,8 @@
-import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.Fragments.Internal.ClosedSource
 import Solcore.Test.Frontend.ExpectedDataImages
 import Solcore.Test.Frontend.ClosedStrictWords
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.SelfApplication
+import Solcore.Frontend.Fragments.Internal.LambdaDepth
 
 /-!
 # Data depth and self-application tests

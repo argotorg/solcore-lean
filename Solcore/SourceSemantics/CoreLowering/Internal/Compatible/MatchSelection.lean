@@ -5,8 +5,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignmen
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementContracts
-import Solcore.Frontend.SourceCoreCompatibleDataMatches
-import Solcore.Core.DefinitionExtension
+import Solcore.Frontend.SourceCore.CompatibleFunctions
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Compatible matches: selection and runtime

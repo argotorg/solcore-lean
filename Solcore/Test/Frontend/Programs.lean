@@ -3,13 +3,10 @@ import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.ProgramChecking
 import Solcore.Syntax.Parser
 import Solcore.Frontend.ProgramTypeResolution
-import Solcore.Frontend.TypedTraitResolution
-import Solcore.Frontend.ProgramInterfaces
-import Solcore.Frontend.ProgramLoading
-import Solcore.Frontend.ProgramModuleResolution
-import Solcore.Frontend.ProgramSignatureFormationProperties
-import Solcore.Frontend.ProgramSignatures
 import Solcore.Frontend.TraitResolution
+import Solcore.Frontend.ProgramInterfaces
+import Solcore.Frontend.Internal.CheckingProperties
+import Solcore.Frontend.ProgramSignatures
 
 /-!
 # Whole program tests

@@ -1,7 +1,7 @@
-import Solcore.Frontend.Expected
-import Solcore.Frontend.ClosedSource
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.Fragments.Internal.Expected
+import Solcore.Frontend.Fragments.Internal.ClosedSource
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Syntax.Parser.Internal.TermBasics
 
 /-!

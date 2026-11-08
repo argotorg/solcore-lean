@@ -2,15 +2,14 @@ import Solcore.Test.Frontend.Source.CompilerFeatureSupport
 import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints
 import Solcore.Frontend.SourceCoreCompiler
 import Solcore.Frontend.SourceCoreIndexedSession
-import Solcore.Frontend.SourceRuntimeDeepValidation
+import Solcore.Frontend.Internal.RuntimeValidation
 import Solcore.Frontend.SourceCoreExecution
-import Solcore.Frontend.SourceCoreRootDiscovery
-import Solcore.Frontend.SourceCoreRawMetadata
-import Solcore.Frontend.SourceCoreRawMetadataRuntime
-import Solcore.Frontend.SourceCoreUnifiedRuntimeCertificates
+import Solcore.Frontend.SourceCore.RawMetadata
+import Solcore.Frontend.SourceCore.Compatible
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.SourceInference
-import Solcore.Frontend.SourceProgramExecution
-import Solcore.Frontend.SourceRuntimeValidation
+import Solcore.Frontend.SourceCore.Internal.DirectLinking
+import Solcore.Frontend.Internal.RuntimeValues
 
 /-!
 # Source compiler tests

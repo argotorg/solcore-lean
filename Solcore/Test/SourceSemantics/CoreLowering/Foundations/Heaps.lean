@@ -1,25 +1,19 @@
-import Solcore.Frontend.SourceCoreAllocationCodebook
-import Solcore.Core.BoundedSafety
-import Solcore.Frontend.SourceCoreAllocationContexts
-import Solcore.Frontend.SourceCoreCompatibleDataMatches
-import Solcore.Frontend.SourceCoreAllocationDiscovery
-import Solcore.Frontend.SourceCoreAllocationLayouts
-import Solcore.Frontend.SourceCoreAllocationLedger
-import Solcore.Frontend.SourceCoreHeapMarkers
+import Solcore.Frontend.SourceCore.Internal.Allocation
+import Solcore.Core.Safety
+import Solcore.Frontend.SourceCore.CompatibleFunctions
+import Solcore.Frontend.SourceCore.Internal.Carriers
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
-import Solcore.Frontend.SourceCoreSession
-import Solcore.Frontend.SourceCoreLocalCell
-import Solcore.SourceSemantics.CoreLowering.LocalCell
-import Solcore.Frontend.SourceCoreLocalEvidence
+import Solcore.Frontend.SourceCore.GeneralFunctions
+import Solcore.Frontend.SourceCore.Lowering
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.Test.SourceSemantics.CoreLowering.Closed.Owned
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodNestedEntries
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectBodies
-import Solcore.SourceSemantics.CoreLowering.CellAwareGeneralizedSourceInversion
-import Solcore.SourceSemantics.CoreLowering.SourceStagingHeapRelation
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectCompiler
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
 
 /-!
 # Heap and allocation tests

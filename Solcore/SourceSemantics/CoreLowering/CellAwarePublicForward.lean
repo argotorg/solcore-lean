@@ -5,11 +5,11 @@ import Solcore.SourceSemantics.CoreLowering.CellAwarePublicRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHandles
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedExpressionCertificates
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.MaterializedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyMeaning
 import Solcore.SourceSemantics.CoreLowering.Internal.Generalized.BodyEntries
-import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.PublicSessions
 
 /-!

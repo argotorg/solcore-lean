@@ -1,19 +1,18 @@
 import Solcore.Syntax.Term
 import Solcore.Core.Syntax
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
-import Solcore.Core.LocalFragment
+import Solcore.Core.Internal.LocalFragment
 import Solcore.Core.Eval
-import Solcore.Core.BoundedSafety
-import Solcore.Core.Renaming
+import Solcore.Core.Safety
+import Solcore.Core.Internal.Renaming
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 import Solcore.Resolved.Eval
-import Solcore.Resolved.FreshIdentity
-import Solcore.Core.ExactFuelProperties
+import Solcore.Resolved.Identity
+import Solcore.Core.Fuel
 import Solcore.Frontend.Fragments.Internal.RuntimeParameters
-import Solcore.Resolved.Renaming
-import Solcore.Core.Safety
+import Solcore.Resolved.Internal.ScopeLaws
 
 /-!
 # Computation bodies

@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionCondit
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionContextualConstructors
-import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 
 /-!

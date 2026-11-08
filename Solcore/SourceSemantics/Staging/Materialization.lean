@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceStagedValue
+import Solcore.Frontend.SourceStageAnalysis
 import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Dynamic.Primitive

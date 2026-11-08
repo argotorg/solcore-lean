@@ -1,7 +1,7 @@
 import Solcore.Frontend.RustHull.Syntax
-import Solcore.Core.LocalLoop
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.Check
-import Solcore.Core.WordMapping
+import Solcore.Core.Internal.MappingLaws
 
 /-!
 # Lowering support

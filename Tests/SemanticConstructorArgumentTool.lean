@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.ConstructorArgumentsCases
+import Solcore.Synthesis.Internal.ConstructorArguments
 
 /-! Native constructor-argument case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.StagedProjected
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.EmittedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.AssignmentHeads
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ScopeStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost

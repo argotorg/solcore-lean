@@ -1,14 +1,13 @@
-import Solcore.Frontend.CheckedDataExpressionOwnerProperties
-import Solcore.Frontend.ClosedSource
-import Solcore.Core.DirectWordComparisons
-import Solcore.Frontend.LocalExpressionEvaluation
-import Solcore.Frontend.SelfApplication
-import Solcore.Frontend.LocalReference
+import Solcore.Frontend.Fragments.Internal.LambdaDepth
+import Solcore.Frontend.Fragments.Internal.ClosedSource
+import Solcore.Core.Internal.WordComparisons
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.Expected
+import Solcore.Frontend.Fragments.Internal.Expected
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Owner expression tests

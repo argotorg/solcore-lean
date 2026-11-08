@@ -11,9 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysic
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
-import Solcore.SourceSemantics.SourceCompiledCachedActualBody
-import Solcore.SourceSemantics.SourceCompiledCachedMethodValidity
-import Solcore.SourceSemantics.SourceCompiledActualInitializerBarriers
+import Solcore.SourceSemantics.CompiledBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ActualInvocationAllocation
 
 /-!

@@ -1,6 +1,6 @@
-import Solcore.Synthesis.Source.MemoryCallsCases
+import Solcore.Synthesis.Internal.MemoryCalls
 import Solcore.Abi.Keccak256
-import Solcore.Synthesis.Source.MemoryValuesCases
+import Solcore.Synthesis.Internal.MemoryValues
 
 /-!
 # Memory profile tests

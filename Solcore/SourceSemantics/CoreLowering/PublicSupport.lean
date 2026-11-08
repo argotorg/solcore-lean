@@ -9,7 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignm
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.InitializedPublicBounds

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.MalformedNestedArrayCases
+import Solcore.Synthesis.Internal.Malformed
 
 /-! Native malformed-nested-array case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

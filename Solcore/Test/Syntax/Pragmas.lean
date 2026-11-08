@@ -1,25 +1,13 @@
-import Solcore.Syntax.Parser.PragmaDeclarationRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.PragmaItemsOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.PragmaItemsContextProperties
-import Solcore.Syntax.DeclarativeRejectionDiagnosticGrammar
-import Solcore.Syntax.Parser.PragmaItemsRejectionTraceCompletenessProperties
-import Solcore.Syntax.Parser.PragmaNameRejectionTraceProperties
-import Solcore.Syntax.Parser.PragmaPrefixBoundaryTraceProperties
-import Solcore.Syntax.Parser.Pragma
-import Solcore.Syntax.DeclarativePragmaRejectionCascadeProperties
-import Solcore.Syntax.DeclarativePragmaRejectionTraceProperties
-import Solcore.Syntax.Parser.PragmaTotalityProperties
-import Solcore.Syntax.Parser.PragmaDeclarationTraceProperties
-import Solcore.Syntax.Parser.PublicPragmaNameRejectionOutputProperties
-import Solcore.Syntax.Parser.PublicPragmaPrefixBoundaryOutputProperties
-import Solcore.Syntax.Parser.PublicPragmaRejectionOutputProperties
-import Solcore.Syntax.DeclarativeParseDiagnosticCascadeStabilityProperties
-import Solcore.Syntax.Parser.PublicPragmaSequenceOutputProperties
-import Solcore.Syntax.Parser.PublicPragmaSuccessOutputProperties
-import Solcore.Syntax.DeclarativePragmaRejectionTraceGrammar
-import Solcore.Syntax.DeclarativePragmaPrefixBoundaryTraceProperties
-import Solcore.Syntax.Parser.PragmaSequenceTraceProperties
+import Solcore.Syntax.Parser.Internal.PragmaTrace
+import Solcore.Syntax.Parser.Internal.ExportSoundness
+import Solcore.Syntax.Parser.Internal.BlockTrace
+import Solcore.Syntax.Grammar.Basics
+import Solcore.Syntax.Parser.Internal.SourceFileTrace
+import Solcore.Syntax.Parser.Internal.ExportProofs
+import Solcore.Syntax.Internal.PragmaTrace
+import Solcore.Syntax.Parser.Internal.ModuleTotality
+import Solcore.Syntax.Parser.PublicOutputs
+import Solcore.Syntax.Internal.TraceBasics
 
 /-!
 # Pragma tests

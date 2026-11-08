@@ -1,6 +1,6 @@
 import Solcore.Frontend.RustHull.Effects
 import Solcore.Frontend.RustHull.Lowering
-import Solcore.Core.BoundedSafety
+import Solcore.Core.Safety
 import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.Frontend.RustHull.ScalarExecution
 

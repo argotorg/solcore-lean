@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.MethodsCases
+import Solcore.Synthesis.Internal.Calls
 
 /-! Native several-methods case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

@@ -1,14 +1,11 @@
-import Solcore.Syntax.Parser.PublicContractFieldTotalityProperties
-import Solcore.Syntax.Parser.PublicCoreTermTotalityProperties
-import Solcore.Syntax.Parser.PublicDiagnosticValidityProperties
-import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
-import Solcore.Syntax.Parser.PublicSourceFileGrammarProperties
-import Solcore.Syntax.Parser.PublicPatternTotalityProperties
-import Solcore.Syntax.Parser.PublicSingleRecoveryOutputProperties
+import Solcore.Syntax.Parser.Internal.DeclarationTotality
+import Solcore.Syntax.Parser.Internal.PublicTermTotality
+import Solcore.Syntax.Parser.Internal.SourceFileSoundness
+import Solcore.Syntax.Parser.PublicOutputs
+import Solcore.Syntax.Parser.Correctness
+import Solcore.Syntax.Parser.Internal.TermTotality
 import Solcore.Syntax.Lexer
-import Solcore.Syntax.Parser.PublicStatementFuelTotalityProperties
-import Solcore.Syntax.Parser.PublicTotalityProperties
-import Solcore.Syntax.Parser.PublicValidityProperties
+import Solcore.Syntax.Parser.Internal.FileTotality
 import Solcore
 
 /-!

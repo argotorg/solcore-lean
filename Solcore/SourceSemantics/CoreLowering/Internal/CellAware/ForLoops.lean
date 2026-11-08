@@ -21,7 +21,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion

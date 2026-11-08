@@ -1,12 +1,11 @@
-import Solcore.Frontend.RustHull.RecursiveProgramCorrespondence
+import Solcore.Frontend.RustHull.Correspondence
 import Solcore.Frontend.RustHull.Contract
-import Solcore.Frontend.RustHull.PureFunctionCorrespondence
-import Solcore.Frontend.RustHull.RankedProgramCorrespondence
-import Solcore.Frontend.RustHull.ScalarExecutionSafety
-import Solcore.Frontend.RustHull.YulLowering
+import Solcore.Frontend.RustHull.Internal.PublicFunctions
+import Solcore.Frontend.RustHull.Safety
+import Solcore.Frontend.RustHull.Lowering
 import Solcore.Core.Machine
-import Solcore.Frontend.RustHull.ContractCallModeExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractCallModeSupported
+import Solcore.Frontend.RustHull.ContractCallTheorems
+import Solcore.Frontend.RustHull.Internal.CallLayout
 
 /-!
 # Hull correspondence tests

@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.TypedLetReturnBody
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
 import Solcore.Core.Safety
 
 /-!

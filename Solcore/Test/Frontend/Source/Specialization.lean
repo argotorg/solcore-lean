@@ -3,7 +3,7 @@ import Solcore
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Core.Machine
 import Solcore.Frontend.SourceSpecialization
-import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceCore.Internal.DirectLinking
 import Solcore.Test.SourceSemantics.CoreLowering.UnifiedCorpusSupport
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.SourceStageAnalysis

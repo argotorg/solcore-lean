@@ -1,22 +1,14 @@
-import Solcore.Frontend.RustHull.ContractAccountExecutionCorrespondence
-import Solcore.Frontend.RustHull.RuntimeAccountEffectsSemantics
+import Solcore.Frontend.RustHull.ContractStateTheorems
+import Solcore.Frontend.RustHull.Semantics.Layers
 import Solcore.Abi.Keccak256
-import Solcore.Frontend.RustHull.AccountInspection
-import Solcore.Core.Machine
-import Solcore.Frontend.RustHull.AccountLifecycle
-import Solcore.Frontend.RustHull.AccountState
-import Solcore.Frontend.RustHull.Contract
-import Solcore.Frontend.RustHull.Ambient
-import Solcore.Frontend.RustHull.CreationRuntime
-import Solcore.Frontend.RustHull.ContractEnvironmentExecutionCorrespondence
-import Solcore.Frontend.RustHull.ChildFrameModeSemantics
-import Solcore.Frontend.RustHull.ContractCallModeSupported
-import Solcore.Frontend.RustHull.ContractCallExecutionCorrespondence
-import Solcore.Test.Frontend.RustHull.Calls
-import Solcore.Frontend.RustHull.ContractCallModeExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractRuntimeEffectsExecutionCorrespondence
-import Solcore.Frontend.RustHull.LinkedContract
 import Solcore.Frontend.RustHull.Effects
+import Solcore.Core.Machine
+import Solcore.Frontend.RustHull.Contract
+import Solcore.Frontend.RustHull.Semantics.Frames
+import Solcore.Frontend.RustHull.Internal.CallLayout
+import Solcore.Frontend.RustHull.ContractCallTheorems
+import Solcore.Test.Frontend.RustHull.Calls
+import Solcore.Frontend.RustHull.LinkedContract
 
 /-!
 # Hull account tests

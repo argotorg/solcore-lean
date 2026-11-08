@@ -1,6 +1,4 @@
 import Solcore.Frontend.SourceCompilationPlan
-import Solcore.Frontend.SourceCompilationPlan.Canonical
-import Solcore.Frontend.SourceCompilationPlan.LocalInstances
 
 /-!
 # Compilation plan tests

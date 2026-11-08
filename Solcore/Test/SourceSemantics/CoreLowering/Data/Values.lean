@@ -1,30 +1,17 @@
-import Solcore.SourceSemantics.CoreLowering.DataEqualityCertificates
-import Solcore.SourceSemantics.CoreLowering.DataEqualityInitialization
-import Solcore.SourceSemantics.CoreLowering.DataEquality
-import Solcore.SourceSemantics.CoreLowering.DataDefaults
-import Solcore.SourceSemantics.CoreLowering.DataEqualityScalarCertificates
-import Solcore.SourceSemantics.CoreLowering.DataEqualityInstalled
-import Solcore.Frontend.SourceCoreDefaultValue
-import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
-import Solcore.SourceSemantics.CoreLowering.Literals
-import Solcore.Frontend.SourceCoreDataExpressions
-import Solcore.Frontend.SourceCoreGeneralEntry
-import Solcore.SourceSemantics.CoreLowering.DataMatchCertificates
-import Solcore.SourceSemantics.CoreLowering.DataMatchSourceScopes
-import Solcore.SourceSemantics.CoreLowering.DataPatternEncoding
-import Solcore.SourceSemantics.CoreLowering.DataPatternParametricLeaves
-import Solcore.SourceSemantics.CoreLowering.DataPatternDecision
-import Solcore.Frontend.SourceCoreDataMatches
-import Solcore.Frontend.SourceCoreLoops
-import Solcore.SourceSemantics.CoreLowering.DataPayloadCatalog
-import Solcore.SourceSemantics.CoreLowering.DataPayloadEncoding
-import Solcore.SourceSemantics.CoreLowering.DataPayloadEquality
-import Solcore.SourceSemantics.CoreLowering.GenericHeap
-import Solcore.SourceSemantics.CoreLowering.DataPayloadFaultPaths
-import Solcore.SourceSemantics.CoreLowering.DataPayloadMapping
-import Solcore.SourceSemantics.CoreLowering.DataPayloadUpdatePaths
-import Solcore.SourceSemantics.CoreLowering.DataPayloadWriteBack
-import Solcore.SourceSemantics.CoreLowering.DataPlaceExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.HeapsAndBindings
+import Solcore.Frontend.SourceCore.Data
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
+import Solcore.Frontend.SourceCore.DataExpressions
+import Solcore.Frontend.SourceCore.Internal.Entries
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Matches
+import Solcore.Frontend.SourceCore.GeneralFunctions
+import Solcore.Frontend.SourceCore.Lowering
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
+import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
 
 /-!
 # Data value tests

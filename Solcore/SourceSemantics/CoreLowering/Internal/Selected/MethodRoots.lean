@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigi
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
+import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
@@ -17,13 +17,13 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.InvocationBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.MethodPrincipal
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies
-import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicPhysicalSessions
 
 /-!

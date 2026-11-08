@@ -1,13 +1,9 @@
-import Solcore.ContractRuntime.CheckedCoreWordOutcome
+import Solcore.ContractRuntime.Internal.EntryOutcomeLaws
 import Solcore.Test.ContractRuntime.NestedExecution
-import Solcore.ContractRuntime.CallChainExecution
-import Solcore.ContractRuntime.CallChoiceExecution
-import Solcore.ContractRuntime.CallResumeExecution
-import Solcore.Core.ContractCallWordResultProperties
-import Solcore.ContractRuntime.ContractCallFailure
-import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.HostStorageHandler
-import Solcore.ContractRuntime.CoreLanguageResult
+import Solcore.ContractRuntime.Internal.CallPhaseLaws
+import Solcore.Core.Internal.HostPreservation
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 
 /-!
 # Contract call convention tests

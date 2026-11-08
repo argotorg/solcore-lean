@@ -10,8 +10,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
-import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
-import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
+import Solcore.SourceSemantics.Staging.RecursiveProfile
+import Solcore.SourceSemantics.Staging.Internal.SelectedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
@@ -19,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StatementCon
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForIterations
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedTerminalDispatch
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LexicalBodies

@@ -6,7 +6,8 @@ import Solcore.Frontend.SourceCore.Data
 
 The native representation of the historical source-value boundary. Main declaration:
 `SourceCoreCompatibleCatalog.Checked`. This file stays below the value encoder:
-`Solcore/Test/SourceCoreCompatiblePayload.lean` asserts that.
+`Tests.SourceCoreCompatiblePayload` in
+`Solcore/Test/SourceSemantics/CoreLowering/Compatible/Payloads.lean` asserts that.
 -/
 
 section

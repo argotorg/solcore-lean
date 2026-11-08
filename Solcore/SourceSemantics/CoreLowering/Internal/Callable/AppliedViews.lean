@@ -1,14 +1,13 @@
-import Solcore.Frontend.SourceCoreCallableContextFrames
+import Solcore.Frontend.SourceCore.Internal.Carriers
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Fuel
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryPaired
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.AncestryWorklists
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
-import Solcore.SourceSemantics.Dynamic.LocalSchemes
-import Solcore.Frontend.SourceCoreCallablePairedFrames
+import Solcore.SourceSemantics.Dynamic.Evidence
 
 /-!
 # Applied views and context frames

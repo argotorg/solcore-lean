@@ -1,12 +1,12 @@
 import Solcore.Frontend.Fragments.Internal.ReturnBodies
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
-import Solcore.Resolved.FreshIdentity
+import Solcore.Resolved.Identity
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Core.Machine
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalFragment
+import Solcore.Core.Fuel
+import Solcore.Resolved.Internal.LocalFragmentLaws
+import Solcore.Core.Internal.LocalFragment
 
 /-!
 # Typed let bodies

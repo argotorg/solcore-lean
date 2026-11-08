@@ -1,10 +1,9 @@
 import Solcore.Synthesis.Internal.Aggregates
-import Solcore.Core.Wire.Codec.Program
-import Solcore.ContractRuntime.CheckedCoreContract
+import Solcore.Core.Wire.Codec
+import Solcore.ContractRuntime.Internal.ContractLaws
 import Solcore.Core.Wire.Conversions
 import Solcore.Frontend.RustHull.Precompiles
-import Solcore.ContractRuntime.CheckedContractRegistry
-import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 import Lean.Data.Json
 import Solcore.Synthesis.Stateful.Sequence
 import Solcore.Abi.Keccak256

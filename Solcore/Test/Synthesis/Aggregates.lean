@@ -1,16 +1,11 @@
-import Solcore.Synthesis.Source.AggregateCallGraphCases
-import Solcore.Synthesis.Source.AggregateCallGraphEmitter
-import Solcore.Synthesis.Source.CallGraphEmitter
+import Solcore.Synthesis.Internal.Aggregates
+import Solcore.Synthesis.Internal.CallGraphs
 import Solcore.Test.Synthesis.CallGraphs
 import Solcore.Core.Machine
-import Solcore.Core.Wire.Codec.Program
-import Solcore.Synthesis.Source.AggregateCases
-import Solcore.Synthesis.Source.AggregateEmitter
-import Solcore.Synthesis.Source.AggregateRenderer
-import Solcore.Synthesis.Source.PrimitiveEmitter
-import Solcore.Synthesis.Source.ClosureCases
-import Solcore.Synthesis.Source.ClosureEmitter
-import Solcore.Synthesis.Source.LoopClosureCases
+import Solcore.Core.Wire.Codec
+import Solcore.Synthesis.Internal.Functions
+import Solcore.Synthesis.Internal.LanguageFeatures
+import Solcore.Synthesis.Internal.Loops
 
 /-!
 # Aggregate and closure profile tests

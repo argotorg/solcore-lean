@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputR
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicNestedInputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectApplications
-import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 
 /-!

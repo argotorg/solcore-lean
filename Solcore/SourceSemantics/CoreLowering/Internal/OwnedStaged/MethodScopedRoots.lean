@@ -19,7 +19,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReceipts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation

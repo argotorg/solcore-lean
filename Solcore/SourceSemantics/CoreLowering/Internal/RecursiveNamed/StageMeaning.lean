@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls

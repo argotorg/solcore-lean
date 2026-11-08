@@ -4,7 +4,7 @@ import Solcore.Frontend.SourceInference.Internal.RequirementProperties
 import Solcore.Frontend.SourceInference.Internal.StateProperties
 import Solcore.Frontend.SourceInference.Internal.TypedIRProperties
 import Solcore.Frontend.Internal.CheckingProperties
-import Solcore.TypeSystem.InferenceProperties
+import Solcore.TypeSystem.Internal.InferenceLaws
 
 /-!
 # Inference state preservation

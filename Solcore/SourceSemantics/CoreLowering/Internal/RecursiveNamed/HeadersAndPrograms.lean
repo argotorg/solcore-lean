@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogExpressions
-import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.Dynamic.Preservation
@@ -11,11 +11,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.ImperativeFo
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchPrefixes
-import Solcore.SourceSemantics.Staging.RecursiveErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning
 import Solcore.Core.Correspondence
 import Solcore.SourceSemantics.Dynamic.Program
-import Solcore.SourceSemantics.Dynamic.ProgramOutcome
 
 /-!
 # Recursive named rows: headers and programs

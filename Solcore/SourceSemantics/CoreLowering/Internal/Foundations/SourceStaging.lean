@@ -8,9 +8,9 @@ import Solcore.Resolved.Typing
 import Solcore.Resolved.Eval
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Lean
-import Solcore.Frontend.ResidualScopeTails
-import Solcore.Frontend.ResidualLexicalScopes
-import Solcore.SourceSemantics.SourceSpecializationStatementReferences
+import Solcore.Frontend.Internal.SpecializationProperties
+import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.SourceSemantics.Internal.Prepared.StatementReferences
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 
 /-!

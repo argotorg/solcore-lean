@@ -3,8 +3,9 @@ import Solcore.Frontend.SourceCoreExecution
 /-!
 # Historical heap import
 
-An explicit migration adapter. It stays apart, because
-`Solcore/Test/SourceCoreUnifiedImportBoundary.lean` asserts that the public API does not reach it.
+An explicit migration adapter. It stays apart, because `Tests.SourceCoreUnifiedImportBoundary` in
+`Solcore/Test/SourceSemantics/CoreLowering/UnifiedCorpus.lean` asserts that the public API does not
+reach it.
 -/
 
 /-! Explicit historical-input migration. The common compiler API uses data

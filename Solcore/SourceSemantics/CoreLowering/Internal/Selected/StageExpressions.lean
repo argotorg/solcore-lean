@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveLiftOutcomes
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalDirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedFlows
@@ -15,7 +15,6 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodBodySuppo
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
-import Solcore.SourceSemantics.Staging.RecursiveAtomicLifting
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndexDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins

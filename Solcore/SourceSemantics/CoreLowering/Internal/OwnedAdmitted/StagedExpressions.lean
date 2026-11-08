@@ -7,8 +7,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LoopAndMatchBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
-import Solcore.SourceSemantics.Staging.RecursiveErasure
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Erasure
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.ReachedNamedFaultPaths

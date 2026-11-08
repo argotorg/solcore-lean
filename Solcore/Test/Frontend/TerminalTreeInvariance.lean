@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.TerminalReturnBody
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Frontend.LocalOwnerRenaming
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.LocalScope
 
 /-!

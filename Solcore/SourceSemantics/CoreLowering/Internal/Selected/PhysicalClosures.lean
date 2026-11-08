@@ -1,6 +1,5 @@
-import Solcore.SourceSemantics.SourceCompiledLocalDomainSeparation
-import Solcore.SourceSemantics.SourceCompiledLocalLexicalAllocation
-import Solcore.SourceSemantics.SourceCompiledLocalCanonicalReadOrder
+import Solcore.SourceSemantics.Internal.Compiled.Barriers
+import Solcore.SourceSemantics.Internal.Compiled.ActualEntries
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceStaging
@@ -25,7 +24,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MixedBodies
-import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.Staging.Internal.FaultCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedScopedPreservation

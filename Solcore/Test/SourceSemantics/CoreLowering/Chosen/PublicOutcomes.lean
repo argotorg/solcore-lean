@@ -1,14 +1,14 @@
 import Solcore.Test.SourceSemantics.CoreLowering.Chosen.OuterBodies
 import Solcore.Frontend.SourceCoreIndexedSession
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootSourceSignature
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.Test.SourceSemantics.CoreLowering.Chosen.Admission
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramOutcomeMeaning
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedProgramAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestorationAdmission
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedInvocationAdmission
+import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ProfileExtraction
+import Solcore.SourceSemantics.CoreLowering.Internal.Owned.NestedEntries
+import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCatalog
 
 /-!
 # Chosen ordinary public tests

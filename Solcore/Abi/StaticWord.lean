@@ -1,9 +1,9 @@
 import Solcore.Abi.Keccak256
-import Solcore.ContractRuntime.RuntimeScalars.WordBytesProperties
-import Solcore.ContractRuntime.CheckedHostCoreProgram
-import Solcore.Core.Renaming
-import Solcore.ContractRuntime.CheckedCoreContract
-import Solcore.ContractRuntime.BalancedTopLevelExecution
+import Solcore.ContractRuntime.Internal.ScalarLaws
+import Solcore.ContractRuntime.Internal.WorldStateLaws
+import Solcore.Core.Internal.Renaming
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.ContractRuntime.Internal.BalancedLaws
 
 /-!
 # Static Word ABI

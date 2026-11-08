@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.MalformedCalldataCases
+import Solcore.Synthesis.Internal.Malformed
 
 /-! Native malformed-calldata case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

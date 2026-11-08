@@ -1,16 +1,5 @@
-import Solcore.ContractRuntime.FrameCheckpointSnapshot
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPair
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress
-import Solcore.ContractRuntime.FrameContinuationContext
-import Solcore.ContractRuntime.FrameContinuationContextFromCheckpointedWorkingPair
-import Solcore.ContractRuntime.FrameResolutionResult
-import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
-import Solcore.ContractRuntime.FrameEffectJournal
-import Solcore.ContractRuntime.FrameOutcome
-import Solcore.ContractRuntime.FrameRun
-import Solcore.ContractRuntime.FrameStateResolution
-import Solcore.ContractRuntime.FrameTrace
+import Solcore.ContractRuntime.Internal.FrameLaws
+import Solcore.ContractRuntime.Internal.ParentIndexedFrames
 
 /-!
 # Frame tests

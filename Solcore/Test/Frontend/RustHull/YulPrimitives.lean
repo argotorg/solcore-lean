@@ -1,4 +1,4 @@
-import Solcore.Frontend.RustYulPrimitives
+import Solcore.Frontend.RustHull.Lowering
 import Solcore.Core.Machine
 
 /-!

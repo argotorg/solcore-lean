@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.CallReturnCases
+import Solcore.Synthesis.Internal.CallReturns
 
 /-! Native call-return case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

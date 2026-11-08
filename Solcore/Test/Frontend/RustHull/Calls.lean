@@ -1,19 +1,13 @@
-import Solcore.Frontend.RustHull.RuntimeCallEffectsSemantics
-import Solcore.Frontend.RustHull.ContractCallExecutionCorrespondence
-import Solcore.Frontend.RustHull.Calls
+import Solcore.Frontend.RustHull.Semantics.Layers
+import Solcore.Frontend.RustHull.ContractCallTheorems
+import Solcore.Frontend.RustHull.Effects
 import Solcore.Core.Machine
-import Solcore.Frontend.RustHull.ChildFrameSemantics
-import Solcore.Frontend.RustHull.ContractChildCallExecutionCorrespondence
-import Solcore.Frontend.RustHull.RecursiveProgramCorrespondence
-import Solcore.Frontend.RustHull.ChildFrameModeSemantics
-import Solcore.Frontend.RustHull.ContractCallModeSupported
-import Solcore.Frontend.RustHull.ContractCallModeExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractNestedChildCallExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractReturnDataExecutionCorrespondence
-import Solcore.Frontend.RustHull.RuntimeReturnDataEffectsSemantics
-import Solcore.Frontend.RustHull.ReturnDataBuiltinCorrespondence
-import Solcore.Frontend.RustHull.ContractRootCallExecutionCorrespondence
-import Solcore.Frontend.RustHull.ContractFullExecutionCorrespondence
+import Solcore.Frontend.RustHull.Semantics.Frames
+import Solcore.Frontend.RustHull.Correspondence
+import Solcore.Frontend.RustHull.Internal.CallLayout
+import Solcore.Frontend.RustHull.ContractCodeTheorems
+import Solcore.Frontend.RustHull.Internal.TerminationLayers
+import Solcore.Frontend.RustHull.ContractStateTheorems
 import Solcore.Test.Frontend.RustHull.Effects
 
 /-!

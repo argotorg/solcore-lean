@@ -1,7 +1,5 @@
-import Solcore.Synthesis.Source.EventLogCases
-import Solcore.Synthesis.Source.EventLogEmitter
-import Solcore.Synthesis.Stateful.EventLogExecution
-import Solcore.Synthesis.Source.HaltCases
+import Solcore.Synthesis.Internal.AdtStorage
+import Solcore.Synthesis.Internal.RevertData
 
 /-!
 # Event and revert profile tests

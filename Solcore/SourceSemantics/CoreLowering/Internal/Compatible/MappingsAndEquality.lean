@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceCoreCompatibleDataEquality
+import Solcore.Frontend.SourceCore.CompatibleCatalog
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
@@ -6,11 +6,11 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
-import Solcore.Frontend.SourceCoreCompatibleDataPlaces
+import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
-import Solcore.SourceSemantics.Dynamic.RuntimeType
+import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
-import Solcore.Frontend.SourceCorePublicOutputShapes
+import Solcore.Frontend.SourceCore.Internal.CallableOutputs
 
 /-!
 # Compatible profile: mappings and equality

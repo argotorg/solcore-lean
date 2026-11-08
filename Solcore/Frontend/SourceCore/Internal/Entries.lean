@@ -2,7 +2,7 @@ import Solcore.Frontend.SourceCore.Lowering
 import Solcore.Frontend.SourceCore.Internal.FaultSites
 import Solcore.Frontend.SourceCompilationPlan
 import Solcore.Frontend.SourceCore.Data
-import Solcore.Core.OptionalCell
+import Solcore.Core.Internal.ConventionLaws
 import Std.Sync.Mutex
 
 /-!

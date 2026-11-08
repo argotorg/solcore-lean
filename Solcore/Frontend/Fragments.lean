@@ -7,9 +7,9 @@ import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Frontend.Fragments.Internal.ReturnBodies
-import Solcore.Resolved.WordLessWithIds
-import Solcore.Core.LocalFragment
-import Solcore.Resolved.LocalFragmentProperties
+import Solcore.Resolved.Internal.ScopeLaws
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Resolved.Internal.LocalFragmentLaws
 import Solcore.Frontend.Fragments.Internal.LocalComputations
 import Solcore.Frontend.Fragments.Internal.RecursiveComputation
 import Solcore.Frontend.Fragments.Internal.Computation

@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.PrimitiveExpressions
-import Solcore.Frontend.SourceCoreInteger
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceKeys
-import Solcore.Core.CallableContract
+import Solcore.Core.Internal.ConventionLaws
 
 /-!
 # Compatible expressions: conditionals and builtin calls

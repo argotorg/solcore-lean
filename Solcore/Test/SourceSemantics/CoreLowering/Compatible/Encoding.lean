@@ -1,11 +1,7 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleEncodedDataTyping
-import Solcore.SourceSemantics.CoreLowering.CompatibleEncoding
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Encoding
 import Solcore.Frontend.ProgramChecking
-import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityEncoding
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingEncoding
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingPreparation
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingPlaceRuns
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappingVirtualRoot
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 
 /-!
 # Compatible encoding tests

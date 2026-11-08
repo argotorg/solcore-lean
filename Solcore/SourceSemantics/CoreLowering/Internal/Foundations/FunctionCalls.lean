@@ -1,10 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericMatches
-import Solcore.Frontend.SourceCoreFunctions
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
-import Solcore.Frontend.SourceCoreCallableContracts
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.Staging.CallGuard
-import Solcore.Frontend.SourceCoreStageContracts
 
 /-!
 # Function values and calls

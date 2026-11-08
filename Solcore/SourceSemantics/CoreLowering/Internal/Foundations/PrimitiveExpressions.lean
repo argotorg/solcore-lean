@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
-import Solcore.Frontend.SourceCorePrimitive
+import Solcore.Frontend.SourceCore.Lowering
 
 /-!
 # Primitive expressions

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.StorageMappingCases
+import Solcore.Synthesis.Internal.Storage
 
 /-! Native Keccak-mapping case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

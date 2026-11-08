@@ -1,6 +1,6 @@
 import Solcore.Frontend.RustHull.Safety
 import Solcore.Frontend.RustHull.Internal.LoweringFacts
-import Solcore.Core.Derived
+import Solcore.Core.Internal.DerivedForms
 
 /-!
 # Expressions and statements

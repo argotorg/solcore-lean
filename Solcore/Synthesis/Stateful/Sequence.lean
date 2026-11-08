@@ -1,9 +1,9 @@
 import Lean.Data.Json
 import Solcore.Synthesis.Core.Seed
 import Solcore.ContractRuntime.WorldState
-import Solcore.Core.WordMapping
+import Solcore.Core.Internal.MappingLaws
 import Solcore.Synthesis.Core.StdDispatch
-import Solcore.ContractRuntime.CheckedCoreContract
+import Solcore.ContractRuntime.Internal.ContractLaws
 
 /-!
 # Stateful sequences

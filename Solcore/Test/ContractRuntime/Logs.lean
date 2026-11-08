@@ -1,12 +1,12 @@
-import Solcore.ContractRuntime.OneLevelNestedExecution
+import Solcore.ContractRuntime.Internal.NestedLaws
 import Solcore.Test.ContractRuntime.Creation
-import Solcore.Core.HostProgress
+import Solcore.Core.Internal.HostPreservation
 import Solcore.Core.HostRunner
-import Solcore.ContractRuntime.Account
-import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.Internal.WorldStateLaws
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 import Solcore.Test.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.HostDriver
-import Solcore.ContractRuntime.HostStorageDriver
+import Solcore.ContractRuntime.Internal.DriverLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
 
 /-!
 # Log tests

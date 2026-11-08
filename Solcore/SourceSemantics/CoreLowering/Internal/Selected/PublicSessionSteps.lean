@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.PhysicalPublic
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicActualRegistry
-import Solcore.SourceSemantics.Staging.SelectedRecursivePreservation
+import Solcore.SourceSemantics.Staging.Preservation
 
 /-!
 # Selected compilations: public session steps

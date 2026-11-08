@@ -1,15 +1,15 @@
-import Solcore.Frontend.SourceStagedValue
+import Solcore.Frontend.SourceStageAnalysis
 import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.Core.Correspondence
-import Solcore.Core.FirstOrderWeakening
+import Solcore.Core.Internal.Renaming
 import Solcore.SourceSemantics.Dynamic
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.SourceSemantics.Dynamic.Evaluation
-import Solcore.Core.IntegerPrimitives
+import Solcore.Core.Primitive
 import Solcore.Core.Eval
 import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.Graph
-import Solcore.TypeSystem.Properties
+import Solcore.TypeSystem.Internal.SchemeLaws
 
 /-!
 # Literals and staged values

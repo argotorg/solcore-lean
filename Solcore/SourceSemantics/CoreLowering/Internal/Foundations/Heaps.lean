@@ -1,10 +1,9 @@
-import Solcore.Frontend.SourceCoreLocalCell
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.Dynamic.Fault
-import Solcore.Core.OrderedMapping
+import Solcore.Core.Internal.MappingLaws
 import Solcore.SourceSemantics.Dynamic.Primitive
-import Solcore.Core.DefinitionExtension
-import Solcore.Core.WordMapping
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Heaps

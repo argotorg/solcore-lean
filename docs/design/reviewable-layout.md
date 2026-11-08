@@ -192,3 +192,66 @@ After all lanes are on main, the integrator does the following:
 
 The moves map stays with the integration records, so older notes can still
 be followed. One example is the paused integer unit's list of statements.
+
+## Result
+
+The five lanes and the consolidation finished on 2026-11-09. Both columns count
+every tracked `.lean` file in the same way, the first at the base `c26259d6c`.
+
+| | Before | After |
+| --- | ---: | ---: |
+| Lean files | 10,435 | 1,253 |
+| Lines | 2,163,994 | 2,178,447 |
+| Files under 200 lines | 7,099 | 153 |
+| `Solcore/SourceSemantics/CoreLowering/` | 3,457 files | 13 front files, 353 in `Internal/` |
+| `Solcore/Test/` | 3,301 files | 211 files |
+
+The line count grew by about one percent, because each merged module keeps its
+module doc and gains a `section` wrapper and a marker line.
+
+| Area | Files | In `Internal/` |
+| --- | ---: | ---: |
+| `SourceSemantics/CoreLowering` | 366 | 353 |
+| `Syntax` | 169 | 108 |
+| `SourceSemantics`, without `CoreLowering` | 147 | 100 |
+| `Frontend` | 135 | 73 |
+| `Synthesis` | 49 | 27 |
+| `Core` | 38 | 15 |
+| `ContractRuntime` | 33 | 21 |
+| `TypeSystem`, `Resolved`, `Workspace`, `Abi`, `Util` | 27 | 5 |
+| `Test` | 211 | |
+| `Tests` | 61 | |
+| Umbrellas, `Solcore.lean`, `lakefile.lean` and the refactor's Lean tools | 17 | |
+
+Two files stay far above the 6,000-line guideline, because each was one module at
+the base: `SourceSemantics/Internal/Inference/Soundness` with 26,302 lines and
+`SourceSemantics/Internal/Substitution/StructuralLaws` with 12,993. Some small
+files stay apart because a check required it: a `@[simp]` lemma, an instance or
+a matcher would reach other modules, or a test asserts what a file's imports
+must not reach. Each area's page in `docs/review/` names these files and the
+reason.
+
+**Records.** These stay in `.refactor/`, so that older notes, commit messages
+and the integration records can still be followed:
+- `moves-<lane>.tsv`: one row per old module, `old_module new_module kind`,
+  where `kind` is `merge` or `move`, 10,254 rows in all. A comment row
+  `# split OLD INTERMEDIATE extract` marks a module whose definitions were
+  extracted before the merge: its row points to the laws, and the definitions
+  are in the area's front under the same namespace.
+- `renames-<lane>.tsv`: the renamed private helpers, 30 in Syntax and 480 in
+  the tests.
+- `deleted-<lane>.tsv`: the identical private copies that were deleted, with
+  their text.
+- `plan-r4.tsv`: Frontend's and Synthesis's planned files, which the second
+  phase of the SourceSemantics lane read to keep its files below Frontend's
+  imports.
+
+**Markers.** Each merged section starts with a line
+`-- leanmerge: from <old module>`: 10,269 markers in 987 files. With the moves
+map, a marker finds the section that an old module name refers to. Older
+headings `## Consolidated module: <name>` come from an earlier consolidation and
+name a section in the same way.
+
+**Not done.** A separate layer of definitions, with the proofs of the
+specification files moved to `Internal/` once marked `private`, is left for a
+later change.

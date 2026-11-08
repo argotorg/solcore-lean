@@ -2,9 +2,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSp
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
-import Solcore.Frontend.SourceSpecializationAcceptance
+import Solcore.Frontend.Internal.SpecializationProperties
 import Lean
-import Solcore.Frontend.SourceCoreCallableIndexedAncestry
+import Solcore.Frontend.SourceCore.Internal.CallableIndexed
 
 /-!
 # Prepared origins

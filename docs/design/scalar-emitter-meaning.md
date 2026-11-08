@@ -155,27 +155,27 @@ nothing about failed emissions.
 
 The source side ([Syntax](../../Solcore/Synthesis/Source/ScalarMeaning/Syntax.lean),
 [Semantics](../../Solcore/Synthesis/Source/ScalarMeaning/Semantics.lean),
-[Print](../../Solcore/Synthesis/Source/ScalarMeaning/Print.lean),
-[Lex](../../Solcore/Synthesis/Source/ScalarMeaning/Lex.lean),
-[Parse](../../Solcore/Synthesis/Source/ScalarMeaning/Parse.lean),
-[Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) and, for loops,
-[LoopSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LoopSemantics.lean)
-and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean), and,
+[Print](../../Solcore/Synthesis/Source/ScalarMeaning/Grammar.lean),
+[Lex](../../Solcore/Synthesis/Source/ScalarMeaning/Grammar.lean),
+[Parse](../../Solcore/Synthesis/Source/ScalarMeaning/Grammar.lean),
+[Text](../../Solcore/Synthesis/Source/ScalarMeaning/Grammar.lean) and, for loops,
+[LoopSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean), and,
 for generic programs,
-[GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/GenericSemantics.lean)
-and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean),
+[GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean),
 and, for storage programs,
-[StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/StorageSemantics.lean)
-and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean),
+[StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean),
 and, for rollback programs,
-[RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackSemantics.lean)
-and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean),
+[RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean),
 and, for keyed programs,
-[KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedSemantics.lean)
-and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean),
+[KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean),
 and, for log programs,
 [LogSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LogSemantics.lean)
-and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean))
+and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean))
 does not import or mention Core.
 
 Syntax. Names, decimal literals, `true` and `false`; parenthesized `!` and `~`
@@ -267,8 +267,8 @@ operands are read in two's complement.
 | `signextend(i, v)` | sign-extends the low `i + 1` bytes; `v` for `i ≥ 31` |
 | `exp(a, b)` | `a^b mod 2^256` |
 
-Loops. [LoopSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LoopSemantics.lean)
-and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean)
+Loops. [LoopSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean)
 extend the fragment for the bounded-loop wrappers as a separate grammar and
 meaning, so `parseSource`, `sourceCall` and every result above are unchanged. A
 method body may also contain `while (a op b) { ... }` at its top level, where
@@ -288,8 +288,8 @@ out. More fuel never changes a result, so all completed calls agree. A text
 that `parseSource` accepts parses under the loop grammar to the same file, and
 its loop meaning is its `sourceCall` meaning for every fuel.
 
-Generics. [GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/GenericSemantics.lean)
-and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
+Generics. [GenericSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean)
 extend the loop-free fragment for the generic selection wrapper, again as a
 separate grammar and meaning. A file may declare generic free functions
 `function f<a, ...>(p: T, ...) returns (T) { ...; return e; }` after its
@@ -319,8 +319,8 @@ generic file without generic functions and with the same printing; when its
 names are valid and not reserved, its generic meaning is its `sourceCall`
 meaning.
 
-Storage. [StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/StorageSemantics.lean)
-and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
+Storage. [StorageSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 extend the loop-free fragment for the two-slot storage wrapper, again as a
 separate grammar and meaning. A storage file imports `std` and `std.dispatch`
 and then `import {sload, sstore, opcode as alias, ...} from std.opcodes;`, in
@@ -348,8 +348,8 @@ has no meaning in this fragment, and no expression can call `sstore`. The
 pinned `std.opcodes` wrappers pass their `word` arguments to the EVM `SLOAD`
 and `SSTORE` instructions (`std/opcodes.sol`).
 
-Rollback. [RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackSemantics.lean)
-and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
+Rollback. [RollbackSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 extend the storage fragment with the terminal revert, again as a separate
 grammar and meaning. A rollback file imports `sload`, `sstore`, `mstore` and
 `revert_` from `std.opcodes`, optionally followed by aliases. Its method body
@@ -373,8 +373,8 @@ Any other offset or size reads memory that the fragment does not model and has
 no meaning. A revert discards the call's storage writes, so the storage after a
 reverted call is the storage it started from.
 
-Keyed storage. [KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedSemantics.lean)
-and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean)
+Keyed storage. [KeyedSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/FragmentSemantics.lean)
+and [KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 extend the rollback fragment, again as a separate grammar and meaning. Keyed
 slots need no new form. `sload` and `sstore` already take any word as their
 slot, so `sload(sc_key)`, `sload(sc_key + 1)` and `sstore(sc_key + 1, sc_old)`
@@ -388,7 +388,7 @@ Writes to aliased slots replace one another in program order, and later loads
 see the last write.
 
 Logs. [LogSemantics](../../Solcore/Synthesis/Source/ScalarMeaning/LogSemantics.lean)
-and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean)
+and [LogText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 extend the rollback fragment with memory and logs, again as a separate grammar
 and meaning. The import adds `mload` after `sstore`, and an alias of `log0` to
 `log4` names that `std.opcodes` wrapper. The method body may also contain the
@@ -413,12 +413,12 @@ memory. A revert discards the call's storage writes and its logs.
 
 ## Connection to the actual emitter
 
-[RendererEquations](../../Solcore/Synthesis/Source/ScalarMeaning/RendererEquations.lean)
+[RendererEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Renderer.lean)
 unfolds the real `ScalarRenderer.render`, including its private helpers, by
 definitional equality. It states each rendered case with the source syntax and
 printer; no second renderer is defined.
 
-`render_spec`, in [RendererPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/RendererPreservation.lean),
+`render_spec`, in [RendererPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Renderer.lean),
 covers every Core expression admitted by `functionAcceptsAt` that the renderer accepts:
 literals, locals, `let`, `if`, `!`, `~` and the eight binary operators. For
 temporaries numbered from `first`, the rendered lines are the printing of
@@ -439,9 +439,9 @@ The per-constructor lemmas are generic. Each assumes only how a renderer
 prints its constructor (an inversion property), a predicate on the call
 context, and the fixed callee names the renderer may print. The scalar
 renderer instantiates them with every context and no fixed callees.
-[PrimitiveEquations](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveEquations.lean)
+[PrimitiveEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/CallGraphs.lean)
 unfolds the actual `PrimitiveRenderer.render` in the same way, and
-[PrimitivePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitivePreservation.lean)
+[PrimitivePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/CallGraphs.lean)
 proves `primitive_render_spec`. The primitive renderer copies each raw opcode
 operand into a fresh `word` temporary, left to right, before the call. A copy
 is another rendering of the same operand, so the operand cases are reused.
@@ -449,35 +449,35 @@ Shifts pass the shift amount first, as `sar(shift, value)` expects, and the
 signed comparison is printed as `tobool(sc_sgt(a, b))`. The call context must
 satisfy `PrimitiveContext`: each of the fourteen aliases reaches its opcode and
 `tobool` reaches the standard library function.
-[PrimitiveAgreement](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveAgreement.lean)
+[PrimitiveAgreement](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/CallGraphs.lean)
 proves that each Core Word operation (`udiv`, `sdiv`, `shiftArithmeticRight`,
 `signExtend`, `pow`, `addMod` and the others) agrees with its formula in the
 table above.
 
-[Emitter](../../Solcore/Synthesis/Source/ScalarMeaning/Emitter.lean) connects
+[Emitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean) connects
 the wrappers. `emit` prints `run()` returning `uint256(value)`. `Input.emit`
 prints `run(input: uint256)` and first binds `sc_input` to
 `Typedef.rep(input)`, matching Core's application of the lambda to the input.
-[FunctionEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/FunctionEmitter.lean)
+[FunctionEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 restates the emitter's helper loop by structural recursion, proves it equal to
 the actual `for` loop, and shows by induction that each printed
 `sc_fn<k>(sc_arg: word)` agrees with the closure Core builds for helper `k`.
-[PrimitiveEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PrimitiveEmitter.lean)
+[PrimitiveEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 proves that the actual import line of `Primitive.emit` is the printing of the
 fourteen `opcode as alias` pairs, so the file's call context satisfies
 `PrimitiveContext`. The helper loop proof is generic over the renderer and the
-call context. [CallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphEquations.lean)
-and [CallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphPreservation.lean)
+call context. [CallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/CallGraphs.lean)
+and [CallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/CallGraphs.lean)
 prove `callGraph_render_spec` for `CallGraphRenderer.renderWithFunctions`. It
 prints raw opcodes as the primitive renderer does, and copies a helper call's
 argument into a fresh temporary before the call.
-[CallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphEmitter.lean)
+[CallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 shows that the helper names `sc_fn<k>` never shadow an opcode alias or
 `tobool`, so every helper body runs in a primitive call context.
 
-[MutationSpec](../../Solcore/Synthesis/Source/ScalarMeaning/MutationSpec.lean),
-[MutationEquations](../../Solcore/Synthesis/Source/ScalarMeaning/MutationEquations.lean)
-and [MutationPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/MutationPreservation.lean)
+[MutationSpec](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Mutation.lean),
+[MutationEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Mutation.lean)
+and [MutationPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Mutation.lean)
 prove `mutation_render_spec` for `MutationRenderer.render`. Core keeps each
 mutable Word local in its store and binds a cell reference; the source keeps it
 in an ordinary local `sc_c<n>` that `x = e;` assigns. The invariant relates
@@ -491,16 +491,16 @@ operand that writes the cell cannot change an earlier value. A helper cannot
 reach its caller's cells, and the proof shows that its evaluation keeps every
 existing location. The proofs inspect the profile's acceptance check through
 its public `initializerKind?`, without naming its private helpers.
-[MutationEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/MutationEmitter.lean)
+[MutationEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 connects the actual helper loop and wrapper. Core machine results follow from
 `runStateful_evaluation_sound`,
 `evaluation_runStateful_complete_with_sufficient_fuel` and determinism of
 `Evaluates`.
 
-[AggregateSpec](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateSpec.lean),
-[AggregateEquations](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateEquations.lean),
-[AggregatePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/AggregatePreservation.lean)
-and [AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateControl.lean)
+[AggregateSpec](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean),
+[AggregateEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean),
+[AggregatePreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean)
+and [AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean)
 prove `aggregate_render_spec` for `AggregateRenderer.render`. The invariant is
 the mutation invariant with two more kinds of binding. A pair binding holds the
 source pair of its two Core Words. A sum binding holds `inl` or `inr` of the
@@ -521,14 +521,14 @@ rendering of the operand. The equations restate the renderer's private
 helpers, such as its scalar-operand conversion, by definitional equality. The
 alias call context is required only for an expression whose rendering prints
 an alias (`usesOpcodeAliases`).
-[AggregateEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateEmitter.lean)
+[AggregateEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 connects the actual helper loop and wrapper. When some rendered body uses an
 alias, the actual import line is the printing of the fourteen aliases and every
 helper and the entry run in a primitive call context. Otherwise the file
 imports no aliases, and no body needs the alias context.
 
-[AggregateCallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphEquations.lean)
-and [AggregateCallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphPreservation.lean)
+[AggregateCallGraphEquations](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean)
+and [AggregateCallGraphPreservation](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean)
 prove `aggregateCallGraph_render_spec` for `AggregateCallGraphRenderer.render`.
 That renderer prints pairs, sums, projections and case payloads as the
 aggregate renderer does, and scalar operations, raw opcodes and helper calls as
@@ -537,14 +537,14 @@ data constructors, so every accepted expression has a value. Its bindings are
 Words, Booleans, pairs and sums; the proof maps each to the aggregate binding
 of the same kind, so the aggregate invariant and its lemmas apply unchanged.
 The value cases of `let`, `if` and `case` are separate lemmas of
-[AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateControl.lean)
+[AggregateControl](../../Solcore/Synthesis/Source/ScalarMeaning/Internal/Aggregates.lean)
 that both renderers use. Every body runs in a primitive call context.
-[AggregateCallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/AggregateCallGraphEmitter.lean)
+[AggregateCallGraphEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/PureTheorems.lean)
 connects the actual helper loop and wrapper. As in the call-graph emitter, the
 file always imports the fourteen aliases, and its import line is their
 printing.
 
-[CallGraphLoopEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/CallGraphLoopEmitter.lean)
+[CallGraphLoopEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LoopTheorems.lean)
 connects the actual `CallGraphLoop.emit`. Its helpers come from the call-graph
 emitter's helper loop. Its entry is printed by the same renderer as one more
 free function, `sc_step(sc_arg: word)`, and `callGraph_render_spec` applies to
@@ -564,7 +564,7 @@ both apply the step: Core's application leaves the store unchanged, and
 loop exits. The bound `input & mask` is at most the mask, so every fuel above
 the mask suffices.
 
-[LoopEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LoopEmitter.lean)
+[LoopEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LoopTheorems.lean)
 connects the actual `Loop.emit` (profile `runtime-loops`). Its helpers come
 from the aggregate emitter's helper loop. Its entry is printed by
 `AggregateRenderer.render` as `sc_step`, and `aggregate_render_spec` applies to
@@ -580,7 +580,7 @@ induction of `boundedLoop_agrees` over such stores: an applied step writes its
 result to the accumulator cell after appending its own cells, and a skipped
 guard keeps the store.
 
-[GenericEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/GenericEmitter.lean)
+[GenericEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LoopTheorems.lean)
 connects the actual `Generic.emit` (profile `runtime-generics`). The file
 declares the selector `sc_select<a>(flag: bool, left: a, right: a)`, whose
 guard returns `left` when `flag` holds and which returns `right` otherwise.
@@ -609,7 +609,7 @@ the store the first left, so the final store holds the cells of both calls. As
 for the aggregate emitter, the file imports the fourteen aliases exactly when
 a helper or the entry uses one.
 
-[StorageEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StorageEmitter.lean)
+[StorageEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StatefulTheorems.lean)
 connects the actual `Storage.emit` (profile `stateful-storage`). Its helpers
 come from the aggregate emitter's helper loop, and its entry is printed by
 `AggregateRenderer.render` as `sc_step`. The import line is the printing of
@@ -636,7 +636,7 @@ committed account, whose storage agrees with the source storage at every slot
 (`storageAgrees_writes`). By `TopLevelExecution.resumeWithFuel_run`, every
 completed run has the same result.
 
-[RollbackEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackEmitter.lean)
+[RollbackEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StatefulTheorems.lean)
 connects the actual `StorageRollback.emit` (profile
 `stateful-storage-rollback`). It prints the helpers, the step and the storage
 protocol as the storage emitter does. The method then binds `sc_result` to the
@@ -653,7 +653,7 @@ decoding of it. A returned outcome commits the working world, and a reverted
 one the world the transaction started from. `rollback_parity` turns the
 low-bit test into the input's parity.
 
-[KeyedEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedEmitter.lean)
+[KeyedEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StatefulTheorems.lean)
 connects the actual `KeyedStorage.emit` (profile `stateful-keyed-storage`). Its
 method `run(key, input)` reads the key slot and counter slot zero. It stores
 the step's result for the input plus the old key slot in the key slot, the old
@@ -671,7 +671,7 @@ alias. Agreement after the three writes therefore gives both the committed
 storage and the three words read back, for every key, including zero and
 `2^256 - 1`. The top-level step reuses `topLevel_run_settled`.
 
-[LogEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/LogEmitter.lean)
+[LogEmitter](../../Solcore/Synthesis/Source/ScalarMeaning/StatefulTheorems.lean)
 connects the actual `EventLog.emit` (profile `stateful-logs`). Its method
 `run(flags, input)` reads slots zero and one, stores the step's result for the
 input plus slot zero in slot zero and the counter plus one in slot one, and
@@ -702,20 +702,20 @@ is named `sc_fnN`. No free function therefore shadows a wrapper
 a reverted one the empty checkpoint journal (`committedJournal_returned`,
 `committedJournal_reverted`).
 
-[Text](../../Solcore/Synthesis/Source/ScalarMeaning/Text.lean) proves that the
+[Text](../../Solcore/Synthesis/Source/ScalarMeaning/Grammar.lean) proves that the
 printed text lexes to exactly the file's tokens and that `parseFile` inverts
 them (`parseSource_print`);
-[LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopText.lean) proves
+[LoopText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean) proves
 the same for loop files (`parseLoopSource_print`), and
-[GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/GenericText.lean)
+[GenericText](../../Solcore/Synthesis/Source/ScalarMeaning/LoopGrammar.lean)
 for generic files (`parseGenericSource_print`), and
-[StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageText.lean)
+[StorageText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 for storage files (`parseStorageSource_print`), and
-[RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/RollbackText.lean)
+[RollbackText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 for rollback files (`parseRollbackSource_print`), and
-[KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/KeyedText.lean)
+[KeyedText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 for keyed files (`parseKeyedSource_print`), and
-[LogText](../../Solcore/Synthesis/Source/ScalarMeaning/LogText.lean)
+[LogText](../../Solcore/Synthesis/Source/ScalarMeaning/StorageGrammar.lean)
 for log files (`parseLogSource_print`). The meaning is therefore a
 function of the emitted `String`, not of an internal printer argument.
 
@@ -899,7 +899,7 @@ the fragment does not know, memory expansion and gas are outside it.
 
 ## Executable checks
 
-[SourceScalarMeaning](../../Solcore/Test/SourceScalarMeaning.lean) is registered
+[SourceScalarMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is registered
 in the test driver. It runs actual emitter output through `sourceCall` and
 compares the result with Core's `runStateful`. It covers all fifteen closed
 fixtures, also against hand-known Words, twelve runtime-input fixtures and the
@@ -925,7 +925,7 @@ unparenthesized operator, an undeclared local, a mistyped declaration, a call
 to an undeclared helper and a literal of `2^256` are all rejected rather than
 given a value.
 
-[SourceAggregateMeaning](../../Solcore/Test/SourceAggregateMeaning.lean) is
+[SourceAggregateMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is
 registered as well. It runs actual `Aggregate.emit` output through `sourceCall`
 at the same eight boundary inputs and compares it with Core. It covers the six
 graphs of the aggregate emitter's regression, the ten `if` and `case` joins at
@@ -939,7 +939,7 @@ match on a word, a pair with a Boolean component, a pair assigned to a word, a
 call to an alias that is not imported, and a primitive text without its import
 line are all rejected.
 
-[SourceAggregateCallGraphMeaning](../../Solcore/Test/SourceAggregateCallGraphMeaning.lean)
+[SourceAggregateCallGraphMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean)
 is registered as well. It runs actual `AggregateCallGraph.emit` output through
 `sourceCall` at the same eight boundary inputs and compares it with Core. It
 covers the regression graph that composes all nine composition shapes, which
@@ -957,7 +957,7 @@ match with two `inr` cases, a payload used after its case, a helper applied to
 a pair, a helper that returns a pair for a `word`, a helper that calls a later
 helper and a primitive text without its import line are all rejected.
 
-[SourceCallGraphLoopMeaning](../../Solcore/Test/SourceCallGraphLoopMeaning.lean)
+[SourceCallGraphLoopMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean)
 is registered as well. It runs actual `CallGraphLoop.emit` output through
 `loopSourceCall` at the eight boundary inputs and the inputs three, six and
 seven, and compares it with Core. Each call must agree with Core at one more
@@ -979,7 +979,7 @@ meaning once it iterates, a `let` in the body leaves the accumulator unchanged,
 and a reversed condition never iterates. A `word` condition and an assignment
 to an undeclared name have no meaning, and counting by two changes the result.
 
-[SourceLoopMeaning](../../Solcore/Test/SourceLoopMeaning.lean) is registered as
+[SourceLoopMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is registered as
 well. It runs actual `Loop.emit` output through `loopSourceCall` in the same
 way, with the same fuel checks at the same inputs. It covers the six
 regression steps of the loop emitter's test (increment, an arbitrary entry, a
@@ -1003,7 +1003,7 @@ its counter step has no meaning once it iterates, a `let` in the body leaves
 the accumulator unchanged, and a step that assigns a cell it never declared has
 no meaning.
 
-[SourceGenericMeaning](../../Solcore/Test/SourceGenericMeaning.lean) is
+[SourceGenericMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is
 registered as well. It runs actual `Generic.emit` output through
 `genericSourceCall` at the eight boundary inputs and compares it with Core. It
 covers the regression plans of the generic emitter's test: an identity step
@@ -1025,7 +1025,7 @@ result, a `word` flag parameter and a guard on a `word` have no meaning, two
 infix operations without parentheses are rejected, and applying the step to
 the input plus two in place of one changes the result.
 
-[SourceStorageMeaning](../../Solcore/Test/SourceStorageMeaning.lean) is
+[SourceStorageMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is
 registered as well. It runs actual `Storage.emit` output through
 `storageSourceCall` transaction by transaction. Each call starts from the
 storage of the account that the committed world holds and is compared with the
@@ -1050,7 +1050,7 @@ parenthesized step argument keeps it. Two infix operations without parentheses
 and an import line without `sstore` are rejected. A free function that reads
 storage and a stored Boolean have no meaning.
 
-[SourceRollbackMeaning](../../Solcore/Test/SourceRollbackMeaning.lean) is
+[SourceRollbackMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is
 registered as well. It runs actual `StorageRollback.emit` output through
 `rollbackSourceCall` transaction by transaction, as the storage check does,
 from the same three initial storages. A returned call must match the Core
@@ -1072,7 +1072,7 @@ makes odd inputs return. A condition in two pairs of parentheses and two infix
 operations without parentheses are rejected, and storing a Boolean in memory
 has no meaning.
 
-[SourceKeyedMeaning](../../Solcore/Test/SourceKeyedMeaning.lean) is registered
+[SourceKeyedMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is registered
 as well. It runs actual `KeyedStorage.emit` output through `keyedSourceCall`
 transaction by transaction, as the rollback check does, from the same three
 initial storages. Each transaction's key slot, the key's successor and nine
@@ -1094,7 +1094,7 @@ aliases the counter, and keeps it for key one. A parenthesized sum or load
 argument keeps the result. A sum of four terms and a mixed
 chain without parentheses are rejected.
 
-[SourceLogMeaning](../../Solcore/Test/SourceLogMeaning.lean) is registered as
+[SourceLogMeaning](../../Solcore/Test/Synthesis/SourceMeaning.lean) is registered as
 well. It runs actual `EventLog.emit` output through `logSourceCall`
 transaction by transaction from the same three initial storages, each with
 three buffer pointers at offset 64. The pointers are 128, then 64, whose buffer

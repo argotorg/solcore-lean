@@ -1,4 +1,4 @@
-import Solcore.Core.LocalLoop
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.Dynamic

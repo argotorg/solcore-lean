@@ -1,14 +1,12 @@
-import Solcore.Frontend.Expected
-import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.LocalTypeInputs
+import Solcore.Frontend.Fragments.Internal.Expected
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.ClosedSource
-import Solcore.Core.ExactFuelProperties
+import Solcore.Frontend.Fragments.Internal.ClosedSource
+import Solcore.Core.Fuel
 import Solcore.Syntax.Parser.Internal.TermBasics
 import Solcore.Test.Frontend.ClosedStrictWords
-import Solcore.Frontend.LocalExpression
-import Solcore.Frontend.StrictWordBinary
+import Solcore.Frontend.Fragments.Internal.Foundations
 
 /-!
 # Expected data image tests

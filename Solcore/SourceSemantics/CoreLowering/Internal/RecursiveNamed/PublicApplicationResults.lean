@@ -6,7 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPr
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalNamedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PatternsAndArms
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedParameters
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths

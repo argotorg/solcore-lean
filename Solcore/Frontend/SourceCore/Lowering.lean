@@ -1,15 +1,8 @@
 import Solcore.Frontend.SourceCoreElaboration
-import Solcore.Core.OptionalCell
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Frontend.SourceCompilationPlan
-import Solcore.Core.LocalSequence
-import Solcore.Core.LocalControl
-import Solcore.Core.LocalAssignment
-import Solcore.Core.IntegerAssignment
-import Solcore.Core.LocalPrimitiveResults
-import Solcore.Core.TaggedFunction
 import Solcore.SourceSemantics.CaptureBinders
 import Solcore.Frontend.SourceCore.Internal.Carriers
-import Solcore.Core.LocalLoop
 
 /-!
 # Lowering of expressions and statements

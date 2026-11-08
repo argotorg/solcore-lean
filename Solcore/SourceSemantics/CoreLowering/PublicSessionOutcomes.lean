@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.PublicSessions
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicSessionSteps
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PublicDirectSessions
-import Solcore.SourceSemantics.Staging.RecursiveCallableErasure
+import Solcore.SourceSemantics.Staging.Erasure
 
 /-!
 # Public session outcomes

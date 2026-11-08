@@ -1,16 +1,14 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.RuntimeBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
-import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
-import Solcore.Frontend.SourceCoreCallableContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.AssignmentContracts
-import Solcore.Frontend.SourceCoreCallableFaultSites
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Paths
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.Graph
-import Solcore.Frontend.SourceInference.TypedIRProperties
+import Solcore.Frontend.SourceInference.Internal.TypedIRProperties
 import Solcore.SourceSemantics.Staging.CallBoundary
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
 

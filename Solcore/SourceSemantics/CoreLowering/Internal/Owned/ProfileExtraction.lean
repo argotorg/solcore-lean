@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHea
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 import Solcore.Frontend.SourceCoreIndexedSession
-import Solcore.SourceSemantics.Dynamic.ProgramOutcome
+import Solcore.SourceSemantics.Dynamic.Program
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 
 /-!

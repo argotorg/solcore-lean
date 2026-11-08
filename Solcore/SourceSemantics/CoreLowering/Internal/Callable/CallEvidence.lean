@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.TraitResolutionSoundness
 import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.Evaluation
-import Solcore.Frontend.SourceCoreEvidence
+import Solcore.Frontend.SourceCore.GeneralFunctions
 
 /-!
 # Call evidence

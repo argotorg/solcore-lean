@@ -1,9 +1,8 @@
-import Solcore.Frontend.SourceCoreRawMetadata
+import Solcore.Frontend.SourceCore.RawMetadata
 import Solcore.Frontend.ProgramChecking
-import Solcore.Frontend.SourceCoreStageCodebook
-import Solcore.Frontend.SourceCoreStageContracts
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Core.TaggedFunction
+import Solcore.Frontend.SourceCore.GeneralFunctions
+import Solcore.Core.Fuel
+import Solcore.Core.Internal.ConventionLaws
 
 /-!
 # Stage contract tests

@@ -1,8 +1,8 @@
 import Solcore.Abi.Keccak256
 import Solcore.Abi.StaticWord
-import Solcore.ContractRuntime.WorldStateDelta
-import Solcore.ContractRuntime.BalancedTopLevelExecution
-import Solcore.ContractRuntime.HostStorageDriver
+import Solcore.ContractRuntime.Internal.WorldStateDeltaLaws
+import Solcore.ContractRuntime.Internal.BalancedLaws
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
 import Solcore.ContractRuntime.WorldState
 
 /-!

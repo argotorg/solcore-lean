@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedForLoop
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.ScopedSourceInversion
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedAssignments
 import Solcore.SourceSemantics.CoreLowering.Internal.Diagnostics.PreparedAssignments
-import Solcore.SourceSemantics.Staging.RecursiveProjectedTargetFacts
-import Solcore.SourceSemantics.Staging.RecursiveControlViews
+import Solcore.SourceSemantics.Staging.Erasure
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedImperative
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.StagedMatches
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativeMatchMeaning

@@ -1,7 +1,7 @@
 import Solcore.Synthesis.Core.Fragment
 import Solcore.Core.Primitive
 import Solcore.Synthesis.Core.Seed
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 import Solcore.Core.Wire.Host
 
 /-!

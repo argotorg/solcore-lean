@@ -1,6 +1,6 @@
 import Solcore.Frontend.SourceCore.Internal.CallableOutputs
 import Solcore.Frontend.SourceCore.Internal.Entries
-import Solcore.Core.FuelResumptionProperties
+import Solcore.Core.Fuel
 import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.SourceCore.Internal.CallableIndexed
 

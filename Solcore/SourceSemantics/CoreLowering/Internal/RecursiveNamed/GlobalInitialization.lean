@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.Dynamic.Preservation
-import Solcore.Frontend.SourceCoreRecursiveEntry
-import Solcore.Frontend.SourceCoreLambdaTemplates
+import Solcore.Frontend.SourceCore.Internal.Entries
+import Solcore.Frontend.SourceCore.Internal.CallableViews
 import Solcore.Core.Correspondence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedAllocation
 import Solcore.Frontend.SourceCoreIndexedSession

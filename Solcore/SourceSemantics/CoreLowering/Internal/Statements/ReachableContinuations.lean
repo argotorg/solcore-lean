@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
-import Solcore.Frontend.SourceCoreLoops
+import Solcore.Frontend.SourceCore.Lowering
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
 

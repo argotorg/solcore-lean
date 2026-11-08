@@ -10,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndStat
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.BranchingTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.BuiltinBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ContextualOrigins

@@ -18,7 +18,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionRuntime
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.StageCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSourceSelection
-import Solcore.SourceSemantics.Staging.RecursiveTrace
+import Solcore.SourceSemantics.Staging.RecursiveProfile
 
 /-!
 # Recursive named rows: call evidence and builtin calls

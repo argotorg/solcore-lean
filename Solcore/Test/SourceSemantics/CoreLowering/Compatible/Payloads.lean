@@ -1,5 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleMappings
-import Solcore.SourceSemantics.CoreLowering.CompatiblePayload
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Payloads
 
 /-!
 # Compatible payload tests

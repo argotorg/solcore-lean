@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NativeLambdas
-import Solcore.SourceSemantics.SourceExecutableCoercionInterfaces
+import Solcore.SourceSemantics.Internal.Inference.ExecutableInterfaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
-import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
+import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.SelectedGeneralCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.CatalogTerminalClosures

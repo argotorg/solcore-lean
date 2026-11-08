@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.MalformedBytesCases
+import Solcore.Synthesis.Internal.Malformed
 
 /-! Native malformed-bytes case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

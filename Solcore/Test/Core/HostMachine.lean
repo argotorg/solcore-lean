@@ -1,7 +1,7 @@
 import Solcore.Core.Check
 import Solcore.Core.HostMachine
 import Solcore.Core.HostRunner
-import Solcore.ContractRuntime.CheckedHostCoreProgram
+import Solcore.ContractRuntime.Internal.WorldStateLaws
 
 /-! Focused admission and runtime regressions for the Core host boundary. -/
 

@@ -1,17 +1,14 @@
-import Solcore.Frontend.ClosedSource
-import Solcore.Frontend.Computation
-import Solcore.Frontend.LocalExpressionEvaluation
-import Solcore.Frontend.RuntimeValue
-import Solcore.Frontend.LocalExpressionExecutionProperties
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Core.LocalFragment
-import Solcore.Frontend.LocalExpression
-import Solcore.Frontend.LocalReference
+import Solcore.Frontend.Fragments.Internal.ClosedSource
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
+import Solcore.Frontend.Fragments.Internal.SourceValues
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.LocalScope
-import Solcore.Core.UnaryPrimitives
+import Solcore.Core.Internal.PrimitiveLaws
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Closed source data tests

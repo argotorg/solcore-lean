@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Staging.Materialization
 import Solcore.SourceSemantics
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Heap
-import Solcore.SourceSemantics.Dynamic.LocalSchemes
+import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.Program
 
 /-!

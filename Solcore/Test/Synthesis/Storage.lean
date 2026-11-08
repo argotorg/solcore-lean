@@ -1,20 +1,7 @@
-import Solcore.Synthesis.Source.AdtStorageCases
-import Solcore.Synthesis.Source.KeyedStorageCases
-import Solcore.Synthesis.Source.KeyedStorageEmitter
-import Solcore.Synthesis.Stateful.KeyedStorageExecution
-import Solcore.Synthesis.Source.StorageCases
-import Solcore.Synthesis.Source.StorageEmitter
-import Solcore.ContractRuntime.CheckedContractRegistry
-import Solcore.ContractRuntime.TopLevelExecution
-import Solcore.Synthesis.Source.StorageLedgerCases
-import Solcore.Synthesis.Source.StorageLedgerEmitter
-import Solcore.Synthesis.Stateful.StorageLedgerExecution
-import Solcore.Synthesis.Source.StorageMappingCases
-import Solcore.Synthesis.Source.StorageMappingEmitter
-import Solcore.Synthesis.Stateful.StorageMappingExecution
-import Solcore.Synthesis.Source.StorageRollbackCases
-import Solcore.Synthesis.Source.StorageRollbackEmitter
-import Solcore.Synthesis.Stateful.StorageExecution
+import Solcore.Synthesis.Internal.AdtStorage
+import Solcore.Synthesis.Internal.Storage
+import Solcore.ContractRuntime.Internal.ContractLaws
+import Solcore.ContractRuntime.Internal.TopLevelLaws
 
 /-!
 # Storage profile tests

@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.NestedCallCases
+import Solcore.Synthesis.Internal.Calls
 
 /-! Native nested-call case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

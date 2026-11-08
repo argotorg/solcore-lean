@@ -1,6 +1,6 @@
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.Renaming
 import Solcore.Core.Eval
-import Solcore.Core.LocalLoop
+import Solcore.Core.Internal.ConventionLaws
 
 /-!
 # Core evaluation and renaming

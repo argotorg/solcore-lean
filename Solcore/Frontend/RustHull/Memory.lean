@@ -1,4 +1,4 @@
-import Solcore.Core.WordMapping
+import Solcore.Core.Internal.MappingLaws
 
 /-!
 # Core memory and logs

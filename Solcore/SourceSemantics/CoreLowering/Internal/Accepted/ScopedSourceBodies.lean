@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericImperativ
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Lean
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
-import Solcore.Frontend.SourceCoreLocalPolymorphism
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.LambdaFormation
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LambdaReadyFamilies
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LiteralReturns

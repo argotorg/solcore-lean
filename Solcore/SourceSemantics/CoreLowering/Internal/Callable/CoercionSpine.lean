@@ -1,6 +1,6 @@
-import Solcore.Frontend.SourceCoreEvidence
+import Solcore.Frontend.SourceCore.GeneralFunctions
 import Solcore.Frontend.ProgramChecking
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.Renaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 
 /-!

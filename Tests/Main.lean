@@ -127,9 +127,7 @@ import Solcore.Test.Syntax.ExpressionAtoms
 import Solcore.Test.Syntax.Types
 import Solcore.Test.Syntax.Parameters
 import Solcore.Test.Syntax.Yul
-import Solcore.Syntax.Parser.LeftAssociativeTraceStateProperties
-import Solcore.Syntax.Parser.LeftAssociativeTraceCompletenessProperties
-import Solcore.Syntax.Parser.LeftAssociativeUnrestrictedFuelContractProperties
+import Solcore.Syntax.Parser.Internal.PostfixTrace
 import Solcore.Test.Abi.StaticWord
 import Solcore.Test.Core.Primitives
 import Solcore.Test.SourceSemantics.CoreLowering.Foundations.EntryPoints

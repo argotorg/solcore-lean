@@ -1,9 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Frontend.SourceCoreCompatibleCatalog
+import Solcore.Frontend.SourceCore.CompatibleCatalog
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
-import Solcore.SourceSemantics.Dynamic.Default
-import Solcore.Frontend.SourceRuntimeValues
-import Solcore.Core.DefinitionExtension
+import Solcore.SourceSemantics.Dynamic.Typing
+import Solcore.Frontend.Internal.RuntimeValues
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Compatible profile: payloads

@@ -38,7 +38,7 @@ function main() returns (Word) {
 ```
 
 Source files are supplied as a `Workspace.RawWorkspace`. The
-[execution tests](Solcore/Test/SourceCoreExecution.lean) show how to compile a
+[execution tests](Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean) show how to compile a
 workspace, open a session, call an entry point, and resume after the fuel runs
 out. They also cover recursive functions, closures, and mappings. A closure
 captures by value, as in solcore-rs: it keeps the values its captured
@@ -812,22 +812,28 @@ campaigns have not yet been deployed.
 
 ## Code layout
 
-| Module | Contents |
-| --- | --- |
-| [Syntax](Solcore/Syntax.lean) | AST, lexer, parser, and parser proofs. |
-| [TypeSystem](Solcore/TypeSystem.lean) | Types, substitutions, unification, and inference. |
-| [Frontend.Current](Solcore/Frontend/Current.lean) | Source checking, staging, specialization, and compilation to Core. |
-| [Frontend/RustHull](Solcore/Frontend/RustHull/) | Checked Rust Hull import, contract effects and Core execution. |
-| [Core](Solcore/Core.lean) | Typed syntax, mutable cells, evaluator, execution machines, and safety proofs. |
-| [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. |
-| [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. |
-| [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. |
-| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Checked program generation and shrinking for bounded execution profiles. |
-| [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). |
+Each area has an umbrella module, a short front with the specification and the
+main theorems, and an `Internal/` directory with everything else. The
+[reviewer's guide](docs/review/README.md) has a page per area: what to read, in
+which order, and which theorems the project claims.
+
+| Module | Contents | Guide |
+| --- | --- | --- |
+| [Syntax](Solcore/Syntax.lean) | AST, lexer, parser, and parser proofs. | [Syntax](docs/review/syntax.md) |
+| [TypeSystem](Solcore/TypeSystem.lean) | Types, substitutions, unification, and inference. | [Foundations](docs/review/foundations.md) |
+| [Frontend.Current](Solcore/Frontend/Current.lean) | Source checking, staging, specialization, and compilation to Core. | [Frontend](docs/review/frontend.md) |
+| [Frontend/RustHull](Solcore/Frontend/RustHull/) | Checked Rust Hull import, contract effects and Core execution. | [Frontend](docs/review/frontend.md) |
+| [Core](Solcore/Core.lean) | Typed syntax, mutable cells, evaluator, execution machines, and safety proofs. | [Core](docs/review/core.md) |
+| [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. | [Source semantics](docs/review/source-semantics.md) |
+| [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. | [ContractRuntime](docs/review/contract-runtime.md) |
+| [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. | [Foundations](docs/review/foundations.md), [Core](docs/review/core.md) |
+| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Checked program generation and shrinking for bounded execution profiles. | [Synthesis](docs/review/synthesis.md) |
+| [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). | [Tests](docs/review/tests.md) |
 
 [Solcore.lean](Solcore.lean) provides the main import. The source-to-Core
 correspondence proofs live under
-[SourceSemantics/CoreLowering](Solcore/SourceSemantics/CoreLowering.lean).
+[SourceSemantics/CoreLowering](Solcore/SourceSemantics/CoreLowering.lean), and
+their guide is [Core lowering](docs/review/core-lowering.md).
 
 ## Contributing
 

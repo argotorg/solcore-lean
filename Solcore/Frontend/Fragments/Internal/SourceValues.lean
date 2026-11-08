@@ -3,7 +3,6 @@ import Solcore.Syntax.Term
 import Solcore.Resolved.Identity
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
-import Solcore.Resolved.FreshIdentity
 import Solcore.Resolved.LocalScope
 import Solcore.Frontend.Fragments.Internal.Computation
 

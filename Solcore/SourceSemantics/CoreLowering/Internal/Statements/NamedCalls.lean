@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedLexicalControl
-import Solcore.Frontend.SourceCoreCallableIndexedPrograms
-import Solcore.Frontend.SourceCoreCompatibleOutputs
+import Solcore.Frontend.SourceCore.Internal.CallableIndexed
+import Solcore.Frontend.SourceCore.Internal.CallableOutputs
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.GlobalInitialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionGeneralBuiltins
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionTyped

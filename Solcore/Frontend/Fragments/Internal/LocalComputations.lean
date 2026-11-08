@@ -1,11 +1,11 @@
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
-import Solcore.Core.LocalFragment
+import Solcore.Core.Internal.LocalFragment
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Frontend.Fragments.Internal.LocalExpressions
-import Solcore.Resolved.LocalFragmentProperties
+import Solcore.Resolved.Internal.LocalFragmentLaws
 import Solcore.Frontend.Fragments.Internal.TypedLet
-import Solcore.Resolved.FreshIdentity
-import Solcore.Core.Renaming
+import Solcore.Resolved.Identity
+import Solcore.Core.Internal.Renaming
 import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
 
 /-!

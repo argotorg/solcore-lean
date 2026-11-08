@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.ForwardedCallCases
+import Solcore.Synthesis.Internal.Calls
 
 /-! Native forwarded-value case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

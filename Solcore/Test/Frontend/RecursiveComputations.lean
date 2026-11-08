@@ -1,15 +1,11 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RecursiveLocalComputation
-import Solcore.Core.ExactFuelProperties
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.Computation
-import Solcore.Frontend.RuntimeComputationFunction
-import Solcore.Frontend.LocalComputation
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.RuntimeApplicationFunction
-import Solcore.Frontend.DirectWordBinary
+import Solcore.Frontend.Fragments.Internal.RecursiveComputation
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.Computation
+import Solcore.Frontend.Fragments.Internal.LocalComputations
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.LocalApplication
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Core.Safety
 
 /-!

@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.PreparedBranching
-import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
+import Solcore.Frontend.SourceCoreUnified
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
-import Solcore.SourceSemantics.SourceBodyTemplateScope
+import Solcore.SourceSemantics.Internal.Prepared.TemplateScope
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.ExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
@@ -15,8 +15,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.OrdinaryCatal
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.MethodOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.Ancestry
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
-import Solcore.SourceSemantics.SubstitutionProperties
-import Solcore.SourceSemantics.SourceBodyResultAnnotation
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
+import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallEvidence
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.OrdinaryCallsReady
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.BodyReadyState

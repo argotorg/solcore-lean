@@ -14,7 +14,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StoredClosures
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.IndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
-import Solcore.SourceSemantics.Staging.RecursiveErasure
+import Solcore.SourceSemantics.Staging.Erasure
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.IndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.PhysicalCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.FormationReceipts
@@ -28,7 +28,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodScopedRoo
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.MethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.CallerMethodSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.EligibleSelected
-import Solcore.SourceSemantics.SelectedOperatorTypingCertificates
+import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 
 /-!
 # Selected compilations: accepted factories and method issuance

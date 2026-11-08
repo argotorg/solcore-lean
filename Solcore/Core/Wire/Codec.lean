@@ -1,7 +1,7 @@
 import Lean.Data.Json
 import Solcore.Util.Json
 import Solcore.Core.Wire.Syntax
-import Solcore.ContractRuntime.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.Internal.ScalarText
 
 /-!
 # Wire codecs

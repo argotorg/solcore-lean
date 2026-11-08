@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.Heaps
-import Solcore.Core.LocalLoop
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.SourceSemantics.Dynamic
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ScalarReflection
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ControlStatements
-import Solcore.Frontend.SourceCoreLoops
+import Solcore.Frontend.SourceCore.Lowering
 
 /-!
 # Loop certificates

@@ -1,33 +1,16 @@
-import Solcore.Synthesis.Source.FunctionCases
-import Solcore.Synthesis.Source.MutationCases
-import Solcore.Synthesis.Source.AggregateCases
-import Solcore.Synthesis.Source.LoopCases
-import Solcore.Synthesis.Source.NestedLoopCases
-import Solcore.Synthesis.Source.RecursionCases
-import Solcore.Synthesis.Source.RecursiveLoopCases
-import Solcore.Synthesis.Source.LoopClosureCases
-import Solcore.Synthesis.Source.GenericCases
-import Solcore.Synthesis.Source.ClosureCases
-import Solcore.Synthesis.Source.ComptimeCases
-import Solcore.Synthesis.Source.ModuleCases
-import Solcore.Synthesis.Source.PrimitiveCases
-import Solcore.Synthesis.Source.AssemblyCases
-import Solcore.Synthesis.Source.AssemblyMemoryCases
-import Solcore.Synthesis.Source.CallGraphCases
-import Solcore.Synthesis.Source.CallGraphLoopCases
-import Solcore.Synthesis.Source.AssemblyLoopCases
-import Solcore.Synthesis.Source.AggregateCallGraphCases
-import Solcore.Synthesis.Source.EnumCases
-import Solcore.Synthesis.Source.TraitCases
-import Solcore.Synthesis.Source.HierarchyCases
-import Solcore.Synthesis.Source.MemoryValuesCases
-import Solcore.Synthesis.Source.MemoryCallsCases
-import Solcore.Synthesis.Source.RevertDataCases
-import Solcore.Synthesis.Source.HaltCases
-import Solcore.Synthesis.Source.CheckedArithmeticCases
-import Solcore.Synthesis.Source.ShiftCases
-import Solcore.Synthesis.Source.MemoryArrayCases
-import Solcore.Synthesis.Source.ArrayAbiCases
+import Solcore.Synthesis.Internal.Functions
+import Solcore.Synthesis.Internal.Aggregates
+import Solcore.Synthesis.Internal.Loops
+import Solcore.Synthesis.Internal.LanguageFeatures
+import Solcore.Synthesis.Internal.Assembly
+import Solcore.Synthesis.Internal.CallGraphs
+import Solcore.Synthesis.Internal.Enums
+import Solcore.Synthesis.Internal.Traits
+import Solcore.Synthesis.Internal.MemoryValues
+import Solcore.Synthesis.Internal.MemoryCalls
+import Solcore.Synthesis.Internal.RevertData
+import Solcore.Synthesis.Internal.Integers
+import Solcore.Synthesis.Internal.Arrays
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false

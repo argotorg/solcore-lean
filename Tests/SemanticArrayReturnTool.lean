@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.ArrayReturnCases
+import Solcore.Synthesis.Internal.AbiReturns
 
 /-! Native array-return case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit

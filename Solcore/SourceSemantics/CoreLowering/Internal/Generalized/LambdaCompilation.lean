@@ -3,10 +3,10 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValue
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaTyping
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.OrdinaryBodies
-import Solcore.SourceSemantics.SubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.StructuralLaws
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.Frontend.SourceSpecializationWorklist
-import Solcore.SourceSemantics.SourceInferenceSubtreeInverseClosure
+import Solcore.SourceSemantics.Internal.Inference.Subtrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionExpressions
 
 /-!

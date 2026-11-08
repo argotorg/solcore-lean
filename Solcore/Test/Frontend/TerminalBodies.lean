@@ -1,15 +1,12 @@
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeFunction
-import Solcore.Core.LocalFragment
-import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.TypedLetReturnBody
-import Solcore.Frontend.TerminalReturnBody
-import Solcore.Frontend.TerminalReturnTree
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Core.Fuel
+import Solcore.Frontend.Fragments.Internal.TypedLet
+import Solcore.Frontend.Fragments.Internal.ReturnBodies
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.RuntimeParameters
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.ConditionalReturnBody
 
 /-!
 # Terminal body tests

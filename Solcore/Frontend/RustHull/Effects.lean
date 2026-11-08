@@ -1,6 +1,6 @@
 import Solcore.Frontend.RustHull.LoweringSupport
 import Solcore.Frontend.RustHull.Memory
-import Solcore.Core.OrderedMapping
+import Solcore.Core.Internal.MappingLaws
 import Solcore.Frontend.RustHull.Precompiles
 
 /-!

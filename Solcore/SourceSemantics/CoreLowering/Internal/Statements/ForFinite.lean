@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
-import Solcore.Frontend.SourceCoreCompatibleDataPlaces
+import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopCertificates
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopLayouts

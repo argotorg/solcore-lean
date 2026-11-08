@@ -1,9 +1,8 @@
-import Solcore.Core.OptionalCell
+import Solcore.Core.Internal.ConventionLaws
 import Solcore.Core.Check
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.Renaming
 import Solcore.Core.LanguageResult
 import Solcore.Core.Safety
-import Solcore.Core.CallableContract
 
 /-!
 # Heap and frame carriers

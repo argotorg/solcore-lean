@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Payloads
-import Solcore.Frontend.SourceCoreDataPlaces
+import Solcore.Frontend.SourceCore.DataPlaces
 
 /-!
 # Data: place execution

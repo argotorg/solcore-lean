@@ -1,10 +1,8 @@
-import Solcore.Frontend.TypedLetReturnTree
-import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.Fragments.Internal.TypedLet
 import Solcore.Core.Safety
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.LocalFunctionApplication
-import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.Fragments.Internal.RuntimeFunctions
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 
 /-!
 # Typed let tree evaluation tests

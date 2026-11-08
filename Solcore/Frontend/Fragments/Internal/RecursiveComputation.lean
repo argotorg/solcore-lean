@@ -2,12 +2,12 @@ import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Core.Machine
-import Solcore.Core.ExactFuelProperties
+import Solcore.Core.Fuel
 import Solcore.Frontend.Fragments.Internal.LocalComputations
 import Solcore.Core.Correspondence
-import Solcore.Core.LocalFragment
-import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Resolved.Renaming
+import Solcore.Core.Internal.LocalFragment
+import Solcore.Resolved.Internal.LocalFragmentLaws
+import Solcore.Resolved.Internal.ScopeLaws
 import Solcore.Frontend.Fragments.Internal.Computation
 
 /-!

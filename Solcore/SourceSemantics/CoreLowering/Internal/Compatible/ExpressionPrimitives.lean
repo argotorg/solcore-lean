@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.PrimitiveExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LiteralsAndStagedValues
-import Solcore.Frontend.SourceCoreInteger
+import Solcore.Frontend.SourceCore.Lowering
 
 /-!
 # Compatible expressions: primitives and products

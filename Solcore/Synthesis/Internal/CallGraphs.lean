@@ -1,6 +1,6 @@
 import Solcore.Synthesis.Internal.Functions
 import Solcore.Synthesis.Core.Seed
-import Solcore.Core.Wire.Codec.Program
+import Solcore.Core.Wire.Codec
 
 /-!
 # Profile: call graphs

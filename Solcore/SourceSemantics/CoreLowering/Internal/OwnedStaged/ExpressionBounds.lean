@@ -8,7 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.LambdaViewTrees
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.PreparedMethods
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.Staging.RecursiveTraceSize
+import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionConstructors
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionReads

@@ -1,13 +1,9 @@
-import Solcore.ContractRuntime.HostDriver
+import Solcore.ContractRuntime.Internal.DriverLaws
 import Solcore.Core.HostRunner
-import Solcore.ContractRuntime.HostStorageContext
-import Solcore.ContractRuntime.HostStorageDriver
+import Solcore.ContractRuntime.Internal.StorageDriverLaws
 import Solcore.Core.Primitive
-import Solcore.ContractRuntime.HostStorageInputData
 import Solcore.ContractRuntime.RuntimeScalars
-import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.TransactionHostStorage
-import Solcore.ContractRuntime.TransactionJournal
+import Solcore.ContractRuntime.Internal.TransactionLaws
 
 /-!
 # Host driver tests

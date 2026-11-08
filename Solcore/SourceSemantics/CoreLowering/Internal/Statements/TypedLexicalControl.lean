@@ -6,8 +6,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateAllocation
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.Statements
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopRenaming
-import Solcore.Core.LocalLoop
-import Solcore.Core.Renaming
+import Solcore.Core.Internal.ConventionLaws
+import Solcore.Core.Internal.Renaming
 
 /-!
 # Typed lexical control

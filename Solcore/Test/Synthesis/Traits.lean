@@ -1,6 +1,5 @@
-import Solcore.Synthesis.Source.HierarchyCases
-import Solcore.Synthesis.Source.MethodsCases
-import Solcore.Synthesis.Source.TraitCases
+import Solcore.Synthesis.Internal.Traits
+import Solcore.Synthesis.Internal.Calls
 
 /-!
 # Trait profile tests

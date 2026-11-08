@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.Internal.Substitution.TraitLaws
 import Solcore.SourceSemantics.Graph
 
 /-!

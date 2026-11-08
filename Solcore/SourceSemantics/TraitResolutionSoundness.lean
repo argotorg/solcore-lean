@@ -1,5 +1,5 @@
-import Solcore.Frontend.TypedTraitResolution
-import Solcore.Frontend.TraitResolutionProperties
+import Solcore.Frontend.TraitResolution
+import Solcore.Frontend.Internal.CheckingProperties
 import Solcore.SourceSemantics.Traits
 
 /-!

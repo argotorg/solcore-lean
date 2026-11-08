@@ -6,14 +6,14 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.AcceptedFactories
 import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ProgramCompletion
 import Solcore.SourceSemantics.CoreLowering.PublicSupport
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.IndirectDispatch
-import Solcore.SourceSemantics.SourceExecutableBinderInterfaces
-import Solcore.SourceSemantics.SubstitutionCorrespondence
+import Solcore.SourceSemantics.Internal.Inference.ExecutableInterfaces
+import Solcore.SourceSemantics.Internal.Substitution.Unification
 import Solcore.SourceSemantics.Graph
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.CatalogOrigins
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.MethodBodies
-import Solcore.SourceSemantics.SourceInferenceSoundness
-import Solcore.SourceSemantics.SourceInferenceSelectedCheckedBodyTypingBridge
-import Solcore.SourceSemantics.SourceInferenceSelectedActualSoundness
+import Solcore.SourceSemantics.Internal.Inference.Soundness
+import Solcore.SourceSemantics.Internal.Inference.RootedSoundness
+import Solcore.SourceSemantics.Internal.Selected.ExpressionSoundness
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedScopedRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.NamedCollectors
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CoercionSpine
@@ -26,9 +26,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Selected.OrdinaryMethodRoot
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.LambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CallBounds
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.HeadersAndPrograms
-import Solcore.SourceSemantics.Staging.SelectedPreservationContracts
+import Solcore.SourceSemantics.Staging.Internal.SelectedContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.TerminalBodies
-import Solcore.SourceSemantics.Staging.SelectedProgramPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicApplicationResults
 
 /-!

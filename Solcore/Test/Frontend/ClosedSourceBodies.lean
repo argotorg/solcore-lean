@@ -1,13 +1,12 @@
-import Solcore.Frontend.ClosedSource
-import Solcore.Frontend.LocalReference
+import Solcore.Frontend.Fragments.Internal.ClosedSource
+import Solcore.Frontend.Fragments.Internal.Foundations
 import Solcore.Resolved.LocalScope
-import Solcore.Frontend.SourceLambdaEvaluation
-import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Fragments.Internal.SourceValues
+import Solcore.Frontend.Fragments.Internal.LocalFunctionApplication
 import Solcore.Syntax.Parser.Internal.TermBasics
-import Solcore.Frontend.LocalExpressionEvaluator
-import Solcore.Frontend.LocalExpression
+import Solcore.Frontend.Fragments.Internal.LocalExpressions
 import Solcore.Frontend.WordLiteral
-import Solcore.Core.UnaryPrimitives
+import Solcore.Core.Internal.PrimitiveLaws
 
 /-!
 # Closed source body tests

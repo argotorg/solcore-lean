@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.CallReturnCases
+import Solcore.Synthesis.Internal.CallReturns
 
 /-! Golden rows of std's decision on return data for the call-return profile.
 Every expected row is written out as hexadecimal text by the probe's

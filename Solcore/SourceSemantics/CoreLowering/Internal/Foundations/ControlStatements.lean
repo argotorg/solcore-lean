@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.Ownership
-import Solcore.Frontend.SourceCoreDataPlaces
+import Solcore.Frontend.SourceCore.DataPlaces
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.LambdaViewsAndMarkedCaptures
 
 /-!

@@ -1,7 +1,7 @@
-import Solcore.Frontend.SourceInference.ExpressionProperties
+import Solcore.Frontend.SourceInference.Internal.ExpressionProperties
 import Solcore.Frontend.SourceInference
-import Solcore.Frontend.SourceInference.NodeGraphRecorderAutomation
-import Solcore.Frontend.ProgramLoading
+import Solcore.Frontend.SourceInference.Internal.NodeGraph
+import Solcore.Frontend.ProgramInterfaces
 
 /-!
 # Source inference tests

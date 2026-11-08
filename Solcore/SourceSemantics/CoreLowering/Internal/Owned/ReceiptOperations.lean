@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.OwnedAdmitted.AssignmentHea
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.ForHeaders
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.StatementAdmission
 import Solcore.SourceSemantics.CoreLowering.Internal.Protected.StateForPost
-import Solcore.SourceSemantics.Staging.SelectedProjectedWritePreservation
+import Solcore.SourceSemantics.Staging.Internal.SelectedContracts
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.CanonicalCallerState
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.FunctionValuesAndState
 

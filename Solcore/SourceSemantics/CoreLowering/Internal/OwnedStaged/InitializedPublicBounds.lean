@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceDiagnostics
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedStaged.NamedEvidenceRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicDirectHistories
-import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
+import Solcore.SourceSemantics.Staging.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.Bootstrap
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.ChosenStoredCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicArgumentReceipts
@@ -11,7 +11,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputR
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MappingsAndEquality
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicFunctionHistory
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
-import Solcore.Frontend.SourceCoreFailurePreservationReceipts
+import Solcore.Frontend.SourceCoreExecution
 import Solcore.SourceSemantics.CoreLowering.Internal.Owned.LexicalBodyFaults
 
 /-!

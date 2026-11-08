@@ -1,4 +1,4 @@
-import Solcore.Synthesis.Source.AdtStorageCases
+import Solcore.Synthesis.Internal.AdtStorage
 
 /-! Native enum and struct storage case boundary. Source generation and replay never execute the
 imported Hull or use stored expected results. The observer requires explicit
