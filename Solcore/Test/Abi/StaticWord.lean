@@ -149,7 +149,7 @@ def method : Method := {
 def methods : List Method := [method]
 
 private def admitted? : Option (StaticWordContract methods) :=
-  (StaticWordContract.admit methods).toOption
+  (StaticWordContract.validate methods).toOption
 
 private theorem admitted?_isSome : admitted?.isSome := by
   native_decide
@@ -668,7 +668,7 @@ private def caller : Address := ⟨0x52, by decide⟩
 private def argument_variant : Word := ⟨0x123, by decide⟩
 
 private def admissionAccepted : Bool :=
-  match StaticWordContract.admit methods with
+  match StaticWordContract.validate methods with
   | .error _ => false
   | .ok _ => true
 
@@ -683,7 +683,7 @@ private theorem admittedCarriesExactProvenance
   ⟨contract.table_valid, contract.checkedCore_eq⟩
 
 private def invocationBytesAgree : Bool :=
-  match StaticWordContract.admit methods with
+  match StaticWordContract.validate methods with
   | .error _ => false
   | .ok contract =>
       let selected := contract.firstMember
@@ -731,7 +731,7 @@ private theorem convenienceDelegatesExactly
   rfl
 
 private def dependentEntriesRun : Bool :=
-  match StaticWordContract.admit methods with
+  match StaticWordContract.validate methods with
   | .error _ => false
   | .ok contract =>
       let selected := contract.firstMember

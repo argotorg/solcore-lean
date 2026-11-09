@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
 const kernelRoots = [
+  "Solcore/Abi",
+  "Solcore/Abi.lean",
   "Solcore/Core",
   "Solcore/Util",
   "Solcore/ContractRuntime",

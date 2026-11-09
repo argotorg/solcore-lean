@@ -184,8 +184,10 @@ The pieces of `StaticWord`, in order:
   host functions `inputDataSize` and `inputDataWordBE?`, by their `HostFunction.index`, and reverts
   with `malformedCalldataReason` or `unknownSelectorReason`. `MethodTable.dispatchProgram_checked`
   proves that `Program.checkHost` accepts it.
-- **Contracts.** `MethodTable.generate` makes it a `wordOutcomeV1` contract, and
-  `StaticWordContract.run` runs it through `BalancedTopLevelExecution.runWithEnvironment`.
+- **Contracts.** `MethodTable.generate` makes it a `wordOutcomeV1` contract.
+  `StaticWordContract.validate` validates a method list and keeps its table with the contract
+  generated from it, and `StaticWordContract.run` runs that contract through
+  `BalancedTopLevelExecution.runWithEnvironment`.
 
 **Change the codec.** The Lean codec and the Core dispatcher describe the same bytes, so change them
 together and re-prove `dispatchProgram_checked`. `StaticWordContract.callInvocation_inputData_bytes`
@@ -195,8 +197,8 @@ changes the signature text, and so every selector. The end-to-end tests (`AbiSta
 ebf59aeaf and 6226e7ab7.
 
 **Pitfalls.** About half of `StaticWord`'s proofs name private helpers, so they stay in the file.
-The kernel check does not visit `Abi`; its word match would reject `Abi.V1.StaticWordContract.admit`,
-a function name ([Conventions](conventions.md#proof-rules)).
+The kernel check visits `Abi` too. It matches words anywhere, comments included, so a name such as
+`admit` or a comment that says "partial" fails it ([Conventions](conventions.md#proof-rules)).
 
 ## Util
 

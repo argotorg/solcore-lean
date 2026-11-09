@@ -68,7 +68,8 @@ structure MethodName where
   text : String
   valid : isValidMethodName text = true
 
-/-- Validate an arbitrary string without normalization or partial failure. -/
+/-- Validate an arbitrary string as written, with no normalization: either the
+whole string is a method name or the result is `none`. -/
 def validateMethodName? (text : String) : Option MethodName :=
   if valid : isValidMethodName text = true then
     some ⟨text, valid⟩
@@ -1306,7 +1307,7 @@ structure StaticWordContract (methods : List Method) where
 namespace StaticWordContract
 
 /-- Validate a finite method list and retain the validator's exact error. -/
-def admit (methods : List Method) :
+def validate (methods : List Method) :
     Except MethodTableError (StaticWordContract methods) :=
   match validated : MethodTable.validate methods with
   | .error failure => .error failure
@@ -1317,12 +1318,12 @@ def admit (methods : List Method) :
       checkedCore_eq := rfl
     }
 
-/-- Admission rejects with precisely the method-table validation error. -/
-@[simp] theorem admit_eq_error_iff
+/-- `validate` fails with exactly the error of `MethodTable.validate`. -/
+@[simp] theorem validate_eq_error_iff
     (methods : List Method) (failure : MethodTableError) :
-    admit methods = .error failure ↔
+    validate methods = .error failure ↔
       MethodTable.validate methods = .error failure := by
-  unfold admit
+  unfold validate
   split <;> simp_all
 
 /-- One method carrying proof that it belongs to this validated table. -/

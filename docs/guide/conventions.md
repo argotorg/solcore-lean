@@ -83,11 +83,12 @@ pure move.
   - [`scripts/check-kernel.mjs`](../../scripts/check-kernel.mjs) rejects any line that contains one
     of these as a whole word: `sorry`, `admit`, `axiom`, `partial`, `unsafe`, `noncomputable`,
     `extern`, `implemented_by`.
-  - It checks every file under `Solcore/Core`, `Solcore/Util`, `Solcore/ContractRuntime`,
-    `Solcore/Resolved`, `Solcore/SourceSemantics`, `Solcore/Synthesis/Source/ScalarMeaning`,
-    `Solcore/TypeSystem`, `Solcore/Frontend`, `Solcore/Syntax` and `Solcore/Workspace`.
-  - It also checks the umbrellas `Resolved.lean`, `SourceSemantics.lean`, `TypeSystem.lean` and
-    `Frontend.lean`.
+  - It checks every file under `Solcore/Abi`, `Solcore/Core`, `Solcore/Util`,
+    `Solcore/ContractRuntime`, `Solcore/Resolved`, `Solcore/SourceSemantics`,
+    `Solcore/Synthesis/Source/ScalarMeaning`, `Solcore/TypeSystem`, `Solcore/Frontend`,
+    `Solcore/Syntax` and `Solcore/Workspace`.
+  - It also checks the umbrellas `Abi.lean`, `Resolved.lean`, `SourceSemantics.lean`,
+    `TypeSystem.lean` and `Frontend.lean`.
   - The check is textual, so the words also fail in comments and docstrings. Prose such as "a
     partial result" fails there too: write "an incomplete result" instead.
 - **No `native_decide` outside tests.** It makes the proof trust compiled evaluation. No file in the
