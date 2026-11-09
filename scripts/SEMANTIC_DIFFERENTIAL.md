@@ -391,7 +391,7 @@ still return some seeded input unchanged.
 
 | Profiles | Identity filter |
 | --- | --- |
-| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data`, `runtime-checked-arithmetic`, `runtime-shifts`, `runtime-memory-arrays`, `runtime-array-abi` | applied |
+| `runtime-word`, `runtime-primitives`, `runtime-assembly`, `runtime-assembly-memory`, `runtime-functions`, `runtime-mutation`, `runtime-aggregates`, `runtime-closures`, `runtime-comptime`, `runtime-modules`, `runtime-call-graphs`, `runtime-aggregate-call-graphs`, `runtime-enums`, `runtime-traits`, `runtime-trait-hierarchies`, `runtime-memory-values`, `runtime-memory-calls`, `runtime-revert-data`, `runtime-checked-arithmetic`, `runtime-shifts`, `runtime-memory-arrays`, `runtime-array-abi`, `runtime-closure-captures`, `runtime-closure-factories` | applied |
 | `runtime-loops`, `runtime-call-graph-loops`, `runtime-assembly-loops`, `runtime-loop-closures`, `runtime-nested-loops`, `runtime-recursion`, `runtime-recursive-loops` | not needed: a loop or a loop closure must already change a positive-trip boundary input, and a nested loop, a recursion or a recursive loop some boundary input |
 | `runtime-generics` | not needed: input 0 returns the result of input 1 (Word and pair variants) or its successor (sum), so a generic function never returns both 0 and 1 |
 | `runtime-halts` | not needed: every accepted plan halts at a boundary input, so none returns all its inputs |
@@ -415,12 +415,16 @@ either profile's first 1,000 seeds does, so both apply the filter. A
 `runtime-memory-arrays` or `runtime-array-abi` plan whose only observation
 reads `sc_v0` at a 256-bit type returns its input, as four of the first 1,000
 memory array plans do, so both apply it as well; an array result is never an
-identity.
+identity. A closure plan whose only observation comes to `sc_x`, such as a
+checked sum of `sc_x` and the unwritten field, returns its input, as 48
+closure capture and 49 closure factory plans of the first 1,000 do, so
+`runtime-closure-captures` and `runtime-closure-factories` apply the filter
+too.
 `closed-g0` has no runtime input.
 
 The filter is versioned on its own rather than as a G0 revision. Acceptance
 belongs to each profile's case module, not to the G0 expression generator, and
-twelve of the twenty-two profiles do not use G0. Only generated cases pass filters:
+fourteen of the twenty-four profiles do not use G0. Only generated cases pass filters:
 imported cases and reductions never did, and a reduction may itself be an
 identity. So the filter lives in the generated origin next to
 `inputSelection`, while a G0 revision is copied into every reduction. It
@@ -433,7 +437,7 @@ filters only. Replay applies the recorded filter again: a saved identity that
 claims it is refused with the exclusion reason, and an unknown value with
 `unsupported acceptance filter`. Without the field, a filtered case is also a
 valid case of the profile's own filters, since the filter only narrows
-acceptance. Reductions record no filter. The generation commands of the twenty-one
+acceptance. Reductions record no filter. The generation commands of the twenty-three
 profiles take the filter after `FUEL`, in any order with a G0 version and an
 input selection; the others refuse it:
 
@@ -595,7 +599,7 @@ storage and call adapters, their campaigns and `semantic-suite.py` accept the
 same option. Run separate output directories for each backend; each has its
 own observations, compilation failures and finding fingerprint.
 
-For the thirty-two pure profiles, `--backend yul --solc PATH` instead runs the checked
+For the thirty-four pure profiles, `--backend yul --solc PATH` instead runs the checked
 Rust Yul output through solc `0.8.35+commit.47b9dedd` with optimization and Osaka
 enabled. The EVM deploys the creation bytes and checks its installed runtime
 against the deployed bytes from the same solc compilation. Imported Hull uses
@@ -3241,6 +3245,135 @@ rejections the probe met: a converted literal as a `new` length, as in
 a let-bound slice or a calldata parameter, where it writes the index as
 `uint256(k)`. On Yul, `runtime-memory-arrays` took 619 of the 900 seconds CI
 allows a profile, under a load average of about ten.
+
+## Compare Solcore closures by value and closure factories
+
+solcore-rs #120 decided that a closure captures by value: it keeps the values
+its captured locals had when it was created, a write in its body reaches only
+that call's copy, and each call starts again from the creation-time values.
+Since `bf7114a8` and `ad1f49cf` a closure factory resolves its captures in its
+own scope and keeps its runtime effects. `runtime-closures` and
+`runtime-loop-closures` capture Words that only later outer writes change. Two
+profiles compare the rest; they share one plan module,
+`Solcore.Synthesis.Internal.Captures`, and each admits its own plans:
+- `runtime-closure-captures` (contract `SynthesizedClosureCaptures`) runs one
+  to ten steps of `run(uint256)`: Word locals; closures made from lambdas, with
+  bodies of up to three statements and lambdas nested two deep, and from
+  aliases; writes to a captured local, a lambda's parameter or the contract
+  field `sc_n`; rebinding a closure to a lambda, also one over its old value,
+  or to another closure, in `run` and in bodies; calls directly, through the
+  generic `sc_apply` and `sc_twice`, from bodies of captured closures and in a
+  loop of up to three iterations; checked `uint256` `+` and `/` as
+  `Typedef.rep(uint256(l) + uint256(r))`; and observations.
+- `runtime-closure-factories` (contract `SynthesizedClosureFactories`) adds one
+  or two factories, `sc_mk<k>(sc_p: word)`, free functions or contract methods
+  (which may use the field), returning one of their closures or a lambda over
+  their parameter and locals, with `run`'s own names; `run` and its lambdas
+  call them with literal or runtime arguments, keep, discard or rebind their
+  closures, and a factory calls an earlier one.
+
+Every observation is folded into the returned Word,
+`sc_r = ((sc_r * 1099511628211) ^ X)`. Every local is assigned where it is
+declared, so no program reads a local before assigning it, which Lean faults
+on and the pin reads as zero.
+
+The pin lowers only closures that are statically one lambda and rejects the
+others with `SC0422` ("cannot lower closure dispatch to Hull" or "cannot lower
+lambda expression to Hull"). Admission keeps every plan to the lowered forms:
+no branch chooses a closure and no loop rebinds one; no closure that captures a
+closure is passed to `sc_apply` or `sc_twice` or captured by a lambda, and a
+body never rebinds a closure to one; no factory's result captures a closure;
+and a factory that returns one of its own closures has no effect of its own
+(field, checked operation or call) and is called with arguments that have none.
+The roadmap's probe lists the rejected forms, and `questions.md` records them.
+
+The Core reference holds every local in a cell. Creating a closure loads what
+it captures into immutable snapshots and makes a Core lambda that copies each
+snapshot into a fresh cell at every call, so writes in its body stay in that
+call; the field and the fold are cells every scope shares, and a factory runs
+where it is called. A call is a `caseE` that passes a panic's revert data on:
+`Panic(0x11)` for a checked `+` past `2^256 − 1` and `Panic(0x12)` for a zero
+divisor, the right injection of 36 bytes; the left injection is the fold. The
+adapter compares revert data of both profiles exactly (`REVERTING_SCHEMAS`).
+
+```sh
+python3 scripts/semantic-suite.py --mode fixed --profile runtime-closure-captures \
+  --profile runtime-closure-factories --backend sonatina-o0 --output .upstream/semantic-closures-fixed
+python3 scripts/semantic-suite.py --mode random --profile runtime-closure-captures \
+  --profile runtime-closure-factories --seed 1 --functions 32 --output .upstream/semantic-closures-random
+python3 Tests/scripts/test-semantic-closure-captures-corpus.py
+python3 Tests/scripts/test-semantic-closure-factories-corpus.py
+```
+
+Native commands are `closure-captures-generate` and `closure-factories-generate
+SEED NODES COUNT ATTEMPTS FUEL [seeded-inputs-v1/splitmix64]
+[exclude-boundary-identity-v1]`, and `closure-captures-emit` and
+`closure-factories-emit PLAN.json INPUT [FUEL]`. Saved cases contain
+`closureCapturesPlan` or `closureFactoriesPlan` and the whole Core reference,
+whose exact correspondence native admission checks for every origin, and
+`closureCapturesShapes` or `closureFactoriesShapes`, which replay recomputes.
+Replay requires a generated plan to be its seed's. Their retained case files
+are compact JSON, about 20 KB a closure capture case and 24 KB a closure
+factory case.
+
+- Inputs are the primitive profile's eight boundary inputs; random campaigns
+  add four seeded inputs. The profiles record no G0 step features.
+- The node budget bounds the applied reference: default 1,024, at most 2,048,
+  at least 256; a case's reference is at most 4,096 nodes.
+- Exclusions, under `closure-captures-profile` and `closure-factories-profile`,
+  are a plan over the budget or not admitted, such as a fitted plan left
+  without an observation or a factory call, then one with the same outcome at
+  all eight boundary inputs, or one that exhausts fuel. Some plans return
+  their input, so random campaigns apply `exclude-boundary-identity-v1`.
+- Reductions keep every declaration: they remove a statement that declares
+  nothing, empty a lambda, shorten a loop, replace a term by `0` or one of its
+  parts and a helper's call by a direct one, reduce a body, a factory and the
+  lambda it returns, then the inputs.
+- `closureCapturesRequirements` declares what lambdas `capture`, the `field`
+  reads and writes by place, a body's `write`s, the `outer` writes and
+  rebindings of earlier captures, the `call` forms, the `closure` forms, and the
+  `outcome`s and `panicSite`s its run reaches at the boundary inputs, 36 values;
+  `closureFactoriesRequirements` adds the factories' parameter captures, field
+  accesses, forms, panic site and the `factory` dimension (method or free,
+  result, captures, later writes, checked effects, chaining, calls in bodies,
+  literal and runtime arguments, instances), 56 values.
+
+The fixed corpora take, from seed 1 upwards at the default budget, every
+accepted plan that covers a missing value, until nothing is missing, each at
+the eight boundary inputs, and both require every value. Closure captures:
+seeds 1, 3, 4, 5, 7, 13, 16, 23, 58 and 413, the last for a body that
+rebinds its own closure, give 80 cases from 10 sources, 66 returns, 12
+`Panic(0x11)` and 2 `Panic(0x12)`. Closure factories: seeds 4, 6, 13, 15,
+18, 21, 23, 30, 33, 49, 50, 55, 59 and 104, the last for the same write,
+give 112 cases from 14 sources, 94 returns, 7 `Panic(0x11)` and 11
+`Panic(0x12)`. `Tests/scripts/test-semantic-closure-captures-corpus.py`, and
+`test-semantic-closure-factories-corpus.py` with the factory profile, rebuild
+that selection, decode every plan and admit it with their own scope walk and
+the pin's forms, recompute every shape and the shrink measure with their own
+interpreter over Python values, re-emit every source and compare it exactly,
+evaluate every case's plan against the recorded outcome, and check replay,
+reductions and tampering natively. That model, re-emission and shapes agree
+with the native ones on every accepted plan of the first 1,000 seeds at
+twelve inputs: 623 closure capture plans with 7,476 outcomes, 985 of them
+revert data, and 497 closure factory plans with 5,964 outcomes, 801 of them
+revert data.
+
+The gate passed before the profiles were committed: the kernel check, 1,007
+Python tests, `lake build` (1,193 jobs), forty-two native tools, `lake test`,
+thirty corpus validator runs and the chunked-generation check over the
+thirty-four pure profiles. Frozen matrices at the lane commit picked as
+`a9f889028`, with the freeze digest unchanged on every run:
+- The fixed corpora matched all 80 and 112 cases on O0, O2 and Yul with
+  complete coverage, in 87, 84 and 122 seconds and 120, 117 and 168.
+- Random suites from root seed 1 with 32 whole functions a profile drew 384
+  closure capture cases from 32 sources, 50 of them revert data, and 33 of
+  the 36 shape values, and 384 closure factory cases from 32 sources, 88 of
+  them revert data, and 54 of the 56 values; O0, O2 and Yul matched all of
+  them.
+
+No mismatch, crash or rejection was found: admission keeps the forms that
+`SC0422` rejects out of every plan. On Yul, `runtime-closure-factories` took
+168 of the 900 seconds CI allows a profile.
 
 ## Compare aggregate compositions with call graphs
 
@@ -8149,7 +8282,7 @@ boundary; this section describes how to run it.
   their creation code reads only its own runtime object, besides the
   arguments appended after the constructor-argument wrapper's init code. Gas, layout, code
   size and optimizer internals are not compared.
-- **Admission:** `export-rust-yul.py` admits the thirty-two pure, the
+- **Admission:** `export-rust-yul.py` admits the thirty-four pure, the
   twenty-four storage-family and the two call-return wrappers, taken from the
   adapters' profile tables;
   the three malformed profiles reuse wrappers. Each must compile to one
@@ -8182,7 +8315,7 @@ archives keep the backend; a Yul finding is a different identity from the same
 difference on Sonatina.
 
 The suite runs a storage-family profile on Yul when `--profile` selects it.
-Its default Yul selection stays the thirty-two pure profiles. `--backend yul`
+Its default Yul selection stays the thirty-four pure profiles. `--backend yul`
 with `stateful-calls` or `stateful-forwarded-value` is refused before
 execution.
 
