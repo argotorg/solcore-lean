@@ -12223,6 +12223,222 @@ twice its load. The O0 fixed suite, last projected at about 6,550 seconds
 before the integer profiles' 316 and the later call profiles, would now take
 more than CI's 7,200.
 
+**Closures by value: probe and definitions.** solcore-rs #120 decided that a
+closure captures by value, and Lean follows it (7ac75aea3): a closure keeps the
+values its captured locals had when it was created, a write in its body reaches
+only that call's copy, and each call starts again from the creation-time
+values; [Source semantics](../guide/source-semantics.md#closures-capture-by-value)
+states the rule. Row 7 of the table above, closure factories (`bf7114a8`,
+`ad1f49cf`), resolves a factory's captures in its own scope and keeps its
+runtime effects. No generated case exercises either: `runtime-closures` and
+`runtime-loop-closures` capture Words that only later outer writes change, so
+no case writes through a capture, calls a writing closure twice, captures a
+closure, or makes a closure in one function and calls it in another. Both
+sides support factories: Lean's public API runs `make` and `makePair` in
+`Tests.SourceCoreExecution`, and the pin's `closure-parameters` fixture runs
+`makeAdder`, `makeComputedAdder` and `makeCountedAdder`. This unit builds two
+new pure profiles whose original Core references model capture by value.
+Every local a generated program declares is assigned where it is declared, so
+no program reads a local before assigning it, directly or through a capture:
+Lean faults on such a read where solcore-rs reads zero, and such a program is
+not a comparison case.
+
+Before the definitions, a probe compiled hand-written sources through checked
+Hull export, Sonatina O0 and O2 and Yul, on Anvil and in the Lean Hull runner
+(on the O0 export), against a Python model of capture by value; the records
+are in `.upstream/upstream-unit4-closures/probe/`:
+- Closures over Words, 27 contracts and 804 calls per path: writes through
+  captures; calls repeated directly, through generic `sc_apply` and
+  `sc_twice`, through a monomorphic helper and in a loop; later outer writes;
+  closures that capture closures; aliases; rebinding a closure, also to a
+  lambda over its old value and inside a body; nested lambdas; writes to a
+  lambda's parameter; nullary and binary lambdas; lambda factories; factories
+  returning closures over their parameter and locals, with `run`'s names; a
+  factory's checked effect used, unused, discarded and reassigned; checked
+  `+` and `/` in bodies; a contract field written by factories and bodies and
+  read at call time; and evaluation order where effects meet.
+- The generators below, in drafts, at twelve inputs, in three rounds of 64, 80
+  and 96 plans, the first two before the admission rules that their rejections
+  gave; 79 further variants of the rejected sources went through the checked
+  frontend alone.
+
+All 3,552 completed outcomes per path matched the model on every path: 804 of
+the hand-written contracts and 672, 924 and 1,152 of the drafts. Operands and
+arguments are evaluated left to right, a field read before a call in the same
+expression sees the old value, and of two panics in one expression the left
+one is raised. Eight hand-written contracts and 11 drafts (8 of the first 64
+and 3 of the next 80) were rejected on every backend with `SC0422`, "cannot
+lower closure dispatch to Hull" or "cannot lower lambda expression to Hull":
+the pin lowers only closures that are statically one lambda. Minimized
+sources and their variants separate the forms it rejects:
+- a closure local given another lambda in one branch of an `if`, a factory
+  returning one of two lambdas by a branch, and a closure rebound in a loop;
+- a closure that captures a closure passed as an argument, to a generic or a
+  monomorphic helper or to a factory;
+- a lambda that captures a closure that itself captures a closure, even
+  without writes; one such level is lowered;
+- a lambda body that rebinds a captured closure to one that captures a
+  closure;
+- a factory whose result captures one of its closures (some of these are
+  lowered, others not);
+- a factory that returns one of its own closures and reads or writes the
+  field, runs a checked operation or calls a closure in its own statements,
+  or is called with an argument that does; the same factory returning a
+  lambda directly is lowered with all of these.
+
+They are recorded in `questions.md` without investigation; Lean was not run on
+them. The generators below admit none of them, and the third round of drafts
+compiled entirely. No path departed from the model. Core,
+`Solcore/SourceSemantics`, `Solcore/Frontend/SourceCore*`, the shared contract
+runtime, the Hull importer and runner, both EVM backends and
+`export-rust-yul.py` need no change, so no stop condition applies; the
+references use Core's existing cells and lambdas. The pure adapter adds both
+schemas to its revert matching. The existing profiles, corpora, emitters and
+emitter proofs stay unchanged, and the new emitter has no proof yet. The
+definitions were fixed before execution:
+
+- Plans (`core-closure-captures-v1`), shared by both profiles, each admitting
+  its own:
+  - Scopes nest: `run` or a factory, a lambda created in it, and one inside
+    that. A scope has a Word parameter (`sc_x` in `run`, `sc_p` in a factory,
+    `sc_a` and `sc_b` in lambdas), up to four Word locals and up to four
+    closures, named by depth (`sc_v<k>` and `sc_f<k>` in `run` and in a
+    factory, `sc_w<k>` and `sc_g<k>`, `sc_u<k>` and `sc_h<k>` in lambdas), so a
+    factory's names are `run`'s too. A reference names a local of the current
+    or an enclosing scope; the contract field `sc_n: word` is declared when a
+    plan names it.
+  - Terms: a literal Word, a parameter, a Word local or the field; `+ - * ^`
+    of Words, wrapping; checked `Typedef.rep(uint256(l) + uint256(r))` and
+    `/`; and a call of a visible closure, `f(e)`, `sc_apply(f, e)` or
+    `sc_twice(f, e)`, the generic helpers emitted when a plan uses them.
+  - Statements: `let <local>: word = e;`, an assignment to a parameter, a
+    local or the field, which in a lambda body writes the call's copy of what
+    it captured; `let <closure>: F = lam (<parameter>: word) -> word { … };`,
+    `= <closure>;` and `= sc_mk<k>(e);`; `sc_mk<k>(e);`; rebinding a closure to
+    a lambda, another closure or a factory's closure, `F` being
+    `function (word) returns (word)`. `run` alone folds an observation,
+    `sc_r = ((sc_r * 1099511628211) ^ e);`, and runs a loop,
+    `let sc_i<k>: word = 0; while (sc_i<k> < c) { …; sc_i<k> = sc_i<k> + 1; }`
+    of one or two assignments and observations, `c` from 1 to 3.
+  - Factories: one or two, each `sc_mk<k>(sc_p: word)` returning one of its
+    closures or a lambda; a contract method may name the field and call method
+    factories, a free function neither; a factory calls only earlier ones.
+  - Bounds: one to ten steps; at most three statements in a body and in a
+    factory; lambdas nested two deep.
+- `runtime-closure-captures`: contract `SynthesizedClosureCaptures`,
+  `run(uint256)` returning `uint256(sc_r)`, no factory, at least one
+  observation.
+- `runtime-closure-factories`: contract `SynthesizedClosureFactories`, the same
+  wrapper with free factories before the contract and method factories in
+  it, and a factory call in `run` or one of its lambdas.
+- Admission checks every statement against the scopes: references to declared
+  locals and closures, the counts and depths above, observations and loops in
+  `run`'s own statements, the field where `run` or a method factory is the
+  outermost scope, factory calls in order, and the pin's forms: no closure that
+  captures a closure is passed to `sc_apply` or `sc_twice` or captured by a
+  lambda; a body never rebinds a closure to one that captures a closure; a
+  factory's result never captures a closure; and a factory that returns one of
+  its own closures has no effect of its own and is called with arguments that
+  have none. Plans have no branch, and a loop declares and rebinds nothing.
+- Draws come from the case seed by a SplitMix64 stream with a domain per
+  profile (`0x636c6f7375726501` and `0x636c6f6661637401`), each statement drawn
+  against the scopes so far and kept only when it checks:
+  - `runtime-closure-captures` draws three to nine steps;
+    `runtime-closure-factories` first draws one or two factories, each a
+    method or a free function evenly, with up to three statements and as its
+    result one of its closures half the time when it has one, otherwise a
+    lambda (a lambda that sees none of its closures when the first draw is not
+    admitted), then three to six steps, and at the end, when none came before,
+    a factory call with an observation of the closure it makes, or a
+    discarded call when no closure fits;
+  - a step is a local 3, a lambda 5, an alias 1, a factory call 5 and a
+    discarded one 1, a rebinding 2, an assignment 3, an observation 5 (of a
+    call two times in three) and the loop 1, among the kinds whose operands
+    and room exist; the last step an observation when none came before;
+  - a body or a factory statement is a local 2, an assignment 5 (to a captured
+    local half the time when there is one), a nested lambda 2, a factory call
+    1 and a rebinding 1, a body of zero to three statements and a result
+    term; a rebinding is to a lambda 3, a closure 2 or a factory's closure 2;
+  - a term two deep is a leaf 3 (a literal among 0, 1, 2, 3, 5, 7 and 255 one
+    time in four, otherwise a visible Word), an operation 3, a checked one 1
+    (`+` two times in three, a divisor a literal among 1, 2, 3 and 7 half the
+    time) and a call 3, directly half the time and otherwise through
+    `sc_apply` or `sc_twice`, always directly for a closure that captures a
+    closure; a factory's argument is a literal half the time.
+- Core reference, with no source text and no data definitions, `fun input =>
+  …` of type `sum word (word × word × word)`:
+  - A local, the field and the fold are cells, the field and the fold shared
+    by every scope. Creating a closure loads each local it captures into an
+    immutable snapshot and makes a Core lambda that, at every call, copies each
+    snapshot into a fresh cell and binds its argument in one, so a write in a
+    body reaches only that call, and a call starts again from the creation-time
+    values; a closure that captures a closure captures its value.
+  - A factory runs where it is called, in a scope of its own: its parameter
+    and locals are cells, and its closures capture them in the same way.
+  - A call is a `caseE` on the closure's result: the left injection continues,
+    the right one, the revert data of a checked operation, is passed on. A
+    checked `+` panics with `0x11` past `2^256 − 1` and `/` with `0x12` on a
+    zero divisor, as the integer profiles' checked `uint256` operations do.
+  - The loop is unrolled. A case observes a returned Word or revert data,
+    compared exactly with the EVM's and the imported Hull's.
+
+  A direct interpreter of the plans over Lean numbers and closure values,
+  independent of the reference, gives the shapes below. Of the first 1,000
+  seeds, it and the reference agreed on all 11,988 and 11,388 outcomes of the
+  999 and 949 admitted plans, at the eight boundary inputs and four more.
+- Bounds: the node budget, default 1,024, at most 2,048 and at least 256,
+  bounds the applied reference; steps are dropped from the end while it
+  exceeds the budget and more than one step remains. A case's reference is at
+  most 4,096 nodes. Of the first 1,000 seeds at the default budget, the
+  capture references had a median of 378 and at most 1,014 nodes, 4 dropped a
+  step and none stayed over; the factory references had a median of 496, 73
+  dropped a step and 2 stayed over. At 256 nodes, 385 and 466 of 500 plans
+  dropped steps and 33 and 79 stayed over.
+- Inputs: the primitive profile's eight boundary inputs; random campaigns add
+  the four seeded inputs.
+- Exclusions, under the stages `closure-captures-profile` and
+  `closure-factories-profile`: a plan over the budget or not admitted, as 1
+  and 51 of the first 1,000 seeds were (2 factory plans over the budget, the
+  others plans whose fitting dropped their last observation or factory call);
+  then, at the eight boundary inputs, fuel exhaustion (an inconclusive
+  resource exclusion), a result other than a return or revert data, or the
+  same outcome for all eight, as for 375 and 452 of them.
+- Identity filter: 48 and 49 of the first 1,000 plans return their input at
+  all eight boundary inputs, so random campaigns apply
+  `exclude-boundary-identity-v1` to both profiles.
+- Reductions keep every declaration, so later indices stay valid: remove a
+  statement that declares nothing; empty a lambda; shorten a loop; replace a
+  term by `0` or by one of its parts and a call through a helper by a direct
+  call; reduce a body's statements, a factory's statements and the lambda it
+  returns; then the inputs 0, 1 and half the input. Every candidate is
+  admitted and sealed by the full checker, and strictly smaller in plan size,
+  then input. A shrink response stops before its cases would exceed 1.5 MB.
+- Specified shapes, from the plan and from the runs its interpreter makes at
+  the eight boundary inputs, never measured on a compiled path:
+  - closure captures, 36 values: `capture` (what lambdas capture: `input`,
+    `value`, `arg` and `body-value` of an enclosing lambda, `closure`, or
+    `nothing`), `field` (`body-read`, `body-write`, `run-read`, `run-write`),
+    `write` (a body's writes: `own-param`, `captured-param`, `own-value`,
+    `captured-value`, `own-closure`, `captured-closure`), `outer`
+    (`later-write` and `later-rebind`, a write or a rebinding of what an
+    earlier lambda of the scope captured), `call` (`direct`, `apply`, `twice`,
+    `loop`, `in-body`, `captured`, and `repeat` for a closure called at two
+    sites of `run`, twice or in a loop), `closure` (`lambda`, `alias`,
+    `relambda`, `realias`, `nested`, `loop`), the `outcome`s reached
+    (`return`, `panic-0x11`, `panic-0x12`) and the `panicSite`s (`run`,
+    `body`);
+  - closure factories, 56 values: the same with `param` captured,
+    `factory-read` and `factory-write`, the forms `make`, `discard` and
+    `remake`, the panic site `factory`, and `factory` (`method`, `free`,
+    `closure-result`, `lambda-result`, `captures-param`, `captures-value`,
+    `later-write`, `checked-effect`, `chained`, `in-body`, `literal-argument`,
+    `runtime-argument`, `instances`).
+- Fixed corpora: from seed 1 upwards at the default budget, every accepted
+  plan that covers a missing value, until nothing is missing, each at the
+  eight boundary inputs: closure captures require every value and took 10
+  seeds between 1 and 413 (80 cases); closure factories require every value
+  and took 14 seeds between 4 and 104 (112 cases).
+
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
 Use the actual checker-derived cached-body validity, remove the restrictive
