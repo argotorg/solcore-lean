@@ -65,5 +65,8 @@ without making the executable frontend authoritative.
   `InferenceSoundness`. Its premise is the recursive soundness of statement inference.
 - `SourceCompiledActualInitializerBarriers.compile_cached_bodies`, in `CompiledBodies`.
 
-The reviewer's guide is `docs/review/source-semantics.md`.
+`Staging.Preservation` and `CompiledBodies` use Core lowering files, so this umbrella does not
+import them; `Solcore.SourceSemantics.CoreLowering` does.
+
+The developer guide's page is `docs/guide/source-semantics.md`.
 -/

@@ -21,5 +21,6 @@ stage-analysis pass.
 is the finite staged profile that the source-to-Core theorems are stated over. `Erasure` projects
 its traces to the dynamic semantics, and `Preservation` holds its main theorems:
 `Staging.Recursive.SelectedPreservation.statements` and
-`Staging.Recursive.FaultPreservation.statements`.
+`Staging.Recursive.FaultPreservation.statements`. `Preservation` uses Core lowering files, so this
+umbrella does not import it; `Solcore.SourceSemantics.CoreLowering` does.
 -/

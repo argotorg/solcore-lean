@@ -5,7 +5,7 @@ import Solcore.Syntax.Parser.Internal.DelimitedTotality
 /-!
 Two totality facts about `recoverLambdaParameter`.
 
-`Parser/LambdaParameterTotalityProperties` proves the same two theorems publicly. Lean accepts
+`Parser/Internal/ParameterTotality` proves the same two theorems publicly. Lean accepts
 that across imports, but not in a file that imports the other copy. So these stay in a small
 file of their own, which that module must not import.
 -/

@@ -7,10 +7,12 @@ import Solcore.Frontend.RustHull.ScalarExecution
 # Rust Hull
 
 Checked import of the typed Hull that the pinned Rust compiler exports, its execution on the Core
-machine, and the proofs about both. Read in this order. `docs/review/frontend.md` lists every file.
+machine, and the proofs about both. Read in this order. `docs/guide/frontend.md` lists every file.
 
 1. **Syntax.** `RustHull/Syntax` is the program, and `RustHull/Decode` reads the exported text.
-2. **Meaning.** `RustHull/Semantics` is the independent evaluation, with no reference to Core.
+2. **Meaning.** `RustHull/Semantics` is the independent evaluation; it does not run compiled Core.
+   It shares a few compiler definitions: `AccountState.Account` and `Memory.packBytes` in
+   `Semantics/World`, and `YulFragment.primitives` in `Semantics/Frames`.
    `RustHull/Semantics/` gives the effects: memory, digests, world, accounts, the stacked effect
    layers, and frames.
 3. **Compiler.** `RustHull/Lowering` compiles Hull and inline Yul to Core, on top of

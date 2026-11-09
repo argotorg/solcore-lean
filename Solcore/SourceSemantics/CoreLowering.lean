@@ -437,7 +437,7 @@ not depend on executable frontend passes.
 
 The proofs cover parts of the language: the theorem for the complete compiler is
 unfinished, and `docs/design/core-runtime-unification.md` records what remains. The
-reviewer's guide is `docs/review/core-lowering.md`.
+developer guide's page is `docs/guide/core-lowering.md`.
 
 ## Reading order
 

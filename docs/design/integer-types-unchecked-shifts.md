@@ -1,6 +1,8 @@
 # Integer types, `unchecked` blocks and shifts
 
-Updated: 2026-11-04.
+Updated: 2026-11-04. Module paths and file counts below predate the layout
+refactor of f820cc25f; `.refactor/moves-*.tsv` maps each old module to its
+current file ([following older notes](../guide/conventions.md#following-older-notes)).
 
 Rows 1 to 3 of the roadmap table "Following upstream's semantics: the next
 units" bring three solcore-rs changes to Lean's source language:
@@ -401,7 +403,8 @@ the operator and panic plumbing first.
 - **Integer targets.** The data-place lowering already refused compound
   assignment outside `word` and `integer`. It now also refuses shifts at
   `integer`, which typing never produces. The assignment profile shared by its
-  theorems says the same: `T = .integer ∧ operator.isShift = false`.
+  theorems says the same: `T = .integer ∧ operator.isShift = false` (now
+  `wordOnly`, below).
 - **Legacy fragments.** The older strict-`word` evaluators leave the shifts
   out.
 
@@ -445,7 +448,7 @@ the operator and panic plumbing first.
 - conversions between two integer types;
 - `pragma solcore;` (row 5);
 - reads of uninitialized locals, which Lean keeps faulting on by decision
-  ([closure capture by value](closure-capture-by-value.md)).
+  ([closure capture by value](../guide/source-semantics.md#closures-capture-by-value)).
 
 ## Consequences for existing programs
 

@@ -38,7 +38,7 @@ import Solcore.ContractRuntime.Internal.SelectedWordExecution
 Checked Core contract execution: accounts and world state, host requests, frames and transactions,
 nested calls and creation, commit and rollback, and top-level observations. This layer is distinct
 from `Solcore.Core`'s local evaluator and from the source-language judgments of
-`Solcore.SourceSemantics`. Read in this order. `docs/review/contract-runtime.md` lists every file.
+`Solcore.SourceSemantics`. Read in this order. `docs/guide/contract-runtime.md` lists every file.
 
 1. **State.** `RuntimeScalars`, then `WorldState`.
 2. **One frame.** `Frames` holds its outcomes and checkpoints.

@@ -44,7 +44,7 @@ out. They also cover recursive functions, closures, and mappings. A closure
 captures by value, as in solcore-rs: it keeps the values its captured
 variables had when it was created, an assignment in its body changes only that
 call's copy, and each call starts again from the creation-time values
-([closure captures](docs/design/closure-capture-by-value.md)). See the
+([closure captures](docs/guide/source-semantics.md#closures-capture-by-value)). See the
 [runtime API overview](docs/design/core-runtime-unification.md#public-runtime-api)
 for values, handles, snapshots, and execution options.
 
@@ -181,8 +181,8 @@ aggregate loop, generic, two-slot storage, storage rollback, keyed storage and
 event-log emitters' text to Core under an independent source semantics and a
 stated Rust-pipeline boundary.
 
-The [differential-testing milestones](docs/design/semantic-differential-testing.md)
-specify source emission, seed replay, failure classification and reduction. A
+The [differential-testing page](docs/guide/differential-testing.md) of the
+developer guide explains the comparison model and how to read a disagreement. A
 single-case runner compares the original generated Core result, Rust-produced
 EVM execution, and execution of Rust Hull on Lean Core. It saves all three
 observations and verifies tools and artifact hashes during replay. A campaign
@@ -814,32 +814,37 @@ campaigns have not yet been deployed.
 
 Each area has an umbrella module, a short front with the specification and the
 main theorems, and an `Internal/` directory with everything else. The
-[reviewer's guide](docs/review/README.md) has a page per area: what to read, in
-which order, and which theorems the project claims.
+[developer guide](docs/guide/README.md) has a page per area: where things are,
+which definitions and theorems other code builds on, and how to make and test a
+change. Its [conventions](docs/guide/conventions.md) and
+[workflow](docs/guide/workflow.md) pages apply to every area.
 
 | Module | Contents | Guide |
 | --- | --- | --- |
-| [Syntax](Solcore/Syntax.lean) | AST, lexer, parser, and parser proofs. | [Syntax](docs/review/syntax.md) |
-| [TypeSystem](Solcore/TypeSystem.lean) | Types, substitutions, unification, and inference. | [Foundations](docs/review/foundations.md) |
-| [Frontend.Current](Solcore/Frontend/Current.lean) | Source checking, staging, specialization, and compilation to Core. | [Frontend](docs/review/frontend.md) |
-| [Frontend/RustHull](Solcore/Frontend/RustHull/) | Checked Rust Hull import, contract effects and Core execution. | [Frontend](docs/review/frontend.md) |
-| [Core](Solcore/Core.lean) | Typed syntax, mutable cells, evaluator, execution machines, and safety proofs. | [Core](docs/review/core.md) |
-| [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. | [Source semantics](docs/review/source-semantics.md) |
-| [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. | [ContractRuntime](docs/review/contract-runtime.md) |
-| [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. | [Foundations](docs/review/foundations.md), [Core](docs/review/core.md) |
-| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Checked program generation and shrinking for bounded execution profiles. | [Synthesis](docs/review/synthesis.md) |
-| [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). | [Tests](docs/review/tests.md) |
+| [Syntax](Solcore/Syntax.lean) | AST, lexer, parser, and parser proofs. | [Syntax](docs/guide/syntax.md) |
+| [TypeSystem](Solcore/TypeSystem.lean) | Types, substitutions, unification, and inference. | [Foundations](docs/guide/foundations.md) |
+| [Frontend.Current](Solcore/Frontend/Current.lean) | Source checking, staging, specialization, and compilation to Core. | [Frontend](docs/guide/frontend.md) |
+| [Frontend/RustHull](Solcore/Frontend/RustHull/) | Checked Rust Hull import, contract effects and Core execution. | [Frontend](docs/guide/frontend.md) |
+| [Core](Solcore/Core.lean) | Typed syntax, mutable cells, evaluator, execution machines, and safety proofs. | [Core](docs/guide/core.md) |
+| [SourceSemantics](Solcore/SourceSemantics.lean) | Independent source semantics and type preservation proofs. | [Source semantics](docs/guide/source-semantics.md) |
+| [ContractRuntime](Solcore/ContractRuntime.lean) | Accounts, world state, host effects, calls, and transactions. | [ContractRuntime](docs/guide/contract-runtime.md) |
+| [Abi](Solcore/Abi.lean) / [Core.Wire](Solcore/Core/Wire.lean) | ABI encoding and the JSON representation of Core. | [Foundations](docs/guide/foundations.md), [Core](docs/guide/core.md) |
+| [Synthesis.Core](Solcore/Synthesis/Core.lean) | Checked program generation and shrinking for bounded execution profiles. | [Synthesis](docs/guide/synthesis.md) |
+| [Test](Solcore/Test/) | Tests and reusable fixtures, registered in [Tests/Main.lean](Tests/Main.lean). | [Tests](docs/guide/tests.md) |
 
 [Solcore.lean](Solcore.lean) provides the main import. The source-to-Core
 correspondence proofs live under
 [SourceSemantics/CoreLowering](Solcore/SourceSemantics/CoreLowering.lean), and
-their guide is [Core lowering](docs/review/core-lowering.md).
+their guide is [Core lowering](docs/guide/core-lowering.md).
 
 ## Contributing
 
 Definitions and proofs live under `Solcore/`. Put tests under `Solcore/Test/`
 and register them in `Tests/Main.lean`. Run the build, tests, and kernel check
-above before submitting changes.
+above before submitting changes. [Workflow](docs/guide/workflow.md) lists every
+check CI runs, and [Conventions](docs/guide/conventions.md) says where new code
+goes.
 
-The [kernel check](scripts/check-kernel.mjs) rejects declarations such as
-`sorry`, `axiom`, `partial`, and `unsafe` in semantic modules.
+The [kernel check](scripts/check-kernel.mjs) rejects the words `sorry`,
+`axiom`, `partial`, `unsafe` and a few others anywhere in the semantic modules,
+comments included.

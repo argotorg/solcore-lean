@@ -10,10 +10,11 @@ there is no general theorem connecting every successfully compiled native
 source body to its independent meaning through the complete public execution
 pipeline.
 
-The [M0–M6 differential-testing milestones](semantic-differential-testing.md)
-are complete for their documented bounded profiles. Those comparisons exercise
-the pinned Rust dialect against original generated Core and imported Hull;
-they do not finish the native source compiler's preservation theorem. The
+The M0–M6 differential-testing milestones are complete for their documented
+bounded profiles ([differential testing](../guide/differential-testing.md)).
+Those comparisons exercise the pinned Rust dialect against original generated
+Core and imported Hull; they do not finish the native source compiler's
+preservation theorem. The
 [next implementation roadmap](next-implementation-roadmap.md) sets the order
 for further testing and proof work.
 
@@ -77,7 +78,8 @@ same quantity.
 Runtime support includes closures, recursive functions, mapping values,
 mutable locals, compound values and function handles nested in data. Closures
 capture by value: a closure copies its captured locals when it is created and
-again at each call ([closure captures](closure-capture-by-value.md)). Source
+again at each call
+([closure captures](../guide/source-semantics.md#closures-capture-by-value)). Source
 mapping values here are local language data; they are not an assertion that
 native contract storage is connected to the account-world runtime.
 

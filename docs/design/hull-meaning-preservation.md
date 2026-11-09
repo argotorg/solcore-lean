@@ -620,9 +620,10 @@ delay those connections.
 
 ## Deferred public proof work
 
-The bounded [M0–M6 differential-testing milestones](semantic-differential-testing.md)
-are complete. They did not require completion of every remaining Hull proof
-and do not discharge those obligations. The
+The bounded M0–M6 differential-testing milestones
+([differential testing](../guide/differential-testing.md)) are complete. They
+did not require completion of every remaining Hull proof and do not discharge
+those obligations. The
 [next implementation roadmap](next-implementation-roadmap.md) prioritizes
 continuous bounded campaigns, backend and grammar coverage, and the native
 Source public proof connection before this remaining Hull work.

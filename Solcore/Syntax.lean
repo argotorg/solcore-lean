@@ -42,7 +42,7 @@ import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
 # Syntax
 
 The AST, the lexer, the parser, and the proofs that the parser matches an independent grammar.
-Read in this order. `docs/review/syntax.md` lists every file.
+Read in this order. `docs/guide/syntax.md` lists every file.
 
 1. **AST.** `Source`, `Token`, `Foundation`, `Type`, `Term`, `Yul`, `Declaration`, `Module` and
    `Trivia`.

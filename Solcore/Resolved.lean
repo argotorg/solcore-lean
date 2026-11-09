@@ -13,7 +13,7 @@ import Solcore.Resolved.Internal.LocalFragmentLaws
 The semantic foundation for already-resolved local expressions: exact lookup, elaboration, typing,
 evaluation, and correspondence with executable Core. Ordered binary products keep the original child
 scopes and actual values. This is not a canonical source resolver or a complete source-to-Core
-pipeline, and it does not enable a canonical tuple adapter. `docs/review/foundations.md` lists every
+pipeline, and it does not enable a canonical tuple adapter. `docs/guide/foundations.md` lists every
 file.
 
 Read `Identity`, `LocalScope`, `Expr`, `Typing` and `Eval`. `ExecutionProperties` holds the main

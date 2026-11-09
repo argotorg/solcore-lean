@@ -35,7 +35,7 @@ import Solcore.Core.Internal.MappingLaws
 # Core
 
 The typed language every program compiles to, its semantics, and its safety proofs. Read in this
-order. `docs/review/core.md` lists every file.
+order. `docs/guide/core.md` lists every file.
 
 1. **Language.** `Syntax`, `Data` and `Primitive`, then `Typing`. `Check` is the same check with
    diagnostics.

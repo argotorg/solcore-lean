@@ -1,7 +1,7 @@
 # Generated semantic comparisons
 
-The implementation plan and completion criteria are in
-[Semantic differential testing milestones](../docs/design/semantic-differential-testing.md).
+The comparison model, how to read a disagreement and the rules are in the
+developer guide's [differential-testing page](../docs/guide/differential-testing.md).
 The reference Rust revision is `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`, upstream main of 2026-11-02;
 until then it was `2a745e12`.
 

@@ -5,7 +5,7 @@ milestones. Delivery and verification are recorded separately below.
 
 ## Baseline
 
-[M0–M6](semantic-differential-testing.md) provide checked generation, source
+[M0–M6](../guide/differential-testing.md) provide checked generation, source
 emission, three-way execution, bounded campaigns, failure-preserving reduction
 and strict replay. The primary oracle executes the original generated Core;
 the other paths execute Rust-produced EVM bytecode and imported Rust Hull.
@@ -11744,9 +11744,12 @@ from them. Every pinned Rust path agrees on this, and Lean now follows it: the
 lambda rule copies the captured cells, each call copies them again before
 binding its parameters, and the Core lowering makes the same copies as marked
 source allocations. Through the public API, #120's two programs and the
-repeated call give 42, 83 and 11, where they gave 101, 84 and 212. The probe,
-the design, its alternatives and the proof changes are in
-[Closures capture by value](closure-capture-by-value.md).
+repeated call give 42, 83 and 11, where they gave 101, 84 and 212. The rule is
+in the [source semantics guide](../guide/source-semantics.md#closures-capture-by-value)
+and the proof structure in the
+[core lowering guide](../guide/core-lowering.md#closures-by-value). The probe and
+the alternatives are in the design note that commit 43956742b added, removed
+once the work was done.
 
 **Integer types, `unchecked` blocks and shifts in Lean.** Rows 1 to 3 of the
 table "Following upstream's semantics: the next units" come to Lean's source
