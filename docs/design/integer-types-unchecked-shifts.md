@@ -285,6 +285,8 @@ blocks has no Lean counterpart.
   holding its exact `Int`, in range by typing. The primitive relations
   dispatch on value shapes, so the new constructor lets the existing rules
   tell `word` and `uint8` apart, as `.integer` already does for `integer`.
+  (Superseded: integer-typed values are words; see [decisions on
+  resuming](#decisions-on-resuming).)
 - **Primitive rules.**
   - Checked and unchecked arithmetic, negation, bitwise operators,
     comparisons and shifts, defined on the exact values as in the table
@@ -316,7 +318,8 @@ blocks has no Lean counterpart.
   proofs relate them directly.
 - **Panic sites.** Each panic site has its own failure reason. The fault-site
   table maps it to a new `RuntimeError.panic` diagnostic carrying the code and
-  the operator's span.
+  the operator's span. (Superseded: one reason per panic code; see [decisions
+  on resuming](#decisions-on-resuming).)
 - **No Core change.** Core's syntax and semantics, the Hull importer and the
   shared contract runtime are unchanged.
 
@@ -342,9 +345,11 @@ blocks has no Lean counterpart.
   `std.unchecked.*` to Lean's dialect, as described above. It is rejected for
   the frontend features it needs and the call per operation.
 - **Values as words.** Integer-type values would be `.word` values in the
-  semantics, with primitive rules indexed by the operands' static types. It is
+  semantics, with primitive rules indexed by the operands' static types. It was
   rejected because every binary, unary and assignment evaluation rule, and
   every fault rule, would then need the operand's static type as a premise.
+  Chosen on resuming, with typed operators in place of those premises; see
+  [decisions on resuming](#decisions-on-resuming).
 - **A typed `unchecked` statement.** A statement form kept through the typed
   IR to the semantics. It is rejected because about 32 SourceSemantics
   modules match the typed statement forms exhaustively, against 5 that match
@@ -466,8 +471,8 @@ the hand-over note, with every theorem statement that each commit changes.
 
 ## Resume point
 
-The unit is required, and it is paused after row 3 and part of row 2
-(2026-11-04).
+The unit is required. It was paused after row 3 and part of row 2 on
+2026-11-04, and resumed on 2026-11-09 from main `99b37ca61`.
 
 **Done.**
 - Row 3, shifts: [shifts as implemented](#shifts-as-implemented).
@@ -508,7 +513,8 @@ The public-API tests are `Tests.SourceCoreShiftExecution` and
   the `integer` value constructor in a case, and the lowering's value
   representation would gain a matching case.
 
-**Decide first when resuming.**
+**Decide first when resuming.** Both are decided in [decisions on
+resuming](#decisions-on-resuming).
 
 1. **Panic threading.** Thread `.panic` the way `uninitialized` is threaded,
    or generalize the fault-to-token hypothesis once, so that later fault
@@ -522,3 +528,73 @@ The public-API tests are `Tests.SourceCoreShiftExecution` and
 
 Theorem statements that change keep being listed in the lane's hand-over
 note.
+
+## Decisions on resuming
+
+Made on 2026-11-09, before any code of the resumed unit.
+
+### Panics: one generalized fault law, one reason per panic code
+
+**Compared.**
+- **Per-reason threading.** A hypothesis tying `.panic code` to its token
+  would sit beside each `uninitialized` hypothesis. That is about 414
+  declarations in 206 files under `Solcore/SourceSemantics/CoreLowering`, in
+  a dozen quantifier shapes. Every call that passes `uninitialized` on would
+  pass it too, and each of the 15 places that prove `uninitialized` would
+  prove it as well. A later fault family would need the same again.
+- **One generalized hypothesis.** A class of fault-to-token laws that hold at
+  every site, threaded once.
+
+**Chosen: the generalized hypothesis, as an instance argument.**
+- `FaultTokens faults` is a `Prop` class. Its first law states that the fault
+  `.panic code` fails with that code's reason.
+- Theorems that need it take `[FaultTokens faults]`. Lean finds the instance
+  at each call site from the caller's own binder, so the threading changes
+  declarations and leaves calls alone. The binder goes beside each
+  `uninitialized` hypothesis or section variable.
+- One instance, for the decoded fault relation of the public results, serves
+  the places that prove `uninitialized`.
+- Row 1's checked arithmetic (`0x11`, `0x12`) and row 4's array panics
+  (`0x31`, `0x32`, `0x41`) are panics too, so they need no more threading. A
+  later family whose token does not depend on its site adds a field.
+- Per-reason threading would cost the same declarations, plus every call site,
+  and would cost them again for each later family.
+
+**Panic reasons.**
+- Panic code `c` fails with the Core reason `2^256 − 2^8 + c`, the same in
+  every function. The design above planned one reason per site instead. A
+  site's token would depend on that site's `reasonAt`, which varies by header
+  and method under binders, so no single instance could carry it.
+- Decoding tries the fault-site tables first and then the panic range, so the
+  existing decoding theorems keep their statements.
+- Program preparation checks that no table reason lies in the panic range.
+  That check proves the panic law for the decoded relation.
+- The panic diagnostic names the code and the function, not the operator's
+  span. Upstream's revert data, `0x4e487b71` followed by the code, carries no
+  site either, and it is computed from the reason alone.
+
+### Row 1's values: integer-typed values are words
+
+**Compared.**
+- **An exact constructor.** `Dynamic.Value` gains a case holding the type and
+  the exact integer, and every relation that matches values gains a case:
+  - about 126 arms in 37 files under `Solcore/SourceSemantics/CoreLowering`,
+    where each pipeline's value representation gains a constructor;
+  - 13 arms in five files under `Solcore/SourceSemantics/Dynamic`;
+  - the frontend's runtime value conversions and staged values.
+- **Words with typed operations.** An integer-typed value is the `.word` that
+  is its canonical two's complement representation. The typed operations
+  check the ranges, as upstream's Hull and lane E's Core reference do.
+
+**Chosen: words.** Both give upstream's results: a value's word is its
+canonical representation, and each typed operation computes the exact result
+and then wraps or panics as upstream does. Words touch fewer proofs:
+- The twelve types have Core type `word`. The lowering's value representation
+  already relates their values, because its word case takes any source type
+  whose runtime type is `word`, so no representation gains a constructor.
+- `ValueHasType` gains one case: a word that is canonical for an integer type.
+  Matches on a fixed expected type, such as `.word`, are unaffected.
+- The typed operations are operators, as the unchecked ones are, and
+  inference selects them once the operands' types are known. The evaluation
+  rules therefore keep their shape, and no rule takes an operand's static type
+  as a premise. That removes the reason the alternative above was rejected.
