@@ -37,6 +37,7 @@ import Solcore.Syntax.Parser.Internal.TriviaProofs
 import Solcore.Syntax.Parser.Internal.Basics
 import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Parser.Internal.YulExpressionSoundness
+import Solcore.Syntax.Unchecked
 
 /-!
 # Syntax
@@ -57,6 +58,10 @@ Read in this order. `docs/guide/syntax.md` lists every file.
 5. **Main theorems.** `Parser/Correctness` proves that `parse` is total, sound and complete against
    the grammar, that the AST is unique, and that its spans belong to the file.
    `Parser/PublicOutputs` fixes the whole output on complete slices of the language.
+
+`Unchecked` is the pass around the parser for `unchecked { … }` blocks: `prepare` blanks each
+block's keyword before parsing, and `mark` gives the block's arithmetic its unchecked operators
+afterwards. `Parser/Correctness` covers `parse` alone, not this pass.
 
 `Internal/` holds the grammar-level proofs and `Parser/Internal/` the parser-level proofs.
 -/
