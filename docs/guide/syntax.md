@@ -298,7 +298,7 @@ No commit since the parser was built has added one, so this order follows the st
     private `absent_conflicts_token`, and the first also has `absent_conflicts_token_variant`.
 - **Private helper names repeat across files**, as `absent_conflicts_token` does in many `Internal/`
   files. Moving code between files can make two of them clash; rename one. The layout refactor used
-  a `_variant` suffix and recorded its renames in `.refactor/renames-r3-syntax.tsv`.
+  a `_variant` suffix.
 - **Tests name theorems.** The Syntax tests check theorem names with `example := @name`, internal
   ones included. Renaming or deleting a theorem breaks them, so update the tests in the same change.
 - **The kernel check is textual.** Words such as `partial` fail even in comments; see

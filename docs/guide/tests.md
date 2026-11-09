@@ -86,7 +86,6 @@ it prints `solcore-lean tests passed` and returns 0.
 The entry points keep the namespaces of the modules they came from:
 `Tests.SourceArrayCases.testSourceArrayCases` is in `Solcore/Test/Synthesis/Arrays.lean`. To find
 one, search for its namespace or for the marker `-- leanmerge: from Solcore.Test.SourceArrayCases`.
-`.refactor/moves-r5-tests.tsv` maps each old test module to its file.
 
 ## Adding a test
 

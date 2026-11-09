@@ -1,8 +1,9 @@
 # Integer types, `unchecked` blocks and shifts
 
 Updated: 2026-11-04. Module paths and file counts below predate the layout
-refactor of f820cc25f; `.refactor/moves-*.tsv` maps each old module to its
-current file ([following older notes](../guide/conventions.md#following-older-notes)).
+refactor of f820cc25f; the marker `-- leanmerge: from <old module>` finds each
+old module's current file
+([following older notes](../guide/conventions.md#following-older-notes)).
 
 Rows 1 to 3 of the roadmap table "Following upstream's semantics: the next
 units" bring three solcore-rs changes to Lean's source language:

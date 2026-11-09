@@ -86,9 +86,12 @@ and changes nothing else.
 - **`lake env lean --run scripts/refactor/PrintConst.lean <Module> <Name>…`** prints the type and
   value of each named constant, which helps to read a diff.
 
-The Python tools print their usage with `--help`. Lean realizes equation lemmas lazily, so a pure
-move can change the module that an `.eq_1` lemma is recorded in. That is one reason the diff
-ignores modules.
+The Python tools print their usage with `--help`. `leanmerge.py` and `leansplit.py` record each
+move in `.refactor/moves.tsv`, or in the file given with `--moves`. Git ignores `.refactor/`, so
+these records stay local.
+
+Lean realizes equation lemmas lazily, so a pure move can change the module that an `.eq_1` lemma
+is recorded in. That is one reason the diff ignores modules.
 
 ## Local records
 

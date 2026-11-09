@@ -118,18 +118,14 @@ pure move.
 ## Following older notes
 
 Commit messages, integration records and notes written before the layout refactor (commit
-f820cc25f) name modules that no longer exist. The `.refactor/` files map them to the current
-layout.
+f820cc25f) name modules that no longer exist.
 
-- **Moves.**
-  - `.refactor/moves-<lane>.tsv` maps each old module to the module that holds it now. Its columns
-    are the old module, the new module and the kind of move.
-  - The marker `-- leanmerge: from <old module>` then finds the old module's section in that file.
-- **Splits.**
-  - A line starting `# split` marks an old module that was split: its definitions went to the front
-    and its laws to `Internal/`.
-  - The map points such a module at the laws. Its definitions are in the area's front, under the
-    same namespace.
-- **Renames and deletions.**
-  - `.refactor/renames-<lane>.tsv` lists the private helpers renamed to avoid clashes.
-  - `.refactor/deleted-<lane>.tsv` lists the identical private copies that were removed.
+- **Moves.** Each merged section starts with the marker `-- leanmerge: from <old module>`. Search
+  for it, as in `git grep -n "leanmerge: from Solcore.Core.Store"`, to find the file and section
+  that hold an old module now.
+- **Splits.** 110 old modules were split before they were merged, nearly all into definitions for
+  the area's front and laws for `Internal/`. The marker that names the old module finds one part;
+  search for the name of a declaration in the other part to find it.
+- **Names.** Declarations kept their names, so a search for a name from an older note finds it.
+  The exceptions are private helpers: the refactor renamed some to avoid clashes, most with a
+  `_variant` suffix, and removed identical private copies.
