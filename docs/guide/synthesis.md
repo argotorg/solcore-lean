@@ -229,12 +229,15 @@ generates and compares, and which backends it runs on.
 
 ### Change what an emitter prints
 
-`acbbc4033` made the aggregate renderer print raw primitives, for eleven profiles.
+`acbbc4033` made the aggregate renderer print raw primitives, for eleven profiles, and `80c3cf2b5`
+made every emitter print `pragma solcore;` first.
 
 1. Find every profile whose emitter uses what you change. `AggregateRenderer`
    (`Internal/Aggregates`) is used by most families; `git grep AggregateRenderer.` lists them.
-2. Bump each affected profile's `emitterVersion` and `profileVersion`, so that older saved cases
-   fail their version check instead of replaying under the new text.
+2. Bump each affected profile's `emitterVersion`, so that older saved cases fail their version
+   check instead of replaying under the new text. Bump its `profileVersion` too only when the
+   programs it accepts change, as for `acbbc4033`; the pragma moved 63 emitter versions and no
+   profile version.
 3. Regenerate the fixed corpora of those profiles, and update the golden sources in their Lean
    tests and corpus validators.
 4. If the emitter has a theorem, update its proof: the `*_render_spec` induction in
