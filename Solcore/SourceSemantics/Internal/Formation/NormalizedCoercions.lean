@@ -1140,11 +1140,15 @@ private theorem finishOperator_formation
                 row.predicate issued
 
 private abbrev finishUnary (context : SourceInference.Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (openLiteral : Bool) (state : State) :=
+    (operandType : Ty) (openLiteral : Bool) (state : State) :
+    Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
-  finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
-    (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] openLiteral state
+  if Detail.fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
+      (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] openLiteral state
 
 private abbrev finishBinary (context : SourceInference.Context) (operator : Syntax.BinaryOp)
     (operandType : Ty) (openLiteral : Bool) (state : State) :
@@ -1191,9 +1195,14 @@ theorem inferUnaryOperator_normalized_issuance
   have finish {before : State} {openLiteral : Bool}
       (accepted : finishUnary context operator operandType openLiteral before = .ok result) :
       ∀ row ∈ result.state.requirements, row ∉ before.requirements →
-        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) :=
-    finishOperator_formation catalog signatures
-      (fun extension => (extension operandType).symm ▸ operandFormed) continuation accepted
+        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) := by
+    simp only [finishUnary] at accepted
+    split at accepted
+    · intro row member fresh
+      rw [← Except.ok.inj accepted] at member
+      exact absurd member fresh
+    · exact finishOperator_formation catalog signatures
+        (fun extension => (extension operandType).symm ▸ operandFormed) continuation accepted
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals operandType
   unfold Detail.inferUnaryOperator at accepted
   cases expected with

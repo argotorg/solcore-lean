@@ -1114,6 +1114,9 @@ mutual
         | integerBitNot =>
             exact ⟨applies.preserves .integerBitNot input_typed, before_typed,
               .refl before⟩
+        | fixedBitNot kind =>
+            exact ⟨applies.preserves (.fixedBitNot kind) input_typed, before_typed,
+              .refl before⟩
         | trait dispatch profile requirements_prove =>
             cases requirements_prove
             cases profile
@@ -1122,6 +1125,7 @@ mutual
         | logicalNot => cases selected
         | wordBitNot => cases selected
         | integerBitNot => cases selected
+        | fixedBitNot kind => cases selected
         | trait static_dispatch profile requirements_prove =>
             rcases unaryDispatch_functional static_dispatch dispatch with
               ⟨rfl, rfl⟩

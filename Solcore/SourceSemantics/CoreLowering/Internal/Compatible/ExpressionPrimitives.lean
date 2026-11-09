@@ -330,11 +330,40 @@ theorem word_fields (represented : ValueRep checked registry functions mapping w
 theorem integer_fields (represented : ValueRep checked registry functions mapping world sourceType source value .integer) :
     ∃ integer, source = .integer integer ∧ value = .integer integer := scalar_fields represented
 
+/-- A value represented at a fixed-width integer type is a canonical word. -/
+theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedInteger}
+    {source : Dynamic.Value} {value : Value} {coreType : Ty}
+    (related : ValueRep checked registry functions mapping world sourceType source value coreType)
+    (view : SourceCoreRawMetadata.runtimeType sourceType = .fixed type) :
+    ∃ word, source = .word word ∧ value = .word word ∧ coreType = .word ∧
+      type.canonical word.val = true := by
+  revert view
+  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
+  | @fixed actual word canonical =>
+      intro view
+      cases view
+      exact ⟨word, rfl, rfl, rfl, canonical⟩
+  | compatible same _ ih => intro view; exact ih (same.symm.trans view)
+  | @constructed metadata id tag sources values types _ _ _ projected _ _ _ =>
+      intro view
+      have scalar : checked.catalog.project metadata.resultType = .ok .word := by
+        rw [← checked.catalog.project_runtimeType, view]
+        rfl
+      cases Except.ok.inj (projected.symm.trans scalar)
+  | unit | bool | word | integer | product | function | proxy | mappingValue =>
+      intro view
+      cases view
+  | nil | cons | empty | entry | absent | present => trivial
+
 /-- Empty evidence admits exactly these scalar unary profiles. -/
 inductive UnaryProfile : Syntax.UnaryOp → TypeSystem.Ty → TypeSystem.Ty → UnaryOp → Prop where
   | logicalNot : UnaryProfile .logicalNot .bool .bool .boolNot
   | wordNot : UnaryProfile .bitNot .word .word .wordNot
   | integerNot : UnaryProfile .bitNot .integer .integer .integerNot
+  /-- `~` on the fixed-width integer types where it is Word's. -/
+  | fixedNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
+      UnaryProfile .bitNot (.fixed type) (.fixed type) .wordNot
 
 theorem UnaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.UnaryOp}
     {operand result : TypeSystem.Ty} (typed : UnaryOperatorHasType context operator operand result []) :
@@ -343,6 +372,7 @@ theorem UnaryProfile.of_typing {context : SourceSemantics.Context} {operator : S
   | logicalNot => exact ⟨_, .logicalNot⟩
   | wordBitNot => exact ⟨_, .wordNot⟩
   | integerBitNot => exact ⟨_, .integerNot⟩
+  | fixedBitNot kind => exact ⟨_, .fixedNot kind⟩
   | trait _ profile evidence => cases profile; cases evidence
 
 theorem UnaryProfile.preserves {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp}
@@ -361,6 +391,9 @@ theorem UnaryProfile.preserves {operator : Syntax.UnaryOp} {operand result : Typ
   | integerNot =>
     obtain ⟨integer, rfl, rfl⟩ := integer_fields represented
     exact ⟨_, _, .integerBitNot integer, rfl, .integer _⟩
+  | fixedNot kind =>
+    obtain ⟨word, rfl, rfl, _, canonical⟩ := fixed_fields represented rfl
+    exact ⟨_, _, .wordBitNot word, rfl, .fixed _ (Dynamic.fixed_canonical_bitNot kind canonical)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitives
 end
@@ -419,8 +452,8 @@ inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty �
   | fixedComparison {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedWordComparison type operator) :
       BinaryProfile operator (.fixed type) .bool .word
-  /-- Bitwise operators on an unsigned fixed-width integer type, which are
-  Word's and keep words canonical. -/
+  /-- Bitwise operators on a fixed-width integer type, which are Word's and
+  keep words canonical. -/
   | fixedBitwise {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedWordBitwise type operator) :
       BinaryProfile operator (.fixed type) (.fixed type) .word
@@ -1352,31 +1385,6 @@ theorem _root_.Solcore.SourceSemantics.FixedWordBitwise.strict {type : TypeSyste
     (kind : FixedWordBitwise type operator) : Dynamic.StrictBinaryOperator operator := by
   cases kind <;> constructor
 
-/-- A value represented at a fixed-width integer type is a canonical word. -/
-theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedInteger}
-    {source : Dynamic.Value} {value : Value} {coreType : Ty}
-    (related : ValueRep checked registry functions mapping world sourceType source value coreType)
-    (view : SourceCoreRawMetadata.runtimeType sourceType = .fixed type) :
-    ∃ word, source = .word word ∧ value = .word word ∧ coreType = .word ∧
-      type.canonical word.val = true := by
-  revert view
-  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
-    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | @fixed actual word canonical =>
-      intro view
-      cases view
-      exact ⟨word, rfl, rfl, rfl, canonical⟩
-  | compatible same _ ih => intro view; exact ih (same.symm.trans view)
-  | @constructed metadata id tag sources values types _ _ _ projected _ _ _ =>
-      intro view
-      have scalar : checked.catalog.project metadata.resultType = .ok .word := by
-        rw [← checked.catalog.project_runtimeType, view]
-        rfl
-      cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | integer | product | function | proxy | mappingValue =>
-      intro view
-      cases view
-  | nil | cons | empty | entry | absent | present => trivial
 
 theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator)) :
@@ -1550,18 +1558,18 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
       rw [Mode.binary_strict _ strict]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
     cases kind with
-    | bitAnd unsigned =>
+    | bitAnd =>
       obtain ⟨result, rfl, rfl⟩ := word_fields represented
       cases applied
-      exact .fixed _ (Dynamic.unsigned_canonical_bitAnd unsigned rightCanonical)
-    | bitOr unsigned =>
+      exact .fixed _ (Dynamic.fixed_canonical_bitAnd leftCanonical rightCanonical)
+    | bitOr =>
       obtain ⟨result, rfl, rfl⟩ := word_fields represented
       cases applied
-      exact .fixed _ (Dynamic.unsigned_canonical_bitOr unsigned leftCanonical rightCanonical)
-    | bitXor unsigned =>
+      exact .fixed _ (Dynamic.fixed_canonical_bitOr leftCanonical rightCanonical)
+    | bitXor =>
       obtain ⟨result, rfl, rfl⟩ := word_fields represented
       cases applied
-      exact .fixed _ (Dynamic.unsigned_canonical_bitXor unsigned leftCanonical rightCanonical)
+      exact .fixed _ (Dynamic.fixed_canonical_bitXor leftCanonical rightCanonical)
   | logicalAnd =>
     refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep

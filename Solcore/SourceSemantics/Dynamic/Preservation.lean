@@ -103,12 +103,215 @@ theorem hasType
 
 end ResolvedIntegerLiteralConstructs
 
+/-- A word is canonical for an unsigned fixed-width integer type exactly when it
+is below `2^N`. -/
+theorem unsigned_canonical_iff {type : TypeSystem.FixedInteger}
+    (unsigned : type.signed = false) (n : Nat) :
+    type.canonical n = true ↔ n < 2 ^ type.width.bits := by
+  unfold TypeSystem.FixedInteger.canonical
+  simp [unsigned]
+
+theorem unsigned_canonical_bitAnd {type : TypeSystem.FixedInteger}
+    (unsigned : type.signed = false) {left right : Core.Word}
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitAnd right).val = true := by
+  rw [unsigned_canonical_iff unsigned] at rightCanonical ⊢
+  show (left &&& right).val < _
+  rw [Fin.and_val]
+  exact Nat.and_lt_two_pow _ rightCanonical
+
+theorem unsigned_canonical_bitOr {type : TypeSystem.FixedInteger}
+    (unsigned : type.signed = false) {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitOr right).val = true := by
+  rw [unsigned_canonical_iff unsigned] at leftCanonical rightCanonical ⊢
+  show (left ||| right).val < _
+  rw [Fin.or_val]
+  exact Nat.lt_of_le_of_lt (Nat.mod_le _ _) (Nat.or_lt_two_pow leftCanonical rightCanonical)
+
+theorem unsigned_canonical_bitXor {type : TypeSystem.FixedInteger}
+    (unsigned : type.signed = false) {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitXor right).val = true := by
+  rw [unsigned_canonical_iff unsigned] at leftCanonical rightCanonical ⊢
+  show (left ^^^ right).val < _
+  rw [Fin.xor_val]
+  exact Nat.lt_of_le_of_lt (Nat.mod_le _ _) (Nat.xor_lt_two_pow leftCanonical rightCanonical)
+
+/-- A word typed at a fixed-width integer type is canonical for it. -/
+theorem fixed_word_canonical {context : Context} {heap : Heap}
+    {type : TypeSystem.FixedInteger} {word : Core.Word}
+    (typed : ValueHasType context heap (.word word) (.fixed type)) :
+    type.canonical word.val = true := by
+  cases typed with
+  | fixed _ canonical => exact canonical
+
+/-- `n / 2^k` is `0`, or all ones in the top `256 - k` bits, exactly when `n` is
+below `2^k` or at least `2^256 - 2^k`. -/
+theorem top_bits_cases {k n : Nat} (le : k ≤ 256) (bound : n < 2 ^ 256) :
+    (n < 2 ^ k ∨ 2 ^ 256 - 2 ^ k ≤ n) ↔
+      (n / 2 ^ k = 0 ∨ n / 2 ^ k = 2 ^ (256 - k) - 1) := by
+  have split : 2 ^ 256 = 2 ^ (256 - k) * 2 ^ k := by
+    rw [← Nat.pow_add]; congr 1; omega
+  have positive : 0 < 2 ^ k := Nat.two_pow_pos k
+  constructor
+  · rintro (low | high)
+    · exact .inl (Nat.div_eq_of_lt low)
+    · refine .inr (Nat.le_antisymm ?_ ?_)
+      · have : n / 2 ^ k < 2 ^ (256 - k) := by
+          rw [Nat.div_lt_iff_lt_mul positive, ← split]; exact bound
+        omega
+      · rw [Nat.le_div_iff_mul_le positive, Nat.sub_mul, ← split, Nat.one_mul]
+        exact high
+  · rintro (low | high)
+    · left
+      rcases Nat.div_eq_zero_iff.mp low with zero | lt
+      · omega
+      · exact lt
+    · right
+      have := Nat.div_mul_le_self n (2 ^ k)
+      rw [high, Nat.sub_mul, ← split, Nat.one_mul] at this
+      exact this
+
+/-- A word is canonical for a signed fixed-width integer type exactly when its
+bits from `N - 1` up are all zero or all one. -/
+theorem signed_canonical_iff {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) (word : Core.Word) :
+    type.canonical word.val = true ↔
+      (word.val / 2 ^ (type.width.bits - 1) = 0 ∨
+        word.val / 2 ^ (type.width.bits - 1) = 2 ^ (256 - (type.width.bits - 1)) - 1) := by
+  have le : type.width.bits - 1 ≤ 256 := by cases type.width <;> decide
+  rw [← top_bits_cases le word.isLt]
+  unfold TypeSystem.FixedInteger.canonical
+  simp [signed]
+
+private theorem zero_or_closed_and {m x y : Nat} (hx : x = 0 ∨ x = m) (hy : y = 0 ∨ y = m) :
+    (x &&& y) = 0 ∨ (x &&& y) = m := by
+  rcases hx with rfl | rfl <;> rcases hy with rfl | rfl <;> simp
+
+private theorem zero_or_closed_or {m x y : Nat} (hx : x = 0 ∨ x = m) (hy : y = 0 ∨ y = m) :
+    (x ||| y) = 0 ∨ (x ||| y) = m := by
+  rcases hx with rfl | rfl <;> rcases hy with rfl | rfl <;> simp
+
+private theorem zero_or_closed_xor {m x y : Nat} (hx : x = 0 ∨ x = m) (hy : y = 0 ∨ y = m) :
+    (x ^^^ y) = 0 ∨ (x ^^^ y) = m := by
+  rcases hx with rfl | rfl <;> rcases hy with rfl | rfl <;> simp
+
+theorem word_bitAnd_val (left right : Core.Word) :
+    (left.bitAnd right).val = left.val &&& right.val := by
+  show (left &&& right).val = _
+  rw [Fin.and_val]
+
+theorem word_bitOr_val (left right : Core.Word) :
+    (left.bitOr right).val = left.val ||| right.val := by
+  show (left ||| right).val = _
+  rw [Fin.or_val]
+  exact Nat.mod_eq_of_lt (Nat.or_lt_two_pow left.isLt right.isLt)
+
+theorem word_bitXor_val (left right : Core.Word) :
+    (left.bitXor right).val = left.val ^^^ right.val := by
+  show (left ^^^ right).val = _
+  rw [Fin.xor_val]
+  exact Nat.mod_eq_of_lt (Nat.xor_lt_two_pow left.isLt right.isLt)
+
+theorem word_bitNot_val (value : Core.Word) : value.bitNot.val = 2 ^ 256 - 1 - value.val := by
+  unfold Core.Word.bitNot
+  rw [Fin.sub_def]
+  simp only [Core.Word.maximum]
+  have bound := value.isLt
+  simp only [Core.wordModulus] at bound ⊢
+  omega
+
+theorem signed_canonical_bitAnd {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitAnd right).val = true := by
+  rw [signed_canonical_iff signed] at leftCanonical rightCanonical ⊢
+  rw [word_bitAnd_val, Nat.and_div_two_pow]
+  exact zero_or_closed_and leftCanonical rightCanonical
+
+theorem signed_canonical_bitOr {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitOr right).val = true := by
+  rw [signed_canonical_iff signed] at leftCanonical rightCanonical ⊢
+  rw [word_bitOr_val, Nat.or_div_two_pow]
+  exact zero_or_closed_or leftCanonical rightCanonical
+
+theorem signed_canonical_bitXor {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitXor right).val = true := by
+  rw [signed_canonical_iff signed] at leftCanonical rightCanonical ⊢
+  rw [word_bitXor_val, Nat.xor_div_two_pow]
+  exact zero_or_closed_xor leftCanonical rightCanonical
+
+theorem signed_canonical_bitNot {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) {value : Core.Word}
+    (canonical : type.canonical value.val = true) :
+    type.canonical value.bitNot.val = true := by
+  unfold TypeSystem.FixedInteger.canonical at canonical ⊢
+  simp only [signed, if_true, Bool.or_eq_true, decide_eq_true_eq] at canonical ⊢
+  rw [word_bitNot_val]
+  have bound := value.isLt
+  have positive : 0 < 2 ^ (type.width.bits - 1) := Nat.two_pow_pos _
+  have small : 2 ^ (type.width.bits - 1) ≤ 2 ^ 256 :=
+    Nat.pow_le_pow_right (by decide) (by cases type.width <;> decide)
+  simp only [Core.wordModulus] at bound
+  omega
+
+/-- `&` keeps a word canonical for every fixed-width integer type. -/
+theorem fixed_canonical_bitAnd {type : TypeSystem.FixedInteger} {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitAnd right).val = true := by
+  cases signed : type.signed
+  · exact unsigned_canonical_bitAnd signed rightCanonical
+  · exact signed_canonical_bitAnd signed leftCanonical rightCanonical
+
+/-- `|` keeps a word canonical for every fixed-width integer type. -/
+theorem fixed_canonical_bitOr {type : TypeSystem.FixedInteger} {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitOr right).val = true := by
+  cases signed : type.signed
+  · exact unsigned_canonical_bitOr signed leftCanonical rightCanonical
+  · exact signed_canonical_bitOr signed leftCanonical rightCanonical
+
+/-- `^` keeps a word canonical for every fixed-width integer type. -/
+theorem fixed_canonical_bitXor {type : TypeSystem.FixedInteger} {left right : Core.Word}
+    (leftCanonical : type.canonical left.val = true)
+    (rightCanonical : type.canonical right.val = true) :
+    type.canonical (left.bitXor right).val = true := by
+  cases signed : type.signed
+  · exact unsigned_canonical_bitXor signed leftCanonical rightCanonical
+  · exact signed_canonical_bitXor signed leftCanonical rightCanonical
+
+/-- Word's `~` keeps a word canonical for the types of `FixedWordBitNot`. -/
+theorem fixed_canonical_bitNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type)
+    {value : Core.Word} (canonical : type.canonical value.val = true) :
+    type.canonical value.bitNot.val = true := by
+  cases signed : type.signed
+  · cases kind with
+    | signed isSigned => rw [signed] at isSigned; cases isSigned
+    | full full =>
+      rw [unsigned_canonical_iff signed, full]
+      exact value.bitNot.isLt
+  · exact signed_canonical_bitNot signed canonical
+
 /-- The primitive unary fragment of source operator typing. -/
 inductive PrimitiveUnaryHasType :
     Syntax.UnaryOp -> Ty -> Ty -> Prop where
   | logicalNot : PrimitiveUnaryHasType .logicalNot .bool .bool
   | wordBitNot : PrimitiveUnaryHasType .bitNot .word .word
   | integerBitNot : PrimitiveUnaryHasType .bitNot .integer .integer
+  | fixedBitNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
+      PrimitiveUnaryHasType .bitNot (.fixed type) (.fixed type)
 
 namespace PrimitiveUnaryHasType
 
@@ -120,6 +323,7 @@ theorem sourceTyping {context : Context} {operator : Syntax.UnaryOp}
   | logicalNot => exact .logicalNot
   | wordBitNot => exact .wordBitNot
   | integerBitNot => exact .integerBitNot
+  | fixedBitNot kind => exact .fixedBitNot kind
 
 end PrimitiveUnaryHasType
 
@@ -132,10 +336,23 @@ theorem preserves
     (operand_typed : ValueHasType context heap operand operandType)
     (application : UnaryPrimitiveApplies operator operand result) :
     ValueHasType context heap result resultType := by
-  cases typing <;> cases application <;> try { cases operand_typed }
-  · exact .bool _
-  · exact .word _
-  · exact .integer _
+  cases typing with
+  | logicalNot =>
+      cases application with
+      | logicalNot => exact .bool _
+  | wordBitNot =>
+      cases application with
+      | wordBitNot => exact .word _
+      | integerBitNot => cases operand_typed
+  | integerBitNot =>
+      cases application with
+      | wordBitNot => cases operand_typed
+      | integerBitNot => exact .integer _
+  | fixedBitNot kind =>
+      cases application with
+      | wordBitNot =>
+          exact .fixed _ (fixed_canonical_bitNot kind (fixed_word_canonical operand_typed))
+      | integerBitNot => cases operand_typed
 
 theorem hasSourceTyping
     {context : Context} {heap : Heap} {operator : Syntax.UnaryOp}
@@ -205,50 +422,6 @@ theorem sourceTyping {context : Context} {operator : Syntax.BinaryOp}
 
 end PrimitiveBinaryHasType
 
-/-- A word is canonical for an unsigned fixed-width integer type exactly when it
-is below `2^N`. -/
-theorem unsigned_canonical_iff {type : TypeSystem.FixedInteger}
-    (unsigned : type.signed = false) (n : Nat) :
-    type.canonical n = true ↔ n < 2 ^ type.width.bits := by
-  unfold TypeSystem.FixedInteger.canonical
-  simp [unsigned]
-
-theorem unsigned_canonical_bitAnd {type : TypeSystem.FixedInteger}
-    (unsigned : type.signed = false) {left right : Core.Word}
-    (rightCanonical : type.canonical right.val = true) :
-    type.canonical (left.bitAnd right).val = true := by
-  rw [unsigned_canonical_iff unsigned] at rightCanonical ⊢
-  show (left &&& right).val < _
-  rw [Fin.and_val]
-  exact Nat.and_lt_two_pow _ rightCanonical
-
-theorem unsigned_canonical_bitOr {type : TypeSystem.FixedInteger}
-    (unsigned : type.signed = false) {left right : Core.Word}
-    (leftCanonical : type.canonical left.val = true)
-    (rightCanonical : type.canonical right.val = true) :
-    type.canonical (left.bitOr right).val = true := by
-  rw [unsigned_canonical_iff unsigned] at leftCanonical rightCanonical ⊢
-  show (left ||| right).val < _
-  rw [Fin.or_val]
-  exact Nat.lt_of_le_of_lt (Nat.mod_le _ _) (Nat.or_lt_two_pow leftCanonical rightCanonical)
-
-theorem unsigned_canonical_bitXor {type : TypeSystem.FixedInteger}
-    (unsigned : type.signed = false) {left right : Core.Word}
-    (leftCanonical : type.canonical left.val = true)
-    (rightCanonical : type.canonical right.val = true) :
-    type.canonical (left.bitXor right).val = true := by
-  rw [unsigned_canonical_iff unsigned] at leftCanonical rightCanonical ⊢
-  show (left ^^^ right).val < _
-  rw [Fin.xor_val]
-  exact Nat.lt_of_le_of_lt (Nat.mod_le _ _) (Nat.xor_lt_two_pow leftCanonical rightCanonical)
-
-/-- A word typed at a fixed-width integer type is canonical for it. -/
-theorem fixed_word_canonical {context : Context} {heap : Heap}
-    {type : TypeSystem.FixedInteger} {word : Core.Word}
-    (typed : ValueHasType context heap (.word word) (.fixed type)) :
-    type.canonical word.val = true := by
-  cases typed with
-  | fixed _ canonical => exact canonical
 
 namespace BinaryPrimitiveApplies
 
@@ -292,21 +465,22 @@ theorem preserves
       cases kind <;> cases application <;> exact ValueHasType.bool _
   | fixedBitwise kind =>
       cases kind with
-      | bitAnd unsigned =>
+      | bitAnd =>
           cases application with
           | wordBitAnd =>
-              exact .fixed _ (unsigned_canonical_bitAnd unsigned (fixed_word_canonical right_typed))
+              exact .fixed _ (fixed_canonical_bitAnd (fixed_word_canonical left_typed)
+                (fixed_word_canonical right_typed))
           | integerBitAnd => cases left_typed
-      | bitOr unsigned =>
+      | bitOr =>
           cases application with
           | wordBitOr =>
-              exact .fixed _ (unsigned_canonical_bitOr unsigned (fixed_word_canonical left_typed)
+              exact .fixed _ (fixed_canonical_bitOr (fixed_word_canonical left_typed)
                 (fixed_word_canonical right_typed))
           | integerBitOr => cases left_typed
-      | bitXor unsigned =>
+      | bitXor =>
           cases application with
           | wordBitXor =>
-              exact .fixed _ (unsigned_canonical_bitXor unsigned (fixed_word_canonical left_typed)
+              exact .fixed _ (fixed_canonical_bitXor (fixed_word_canonical left_typed)
                 (fixed_word_canonical right_typed))
           | integerBitXor => cases left_typed
   | booleanAnd =>

@@ -920,13 +920,16 @@ private abbrev finishUnaryOperatorLedger
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := match operator with
-    | .logicalNot => Ty.bool
-    | .bitNot => Ty.word
-  finishOperatorLedger context (Detail.unaryOperatorDispatch operator)
-    operand builtin builtin
-    (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
-    [operand] hasOpenLiteralOperand state
+  if Detail.fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := match operator with
+      | .logicalNot => Ty.bool
+      | .bitNot => Ty.word
+    finishOperatorLedger context (Detail.unaryOperatorDispatch operator)
+      operand builtin builtin
+      (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
+      [operand] hasOpenLiteralOperand state
 
 private theorem finishUnaryOperatorLedger_evolution
     {context : Frontend.SourceInference.Context}
@@ -936,8 +939,12 @@ private theorem finishUnaryOperatorLedger_evolution
     (success : finishUnaryOperatorLedger context operator operandType
       hasOpenLiteralOperand state = .ok result) :
     LedgerEvolution state result.state := by
-  exact finishOperatorLedger_evolution
-    (by simpa only [finishUnaryOperatorLedger] using success)
+  simp only [finishUnaryOperatorLedger] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact .refl state
+  · exact finishOperatorLedger_evolution success
 
 private abbrev finishBinaryOperatorLedger
     (context : Frontend.SourceInference.Context)

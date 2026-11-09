@@ -3269,12 +3269,15 @@ private abbrev finishUnaryOperator (context : Context)
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := match operator with
-    | .logicalNot => Ty.bool
-    | .bitNot => Ty.word
-  finishOperator context (unaryOperatorDispatch operator) operand builtin
-    builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
-    [operand] hasOpenLiteralOperand state
+  if fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := match operator with
+      | .logicalNot => Ty.bool
+      | .bitNot => Ty.word
+    finishOperator context (unaryOperatorDispatch operator) operand builtin
+      builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
+      [operand] hasOpenLiteralOperand state
 
 private theorem finishUnaryOperator_inferenceProperties
     {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
@@ -3307,8 +3310,13 @@ private theorem finishUnaryOperator_inferenceProperties
           (.builtin .bool))
     · simpa only [returnsBool, Bool.false_eq_true, if_false] using
         resolvedOperandBelow
-  exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
-    (by simpa only [finishUnaryOperator] using success)
+  simp only [finishUnaryOperator] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact ⟨.refl ready.solved, ready, resolvedOperandBelow⟩
+  · exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
+      success
 
 private abbrev finishBinaryOperator (context : Context)
     (operator : Syntax.BinaryOp) (left : Ty)

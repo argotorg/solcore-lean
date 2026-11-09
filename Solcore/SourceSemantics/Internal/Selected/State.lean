@@ -1709,10 +1709,13 @@ private abbrev finishUnaryOperator (context : Frontend.SourceInference.Context)
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := unaryBuiltin operator
-  finishOperator context (unaryOperatorDispatch operator) operand builtin
-    builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
-    [operand] hasOpenLiteralOperand state
+  if fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := unaryBuiltin operator
+    finishOperator context (unaryOperatorDispatch operator) operand builtin
+      builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
+      [operand] hasOpenLiteralOperand state
 
 private abbrev finishBinaryOperator (context : Frontend.SourceInference.Context)
     (operator : Syntax.BinaryOp) (left : Ty)
@@ -1750,7 +1753,12 @@ private theorem finishUnaryOperator_supported
     split
     · exact resolved_closed _ _ _ rfl
     · exact resolved_normalized ready supported
-  exact finishOperator_supported builtin output success
+  simp only [finishUnaryOperator] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact ⟨.refl _ _ _, resolved_normalized ready supported⟩
+  · exact finishOperator_supported builtin output success
 
 private theorem finishBinaryOperator_supported
     {cutoff : Nat} {roots : List Ty} {context : Frontend.SourceInference.Context} {operator : Syntax.BinaryOp}

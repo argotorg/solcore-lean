@@ -1542,11 +1542,15 @@ private theorem finishOperator_private {protectedVars : List TypeVarId}
 
 
 private abbrev finishUnary (context : SourceInference.Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :=
+    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
+    Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
-  finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
-    (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
+  if Detail.fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
+      (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
 
 private abbrev finishBinary (context : SourceInference.Context) (operator : Syntax.BinaryOp)
     (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
@@ -1580,6 +1584,10 @@ private theorem finishUnary_private {protectedVars : List TypeVarId}
     ∀ row ∈ result.state.requirements, row ∉ state.requirements →
       PredicateSafe protectedVars result.state row.predicate := by
   have resolvedSafe := safe_resolved ready operandSafe
+  simp only [finishUnary] at accepted
+  split at accepted
+  · cases Except.ok.inj accepted
+    exact ⟨.refl _ _, resolvedSafe, live, fun _ member fresh => (fresh member).elim⟩
   apply finishOperator_private catalog resolvedSafe _ _ live accepted
   · cases operator <;> exact safe_closed _ _ (by simp [Ty.VariablesBelow, Ty.bool, Ty.word, Ty.freeVariables])
   · split

@@ -603,18 +603,18 @@ private theorem tail_outcome (profile : BinaryProfile operator operand result mo
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
       refine ⟨_, _, applied, ?_, rfl, rfl⟩
       cases kind with
-      | bitAnd unsigned =>
+      | bitAnd =>
         obtain ⟨result, rfl, rfl⟩ := word_fields represented
         cases applied
-        exact .fixed _ (Dynamic.unsigned_canonical_bitAnd unsigned rightCanonical)
-      | bitOr unsigned =>
+        exact .fixed _ (Dynamic.fixed_canonical_bitAnd leftCanonical rightCanonical)
+      | bitOr =>
         obtain ⟨result, rfl, rfl⟩ := word_fields represented
         cases applied
-        exact .fixed _ (Dynamic.unsigned_canonical_bitOr unsigned leftCanonical rightCanonical)
-      | bitXor unsigned =>
+        exact .fixed _ (Dynamic.fixed_canonical_bitOr leftCanonical rightCanonical)
+      | bitXor =>
         obtain ⟨result, rfl, rfl⟩ := word_fields represented
         cases applied
-        exact .fixed _ (Dynamic.unsigned_canonical_bitXor unsigned leftCanonical rightCanonical)
+        exact .fixed _ (Dynamic.fixed_canonical_bitXor leftCanonical rightCanonical)
   | integer strict =>
     refine .inl ?_
     have operandEq : SourceCoreInteger.binaryOperandType operator = .integer := by cases strict <;> rfl

@@ -2272,11 +2272,15 @@ private abbrev finishOperator (context : SourceInference.Context) (dispatch : De
         else throw (.operatorNotSupported traitName operand)
 
 private abbrev finishUnary (context : SourceInference.Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :=
+    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
+    Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
-  finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
-    (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
+  if Detail.fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
+  else
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
+      (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
 
 private abbrev finishBinary (context : SourceInference.Context) (operator : Syntax.BinaryOp)
     (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
@@ -2334,6 +2338,20 @@ private theorem finishOperator_fixes_protected {protectedVars : List TypeVarId}
             cases accepted
             exact fixed.of_substitution_eq (congrArg InferState.substitution (requirementBatch_inference _ _))
 
+/-- The unary suffix: `~` on the fixed-width integer types where it is Word's
+keeps the state, and every other operator goes through `finishOperator`. -/
+private theorem finishUnary_fixes_protected {protectedVars : List TypeVarId}
+    {context : SourceInference.Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {hasOpenLiteralOperand : Bool} {state : State} {result : Detail.OperatorInferenceResult}
+    (fixed : FixesProtected protectedVars state)
+    (accepted : finishUnary context operator operandType hasOpenLiteralOperand state = .ok result) :
+    FixesProtected protectedVars result.state := by
+  simp only [finishUnary] at accepted
+  split at accepted
+  · cases Except.ok.inj accepted
+    exact fixed
+  · exact finishOperator_fixes_protected fixed accepted
+
 /-- The binary tail: the fixed-width integer types' builtin operators keep the
 state, and every other operator goes through `finishOperator`. -/
 private theorem finishBinary_fixes_protected {protectedVars : List TypeVarId}
@@ -2363,14 +2381,14 @@ theorem inferUnaryOperator_fixes_protected {protectedVars : List TypeVarId}
   cases expected with
   | none =>
     simp only [bind, Except.bind, pure, Pure.pure, Except.pure] at accepted
-    exact finishOperator_fixes_protected fixed (show finishUnary context operator operandType openLiteral state = .ok result from accepted)
+    exact finishUnary_fixes_protected fixed (show finishUnary context operator operandType openLiteral state = .ok result from accepted)
   | some expectedType =>
     have expectedSafe := expectedSafe expectedType (by simp)
     cases skip : (operator == Syntax.UnaryOp.logicalNot ||
         (state.resolve operandType).freeVariables.isEmpty || !openLiteral) with
     | true =>
       simp only [openLiteral, skip, if_true, bind, Except.bind, pure, Pure.pure, Except.pure] at accepted
-      exact finishOperator_fixes_protected fixed (show finishUnary context operator operandType openLiteral state = .ok result from accepted)
+      exact finishUnary_fixes_protected fixed (show finishUnary context operator operandType openLiteral state = .ok result from accepted)
     | false =>
       simp only [openLiteral, skip, Bool.false_eq_true, if_false] at accepted
       cases unified : Detail.unify state (state.resolve operandType) expectedType with
@@ -2378,7 +2396,7 @@ theorem inferUnaryOperator_fixes_protected {protectedVars : List TypeVarId}
       | ok fitted =>
         simp only [unified, bind, Except.bind] at accepted
         have fittedFixed := unify_fixes_protected fixed (safe_resolved ready operandSafe) expectedSafe unified
-        exact finishOperator_fixes_protected fittedFixed (show finishUnary context operator operandType openLiteral fitted = .ok result from accepted)
+        exact finishUnary_fixes_protected fittedFixed (show finishUnary context operator operandType openLiteral fitted = .ok result from accepted)
 
 theorem inferBinaryOperator_fixes_protected {protectedVars : List TypeVarId}
     {context : SourceInference.Context} {operator : Syntax.BinaryOp} {left right : Ty}

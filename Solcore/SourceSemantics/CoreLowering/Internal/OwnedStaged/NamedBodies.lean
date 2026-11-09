@@ -158,7 +158,8 @@ private theorem primary_admissible
           generalize targetEq : receipt.node.type = target at path
           cases path
           cases operatorTyped with
-          | logicalNot | wordBitNot | integerBitNot => exact False.elim (receipt.operator.nonempty ownedEq)
+          | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ =>
+            exact False.elim (receipt.operator.nonempty ownedEq)
           | trait dispatch profile proves =>
             cases profile with
             | @intro signature method parameter member name parameters methodUnique inputs results =>

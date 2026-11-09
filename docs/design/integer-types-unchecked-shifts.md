@@ -679,8 +679,9 @@ operands' types are known.
   (`Tree.binary` and `BinaryProfile`).
 - The operators that are Word's on canonical words (step 2 below) need no
   lookup: the word rules give their result at every one of the twelve types.
-  Only the operators whose meaning differs (signed order, `~`, checked
-  arithmetic) take the lookup, and only those restrict the primitive rules.
+  Only the operators whose meaning differs (signed order, `~` on the narrower
+  unsigned types, checked arithmetic) take the lookup, and only those restrict
+  the primitive rules.
 - Compound assignment needs no lookup, because its form holds the target's
   type.
 
@@ -732,16 +733,22 @@ types only once the operators have typing rules there.
    non-canonical argument before the body runs. No operator is defined on the
    twelve types yet, no literal is accepted at them, and open literals still
    default to `word`.
-2. **The operators that are Word's on canonical words.** `==` and `!=` on
-   the twelve types, and `< > <= >=` and `& | ^` on the unsigned ones, are
-   builtins without requirements (`Detail.fixedWordOperator`), with both
+2. **The operators that are Word's on canonical words.** `==`, `!=` and
+   `& | ^` on the twelve types, `< > <= >=` on the unsigned ones, and `~` on
+   the signed ones and `uint256` are builtins without requirements
+   (`Detail.fixedWordOperator`, `Detail.fixedUnaryOperator`), with both
    operands of the same type. On canonical words they compute what Word's
-   operators compute, and `& | ^` keep the words canonical. So they evaluate
-   by the existing word rules, and no rule looks up an operand's type.
-3. **Checked `+ - *`, the signed comparisons and the other bitwise
-   operators**, chosen as above. Checked `+ - *` panic with `0x11`.
-   Comparisons are signed for `intN`. `~` is masked for `uintN`. Compound
-   `+= -= *=` check the result at the guard, after the setter.
+   operators compute and keep the words canonical: `& | ^` keep a word below
+   `2^N` or sign-extended from bit `N - 1`, and `~` keeps a sign-extended
+   word sign-extended. So they evaluate by the existing word rules, and no
+   rule looks up an operand's type. This step is committed in two parts: the
+   comparisons and unsigned bitwise operators, then the signed bitwise
+   operators and `~`.
+3. **Checked `+ - *`, the signed comparisons and `~` on the narrower
+   unsigned types**, chosen as above. Checked `+ - *` panic with `0x11`.
+   Comparisons are signed for `intN`. `~` on `uintN` below 256 keeps the low
+   `N` bits. Compound `+= -= *=` check the result at the guard, after the
+   setter.
 4. **Literals.** A literal at one of the twelve types is range-checked at
    compile time, with builtin `Int` evidence for each type.
 5. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and

@@ -454,16 +454,29 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | _ => .word
 
 /-- The operators on a fixed-width integer type whose builtin meaning is Word's
-on its canonical words: `==` and `!=` on every type, and the orderings and
-`& | ^` on the unsigned types. -/
+on its canonical words: `==`, `!=` and `& | ^` on every type, and the orderings
+on the unsigned types. -/
 def fixedWordOperator (operator : Syntax.BinaryOp) : Ty → Bool
   | .constructor (.builtin (.fixed fixed)) =>
       match operator with
-      | .equal | .notEqual => true
-      | .less | .greater | .lessEqual | .greaterEqual
-      | .bitAnd | .bitXor | .bitOr => !fixed.signed
+      | .equal | .notEqual | .bitAnd | .bitXor | .bitOr => true
+      | .less | .greater | .lessEqual | .greaterEqual => !fixed.signed
       | _ => false
   | _ => false
+
+/-- The unary operators on a fixed-width integer type whose builtin meaning is
+Word's on its canonical words: `~` on the signed types and on `uint256`. -/
+def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
+  | .constructor (.builtin (.fixed fixed)) =>
+      match operator with
+      | .bitNot => fixed.signed || fixed.width == .w256
+      | .logicalNot => false
+  | _ => false
+
+@[simp] theorem fixedUnaryOperator_logicalNot (operand : Ty) :
+    fixedUnaryOperator .logicalNot operand = false := by
+  unfold fixedUnaryOperator
+  split <;> rfl
 
 /-- The builtin operand type of a binary operator at one operand type: the
 operand itself when it is a fixed-width integer type that takes the operator
@@ -651,51 +664,56 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
           unify state operand expected
     | none => pure state
   let operand := state.resolve operandType
-  let builtin := match operator with
-    | .logicalNot => Ty.bool
-    | .bitNot => Ty.word
-  if operand = builtin then
-    pure { type := builtin, requirements := [], state }
+  -- `~` on the fixed-width integer types where it is Word's
+  -- (`fixedUnaryOperator`) is a builtin too.
+  if fixedUnaryOperator operator operand then
+    pure { type := operand, requirements := [], state }
   else
-    match unaryOperatorDispatch operator with
-    | .function name =>
-        if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
-              builtin operand ||
-            isStagedIntegerOperatorTarget state hasOpenLiteralOperand
-              builtin operand then
-          pure {
-            type := if operator == .logicalNot then .bool else operand
-            requirements := []
-            state
-          }
-        else
-          throw (.unknownVariable name)
-    | .traitMethod traitName methodName =>
-        match ← operatorTrait? context traitName with
-        | some trait =>
-            let result := if operator == .logicalNot then .bool else operand
-            let predicates ←
-              operatorTraitPredicates context trait methodName operand
-                [operand] [result]
-            let (requirements, state) :=
-              state.addRequirementsWithIds predicates
+    let builtin := match operator with
+      | .logicalNot => Ty.bool
+      | .bitNot => Ty.word
+    if operand = builtin then
+      pure { type := builtin, requirements := [], state }
+    else
+      match unaryOperatorDispatch operator with
+      | .function name =>
+          if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                builtin operand ||
+              isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                builtin operand then
             pure {
-              type := result
-              requirements
+              type := if operator == .logicalNot then .bool else operand
+              requirements := []
               state
             }
-        | none =>
-            if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
-                  builtin operand ||
-                isStagedIntegerOperatorTarget state hasOpenLiteralOperand
-                  builtin operand then
+          else
+            throw (.unknownVariable name)
+      | .traitMethod traitName methodName =>
+          match ← operatorTrait? context traitName with
+          | some trait =>
+              let result := if operator == .logicalNot then .bool else operand
+              let predicates ←
+                operatorTraitPredicates context trait methodName operand
+                  [operand] [result]
+              let (requirements, state) :=
+                state.addRequirementsWithIds predicates
               pure {
-                type := if operator == .logicalNot then .bool else operand
-                requirements := []
+                type := result
+                requirements
                 state
               }
-            else
-              throw (.operatorNotSupported traitName operand)
+          | none =>
+              if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                    builtin operand ||
+                  isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                    builtin operand then
+                pure {
+                  type := if operator == .logicalNot then .bool else operand
+                  requirements := []
+                  state
+                }
+              else
+                throw (.operatorNotSupported traitName operand)
 
 /-- Expected-type checking result for one exact source occurrence. -/
 structure ExpectationResult where

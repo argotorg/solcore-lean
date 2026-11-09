@@ -3414,6 +3414,7 @@ theorem UnaryOperatorHasType.applyParameters
   | logicalNot => exact .logicalNot
   | wordBitNot => exact .wordBitNot
   | integerBitNot => exact .integerBitNot
+  | fixedBitNot kind => exact .fixedBitNot kind
   | trait dispatch profile evidence =>
       exact .trait dispatch
         (StructuralSubstitution.OperatorProfileInstantiates.applyParameters
@@ -6230,6 +6231,7 @@ theorem result_type_admissible
   | logicalNot => exact TypeAdmissible.bool binders
   | wordBitNot => exact TypeAdmissible.word binders
   | integerBitNot => exact TypeAdmissible.integer binders
+  | fixedBitNot => exact TypeAdmissible.fixed binders _
   | trait _ profile _ =>
       exact profile.return_types_admissible catalog binders operandAdmissible
         result (by simp)
@@ -11253,6 +11255,7 @@ theorem UnaryOperatorHasType.applySubstitution
   | logicalNot => exact .logicalNot
   | wordBitNot => exact .wordBitNot
   | integerBitNot => exact .integerBitNot
+  | fixedBitNot kind => exact .fixedBitNot kind
   | trait dispatch profile evidence =>
       exact .trait dispatch
         (OperatorProfileInstantiates.applySubstitution catalog contextValid

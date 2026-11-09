@@ -1900,7 +1900,10 @@ private def validateUnaryOperatorRequirementLayout
     let expectedInput := match operator with
       | .logicalNot => Ty.bool
       | .bitNot =>
-          if operand.type = Ty.integer then Ty.integer else Ty.word
+          if operand.type = Ty.integer then Ty.integer
+          else if SourceInference.Detail.fixedUnaryOperator operator operand.type then
+            operand.type
+          else Ty.word
     let expectedResult := runtimeUnaryResultType operator expectedInput
     unless operand.type = expectedInput do
       throw (.runtimeUnaryInputTypesMismatch specialized.key node.id

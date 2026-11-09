@@ -16502,6 +16502,31 @@ theorem binaryFixedWord_hasType
     | declaration => simp [Detail.fixedWordOperator] at accepted
   | _ => simp [Detail.fixedWordOperator] at accepted
 
+/-- `~` on the fixed-width integer types that inference takes as a builtin
+(`Detail.fixedUnaryOperator`) has its builtin typing. -/
+theorem unaryFixedWord_hasType
+    (context : SourceSemantics.Context) (operator : Syntax.UnaryOp)
+    (operand : TypeSystem.Ty)
+    (accepted : Detail.fixedUnaryOperator operator operand = true) :
+    UnaryOperatorHasType context operator operand operand [] := by
+  cases operand with
+  | constructor id =>
+    cases id with
+    | builtin builtin =>
+      cases builtin with
+      | fixed fixed =>
+        cases operator with
+        | logicalNot => simp at accepted
+        | bitNot =>
+          apply UnaryOperatorHasType.fixedBitNot
+          simp only [Detail.fixedUnaryOperator, Bool.or_eq_true, beq_iff_eq] at accepted
+          rcases accepted with signed | full
+          · exact .signed signed
+          · exact .full full
+      | _ => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted
+    | declaration => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted
+  | _ => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted
+
 /-- Every Word-backed binary builtin also has the staged integer typing used
 while literal targets are being finalized. -/
 theorem binaryInteger_hasType
@@ -16579,6 +16604,7 @@ theorem inferUnaryOperator_success_case
     simp_all [bind, Except.bind] <;>
     repeat' first | split at success
   all_goals try cases success
+  all_goals try exact .primitive (unaryFixedWord_hasType _ _ _ (by assumption))
   all_goals try simp_all [Detail.unaryOperatorDispatch]
   all_goals try exact .primitive (by
     simp_all

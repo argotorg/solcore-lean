@@ -1818,7 +1818,8 @@ theorem source_facts (unique : NodeOccurrencesUnique source)
           generalize targetEq : node.type = target at path
           cases path
           cases operatorTyped with
-          | logicalNot | wordBitNot | integerBitNot => exact False.elim (receipt.nonempty ownedEq)
+          | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ =>
+            exact False.elim (receipt.nonempty ownedEq)
           | trait staticDispatch operatorProfile proves =>
             obtain ⟨rfl, rfl⟩ := unary_dispatch_unique dispatch staticDispatch
             exact ⟨_, _, _, _, arguments ▸ .cons child (.nil context), operatorProfile, ownedEq.symm ▸ proves, rfl⟩

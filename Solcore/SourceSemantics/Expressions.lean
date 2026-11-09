@@ -334,12 +334,20 @@ inductive FixedWordComparison (type : TypeSystem.FixedInteger) : Syntax.BinaryOp
   | lessEqual (unsigned : type.signed = false) : FixedWordComparison type .lessEqual
   | greaterEqual (unsigned : type.signed = false) : FixedWordComparison type .greaterEqual
 
-/-- The bitwise operators whose meaning on an unsigned fixed-width integer type
-is Word's: canonical words stay canonical. -/
+/-- The bitwise operators, whose meaning on every fixed-width integer type is
+Word's: `& | ^` keep canonical words canonical, below `2^N` for `uintN` and
+sign-extended from bit `N - 1` for `intN`. -/
 inductive FixedWordBitwise (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
-  | bitAnd (unsigned : type.signed = false) : FixedWordBitwise type .bitAnd
-  | bitXor (unsigned : type.signed = false) : FixedWordBitwise type .bitXor
-  | bitOr (unsigned : type.signed = false) : FixedWordBitwise type .bitOr
+  | bitAnd : FixedWordBitwise type .bitAnd
+  | bitXor : FixedWordBitwise type .bitXor
+  | bitOr : FixedWordBitwise type .bitOr
+
+/-- The fixed-width integer types on which `~` is Word's: the signed ones, whose
+canonical words stay sign-extended, and `uint256`. On the other unsigned types
+`~` keeps only the low `N` bits. -/
+inductive FixedWordBitNot (type : TypeSystem.FixedInteger) : Prop where
+  | signed (signed : type.signed = true) : FixedWordBitNot type
+  | full (full : type.width = .w256) : FixedWordBitNot type
 
 /-- The source spelling-to-trait-method assignment for operator forms which
 remain operator nodes after resolution. -/
@@ -401,6 +409,9 @@ inductive UnaryOperatorHasType (context : Context) :
   | logicalNot : UnaryOperatorHasType context .logicalNot .bool .bool []
   | wordBitNot : UnaryOperatorHasType context .bitNot .word .word []
   | integerBitNot : UnaryOperatorHasType context .bitNot .integer .integer []
+  /-- `~` on the fixed-width integer types where it is Word's. -/
+  | fixedBitNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
+      UnaryOperatorHasType context .bitNot (.fixed type) (.fixed type) []
   | trait
       {operator : Syntax.UnaryOp}
       {traitName methodName : String}
@@ -465,7 +476,7 @@ theorem requirements_valid
     (typing : UnaryOperatorHasType context operator operand result requirements) :
     RequirementIdsValid context requirements := by
   cases typing with
-  | logicalNot | wordBitNot | integerBitNot => simp [RequirementIdsValid]
+  | logicalNot | wordBitNot | integerBitNot | fixedBitNot => simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
 end UnaryOperatorHasType

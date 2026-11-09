@@ -2749,6 +2749,7 @@ private theorem unary_result_typed {operator : Syntax.UnaryOp} {operand result :
     Dynamic.ValueHasType context heap source result := by
   cases profile
   all_goals first
+    | obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl; exact .fixed word canonical
     | obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag
     | obtain ⟨word, rfl, _⟩ := word_fields represented; exact .word word
     | obtain ⟨integer, rfl, _⟩ := integer_fields represented; exact .integer integer

@@ -854,7 +854,7 @@ theorem expression_fault_step (selectedBodies : SelectedPreservation.SelectedBod
               obtain ⟨inputTyped, argumentsHeapTyped, operandExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers locals heap operandTyped operandTrace
               cases operatorTyped with
-              | logicalNot | wordBitNot | integerBitNot => cases method
+              | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ => cases method
               | trait staticDispatch profile requirementsProve =>
                   have same := unary_dispatch_same staticDispatch dispatch
                   rcases same with ⟨rfl, rfl⟩
@@ -1246,6 +1246,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               | logicalNot => exact ⟨applies.preserves .logicalNot (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
               | wordBitNot => exact ⟨applies.preserves .wordBitNot (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
               | integerBitNot => exact ⟨applies.preserves .integerBitNot (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
+              | fixedBitNot kind => exact ⟨applies.preserves (.fixedBitNot kind) (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
               | trait _dispatch profile requirementsProve => cases requirementsProve; cases profile
   | @binaryShortCircuit firstSize scope context environment before after id left operator right input output occurrence first circuit =>
       obtain ⟨_plan, formTyped, valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
@@ -1294,7 +1295,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               obtain ⟨inputTyped, argumentsHeapTyped, operandExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers locals heap operandTyped operandTrace
               cases operatorTyped with
-              | logicalNot | wordBitNot | integerBitNot => cases method
+              | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ => cases method
               | trait staticDispatch profile requirementsProve =>
                   have same := unary_dispatch_same staticDispatch dispatch
                   rcases same with ⟨rfl, rfl⟩
