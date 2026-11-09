@@ -11391,7 +11391,7 @@ wrapping are ordinary Core over Words.
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Lean: done for `word`; `/ %` panic with `0x12` on a zero divisor** ([unchecked blocks as implemented](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented), [panics as implemented](integer-types-unchecked-shifts.md#panics-as-implemented)). Parser: the `unchecked { … }` statement. Typing: the five unchecked operators and their traits. Source semantics: wrapping arithmetic by lexical scope, `MIN / -1` wrapping. Lowering: the plain Core operations. Generators: the checked profile's operations inside and outside such blocks. | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Lean: done for `word`** ([shifts as implemented](integer-types-unchecked-shifts.md#shifts-as-implemented)). Parser: the two tokens and their precedence. Typing: the two-parameter traits, an unsigned amount. Source semantics and lowering: Core's `wordShl`, `wordShr` and `wordSar`. Generators: shifts in the scalar fragment; the scalar meaning already has `shl`, `shr` and `sar`. | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` reads and writes through a checked `memref`, read-only slices `a[s:e]` over memory, storage and calldata arrays, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | Parser: the array type, `new`, slices and member calls. Typing: an array's location by context, `memref`, `arraySlice` and `assignRef`. Source semantics: memory arrays and slices with their panics. Lowering: std's layout. ABI: memory arrays as parameters and returns. Generators: the memory-value and memory-call profiles in `T[]` syntax, array returns through `T[]`, slices; their references already model `Panic(0x32)` (this unit). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
-| 5 | `pragma solcore;` (#141): required first in every file, once, without arguments | Parser: it reads the declaration as an ordinary pragma, which the frontend ignores, and also accepts a file without it, with it after another declaration, twice, or with arguments. Following upstream means rejecting those four cases as upstream's `SC0002` does (missing, not first, duplicate, arguments); other pragmas stay as they are. Generators: the emitters print it, and the scalar meaning's printer, lexer and parser and its text theorems take it, so the harness's transport header goes away. | every fixture |
+| 5 | `pragma solcore;` (#141): required first in every file, once, without arguments | **Lean: generators done** (`80c3cf2b5`); the parser's four rejections remain. Parser: it reads the declaration as an ordinary pragma, which the frontend ignores, and also accepts a file without it, with it after another declaration, twice, or with arguments. Following upstream means rejecting those four cases as upstream's `SC0002` does (missing, not first, duplicate, arguments); other pragmas stay as they are. Generators: the emitters print it, and the scalar meaning's printer, lexer and parser and its text theorems take it, so the harness's transport header goes away. | every fixture |
 | 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | Importer: whether a plain-name Hull call from inline Yul, which the Yul emitter now qualifies, is accepted rather than diagnosed (Q006). Typing: whether Lean refuses the recursive layouts that `SC0420` refuses. The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted already follow upstream (this unit). | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
 | 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | Source semantics and lowering of captures, together with lane D's by-value capture (solcore-rs #120). | `closure-parameters` (36 → 49 calls) |
 | — | `msgSender` (#142) and contract-declared struct state (#138) | Nothing: #142 uses std's existing `msgSender` in examples and #138 changes only examples. | `msg-context` |
@@ -12556,6 +12556,81 @@ the write to a body's own closure; the fixed corpora cover all of them. The
 two corpora add about 207 seconds on O0, 201 on O2 and 290 on Yul to the
 complete fixed suites; `runtime-closure-factories` took 168 of the 900
 seconds CI allows a profile on Yul.
+
+**`pragma solcore;` in the emitters: results.** Row 5's generator side does
+not wait for the parser's rejections: Lean's parser already reads the
+declaration as an ordinary pragma, no Lean component parses an emitted source
+with it, and the scalar meaning has its own grammar. `80c3cf2b5` implements it:
+- Every emitter in `Solcore/Synthesis` prints `pragma solcore;` as the first
+  line of every file it emits, the module bundle's four among them, directly
+  before the imports, so the compiler reads the bytes the harness's transport
+  used to write. The six corpus validators with emitters of their own
+  (checked arithmetic, closure captures, whose walk the closure factory
+  validator runs, memory arrays, memory calls, memory values and revert data)
+  print it, and the Lean tests' golden sources start with it.
+- The scalar meaning takes it. `importTokens` starts with `pragma`, `solcore`
+  and `;`, so the token printing and the parser of every file kind read it
+  before the imports, and the line pieces of the seven file kinds start with
+  its line; `SourceFile.linePieces_separated`, which the other six reuse for
+  their header lines, has one more case. The emitters' text theorems now
+  cover the whole file the compiler reads, the pragma included, where they
+  covered the text after it.
+- The 63 source emitter versions move one step, in the Lean sources and tests
+  and in the 66 corpus manifests. Generator, profile and wrapper versions
+  stay: every profile admits the same plans and emits the same programs.
+  Replay refuses an older saved case at the version check: the 3,192 archived
+  cases of the six newest pure profiles' frozen matrices (checked arithmetic
+  and shifts, memory arrays and array ABI, closure captures and closure
+  factories, fixed and random on O0) are all refused with `emitterVersion
+  changed`, and the previous case tool replays all of them to the saved JSON.
+- The transport is gone: `compiler_source` and its `PRAGMA` left
+  `semantic-source-bundle.py`, and the pure, storage and call harnesses, the
+  module bundle's writer and receipt and `test-source-synthesis-rust.py`
+  write and hash each file exactly as emitted.
+
+Lean's parser still accepts a file without the pragma; rejecting upstream's
+four `SC0002` cases stays row 5's parser side.
+
+The gate passed before the commit: the kernel check, 1,007 Python tests, `lake
+build` (1,193 jobs), forty-two native tools prepared and verified offline,
+`lake test`, thirty corpus validator runs and the chunked-generation check
+over the thirty-four pure profiles, and `git diff --check`.
+
+Frozen runs at the lane commit picked as `80c3cf2b5`: three freeze
+records of 365 digests, taken before, between and after the runs, were
+identical (combined SHA-256
+`3a94704a9df393573dcb9c0af377781b7afa241c742c8365a62582692688e842`, case tool
+`470cfdbb26ffdc171fb8dba89271edbf53d863e3f67307e0c5ab7d09d65b9edd`; the Rust
+driver and exporters, solc, Anvil, the upstream driver files and the nine Hull
+runners unchanged from the closure profiles' matrices, the 33 case tools
+rebuilt). Each backend ran its complete fixed suite in four parallel streams,
+O0 and O2 together:
+- Sonatina O0 and O2 each matched all 3,517 cases of the 66 profiles, 2,994
+  of the 34 pure profiles, 416 of the 27 storage-family profiles and 107 of
+  the five call profiles, with no mismatch, inconclusive case, error or
+  rejection; their streams took 2,316 to 2,493 and 2,301 to 2,475 seconds.
+- Yul ran the 64 profiles it supports, 3,489 cases. All 416 storage-family
+  cases and the 79 call-return, call-sequence and call-branch cases matched,
+  and 2,978 of the 2,994 pure cases. The other 16 are the known solc
+  `StackTooDeepError` on the exported Yul of specialized trait methods
+  (`questions.md`, 2026-10-29): the same eight cases of `runtime-traits`, one
+  source of seed 2, and eight of `runtime-trait-hierarchies`, one source of
+  seed 9, that the re-pin's matrices rejected. No mismatch or inconclusive
+  case; the streams took 2,663 to 3,516 seconds, and `stateful-call-returns`
+  completed its 45 cases in 857 seconds.
+- `test-source-synthesis-rust.py` passed: 39 of 39 emitted programs passed
+  checked Rust compilation and matched on Core.
+- In every archive each source text, 3,772 on O0 and on O2 and 3,804 on Yul
+  with the findings' reports, starts with `pragma solcore;` and declares it
+  once. Every report's source digests, 3,772, 3,772 and 3,744, equal the
+  SHA-256 of the archived texts, so the harnesses wrote the texts as emitted.
+  And every text is the pragma line followed by the text the newest earlier
+  archive of its case holds, the re-pin's for 60 profiles and units 2 to 4's
+  for the six added since: 3,517, 3,517 and 3,489 cases, none different. The
+  compiler read the bytes the transport used to write.
+
+No mismatch, crash or compiler rejection beyond the recorded Yul one was
+found, and no new upstream defect.
 
 **Native Source goal two:** follow the remaining work in
 [Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal).
