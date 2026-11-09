@@ -186,6 +186,9 @@ mutual
       | .constructor (.builtin .unit), .unit => pure (Extended.pure registry .unit)
       | .constructor (.builtin .bool), .bool value => pure (Extended.pure registry (.bool value))
       | .constructor (.builtin .word), .word value => pure (Extended.pure registry (.word value))
+      | .constructor (.builtin (.fixed type)), .word value =>
+          if type.canonical value.val then pure (Extended.pure registry (.word value))
+          else throw ⟨[], .nonCanonicalSourceValue⟩
       | .constructor (.builtin .integer), .integer value => pure (Extended.pure registry (.integer value))
       | .product leftType rightType, .product left right => do
           let left ← (encodeRaw fuel checked registry leftType left).mapError (Error.at .productLeft)
@@ -255,6 +258,7 @@ mutual
       | .constructor (.builtin .unit), .unit => pure .unit
       | .constructor (.builtin .bool), .bool value => pure (.bool value)
       | .constructor (.builtin .word), .word value => pure (.word value)
+      | .constructor (.builtin (.fixed _)), .word value => pure (.word value)
       | .constructor (.builtin .integer), .integer value => pure (.integer value)
       | .product leftType rightType, .pair left right => do
           let left ← (decodeRaw fuel context leftType left).mapError (Error.at .productLeft)
@@ -1698,14 +1702,20 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceCoreRawMetadata
 
+/-- The source runtime's normalization is the metadata view followed by its
+own normalization, which also gives the fixed-width integer types the runtime
+type `word`. -/
 theorem runtimeType_sourceValues (type : TypeSystem.Ty) :
-    runtimeType type = SourceTypedRuntime.runtimeType type := by
-  induction type <;> simp_all [runtimeType]
+    SourceTypedRuntime.runtimeType (runtimeType type) = SourceTypedRuntime.runtimeType type := by
+  induction type
+  case constructor id => rfl
+  all_goals simp_all [runtimeType]
 
 theorem Inserted.source_runtime_compatible {before : Registry} {expected : TypeSystem.Ty} {metadata : Metadata}
     (inserted : Inserted before expected metadata) :
     SourceTypedRuntime.runtimeType expected = SourceTypedRuntime.runtimeType metadata.type := by
-  simpa only [runtimeType_sourceValues] using inserted.runtime_compatible
+  rw [← runtimeType_sourceValues expected, ← runtimeType_sourceValues metadata.type,
+    inserted.runtime_compatible]
 
 end Solcore.Frontend.SourceCoreRawMetadata
 end

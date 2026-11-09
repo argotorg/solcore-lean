@@ -189,6 +189,12 @@ mutual
     | bool (value : Bool) : ValueHasType context heap (.bool value) .bool
     | word (value : Core.Word) : ValueHasType context heap (.word value) .word
     | integer (value : Int) : ValueHasType context heap (.integer value) .integer
+    /-- A value of a fixed-width integer type is the word that is canonical for
+    the type: below `2^N` for `uintN`, sign-extended from bit `N - 1` for
+    `intN`. -/
+    | fixed {type : TypeSystem.FixedInteger} (value : Core.Word)
+        (canonical : type.canonical value.val = true) :
+        ValueHasType context heap (.word value) (.fixed type)
     | product
         {left right : Value} {leftType rightType : Ty}
         (left_typed : ValueHasType context heap left leftType)
@@ -814,6 +820,7 @@ mutual
     | bool value => exact .bool value
     | word value => exact .word value
     | integer value => exact .integer value
+    | fixed value canonical => exact .fixed value canonical
     | product left_typed right_typed =>
         exact .product (ValueHasType.mono extension left_typed)
           (ValueHasType.mono extension right_typed)
@@ -884,6 +891,7 @@ mutual
     | bool value => exact .bool value
     | word value => exact .word value
     | integer value => exact .integer value
+    | fixed value canonical => exact .fixed value canonical
     | product left_typed right_typed =>
         exact .product
           (ValueHasType.transportContext supports left_typed)
@@ -1498,7 +1506,8 @@ Declarative default values for the source runtime domain.
 
 The rules cover exactly the source type forms for which execution can create a
 default without choosing a nominal constructor or synthesizing code: the four
-primitive types, products, proxies, mappings, and staging wrappers.  The
+primitive types, the fixed-width integer types, products, proxies, mappings,
+and staging wrappers.  The
 relation is independent of the executable default-value function.
 -/
 
@@ -1514,6 +1523,7 @@ inductive Defaultable : Ty → Prop where
   | bool : Defaultable .bool
   | word : Defaultable .word
   | integer : Defaultable .integer
+  | fixed (type : FixedInteger) : Defaultable (.fixed type)
   | product {left right : Ty}
       (left_defaultable : Defaultable left)
       (right_defaultable : Defaultable right) :
@@ -1530,6 +1540,8 @@ inductive DefaultValue : Ty → Value → Prop where
   | bool : DefaultValue .bool (.bool false)
   | word : DefaultValue .word (.word Core.Word.zero)
   | integer : DefaultValue .integer (.integer 0)
+  /-- A fixed-width integer defaults to zero, whose word is canonical. -/
+  | fixed (type : FixedInteger) : DefaultValue (.fixed type) (.word Core.Word.zero)
   | product
       {leftType rightType : Ty} {left right : Value}
       (left_default : DefaultValue leftType left)
@@ -1556,6 +1568,7 @@ theorem hasType
   | bool => exact .bool false
   | word => exact .word Core.Word.zero
   | integer => exact .integer 0
+  | fixed type => exact .fixed Core.Word.zero (FixedInteger.canonical_zero type)
   | product _ _ left_ih right_ih => exact .product left_ih right_ih
   | proxy inner => exact .proxy inner
   | mapping keyType valueType =>
@@ -1571,6 +1584,7 @@ theorem defaultable
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
+  | fixed type => exact .fixed type
   | product _ _ left_ih right_ih => exact .product left_ih right_ih
   | proxy inner => exact .proxy inner
   | mapping keyType valueType => exact .mapping keyType valueType
@@ -1587,6 +1601,7 @@ theorem functional
   | bool => cases rightDefault; rfl
   | word => cases rightDefault; rfl
   | integer => cases rightDefault; rfl
+  | fixed _ => cases rightDefault; rfl
   | product leftDefault rightDefault left_ih right_ih =>
       cases rightDefault with
       | product otherLeft otherRight =>
@@ -1633,6 +1648,7 @@ theorem exists_default {type : Ty} (defaultable : Defaultable type) :
   | bool => exact ⟨.bool false, .bool⟩
   | word => exact ⟨.word Core.Word.zero, .word⟩
   | integer => exact ⟨.integer 0, .integer⟩
+  | fixed type => exact ⟨.word Core.Word.zero, .fixed type⟩
   | product _ _ left_ih right_ih =>
       rcases left_ih with ⟨left, leftDefault⟩
       rcases right_ih with ⟨right, rightDefault⟩

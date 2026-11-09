@@ -91,6 +91,7 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .unit) => pure .unit
   | .constructor (.builtin .bool) => pure .bool
   | .constructor (.builtin .word) => pure .word
+  | .constructor (.builtin (.fixed _)) => pure .word
   | .constructor (.builtin .integer) => pure .integer
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do
@@ -451,6 +452,7 @@ def defaultExpression (fuel : Nat) (catalog : Catalog) (type : TypeSystem.Ty) :
     | .constructor (.builtin .unit) => pure (some .unit)
     | .constructor (.builtin .bool) => pure (some (.bool false))
     | .constructor (.builtin .word) => pure (some (.word Word.zero))
+    | .constructor (.builtin (.fixed _)) => pure (some (.word Word.zero))
     | .constructor (.builtin .integer) => pure (some (.integer 0))
     | .product left right => do
         let left ← defaultExpression fuel catalog left

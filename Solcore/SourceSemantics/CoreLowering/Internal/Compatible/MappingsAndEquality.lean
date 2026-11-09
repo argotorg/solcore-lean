@@ -724,6 +724,7 @@ theorem ValueRep.observation {checked : SourceCoreCompatibleCatalog.Checked} {re
   | bool value => exact .bool value
   | word value => exact .word value
   | integer value => exact .integer value
+  | fixed value => exact .word value
   | product _ _ first second => exact .product first second
   | function related => exact functionLeaves related
   | @proxy inner owner id metadata identity registered =>
@@ -1201,7 +1202,7 @@ structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Reg
         Fields checked registry functions mapping world sourceKey sourceValue sources header layout entries fallback := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | constructed => intro _ _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed => intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
     have shape := functions.source_function related
@@ -1313,7 +1314,7 @@ theorem constructor_fields {expected : TypeSystem.Ty} {source : Dynamic.Value} {
         ConstructorFields checked registry functions mapping world expected metadata tag id sources values types := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | mappingValue => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | mappingValue => intro _ _ impossible; cases impossible
   | function related =>
     intro _ _ impossible
     have shape := functions.source_function related
@@ -3290,11 +3291,21 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 open Core Frontend SourceInference GeneralHeap
 
-/-- The independent source normalization agrees with the compiler's metadata
-view, by structural recursion over every source type form. -/
+/-- The independent source normalization is the compiler's metadata view
+followed by its own normalization, which also gives the fixed-width integer
+types the runtime type `word`; by structural recursion over every source type
+form. -/
 theorem runtimeType_agrees_metadata (type : TypeSystem.Ty) :
-    Dynamic.runtimeType type = SourceCoreRawMetadata.runtimeType type := by
-  induction type <;> simp_all [Dynamic.runtimeType, SourceCoreRawMetadata.runtimeType]
+    Dynamic.runtimeType type = Dynamic.runtimeType (SourceCoreRawMetadata.runtimeType type) := by
+  induction type
+  case constructor id => rfl
+  all_goals simp_all [Dynamic.runtimeType, SourceCoreRawMetadata.runtimeType]
+
+/-- Equal metadata views give equal source runtime types. -/
+theorem runtimeType_eq_of_metadata {left right : TypeSystem.Ty}
+    (same : SourceCoreRawMetadata.runtimeType left = SourceCoreRawMetadata.runtimeType right) :
+    Dynamic.runtimeType left = Dynamic.runtimeType right := by
+  rw [runtimeType_agrees_metadata left, runtimeType_agrees_metadata right, same]
 
 def FunctionRuntimeViews {catalog : SourceCoreCompatibleCatalog.Catalog} {ambient : AmbientDefinitions catalog.definitions} (functions : FunctionModel catalog ambient) : Prop :=
   ∀ {registry mapping world parameter result source value type},
@@ -3317,6 +3328,7 @@ theorem ValueRep.source_runtimeView {checked : SourceCoreCompatibleCatalog.Check
   | bool value => exact .bool value
   | word value => exact .word value
   | integer value => exact .integer value
+  | fixed value => exact .intro (.word value) rfl
   | product _ _ first second =>
     cases first with
     | intro first firstView =>
@@ -3330,7 +3342,7 @@ theorem ValueRep.source_runtimeView {checked : SourceCoreCompatibleCatalog.Check
   | compatible same _ ih =>
     cases ih with
     | intro typed view =>
-      exact .intro typed (view.trans (by simpa only [runtimeType_agrees_metadata] using same.symm))
+      exact .intro typed (view.trans (runtimeType_eq_of_metadata same.symm))
   | nil | cons | empty | entry | absent | present => trivial
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePayload
@@ -3364,7 +3376,7 @@ theorem word_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | product | function | proxy | mappingValue =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -3384,7 +3396,7 @@ theorem integer_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {va
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | product | function | proxy | mappingValue =>
+  | unit | bool | word | fixed | product | function | proxy | mappingValue =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -3854,6 +3866,7 @@ private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.
   | unit => exact ⟨.unit, fun _ data => by cases data; exact ⟨_, rfl, .unit⟩⟩
   | bool value => exact ⟨.bool value, fun _ data => by cases data; exact ⟨_, rfl, .bool _⟩⟩
   | word value => exact ⟨.word value, fun _ data => by cases data; exact ⟨_, rfl, .word _⟩⟩
+  | fixed value canonical => exact ⟨.fixed value canonical, fun _ data => by cases data; exact ⟨_, rfl, .fixed _ canonical⟩⟩
   | integer value => exact ⟨.integer value, fun _ data => by cases data; exact ⟨_, rfl, .integer _⟩⟩
   | product _ _ first second =>
     refine ⟨.product first.1 second.1, ?_⟩

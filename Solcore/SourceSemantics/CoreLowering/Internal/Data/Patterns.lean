@@ -569,7 +569,7 @@ theorem literalMatcher_sound (compilation : Compilation) (site : StatementId) (s
     | declaration => simp [literalMatcher, bind, Except.bind] at accepted
     | builtin builtin =>
       cases builtin with
-      | unit | bool => simp [literalMatcher, bind, Except.bind] at accepted
+      | unit | bool | fixed _ => simp [literalMatcher, bind, Except.bind] at accepted
       | word =>
         let node : ExpressionNode := ⟨⟨site.occurrence⟩, span, .word, .integerLiteral literal resolution, [resolution.requirement], [], none⟩
         cases validated : SourceCoreElaboration.validateWordIntegerLiteral compilation.solvedRequirements node literal resolution with
@@ -1141,6 +1141,8 @@ mutual
     | bool (value : Bool) : TypedValueRep catalog signatures .bool (.bool value) (.bool value)
     | word (value : Word) : TypedValueRep catalog signatures .word (.word value) (.word value)
     | integer (value : Int) : TypedValueRep catalog signatures .integer (.integer value) (.integer value)
+    | fixed {type : TypeSystem.FixedInteger} (value : Word) :
+        TypedValueRep catalog signatures (.fixed type) (.word value) (.word value)
     | product {leftType rightType : TypeSystem.Ty} {left right : Dynamic.Value} {a b : Value}
         (first : TypedValueRep catalog signatures leftType left a)
         (second : TypedValueRep catalog signatures rightType right b) :
@@ -1172,6 +1174,7 @@ theorem TypedValueRep.erase {catalog : SourceCoreDataCatalog.Catalog} {signature
   | bool => exact .bool _
   | word => exact .word _
   | integer => exact .integer _
+  | fixed => exact .word _
   | product _ _ first second => exact .product first second
   | constructed _ _ authenticated _ ih => exact .constructed (SourceCoreDataValues.resolveConstructor_lookup authenticated) ih
   | nil => exact .nil
@@ -1506,6 +1509,7 @@ theorem TypedValueRep.project_typed {catalog : SourceCoreDataCatalog.Catalog} {s
   | bool value => exact ⟨.bool, rfl, fun _ => .bool⟩
   | word value => exact ⟨.word, rfl, fun _ => .word⟩
   | integer value => exact ⟨.integer, rfl, fun _ => .integer⟩
+  | fixed value => exact ⟨.word, rfl, fun _ => .word⟩
   | product left right leftIH rightIH =>
     obtain ⟨a, projectA, typedA⟩ := leftIH
     obtain ⟨b, projectB, typedB⟩ := rightIH
@@ -1727,6 +1731,7 @@ theorem TypedValueRep.observation {catalog : SourceCoreDataCatalog.Catalog} {sig
   | bool value => exact ⟨_, rfl, .bool value⟩
   | word value => exact ⟨_, rfl, .word value⟩
   | integer value => exact ⟨_, rfl, .integer value⟩
+  | fixed value => exact ⟨_, rfl, .word value⟩
   | product left right first second =>
     obtain ⟨a, projectA, observedA⟩ := first
     obtain ⟨b, projectB, observedB⟩ := second
@@ -2268,9 +2273,10 @@ theorem Tree.decides {compilation : Compilation} {context : Context} {source : T
       rw [nominalResult]
       exact ⟨_, _, nominalParts_nominal _ _⟩
     cases represented with
-    | unit | bool | word | integer | product =>
+    | unit | bool | word | integer | fixed | product =>
       obtain ⟨_, _, impossible⟩ := nominalExpected
-      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer] at impossible
+      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer,
+        TypeSystem.Ty.fixed] at impossible
     | @constructed actualType actual actualTag declaration arguments sourceArguments values nominal actualResult authenticated payloads =>
       have resultEq : actual.resultType = metadata.resultType := actualResult.trans result.symm
       have ownerEq : actualTag.owner = constructor.owner := by

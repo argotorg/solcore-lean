@@ -1631,7 +1631,7 @@ private theorem source_mapping {checked : Checked} {registry : SourceCoreRawMeta
       ∃ rawKey rawResult entries, source = .mapping rawKey rawResult entries := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | function | proxy => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | function | proxy => intro _ _ impossible; cases impossible
   | constructed metadata =>
     intro key result view
     have facts := CompatibleConstructorMetadata.facts metadata.authenticated
@@ -1653,7 +1653,7 @@ private theorem source_constructor {checked : Checked} {registry : SourceCoreRaw
       ∃ metadata payloads, source = .constructed metadata payloads := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | function | proxy | mappingValue => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue => intro _ _ impossible; cases impossible
   | constructed => intro _ _ _; exact ⟨_, _, rfl⟩
   | compatible same _ ih => intro _ _ view; exact ih (by rw [← same]; exact view)
   | nil | cons | empty | entry | absent | present => trivial

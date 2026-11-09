@@ -2499,7 +2499,7 @@ theorem related_origin
     CallableLedger.OriginRep sidecar.plan site.table source carrier := by
   induction represented using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue => cases callable
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue => cases callable
   | function related => exact origins related
   | compatible _ _ ih => exact ih callable
   | nil | cons | empty | entry | absent | present => trivial

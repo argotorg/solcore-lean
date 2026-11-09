@@ -303,6 +303,7 @@ private theorem scalar_fields (represented : ValueRep checked registry functions
   | unit | product | proxy | constructed | mappingValue => trivial
   | bool boolean => exact ⟨boolean, rfl, rfl⟩
   | word word => exact ⟨word, rfl, rfl⟩
+  | fixed word => exact ⟨word, rfl, rfl⟩
   | integer integer => exact ⟨integer, rfl, rfl⟩
   | @function parameter result source value type related =>
     have projected := functions.projection related

@@ -5964,7 +5964,12 @@ open CompatiblePayload CompatibleEquality CompatibleMapping
 /-- The independent normalizer matches the historical pure runtime type view
 on every type, including nested nominal arguments, proxies and function types. -/
 theorem normalization (type : TypeSystem.Ty) : Dynamic.runtimeType type = SourceTypedRuntime.runtimeType type := by
-  induction type <;> simp_all [Dynamic.runtimeType, SourceTypedRuntime.runtimeType]
+  induction type
+  case constructor id =>
+    cases id with
+    | builtin builtin => cases builtin <;> rfl
+    | declaration _ => rfl
+  all_goals simp_all [Dynamic.runtimeType, SourceTypedRuntime.runtimeType]
 
 theorem staged_boolean (value : Bool) : Dynamic.ValueRuntimeTypeMatches (.bool value) (.comptime .bool) :=
   .intro (.bool value) rfl

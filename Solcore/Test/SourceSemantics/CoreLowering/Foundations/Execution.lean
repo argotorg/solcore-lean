@@ -3938,6 +3938,131 @@ end Tests.SourceCoreUncheckedExecution
 end
 
 section
+/-! The twelve fixed-width integer types through the public source API (row 1's
+types step): `uint8` … `uint256` and `int8` … `int256` are builtins, and a value
+of one of them is the word that is canonical for the type: below `2^N` for
+`uintN`, sign-extended from bit `N - 1` for `intN`. Parameters, results, locals
+and mapping elements hold such values, and a missing mapping element is zero.
+An argument that is not canonical for its parameter's type is rejected before
+the body runs, as upstream's ABI decoder rejects it. The types are distinct
+from each other and from `Word`. No operator is defined on them yet, and a
+literal at one of them is still rejected; row 1's later steps add both. -/
+set_option autoImplicit false
+namespace Tests.SourceCoreFixedIntegerTypes
+open Solcore Solcore.Frontend SourceCoreExecution
+
+private def require (condition : Bool) (message : String) : IO Unit :=
+  unless condition do throw (IO.userError message)
+private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
+  | .ok value => pure value
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
+private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
+private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [],
+  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+
+private def types : List TypeSystem.FixedInteger := TypeSystem.FixedInteger.all
+private def modulus : Nat := 2 ^ 256
+
+/-- Words canonical for the type: zero and its extremes, and `-1` when signed. -/
+private def canonicalSamples (type : TypeSystem.FixedInteger) : List Nat :=
+  if type.signed then
+    [0, 2 ^ (type.width.bits - 1) - 1, modulus - 2 ^ (type.width.bits - 1), modulus - 1]
+  else [0, 2 ^ type.width.bits - 1]
+
+/-- Words that are not canonical for the type: just past each extreme. Every
+word is canonical for `uint256` and `int256`. -/
+private def nonCanonicalSamples (type : TypeSystem.FixedInteger) : List Nat :=
+  if type.width.bits = 256 then []
+  else if type.signed then [2 ^ (type.width.bits - 1), modulus - 2 ^ (type.width.bits - 1) - 1]
+  else [2 ^ type.width.bits, modulus - 1]
+
+private def identity (type : TypeSystem.FixedInteger) : String :=
+  "function id" ++ type.name ++ "(x: " ++ type.name ++ ") returns (" ++ type.name ++ ") { return x; }"
+
+private def workspace : Workspace.RawWorkspace := workspaceOf (types.map identity ++ [
+  "function store(k: uint8, v: int8) returns (int8) { let table: mapping(uint8 => int8); table[k] = v; return table[k]; }",
+  "function missing(k: uint16) returns (int32) { let table: mapping(uint16 => int32); return table[k]; }",
+  "function copy(x: int256) returns (int256) { let y: int256 = x; return y; }"
+])
+
+private def names : List String := types.map (fun type => "id" ++ type.name) ++ ["store", "missing", "copy"]
+
+private def seed (program : CheckedProgram) (name : String) : IO Seed :=
+  match program.signatures.functions.filter (·.name == name) with
+  | [signature] => pure (SourceCoreCompiler.Seed.declaration signature.id)
+  | _ => throw (IO.userError s!"fixed-width fixture missing {name}")
+private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value) :
+    IO (Completion artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.succeeded result) => pure result
+  | .ok (.exportError error _) => throw (IO.userError s!"fixed-width export: {reprStr error}")
+  | .ok (.failed reason _) => throw (IO.userError s!"fixed-width language failure: {reprStr reason}")
+  | .ok (.outOfFuel _) => throw (IO.userError "fixed-width execution exhausted")
+  | .error error => throw (IO.userError s!"fixed-width invocation: {reprStr error}")
+/-- The arguments are rejected as not canonical before the body runs. -/
+private def rejectedArguments {artifact : Artifact} (session : Session artifact) (key : Key)
+    (arguments : List Value) (label : String) : IO Unit := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .error error =>
+      require (((reprStr error).splitOn "nonCanonicalSourceValue").length > 1)
+        s!"{label} was rejected for another reason: {reprStr error}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+private def boot (artifact : Artifact) : IO (Session artifact) := do
+  let fresh ← artifact.bootstrapWithReceipt
+  match fresh.val.resume 300000 with
+  | .ready session => pure session
+  | .error error => throw (IO.userError s!"fixed-width bootstrap: {reprStr error}")
+  | .outOfFuel _ => throw (IO.userError "fixed-width bootstrap exhausted")
+
+/-- Inference itself rejects the program, after loading succeeded. -/
+private def rejectedByInference (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference _] => pure ()
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+def run : IO Unit := do
+  for type in types do
+    require ((canonicalSamples type).all type.canonical) s!"{type.name} canonical samples"
+    require ((nonCanonicalSamples type).all (!type.canonical ·)) s!"{type.name} non-canonical samples"
+  let program ← get "fixed-width check" (checkProgram workspace)
+  let seeds ← names.mapM (seed program)
+  let compiled ← get "fixed-width compilation"
+    (compile workspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "fixed-width root missing")
+  let mut session ← boot (← compiled.open)
+  for (type, index) in types.zipIdx do
+    for n in canonicalSamples type do
+      let completed ← execute session (← key index) [word n]
+      require (completed.value == word n) s!"id{type.name} on {n} gave {reprStr completed.value}"
+      session := completed.session
+    for n in nonCanonicalSamples type do
+      rejectedArguments session (← key index) [word n] s!"id{type.name} on {n}"
+  let completed ← execute session (← key 12) [word 5, word (modulus - 3)]
+  require (completed.value == word (modulus - 3)) s!"store gave {reprStr completed.value}"
+  session := completed.session
+  rejectedArguments session (← key 12) [word 256, word 1] "store with key 256"
+  rejectedArguments session (← key 12) [word 1, word 128] "store with value 128"
+  let completed ← execute session (← key 13) [word 7]
+  require (completed.value == word 0) s!"missing gave {reprStr completed.value}"
+  session := completed.session
+  let completed ← execute session (← key 14) [word (modulus - 5)]
+  require (completed.value == word (modulus - 5)) s!"copy gave {reprStr completed.value}"
+  rejectedByInference "uint256 is not Word" ["function bad(x: uint256) returns (Word) { return x; }"]
+  rejectedByInference "uint8 is not uint16" ["function bad(x: uint8) returns (uint16) { return x; }"]
+  rejectedByInference "int8 is not uint8" ["function bad(x: int8) returns (uint8) { return x; }"]
+  rejectedByInference "no operator on uint8 yet" ["function bad(x: uint8) returns (uint8) { return x + x; }"]
+  rejectedByInference "no literal at uint8 yet" ["function bad() returns (uint8) { return 5; }"]
+  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, and operators and literals at them are not yet accepted"
+
+end Tests.SourceCoreFixedIntegerTypes
+end
+
+section
 -- leanmerge: from Solcore.Test.SourceCoreExecution
 #check_failure Solcore.Frontend.SourceCoreExecution.Options.backendPreference
 #check_failure Solcore.Frontend.SourceCoreExecution.Compiled.mk

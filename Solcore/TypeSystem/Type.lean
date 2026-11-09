@@ -28,12 +28,83 @@ structure TypeParameterId where
   index : Nat
   deriving Repr, DecidableEq
 
+/-- The width of a fixed-width integer type, in bits. -/
+inductive IntegerWidth where
+  | w8
+  | w16
+  | w32
+  | w64
+  | w128
+  | w256
+  deriving Repr, DecidableEq
+
+namespace IntegerWidth
+
+def bits : IntegerWidth → Nat
+  | .w8 => 8
+  | .w16 => 16
+  | .w32 => 32
+  | .w64 => 64
+  | .w128 => 128
+  | .w256 => 256
+
+def all : List IntegerWidth := [.w8, .w16, .w32, .w64, .w128, .w256]
+
+end IntegerWidth
+
+/-- One of upstream's twelve integer types: `uintN` when `signed` is false and
+`intN` when it is true. Its values are canonical words: an unsigned value as
+it is, a signed one in two's complement sign-extended from bit `N - 1`. -/
+structure FixedInteger where
+  signed : Bool
+  width : IntegerWidth
+  deriving Repr, DecidableEq
+
+namespace FixedInteger
+
+/-- The type's name in source programs, such as `uint8` or `int256`. -/
+def name (type : FixedInteger) : String :=
+  (if type.signed then "int" else "uint") ++ toString type.width.bits
+
+/-- The least value of the type. -/
+def min (type : FixedInteger) : Int :=
+  if type.signed then -(2 ^ (type.width.bits - 1) : Nat) else 0
+
+/-- The greatest value of the type. -/
+def max (type : FixedInteger) : Int :=
+  if type.signed then (2 ^ (type.width.bits - 1) - 1 : Nat) else (2 ^ type.width.bits - 1 : Nat)
+
+/-- Whether the word whose value is `n` (below `2^256`) represents a value of
+the type: below `2^N` for `uintN`, and sign-extended from bit `N - 1` for
+`intN`. -/
+def canonical (type : FixedInteger) (n : Nat) : Bool :=
+  if type.signed then
+    n < 2 ^ (type.width.bits - 1) || 2 ^ 256 - 2 ^ (type.width.bits - 1) ≤ n
+  else n < 2 ^ type.width.bits
+
+/-- Zero is canonical for every fixed-width integer type. -/
+theorem canonical_zero (type : FixedInteger) : type.canonical 0 = true := by
+  unfold canonical
+  split <;> simp [Nat.two_pow_pos]
+
+/-- The twelve types, unsigned first. -/
+def all : List FixedInteger :=
+  IntegerWidth.all.map (⟨false, ·⟩) ++ IntegerWidth.all.map (⟨true, ·⟩)
+
+/-- The type a source name denotes, if it is one of the twelve. -/
+def ofName? (name : String) : Option FixedInteger :=
+  all.find? (·.name = name)
+
+end FixedInteger
+
 /-- Built-ins which do not need declaration identities in the first slice. -/
 inductive BuiltinType where
   | unit
   | bool
   | word
   | integer
+  /-- `uint8` … `uint256` and `int8` … `int256`. -/
+  | fixed (type : FixedInteger)
   deriving Repr, DecidableEq
 
 /-- The stable identity at the head of a type application. -/
@@ -87,6 +158,9 @@ def word : Ty := .constructor (.builtin .word)
 /-- The arbitrary-precision source integer type.  It is staged and therefore
 does not by itself acquire a `Core.Ty` projection. -/
 def integer : Ty := .constructor (.builtin .integer)
+
+/-- One of the twelve fixed-width integer types. Its runtime type is `word`. -/
+def fixed (type : FixedInteger) : Ty := .constructor (.builtin (.fixed type))
 
 /-- Left-associated type application. -/
 def applyMany (head : Ty) (arguments : List Ty) : Ty :=

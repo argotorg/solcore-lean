@@ -1531,6 +1531,9 @@ theorem simple_input_hasType
   | word value view =>
       cases meaning
       exact restore_simple_type (.word value) (view.symm ▸ .word value)
+  | fixed value view canonical =>
+      cases meaning
+      exact restore_simple_type (.word value) (view.symm ▸ .fixed value canonical)
   | integer value view =>
       cases meaning
       exact restore_simple_type (.integer value) (view.symm ▸ .integer value)

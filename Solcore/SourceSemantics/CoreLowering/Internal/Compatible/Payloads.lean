@@ -90,6 +90,9 @@ mutual
     | bool (value : Bool) : ValueRep checked registry functions mapping world .bool (.bool value) (.bool value) .bool
     | word (value : Word) : ValueRep checked registry functions mapping world .word (.word value) (.word value) .word
     | integer (value : Int) : ValueRep checked registry functions mapping world .integer (.integer value) (.integer value) .integer
+    /-- A fixed-width integer value is its word, which is canonical for the type. -/
+    | fixed {type : TypeSystem.FixedInteger} (value : Word) (canonical : type.canonical value.val = true) :
+        ValueRep checked registry functions mapping world (.fixed type) (.word value) (.word value) .word
     | product {leftType rightType : TypeSystem.Ty} {left right : Dynamic.Value} {a b : Value} {aType bType : Ty}
         (first : ValueRep checked registry functions mapping world leftType left a aType)
         (second : ValueRep checked registry functions mapping world rightType right b bType) :
@@ -177,7 +180,7 @@ theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value
     checked.catalog.project sourceType = .ok type := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer => rfl
+  | unit | bool | word | integer | fixed => rfl
   | product _ _ first second => simp [SourceCoreCompatibleCatalog.Catalog.project, first, second, bind, Except.bind, pure, Except.pure]
   | function related => exact functions.projection related
   | proxy _ identity _ => simp [SourceCoreCompatibleCatalog.Catalog.project, identity]
@@ -210,6 +213,7 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
+  | fixed => exact .word
   | product _ _ first second => exact .pair first second
   | function related => exact functions.runtime_hasType related
   | proxy _ _ registered => exact .constructed (ambient.basePrefix.constructor_lookup registered) .word
@@ -244,6 +248,7 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
   | bool => exact .bool _
   | word => exact .word _
   | integer => exact .integer _
+  | fixed value canonical => exact .fixed value canonical
   | product _ _ first second => exact .product first second
   | function related => exact .function (functions.extend related metadata maps worlds)
   | proxy header identity registered => exact .proxy (header.extend metadata) identity registered
@@ -330,6 +335,7 @@ theorem defaultValue?_sound {fuel : Nat} {type : TypeSystem.Ty} {raw : SourceTyp
         · exact ⟨_, .bool, .bool _⟩
         · exact ⟨_, .word, .word _⟩
         · exact ⟨_, .integer, .integer _⟩
+        · exact ⟨_, .fixed _, .word _⟩
       | declaration => simp [SourceTypedRuntime.defaultValue?] at found
     | product left right =>
       cases first : SourceTypedRuntime.defaultValue? fuel left with
@@ -363,7 +369,7 @@ theorem defaultValue?_complete {type : TypeSystem.Ty} {source : Dynamic.Value}
     ∀ fuel, type.size < fuel → ∃ raw,
       SourceTypedRuntime.defaultValue? fuel type = some raw ∧ DefaultData raw source := by
   induction meaning with
-  | unit | bool | word | integer | proxy | mapping =>
+  | unit | bool | word | integer | fixed | proxy | mapping =>
     intro fuel bound
     cases fuel with
     | zero => omega
@@ -575,7 +581,7 @@ theorem ValueRep.mapping_shape {sourceType : TypeSystem.Ty} {source : Dynamic.Va
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True)
     (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | constructed => intro _ _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed => intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
     have shape := functions.source_function related
@@ -645,6 +651,7 @@ theorem ValueRep.map_functions {checked : SourceCoreCompatibleCatalog.Checked}
   | bool => exact .bool _
   | word => exact .word _
   | integer => exact .integer _
+  | fixed value canonical => exact .fixed value canonical
   | product _ _ first second => exact .product first second
   | function related => exact .function (includes related)
   | proxy header identity registered => exact .proxy header identity registered

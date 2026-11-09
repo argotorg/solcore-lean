@@ -141,6 +141,7 @@ theorem ValueHasType.nominal_value
   | unit => exact (nominal_ne_of_head _ _ _ (by simp [Ty.unit, applicationHead]) type_eq).elim
   | bool => exact (nominal_ne_of_head _ _ _ (by simp [Ty.bool, applicationHead]) type_eq).elim
   | word => exact (nominal_ne_of_head _ _ _ (by simp [Ty.word, applicationHead]) type_eq).elim
+  | fixed => exact (nominal_ne_of_head _ _ _ (by simp [Ty.fixed, applicationHead]) type_eq).elim
   | integer => exact (nominal_ne_of_head _ _ _ (by simp [Ty.integer, applicationHead]) type_eq).elim
   | product => exact (nominal_ne_of_head _ _ _ (by simp [applicationHead]) type_eq).elim
   | proxy => exact (nominal_ne_of_head _ _ _ (by simp [applicationHead]) type_eq).elim
@@ -169,6 +170,7 @@ theorem ValueHasType.unit_value
   | unit => rfl
   | bool => simp [Ty.unit, Ty.bool] at type_eq
   | word => simp [Ty.unit, Ty.word] at type_eq
+  | fixed => simp [Ty.unit, Ty.fixed] at type_eq
   | integer => simp [Ty.unit, Ty.integer] at type_eq
   | product => cases type_eq
   | proxy => cases type_eq
@@ -207,6 +209,7 @@ theorem ValueHasType.product_value
   | bool => cases type_eq
   | word => cases type_eq
   | integer => cases type_eq
+  | fixed => cases type_eq
   | product left_typed right_typed =>
       cases type_eq
       exact ⟨_, _, rfl, left_typed, right_typed⟩

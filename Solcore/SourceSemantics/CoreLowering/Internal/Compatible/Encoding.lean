@@ -589,6 +589,14 @@ private theorem word_sound {fuel : Nat} {registry : Registry} {expected : TypeSy
         cases accepted
         cases typed
         exact ⟨_, .word value, .compatible (actual := .word) erased (.word value)⟩
+      case fixed type =>
+        by_cases canonical : type.canonical value.val = true
+        · simp only [canonical, ↓reduceIte] at accepted
+          cases accepted
+          cases typed
+          exact ⟨_, .word value, .compatible (actual := .fixed type) erased (.fixed value canonical)⟩
+        · simp only [canonical, Bool.false_eq_true, ↓reduceIte] at accepted
+          all_goals cases accepted
 
 private theorem integer_sound {fuel : Nat} {registry : Registry} {expected : TypeSystem.Ty}
     (value : Int) {encoded : Extended registry Value} {type : Ty}

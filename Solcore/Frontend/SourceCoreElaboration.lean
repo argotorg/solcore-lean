@@ -479,6 +479,9 @@ def lowerType (site : ErrorSite) : Ty → Except Error Core.Ty
   | .constructor (.builtin .word) => .ok .word
   | type@(.constructor (.builtin .integer)) =>
       fail site (.unsupportedType type)
+  -- The fixed-width integer types are lowered by the catalog projections only.
+  | type@(.constructor (.builtin (.fixed _))) =>
+      fail site (.unsupportedType type)
   | .constructor (.declaration id) => fail site (.nominalType id)
   | .product left right => do
       pure (.product (← lowerType site left) (← lowerType site right))

@@ -2266,6 +2266,8 @@ mutual
     | unit : DefaultData checked registry .unit .unit .unit
     | bool (value : Bool) : DefaultData checked registry .bool (.bool value) (.bool value)
     | word (value : Core.Word) : DefaultData checked registry .word (.word value) (.word value)
+    | fixed {type : FixedInteger} (value : Core.Word) (canonical : type.canonical value.val = true) :
+        DefaultData checked registry (.fixed type) (.word value) (.word value)
     | integer (value : Int) : DefaultData checked registry .integer (.integer value) (.integer value)
     | product {leftType rightType : Ty} {left right : DataValue} {a b : Core.Value}
         (first : DefaultData checked registry leftType left a)
@@ -2301,6 +2303,8 @@ mutual
     | unit : Output checked registry world definitions .unit .unit
     | bool (value : Bool) : Output checked registry world definitions .bool (.bool value)
     | word (value : Core.Word) : Output checked registry world definitions .word (.word value)
+    | fixed {type : FixedInteger} (value : Core.Word) (canonical : type.canonical value.val = true) :
+        Output checked registry world definitions (.fixed type) (.word value)
     | integer (value : Int) : Output checked registry world definitions .integer (.integer value)
     | product {leftType rightType : Ty} {left right : Core.Value}
         (first : Output checked registry world definitions leftType left)
@@ -2438,6 +2442,18 @@ theorem data_complete (context : Context) {raw : Ty} {data : DataValue} {native 
       unfold decodeRaw encodeRaw
       rw [same]
       exact ⟨rfl, rfl⟩
+  | fixed value canonical =>
+    refine ⟨1, ?_⟩
+    intro fuel enough expected same
+    cases fuel with
+    | zero => omega
+    | succ fuel =>
+      unfold decodeRaw encodeRaw
+      rw [same]
+      refine ⟨rfl, ?_⟩
+      first
+        | (simp only [TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType, canonical, ↓reduceIte] <;> rfl)
+        | (simp [TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType, canonical] <;> rfl)
   | integer value =>
     refine ⟨1, ?_⟩
     intro fuel enough expected same

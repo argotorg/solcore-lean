@@ -210,7 +210,7 @@ private theorem closure_functions {checked : SourceCoreCompatibleCatalog.Checked
         SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType actualType := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue => intro _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue => intro _ impossible; cases impossible
   | function related => intro _ same; subst same; exact ⟨_, related, rfl⟩
   | compatible same related ih =>
     intro function source

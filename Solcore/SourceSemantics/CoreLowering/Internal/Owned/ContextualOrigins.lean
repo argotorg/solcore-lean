@@ -1084,7 +1084,7 @@ theorem PayloadOrigins.closure_member
       | global related => intro function impossible; cases impossible
       | builtin related => intro function impossible; cases impossible
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
       intro function impossible
       cases impossible
   | nil | cons | empty | entry | absent | present => trivial
@@ -1310,7 +1310,7 @@ theorem callable_at
       intro callable
       obtain ⟨parameter, result, view, positive⟩ := ih callable
       exact ⟨parameter, result, same.trans view, positive⟩
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
       intro callable
       cases callable
   | nil | cons | empty | entry | absent | present => trivial

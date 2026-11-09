@@ -3177,8 +3177,17 @@ private theorem raw_data_succ {fuel : Nat} (raw : RawData fuel)
     case constructor id =>
       cases id with
       | declaration => cases accepted
-      | builtin builtin => cases builtin <;> try (solve | cases accepted)
-                           all_goals cases accepted; constructor
+      | builtin builtin =>
+        cases builtin <;> try (solve | cases accepted)
+        all_goals first
+          | (cases accepted; constructor)
+          | (rename_i type
+             by_cases canonical : type.canonical value.val = true
+             · simp only [canonical, ↓reduceIte] at accepted
+               cases accepted
+               constructor
+             · simp only [canonical, Bool.false_eq_true, ↓reduceIte] at accepted
+               all_goals cases accepted)
   | product left right =>
     cases erased : SourceCoreRawMetadata.runtimeType expected <;>
       (unfold encodeRaw at accepted; rw [erased] at accepted)

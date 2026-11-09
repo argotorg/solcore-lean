@@ -187,7 +187,8 @@ end
 
 section
 -- leanmerge: from Solcore.SourceSemantics.Dynamic.RuntimeType
-/-! Source runtime type compatibility erases staging recursively. Canonical
+/-! Source runtime type compatibility erases staging and fixed-width integer
+types recursively. Canonical
 shallow metadata remains raw; a runtime key guard compares its normalized
 view with the normalized expected type. Defaults and diagnostics retain the
 original expected metadata. No runtime value codec or evaluator is imported. -/
@@ -195,10 +196,14 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.Dynamic
 open Frontend Frontend.SourceInference TypeSystem
 
-/-- Erase availability annotations throughout a source type. -/
+/-- Erase availability annotations throughout a source type, and give the
+twelve fixed-width integer types the runtime type `word`: their values are
+canonical words. The lowering's metadata view (`SourceCoreRawMetadata.runtimeType`)
+keeps them, so word operations never apply to them. -/
 @[simp] def runtimeType : Ty → Ty
   | .variable id => .variable id
   | .parameter id => .parameter id
+  | .constructor (.builtin (.fixed _)) => .word
   | .constructor id => .constructor id
   | .application function argument => .application (runtimeType function) (runtimeType argument)
   | .function parameter result => .function (runtimeType parameter) (runtimeType result)
@@ -209,7 +214,12 @@ open Frontend Frontend.SourceInference TypeSystem
   | .error => .error
 
 @[simp] theorem runtimeType_idempotent (type : Ty) : runtimeType (runtimeType type) = runtimeType type := by
-  induction type <;> simp_all [runtimeType]
+  induction type
+  case constructor id =>
+    cases id with
+    | builtin builtin => cases builtin <;> rfl
+    | declaration _ => rfl
+  all_goals simp_all [runtimeType]
 
 /-- Canonical shallow runtime type of every mathematical source value. -/
 inductive ValueRuntimeType : Value → Ty → Prop where

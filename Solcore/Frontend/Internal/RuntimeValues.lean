@@ -56,10 +56,13 @@ open SourceInference TypeSystem SourceCompilationPlan
 /-- Erase staging wrappers while preserving the complete runtime type shape.
 `comptime<T>` changes when a value is available, not its runtime
 representation.  Erasure is recursive because staging wrappers may occur
-inside products, functions, mappings, proxies, and nominal arguments. -/
+inside products, functions, mappings, proxies, and nominal arguments.  The
+twelve fixed-width integer types have runtime type `word`, because their
+values are canonical words; input validation checks the canonical range. -/
 @[simp] def runtimeType : Ty → Ty
   | .variable id => .variable id
   | .parameter id => .parameter id
+  | .constructor (.builtin (.fixed _)) => .word
   | .constructor id => .constructor id
   | .application function argument =>
       .application (runtimeType function) (runtimeType argument)
@@ -73,7 +76,12 @@ inside products, functions, mappings, proxies, and nominal arguments. -/
 
 @[simp] theorem runtimeType_idempotent (type : Ty) :
     runtimeType (runtimeType type) = runtimeType type := by
-  induction type <;> simp_all [runtimeType]
+  induction type
+  case constructor id =>
+    cases id with
+    | builtin builtin => cases builtin <;> rfl
+    | declaration _ => rfl
+  all_goals simp_all [runtimeType]
 
 abbrev Environment := List (Resolved.LocalId × Location)
 
@@ -156,6 +164,7 @@ def defaultValue? : Nat → Ty → Option Value
   | _ + 1, .constructor (.builtin .unit) => some .unit
   | _ + 1, .constructor (.builtin .bool) => some (.bool false)
   | _ + 1, .constructor (.builtin .word) => some (.word Core.Word.zero)
+  | _ + 1, .constructor (.builtin (.fixed _)) => some (.word Core.Word.zero)
   | _ + 1, .constructor (.builtin .integer) => some (.integer 0)
   | fuel + 1, .product left right => do
       pure (.product (← defaultValue? fuel left) (← defaultValue? fuel right))
@@ -264,6 +273,19 @@ def validConstructorInstantiation (signatures : ProgramSignatures)
                 instantiation.payloadTypes = expectedPayload &&
                   instantiation.resultType = expectedResult
 
+/-- Erase staging wrappers only, keeping the fixed-width integer types: the type
+whose canonical values a runtime input must have. -/
+@[simp] def unstagedType : Ty → Ty
+  | .application function argument =>
+      .application (unstagedType function) (unstagedType argument)
+  | .function parameter result =>
+      .function (unstagedType parameter) (unstagedType result)
+  | .product left right => .product (unstagedType left) (unstagedType right)
+  | .mapping key value => .mapping (unstagedType key) (unstagedType value)
+  | .proxy inner => .proxy (unstagedType inner)
+  | .comptime inner => unstagedType inner
+  | type => type
+
 /-- Exact outcome of bounded recursive runtime-input validation. -/
 inductive TypeValidation where
   | valid
@@ -304,25 +326,27 @@ mutual
               rest))
 
   /-- Bounded deep validation which distinguishes malformed input from budget
-  exhaustion. -/
+  exhaustion.  A word at a fixed-width integer type must be canonical for it. -/
   def Value.validateTypeFuel :
       Nat → ProgramSignatures → Plan → Ty → Value → TypeValidation
     | 0, _, _, _, _ => .outOfFuel
     | fuel + 1, signatures, plan, expected, actual =>
-        match runtimeType expected, actual with
+        match unstagedType expected, actual with
         | .constructor (.builtin .unit), .unit => .valid
         | .constructor (.builtin .bool), .bool _ => .valid
         | .constructor (.builtin .word), .word _ => .valid
+        | .constructor (.builtin (.fixed type)), .word value =>
+            if type.canonical value.val then .valid else .invalid
         | .constructor (.builtin .integer), .integer _ => .valid
         | .product leftType rightType, .product left right =>
             combineValidation
               (Value.validateTypeFuel fuel signatures plan leftType left)
               (Value.validateTypeFuel fuel signatures plan rightType right)
         | .proxy inner, .proxy actualInner =>
-            if inner = runtimeType actualInner then .valid else .invalid
+            if runtimeType inner = runtimeType actualInner then .valid else .invalid
         | .mapping keyType valueType, .mapping actualKey actualValue entries =>
-            if decide (keyType = runtimeType actualKey) &&
-                decide (valueType = runtimeType actualValue) then
+            if decide (runtimeType keyType = runtimeType actualKey) &&
+                decide (runtimeType valueType = runtimeType actualValue) then
               mappingEntriesValidateFuel fuel signatures plan keyType valueType
                 entries
             else

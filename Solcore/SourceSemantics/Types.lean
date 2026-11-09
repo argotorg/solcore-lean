@@ -767,6 +767,12 @@ theorem integer
     TypeAdmissible context .integer := by
   simpa [TypeSystem.Ty.integer] using builtin binders .integer
 
+theorem fixed
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (type : TypeSystem.FixedInteger) :
+    TypeAdmissible context (.fixed type) := by
+  simpa [TypeSystem.Ty.fixed] using builtin binders (.fixed type)
+
 /-- Admissibility is compositional for function types. -/
 theorem function
     {context : Context} {parameter result : TypeSystem.Ty}

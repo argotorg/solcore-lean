@@ -1,6 +1,6 @@
 # Integer types, `unchecked` blocks and shifts
 
-Updated: 2026-11-04. Module paths and file counts below predate the layout
+Updated: 2026-11-10. Module paths and file counts below predate the layout
 refactor of f820cc25f; the marker `-- leanmerge: from <old module>` finds each
 old module's current file
 ([following older notes](../guide/conventions.md#following-older-notes)).
@@ -648,3 +648,95 @@ and then wraps or panics as upstream does. Words touch fewer proofs:
   inference selects them once the operands' types are known. The evaluation
   rules therefore keep their shape, and no rule takes an operand's static type
   as a premise. That removes the reason the alternative above was rejected.
+
+### Row 1's operators: chosen from the operand's static type
+
+Made on 2026-11-10, before row 1's operators. It revises the last point
+above, which planned to rewrite each operator into a typed one once its
+operands' types are known.
+
+**Compared.**
+- **Rewriting the typed IR after finalization.** The inference soundness
+  proofs rest on one equation: the final source is the inferred node table
+  under the final substitution (`Detail.finalize_typedSource`). About 70
+  rewrites in about 25 inference files use it, as do the
+  `TypingSourceExtends` premises of 11 more and the `finalize_*` lemmas. A
+  rewritten node falsifies all of them, so a rewrite would need a transport of
+  every typing judgment and resource, comparable in size to the substitution
+  laws (`Internal/Substitution/StructuralLaws.lean`).
+- **Choosing by the operand's static type.** The binary and unary rules look up
+  their left (or only) operand's node, and apply the twelve types' operations
+  when its type is one of them.
+
+**Chosen: the static type.**
+- About ten rule constructors gain the lookup: binary and unary evaluation and
+  faults in the source semantics, the staged rules, and their sized forms.
+  The inference proofs are unaffected.
+- The other operand types keep their primitive relations, restricted to
+  operands that are not of a fixed-width type, so the semantics stays
+  deterministic.
+- CoreLowering already chooses its lowering mode from the same type
+  (`Tree.binary` and `BinaryProfile`).
+- Compound assignment needs no lookup, because its form holds the target's
+  type.
+
+### Row 1's runtime types: the shape erases the twelve types
+
+Made on 2026-11-10, during row 1's types step. It corrects the second point of
+"Row 1's values" above: there are three runtime-type views, and the lowering's
+own view keeps the twelve types.
+
+- **The shape views erase them.** `Dynamic.runtimeType` and
+  `SourceTypedRuntime.runtimeType` map each of the twelve types to `word`, as
+  they erase `comptime`. These views only compare value shapes: the mapping
+  key guard (`ValueRuntimeTypeMatches`), the shared runtime's `Value.type?`
+  checks, and the result check of the unified API. A `uint8` value is a word,
+  so it passes them.
+- **The metadata view keeps them.** `SourceCoreRawMetadata.runtimeType` is
+  unchanged. The lowering's operator profiles test `runtimeType leaf = .word`,
+  and compound assignment and bit-not on places choose word operations from
+  that test. Erasing the twelve types there would apply wrapping word
+  operations to them.
+- **So the representations gain a case.** The value relations keyed by the
+  metadata view (`CompatiblePayload.ValueRep`, `DataPayload.ValueRep`, the
+  public input and output shapes, the defaults) each gain a `fixed` case:
+  the word itself, canonical for the type where the codec must re-encode it.
+  The agreement lemmas now say that the shape view is the metadata view
+  followed by the erasure.
+- **Inputs check the range.** Every encoder (compatible, indexed session,
+  general functions, data values) and the shared runtime's input validator
+  reject a word that is not canonical for its type. The validator matches on
+  the type with only `comptime` erased (`unstagedType`), so nested values are
+  checked too.
+- **The legacy lowering rejects them.** `SourceCoreElaboration.lowerType`
+  rejects the twelve types, as it rejects `integer`. Its local-cell proofs
+  rely on each Core type having one source type. The catalog projections,
+  which the public pipelines use, lower the twelve types to `word`.
+
+### Row 1: steps
+
+Row 1 is committed in steps, each through the full gate, so that each can be
+integrated on its own.
+
+1. **Types.** The twelve types are builtins (`BuiltinType.fixed`), resolved
+   before declared types. Their values are canonical words
+   (`ValueHasType.fixed`), as parameters, results, locals and mapping
+   elements, and a missing mapping element is zero. The public API rejects a
+   non-canonical argument before the body runs. No operator is defined on the
+   twelve types yet, no literal is accepted at them, and open literals still
+   default to `word`.
+2. **Literals.** A literal at one of the twelve types is range-checked at
+   compile time, with builtin `Int` evidence for each type.
+3. **Checked `+ - *`, comparisons and bitwise operators**, chosen as above.
+   Checked `+ - *` panic with `0x11`. Comparisons are signed for `intN`.
+   Bitwise results are masked or sign-extended. Compound `+= -= *=` check the
+   result at the guard, after the setter.
+4. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and
+   `MIN / −1` and a negation out of range panic with `0x11`. Quotients round
+   toward zero. A unary `-` on a literal folds into the literal.
+5. **The `uint256` default.** Open literals default to `uint256`, and an open
+   literal in no operator, comparison or requirement is rejected as
+   ambiguous. The existing tests that relied on the `word` default change in
+   this step.
+6. **Unchecked operators and shifts on the twelve types**, and ports of the
+   upstream fixtures.

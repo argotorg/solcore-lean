@@ -255,9 +255,10 @@ theorem Members.select {checked : Checked} {signatures : ProgramSignatures}
       fun _ store _ _ selected => .inRight (.inRight (selected.evaluates store))⟩
   | @member root field leaf dataType index branches fieldType name steps projections layout tail ih =>
     cases represented with
-    | unit | bool | word | integer | product =>
+    | unit | bool | word | integer | fixed | product =>
       obtain ⟨_, _, impossible⟩ := layout.nominal
-      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer] at impossible
+      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer,
+        TypeSystem.Ty.fixed] at impossible
     | @constructed type metadata tag declaration typeArguments arguments values nominal result authenticated payloads =>
       obtain ⟨owner, branch, branchLookup, branchConstructor, fieldLookup, payloadLength⟩ := layout.constructors metadata tag result authenticated
       obtain ⟨selectedSource, selectedCore, sourceAt, coreAt, selectedRepresentation⟩ := TypedValuesRep.at payloads fieldLookup
@@ -289,9 +290,10 @@ theorem Members.update {checked : Checked} {signatures : ProgramSignatures}
       fun _ store _ _ _ _ _ selected => .inRight (selected.evaluates store)⟩
   | @member root field leaf dataType index branches fieldType name steps projections layout tail ih =>
     cases represented with
-    | unit | bool | word | integer | product =>
+    | unit | bool | word | integer | fixed | product =>
       obtain ⟨_, _, impossible⟩ := layout.nominal
-      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer] at impossible
+      simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer,
+        TypeSystem.Ty.fixed] at impossible
     | @constructed sourceType metadata tag declaration typeArguments arguments values nominal result authenticated payloads =>
       obtain ⟨owner, branch, branchLookup, branchConstructor, fieldLookup, payloadLength⟩ := layout.constructors metadata tag result authenticated
       obtain ⟨selectedSource, selectedCore, sourceAt, coreAt, selectedRepresentation⟩ := TypedValuesRep.at payloads fieldLookup

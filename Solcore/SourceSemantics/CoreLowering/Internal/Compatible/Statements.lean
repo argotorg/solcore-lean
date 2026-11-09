@@ -2945,7 +2945,7 @@ theorem finish_with_diagnostics {values : ValuesContext} {source : TypedSource} 
   have keyTyped : Dynamic.ValueRuntimeTypeMatches keySource rawKey := by
     cases keyRep.source_runtimeView functionTypes with
     | intro typed view =>
-      exact .intro typed (view.trans (by simpa only [runtimeType_agrees_metadata] using keyView))
+      exact .intro typed (view.trans (runtimeType_eq_of_metadata keyView))
   have nativeKey : Payload registry functions mapping world rawKey layout.keyType keySource keyValue :=
     .compatible keyView.symm (header.keyType ▸ keyRep)
   obtain ⟨result, finalStore, futureWorld, resultMeaning, evaluated, finalHeaps, worlds, frame⟩ :=

@@ -1185,8 +1185,7 @@ theorem validateTypeFuel_closure_notValid
     (Value.closure parameters resultType body source owner captured evidence).validateTypeFuel fuel signatures plan expected ≠ .valid := by
   cases fuel with
   | zero => intro impossible; cases impossible
-  | succ fuel =>
-    rw [Value.validateTypeFuel.eq_12] <;> simp
+  | succ fuel => simp [Value.validateTypeFuel]
 
 theorem capturesReadable_empty (state : RuntimeState) :
     CapturesReadable state [] := by

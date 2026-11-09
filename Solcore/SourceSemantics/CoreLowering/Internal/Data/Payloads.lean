@@ -31,6 +31,9 @@ mutual
     | bool (value : Bool) : ValueRep catalog signatures functions mapping world .bool (.bool value) (.bool value) .bool
     | word (value : Word) : ValueRep catalog signatures functions mapping world .word (.word value) (.word value) .word
     | integer (value : Int) : ValueRep catalog signatures functions mapping world .integer (.integer value) (.integer value) .integer
+    /-- A fixed-width integer value is its word; its range is a typing fact. -/
+    | fixed {type : TypeSystem.FixedInteger} (value : Word) :
+        ValueRep catalog signatures functions mapping world (.fixed type) (.word value) (.word value) .word
     | product {leftType rightType : TypeSystem.Ty} {left right : Dynamic.Value} {a b : Value} {aType bType : Ty}
         (first : ValueRep catalog signatures functions mapping world leftType left a aType)
         (second : ValueRep catalog signatures functions mapping world rightType right b bType) :
@@ -99,7 +102,7 @@ theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value
     catalog.project sourceType = .ok type := by
   induction represented using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) with
-  | unit | bool | word | integer => rfl
+  | unit | bool | word | integer | fixed => rfl
   | product _ _ first second => simp [SourceCoreDataCatalog.Catalog.project, first, second, bind, Except.bind, pure, Except.pure]
   | function represented => exact functions.projection represented
   | proxy identity _ => simp [SourceCoreDataCatalog.Catalog.project, identity, pure, Except.pure]
@@ -129,6 +132,7 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
+  | fixed => exact .word
   | product _ _ first second => exact .pair first second
   | function represented => exact functions.runtime_hasType represented
   | proxy _ registered => exact .constructed registered .unit
@@ -156,6 +160,7 @@ theorem ValueRep.extend {futureMapping : LocationMap} {futureWorld : StoreTyping
   | bool => exact .bool _
   | word => exact .word _
   | integer => exact .integer _
+  | fixed => exact .fixed _
   | product _ _ first second => exact .product first second
   | function represented => exact .function (functions.extend represented maps worlds)
   | proxy identity registered => exact .proxy identity registered
@@ -240,6 +245,7 @@ theorem default_represents {catalog : SourceCoreDataCatalog.Catalog} {signatures
   | bool => exact ⟨_, .bool _⟩
   | word => exact ⟨_, .word _⟩
   | integer => exact ⟨_, .integer _⟩
+  | fixed => exact ⟨_, .fixed _⟩
   | product _ _ left right =>
     obtain ⟨a, first⟩ := left
     obtain ⟨b, second⟩ := right
@@ -275,6 +281,7 @@ theorem finite_represents {catalog : SourceCoreDataCatalog.Catalog} {signatures 
   | bool value => exact ⟨_, .bool value⟩
   | word value => exact ⟨_, .word value⟩
   | integer value => exact ⟨_, .integer value⟩
+  | fixed value => exact ⟨_, .fixed value⟩
   | product _ _ first second =>
     obtain ⟨a, first⟩ := first
     obtain ⟨b, second⟩ := second
@@ -480,6 +487,12 @@ private theorem raw_sound (fuel : Nat) (context : EncodingContext)
           all_goals try (solve | cases accepted; exact ⟨_, _, .bool _, .bool _⟩)
           all_goals try (solve | cases accepted; exact ⟨_, _, .word _, .word _⟩)
           all_goals try (solve | cases accepted; exact ⟨_, _, .integer _, .integer _⟩)
+          -- A word at a fixed-width integer type is accepted only when canonical.
+          all_goals try (solve
+            | (simp only [SourceCoreDataValues.encodeRaw] at accepted
+               split at accepted
+               · cases accepted; exact ⟨_, _, .word _, .fixed _⟩
+               · cases accepted))
           all_goals
             simp only [SourceCoreDataValues.encodeRaw] at accepted
             split at accepted
@@ -700,6 +713,7 @@ theorem ValueRep.observation {catalog : SourceCoreDataCatalog.Catalog} {signatur
   | bool value => exact .bool value
   | word value => exact .word value
   | integer value => exact .integer value
+  | fixed value => exact .word value
   | product _ _ first second => exact .product first second
   | function represented => exact functionObservations represented
   | proxy identity _ => exact .proxy_of_identity identity
@@ -890,7 +904,8 @@ theorem ValueRep.nominal_parts {sourceType : TypeSystem.Ty} {source : Dynamic.Va
       ValuesRep catalog signatures functions mapping world metadata.payloadTypes sources values types := by
   cases represented with
   | constructed nominal result authenticated projection registered payloads => exact ⟨_, _, _, _, _, rfl, rfl, rfl, result, authenticated, registered, payloads⟩
-  | _ => simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer] at nominal
+  | _ => simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer,
+      TypeSystem.Ty.fixed] at nominal
 
 theorem ValueRep.mapping_parts {keyType valueType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value}
     (layout : Core.OrderedMapping.Layout)
@@ -1167,31 +1182,37 @@ private theorem erase_ne_comptime (type inner : TypeSystem.Ty) :
   induction type <;> simp_all [SourceCoreDataCatalog.erase]
 
 /-- Canonical retained data types determine the mathematical source value's
-shallow runtime type, including functions nested in products. Nominal and
-proxy arguments are retained exactly, not erased by this conclusion. -/
+shallow runtime type up to the runtime type guard, including functions nested
+in products: a fixed-width integer value is a word. Nominal and proxy
+arguments are retained exactly, not erased by this conclusion. -/
 theorem ValueRep.source_runtimeType {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (functionTypes : FunctionRuntimeTypes functions)
     (represented : ValueRep catalog signatures functions mapping world sourceType source value type)
     (canonical : SourceCoreDataCatalog.erase sourceType = sourceType) :
-    Dynamic.ValueRuntimeType source sourceType := by
+    Dynamic.ValueRuntimeTypeMatches source sourceType := by
   revert canonical
   induction represented using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) with
-  | unit => intro _; exact .unit
-  | bool value => intro _; exact .bool value
-  | word value => intro _; exact .word value
-  | integer value => intro _; exact .integer value
+  | unit => intro _; exact Dynamic.ValueRuntimeType.unit.matches
+  | bool value => intro _; exact (Dynamic.ValueRuntimeType.bool value).matches
+  | word value => intro _; exact (Dynamic.ValueRuntimeType.word value).matches
+  | integer value => intro _; exact (Dynamic.ValueRuntimeType.integer value).matches
+  | fixed value => intro _; exact .intro (.word value) rfl
   | product _ _ first second =>
     intro canonical
     obtain ⟨left, right⟩ := TypeSystem.Ty.product.inj canonical
-    exact .product (first left) (second right)
-  | function related => intro _; exact functionTypes related
-  | proxy => intro _; exact .proxy _
-  | mapping => intro _; exact .mapping _ _ _
-  | constructed nominal result => intro _; rw [← result]; exact .constructed _ _
+    cases first left with
+    | intro first firstView =>
+      cases second right with
+      | intro second secondView =>
+        exact .intro (.product first second) (by simp only [Dynamic.runtimeType, firstView, secondView])
+  | function related => intro _; exact (functionTypes related).matches
+  | proxy => intro _; exact (Dynamic.ValueRuntimeType.proxy _).matches
+  | mapping => intro _; exact (Dynamic.ValueRuntimeType.mapping _ _ _).matches
+  | constructed nominal result => intro _; rw [← result]; exact (Dynamic.ValueRuntimeType.constructed _ _).matches
   | comptime => intro impossible; exact False.elim (erase_ne_comptime _ _ impossible)
   | nil | cons | empty | prepend => trivial
 

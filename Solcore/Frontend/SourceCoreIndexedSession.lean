@@ -490,6 +490,9 @@ mutual
       | .constructor (.builtin .unit), .unit => pure (.pure registry .unit)
       | .constructor (.builtin .bool), .bool value => pure (.pure registry (.bool value))
       | .constructor (.builtin .word), .word value => pure (.pure registry (.word value))
+      | .constructor (.builtin (.fixed type)), .word value =>
+          if type.canonical value.val then pure (.pure registry (.word value))
+          else throw (compatibleCode .nonCanonicalSourceValue)
       | .constructor (.builtin .integer), .integer value => pure (.pure registry (.integer value))
       | .product leftType rightType, .product left right =>
           let left ← (encodeRaw authority slots fuel registry leftType left).mapError (Error.at .productLeft)
@@ -567,6 +570,7 @@ mutual
       | .constructor (.builtin .unit), .unit => pure (.unit, slots)
       | .constructor (.builtin .bool), .bool value => pure (.bool value, slots)
       | .constructor (.builtin .word), .word value => pure (.word value, slots)
+      | .constructor (.builtin (.fixed _)), .word value => pure (.word value, slots)
       | .constructor (.builtin .integer), .integer value => pure (.integer value, slots)
       | .product leftType rightType, .pair left right =>
           let (left, slots) ← (decodeRaw authority generation values fuel slots leftType left).mapError (Error.at .productLeft)
@@ -1594,6 +1598,11 @@ inductive SimpleInput : TypeSystem.Ty → Value → Core.Value → Prop where
   | word {expected : TypeSystem.Ty} (value : Core.Word)
       (view : SourceCoreRawMetadata.runtimeType expected = .word) :
       SimpleInput expected (.word value) (.word value)
+  /-- A word at a fixed-width integer type, accepted only when canonical. -/
+  | fixed {expected : TypeSystem.Ty} {type : TypeSystem.FixedInteger} (value : Core.Word)
+      (view : SourceCoreRawMetadata.runtimeType expected = .fixed type)
+      (canonical : type.canonical value.val = true) :
+      SimpleInput expected (.word value) (.word value)
   | integer {expected : TypeSystem.Ty} (value : Int)
       (view : SourceCoreRawMetadata.runtimeType expected = .integer) :
       SimpleInput expected (.integer value) (.integer value)
@@ -1657,8 +1666,16 @@ private theorem simple_raw_input {artifact : Artifact} {world : Core.StoreTyping
         | declaration => cases accepted
         | builtin builtin =>
           cases builtin <;> try (solve | cases accepted)
-          cases accepted
-          exact ⟨.word value view, rfl⟩
+          case word =>
+            cases accepted
+            exact ⟨.word value view, rfl⟩
+          case fixed type =>
+            by_cases canonical : type.canonical value.val = true
+            · simp only [canonical, ↓reduceIte] at accepted
+              cases accepted
+              exact ⟨.fixed value view canonical, rfl⟩
+            · simp only [canonical, Bool.false_eq_true, ↓reduceIte] at accepted
+              all_goals cases accepted
   | integer value =>
     cases fuel with
     | zero => cases accepted
@@ -1871,7 +1888,15 @@ private theorem raw_data_succ {fuel : Nat} (raw : RawDataCorrespondence fuel)
       | declaration => cases accepted
       | builtin builtin =>
         cases builtin <;> try (solve | cases accepted)
-        all_goals cases accepted; simp [SourceCoreCompatibleValues.encodeRaw, erased]
+        all_goals first
+          | (cases accepted; simp [SourceCoreCompatibleValues.encodeRaw, erased])
+          | (rename_i type
+             by_cases canonical : type.canonical value.val = true
+             · simp only [canonical, ↓reduceIte] at accepted
+               cases accepted
+               simp [SourceCoreCompatibleValues.encodeRaw, erased, canonical]
+             · simp only [canonical, Bool.false_eq_true, ↓reduceIte] at accepted
+               all_goals cases accepted)
   | product left right =>
     simp only [DataInput.publicValue] at accepted
     cases erased : SourceCoreRawMetadata.runtimeType expected <;>
@@ -3950,6 +3975,7 @@ private theorem decode_raw_append_succ {fuel : Nat} (raw : DecodedSlotsAppend fu
   · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
   · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
   · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
   · obtain ⟨⟨left, first⟩, leftAt, accepted⟩ := root_factory_bind_ok accepted
     obtain ⟨⟨right, second⟩, rightAt, accepted⟩ := root_factory_bind_ok accepted
     obtain ⟨a, firstEq⟩ := raw authority generation values slots _ _ left first (simple_mapError_ok leftAt)
@@ -5318,6 +5344,7 @@ private theorem decode_raw_issued_succ {fuel : Nat} (raw : DecodedSlotsIssued fu
   · cases accepted; exact issued
   · cases accepted; exact issued
   · cases accepted; exact issued
+  · cases accepted; exact issued
   · obtain ⟨⟨left, first⟩, leftAt, accepted⟩ := root_factory_bind_ok accepted
     obtain ⟨⟨right, second⟩, rightAt, accepted⟩ := root_factory_bind_ok accepted
     have firstIssued := raw authority generation values slots _ _ left first issued (simple_mapError_ok leftAt)
@@ -6106,6 +6133,22 @@ private theorem output_complete {artifact : Artifact} {world : Core.StoreTyping}
       cases encodingFuel with
       | zero => omega
       | succ encodingFuel => unfold encodeRaw; rw [same]; rfl
+  | fixed value canonical =>
+    refine ⟨1, ?_⟩
+    intro generation fuel enough expected same slots issued
+    refine ⟨.word value, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+    · cases fuel with
+      | zero => omega
+      | succ fuel => unfold decodeRaw; rw [same]; rfl
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel =>
+        unfold encodeRaw
+        rw [same]
+        first
+          | (simp only [TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType, canonical, ↓reduceIte] <;> rfl)
+          | (simp [TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType, canonical] <;> rfl)
   | integer value =>
     refine ⟨1, ?_⟩
     intro generation fuel enough expected same slots issued

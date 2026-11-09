@@ -86,11 +86,12 @@ theorem value_bounded {context : SourceSemantics.Context} {heap : Heap} {value :
     (motive_1 := fun value _ _ => ValueBounded heap.cells.length value)
     (motive_2 := fun values _ _ => ValuesBounded heap.cells.length values)
     (motive_3 := fun entries _ _ _ => EntriesBounded heap.cells.length entries)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typed
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typed
   · intro location captured; cases captured
   · intro _ location captured; cases captured
   · intro _ location captured; cases captured
   · intro _ location captured; cases captured
+  · intro _ _ _ location captured; cases captured
   · intro left right leftType rightType leftTyped rightTyped leftBound rightBound location captured
     cases captured with
     | productLeft inside => exact leftBound location inside

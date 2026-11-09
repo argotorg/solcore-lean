@@ -57,6 +57,7 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .unit) => pure .unit
   | .constructor (.builtin .bool) => pure .bool
   | .constructor (.builtin .word) => pure .word
+  | .constructor (.builtin (.fixed _)) => pure .word
   | .constructor (.builtin .integer) => pure .integer
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do

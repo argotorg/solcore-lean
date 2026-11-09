@@ -696,6 +696,8 @@ inductive Tree (catalog : SourceCoreDataCatalog.Catalog) :
   | bool : Tree catalog .bool (.bool false) (.bool false) (.bool false)
   | word : Tree catalog .word (.word Word.zero) (.word Word.zero) (.word Word.zero)
   | integer : Tree catalog .integer (.integer 0) (.integer 0) (.integer 0)
+  | fixed (type : TypeSystem.FixedInteger) :
+      Tree catalog (.fixed type) (.word Word.zero) (.word Word.zero) (.word Word.zero)
   | product {leftTy rightTy : TypeSystem.Ty} {left right : Dynamic.Value}
       {leftValue rightValue : Value} {leftExpr rightExpr : Expr}
       (leftTree : Tree catalog leftTy left leftValue leftExpr)
@@ -722,6 +724,7 @@ theorem Tree.meaning {catalog : Catalog} {type : TypeSystem.Ty}
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
+  | fixed type => exact .fixed type
   | product _ _ left right => exact .product left right
   | proxy inner _ _ => exact .proxy inner
   | mapping key value _ _ => exact .mapping key value
@@ -736,6 +739,7 @@ theorem Tree.evaluates {catalog : Catalog} {type : TypeSystem.Ty}
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
+  | fixed => exact .word
   | product _ _ left right => exact .pair left right
   | proxy | mapping => exact .construct .unit
   | comptime _ inner => exact inner
@@ -758,6 +762,7 @@ theorem tree_of_defaultExpression (fuel : Nat) (catalog : Catalog) (type : TypeS
         · exact ⟨_, _, .bool⟩
         · exact ⟨_, _, .word⟩
         · exact ⟨_, _, .integer⟩
+        · exact ⟨_, _, .fixed _⟩
     | product left right =>
       cases leftResult : defaultExpression fuel catalog left with
       | error => simp [defaultExpression, leftResult, bind, Except.bind] at accepted
@@ -804,6 +809,7 @@ theorem absent_has_no_default (fuel : Nat) (catalog : Catalog) (type : TypeSyste
     | bool => simp [TypeSystem.Ty.bool, defaultExpression] at accepted
     | word => simp [TypeSystem.Ty.word, defaultExpression] at accepted
     | integer => simp [TypeSystem.Ty.integer, defaultExpression] at accepted
+    | fixed type => simp [TypeSystem.Ty.fixed, defaultExpression] at accepted
     | proxy inner =>
       cases identity : catalog.identity? (.proxy inner) <;>
         simp [defaultExpression, identity, pure, Except.pure] at accepted

@@ -1402,7 +1402,7 @@ theorem payload_origin
     (motive_4 := fun _ _ _ _ => True) with
   | function positive => intro _; exact function_origin positive
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
     intro callable; cases callable
   | nil | cons | empty | entry | absent | present => trivial
 

@@ -304,7 +304,7 @@ theorem builtin (profile : compiled.compatible.checked.catalog.callableContracts
   | compatible same _ ih =>
     intro function selected
     exact .compatible same (ih function selected)
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
     intro function impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 
@@ -325,7 +325,7 @@ theorem stage_origin (profile : compiled.compatible.checked.catalog.callableCont
     | ordinary retained => exact SelectedCompilationCallableOrigins.prepared_origin profile (registry := registry) (.function retained) shape
     | generalized member _ _ => exact member.stage_origin
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
     intro impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 

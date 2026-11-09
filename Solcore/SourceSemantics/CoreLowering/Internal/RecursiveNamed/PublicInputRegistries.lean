@@ -1714,6 +1714,8 @@ theorem SimpleInput.represents {checked : SourceCoreCompatibleCatalog.Checked}
   | unit view => exact ⟨_, _, .unit, .compatible (CompatibleEncoding.runtime_view view) .unit⟩
   | bool value view => exact ⟨_, _, .bool value, .compatible (CompatibleEncoding.runtime_view view) (.bool value)⟩
   | word value view => exact ⟨_, _, .word value, .compatible (CompatibleEncoding.runtime_view view) (.word value)⟩
+  | fixed value view canonical =>
+      exact ⟨_, _, .word value, .compatible (CompatibleEncoding.runtime_view view) (.fixed value canonical)⟩
   | integer value view => exact ⟨_, _, .integer value, .compatible (CompatibleEncoding.runtime_view view) (.integer value)⟩
   | product view _ _ first second =>
     obtain ⟨left, leftType, leftMeaning, leftRep⟩ := first

@@ -1681,8 +1681,15 @@ private def wordResult (compiled : SourceCompilerFeatureSupport.Entry) (argument
   | .word actual => assertTrue (actual == word expected) "source boundary Word result changed"; pure state
   | _ => throw (IO.userError "source boundary result was not Word")
 
-example (type : TypeSystem.Ty) : SourceCoreRawMetadata.runtimeType type = SourceTypedRuntime.runtimeType type := by
+example (type : TypeSystem.Ty) :
+    SourceTypedRuntime.runtimeType (SourceCoreRawMetadata.runtimeType type) = SourceTypedRuntime.runtimeType type := by
   exact SourceCoreRawMetadata.runtimeType_sourceValues type
+
+/- The metadata view keeps a fixed-width integer type, so word operations never
+apply to it; the source runtime gives it the runtime type `word`. -/
+example (type : TypeSystem.FixedInteger) :
+    SourceCoreRawMetadata.runtimeType (.fixed type) = .fixed type ∧
+      SourceTypedRuntime.runtimeType (.fixed type) = .word := ⟨rfl, rfl⟩
 
 example (signatures : ProgramSignatures) (instantiation : DataConstructorInstantiation) :
     SourceCoreRawMetadata.constructorAuthentic signatures instantiation =

@@ -860,7 +860,7 @@ private theorem selected_of_representation {sourceValue : Dynamic.Value}
       (mapping := mapping) (world := world) (raw := raw) (function := function) (native := native) (type := type) root expressionSyntax := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | proxy | constructed | mappingValue => cases closure
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue => cases closure
   | function value =>
     cases closure
     exact ⟨_, _, rfl, Selection.of_represents root expressionSyntax value⟩

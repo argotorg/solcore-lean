@@ -658,6 +658,7 @@ private theorem selected_of_representation {raw : TypeSystem.Ty} {sourceValue : 
   | bool => cases closure
   | word => cases closure
   | integer => cases closure
+  | fixed => cases closure
   | product => cases closure
   | proxy => cases closure
   | constructed => cases closure

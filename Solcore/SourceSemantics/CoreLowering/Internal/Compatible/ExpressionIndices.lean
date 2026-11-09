@@ -1007,7 +1007,7 @@ theorem source_mapping {checked : SourceCoreCompatibleCatalog.Checked} {registry
       ∃ sourceKey sourceValue sources, source = .mapping sourceKey sourceValue sources := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | product | function | proxy => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | function | proxy => intro _ _ impossible; cases impossible
   | constructed metadata =>
     intro key result view
     have facts := CompatibleConstructorMetadata.facts metadata.authenticated
@@ -1394,15 +1394,15 @@ theorem SourceScalar.runtime_matches {expected raw : TypeSystem.Ty} (scalar : So
   | bool =>
     cases projected
     obtain ⟨value, rfl, rfl⟩ := bool_fields related
-    exact .intro (.bool value) (by simpa only [runtimeType_agrees_metadata] using view)
+    exact .intro (.bool value) (runtimeType_eq_of_metadata view)
   | word =>
     cases projected
     obtain ⟨value, rfl, rfl⟩ := word_fields related
-    exact .intro (.word value) (by simpa only [runtimeType_agrees_metadata] using view)
+    exact .intro (.word value) (runtimeType_eq_of_metadata view)
   | integer =>
     cases projected
     obtain ⟨value, rfl, rfl⟩ := integer_fields related
-    exact .intro (.integer value) (by simpa only [runtimeType_agrees_metadata] using view)
+    exact .intro (.integer value) (runtimeType_eq_of_metadata view)
 
 theorem Header.mapping_fields {values : ValuesContext} {source : TypedSource} {id base : ExpressionId}
     {node baseNode keyNode : ExpressionNode} {layout : Core.OrderedMapping.Layout}

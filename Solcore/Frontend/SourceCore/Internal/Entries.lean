@@ -973,6 +973,9 @@ mutual
       | .constructor (.builtin .unit), .unit => pure .unit
       | .constructor (.builtin .bool), .bool value => pure (.bool value)
       | .constructor (.builtin .word), .word value => pure (.word value)
+      | .constructor (.builtin (.fixed type)), .word value =>
+          if type.canonical value.val then pure (.word value)
+          else throw ⟨[], .nonCanonicalSourceValue⟩
       | .constructor (.builtin .integer), .integer value => pure (.integer value)
       | .product leftType rightType, .product left right => do
           let left ← (encodeRaw fuel context leftType left).mapError (Error.at .productLeft)
@@ -1039,6 +1042,7 @@ mutual
       | .constructor (.builtin .unit), .unit => pure .unit
       | .constructor (.builtin .bool), .bool value => pure (.bool value)
       | .constructor (.builtin .word), .word value => pure (.word value)
+      | .constructor (.builtin (.fixed _)), .word value => pure (.word value)
       | .constructor (.builtin .integer), .integer value => pure (.integer value)
       | .product leftType rightType, .pair left right => do
           let left ← (decodeRaw fuel context leftType left).mapError (Error.at .productLeft)

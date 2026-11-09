@@ -1458,7 +1458,7 @@ theorem word_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | product | function | proxy | mappingValue =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial

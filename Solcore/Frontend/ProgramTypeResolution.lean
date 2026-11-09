@@ -86,7 +86,7 @@ private def builtinTypeName? : String → Option TypeSystem.BuiltinType
   | "Unit" | "unit" => some .unit
   | "Bool" | "bool" => some .bool
   | "Word" | "word" => some .word
-  | _ => none
+  | name => (TypeSystem.FixedInteger.ofName? name).map .fixed
 
 private def declaredType
     (components : List String) (declaration : ProgramDeclaration)
