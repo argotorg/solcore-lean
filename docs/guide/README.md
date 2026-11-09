@@ -58,7 +58,7 @@ module docs. Git history keeps it.
 | Note | Work |
 | --- | --- |
 | [Next implementation roadmap](../design/next-implementation-roadmap.md) | The order of testing and proof work, and the record of delivered units |
-| [Integer types, `unchecked` blocks and shifts](../design/integer-types-unchecked-shifts.md) | The integer unit. Shifts and `unchecked` blocks without division are done; panics and the integer types are paused, with a resume point |
+| [Integer types, `unchecked` blocks and shifts](../design/integer-types-unchecked-shifts.md) | The integer unit. Shifts, `unchecked` blocks and panics are done; the integer types are in progress, with a resume point |
 | [Core runtime unification](../design/core-runtime-unification.md) | The public runtime API, and what remains of the source-to-Core preservation theorem |
 | [Hull meaning preservation](../design/hull-meaning-preservation.md) | The Hull import's meaning theorems and the remaining public connections |
 | [Source emitter meaning](../design/scalar-emitter-meaning.md) | The emitters' meaning proofs, their assumptions, and the emitters still open |

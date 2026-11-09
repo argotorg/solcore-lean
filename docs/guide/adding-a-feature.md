@@ -161,8 +161,9 @@ predicate that classifies operators (`IntegerStrictBinaryOperator`, or `ValueAss
 The public API in [`Frontend/SourceCompiler.lean`](../../Solcore/Frontend/SourceCompiler.lean),
 which re-exports `SourceCoreExecution`, did not change for shifts, nor did the checker
 `checkProgram` ([`Frontend/ProgramChecking.lean`](../../Solcore/Frontend/ProgramChecking.lean)).
-They change when callers see new values, errors or behaviour: the integer note plans integer values
-and panics, and `unchecked` blocks added the load error `ProgramLoadError.uncheckedBlock`.
+They change when callers see new values, errors or behaviour: `unchecked` blocks added the load
+error `ProgramLoadError.uncheckedBlock`, panics the diagnostic `RuntimeError.panic`, and the integer
+note plans integer values.
 
 ### Tests
 
@@ -217,13 +218,13 @@ operators are matched in far fewer places. So
 [`Syntax/Unchecked.lean`](../../Solcore/Syntax/Unchecked.lean) works around the parser:
 - `prepare` finds each `unchecked` at a statement start followed by `{` and blanks the keyword's
   bytes. The parser reads a plain block, and every span stays the same.
-- `mark` then turns `+ - *` and `+= -= *=` in each recorded block into unchecked operators, which
-  only this pass produces. Lambda bodies start outside any block. From there the operators cross
-  the other layers as shifts did.
+- `mark` then turns `+ - * / %` and `+= -= *= /= %=` in each recorded block into unchecked
+  operators, which only this pass produces. Lambda bodies start outside any block. From there the
+  operators cross the other layers as shifts did. `/ % /= %=` were a load error until panics
+  (9597a7771); now they panic with `0x12` on a zero divisor.
 - `parseWorkspaceFile` in
   [`Frontend/ProgramInterfaces.lean`](../../Solcore/Frontend/ProgramInterfaces.lean) runs both
-  steps. A nested block is a load error (`Syntax.Unchecked.Error`), and so are `/ % /= %=` in a
-  block until Lean has panics.
+  steps. A nested block is a load error (`Syntax.Unchecked.Error`).
 
 **Closures by value: a change of meaning.** Nothing changed in Syntax, TypeSystem, `SourceInference`
 or Core; the semantics and the lowering changed in lockstep. [Source

@@ -11775,20 +11775,22 @@ tokens, type, run in the source semantics and lower to Core's `wordShl` and
 through the public API with the probe's results. Compound assignment at
 `integer` now excludes the shifts in the lowering and in its theorems.
 
-`unchecked` blocks are done except division and remainder. A pass around the
-parser marks `+ - *` and `+= -= *=` in a block as unchecked operators, which
-wrap on `word`, dispatch to `UncheckedAdd`, `UncheckedSub` and `UncheckedMul` on
-declared types, and are rejected on `integer` as upstream rejects them. `/ %`
-and `/= %=` in a block are a load error until Lean has panics.
+`unchecked` blocks are done. A pass around the parser marks `+ - * / %` and
+`+= -= *= /= %=` in a block as unchecked operators, which wrap on `word`,
+dispatch to `UncheckedAdd`, `UncheckedSub`, `UncheckedMul`, `UncheckedDiv` and
+`UncheckedMod` on declared types, and are rejected on `integer` as upstream
+rejects them. Unchecked `/` and `%` and their compound forms panic with
+`Panic(0x12)` on a zero divisor ([panics as
+implemented](integer-types-unchecked-shifts.md#panics-as-implemented)).
 `Tests.SourceCoreUncheckedExecution` in
 `Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean` runs the
 blocks through the public API.
 
-The unit resumed on 2026-11-09. Panics come next, then row 1. The [decisions
-on resuming](integer-types-unchecked-shifts.md#decisions-on-resuming) choose
-one generalized fault-to-token law, carried as an instance argument, with one
-Core reason per panic code; and integer-typed values held as words, with typed
-operators.
+The unit resumed on 2026-11-09. Panics are done, and row 1 is next. The
+[decisions on resuming](integer-types-unchecked-shifts.md#decisions-on-resuming)
+choose one generalized fault-to-token law, carried as an instance argument,
+with one Core reason per panic code; and integer-typed values held as words,
+with typed operators.
 
 **Memory arrays, slices and their panics: probe and definitions.** Row 4 of
 the table above makes `T[]` a memory array in locals, parameters and returns,

@@ -36,7 +36,7 @@ A merged test file is a sequence of sections. Each starts at a line
 | [`Frontend/RustHull/`](../../Solcore/Test/Frontend/RustHull) | [Frontend](frontend.md): the imported Hull, its execution and its correspondence with upstream | `Accounts`, `Calls`, `Correspondence`, `Creation`, `Effects`, `Runtime`, `YulPrimitives` |
 | [`SourceSemantics/`](../../Solcore/Test/SourceSemantics) | [Source semantics](source-semantics.md): the semantics and inference | `CompiledOrigins`, `Inference`, `IntegerBitNot`, `Semantics`, `SemanticsBoundary`, `SemanticsSubstitution` |
 | [`SourceSemantics/CoreLowering/`](../../Solcore/Test/SourceSemantics/CoreLowering) | [Core lowering](core-lowering.md): fixtures, compiled programs, public execution | The table below |
-| [`Synthesis/`](../../Solcore/Test/Synthesis) | [Synthesis](synthesis.md#testing): generators, emitters, golden rows, fixed corpora | `Aggregates`, `Arrays`, `Bytes`, `CallGraphs`, `Calls`, `Enums`, `EventsAndReverts`, `Generators`, `Loops`, `Malformed`, `Memory`, `Scalars`, `SourceMeaning`, `Storage`, `Traits` |
+| [`Synthesis/`](../../Solcore/Test/Synthesis) | [Synthesis](synthesis.md#testing): generators, emitters, golden rows, fixed corpora | `Aggregates`, `Arrays`, `Bytes`, `CallGraphs`, `Calls`, `Captures`, `Enums`, `EventsAndReverts`, `Generators`, `Loops`, `Malformed`, `Memory`, `Scalars`, `SourceMeaning`, `Storage`, `Traits` |
 | [`SourceCallReturnGolden.lean`](../../Solcore/Test/SourceCallReturnGolden.lean) | [Synthesis](synthesis.md#testing) | Stays at the top level; see [Pitfalls](#pitfalls) |
 
 `SourceSemantics/CoreLowering/`:

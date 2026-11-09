@@ -98,6 +98,8 @@ command; `observe`, `replay` and `shrink` choose the profile by the case's schem
 | `runtime-shifts` | `Shifts` | `shift-generate` | [`Internal/Integers`](../../Solcore/Synthesis/Internal/Integers.lean) |
 | `runtime-memory-arrays` | `MemoryArrays` | `memory-arrays-generate` | [`Internal/Arrays`](../../Solcore/Synthesis/Internal/Arrays.lean) |
 | `runtime-array-abi` | `ArrayAbi` | `array-abi-generate` | [`Internal/Arrays`](../../Solcore/Synthesis/Internal/Arrays.lean) |
+| `runtime-closure-captures` | `ClosureCaptures` | `closure-captures-generate` | [`Internal/Captures`](../../Solcore/Synthesis/Internal/Captures.lean) |
+| `runtime-closure-factories` | `ClosureFactories` | `closure-factories-generate` | [`Internal/Captures`](../../Solcore/Synthesis/Internal/Captures.lean) |
 
 Each stateful profile has a case tool of its own. The five two-contract profiles (`stateful-calls`,
 `stateful-forwarded-value`, `stateful-call-returns`, `stateful-call-sequences`,
@@ -288,6 +290,7 @@ generates and compares, and which backends it runs on.
 | [`Memory`](../../Solcore/Test/Synthesis/Memory.lean) | `runtime-memory-values`, `-memory-calls` |
 | [`EventsAndReverts`](../../Solcore/Test/Synthesis/EventsAndReverts.lean) | `runtime-revert-data`, `-halts`, `stateful-logs` |
 | [`Arrays`](../../Solcore/Test/Synthesis/Arrays.lean) | `runtime-memory-arrays`, `-array-abi`, `stateful-array-returns`, `-dynamic-array`, `-nested-array` |
+| [`Captures`](../../Solcore/Test/Synthesis/Captures.lean) | `runtime-closure-captures`, `-closure-factories` |
 | [`Bytes`](../../Solcore/Test/Synthesis/Bytes.lean) | `stateful-bytes-returns`, `-tuple-returns`, `-bytes`, `-long-bytes` |
 | [`Storage`](../../Solcore/Test/Synthesis/Storage.lean) | `stateful-storage`, `-storage-rollback`, `-keyed-storage`, `-mapping`, `-ledger`, `-adt-storage` |
 | [`Calls`](../../Solcore/Test/Synthesis/Calls.lean) | `stateful-call-value`, `-forwarded-value`, `-call-returns`, `-call-sequences`, `-call-branches`, `-constructor-arguments` |

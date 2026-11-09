@@ -194,7 +194,7 @@ comparisons. Saved archives and reductions retain that choice. Core fuel, EVM
 gas and process timeouts remain separate resource limits.
 
 Yul compiled by pinned solc is
-available for the thirty-two pure profiles with `--backend yul`, and for the
+available for the thirty-four pure profiles with `--backend yul`, and for the
 twenty-seven storage-family profiles and the call-return, call-sequence and
 call-branch profiles when they are selected. Its EVM bytes are
 compared with original Core and with Hull using Sonatina O0 code images. Yul
@@ -207,7 +207,7 @@ may be constant-folded; source coverage is not runtime opcode coverage.
 The [CI workflow](.github/workflows/semantic.yml) runs the complete fixed-corpus
 gate and recorded random seeds. Its automatic triggers are disabled for now, so
 it runs only on manual dispatch.
-The same sixty-four-profile suite runs locally with shared time and disk limits.
+The same sixty-six-profile suite runs locally with shared time and disk limits.
 It retains replayable findings and checks mismatch reduction and resource
 classification using actual executions. See [suite preparation and operation](scripts/SEMANTIC_CI.md).
 [Continuous fuzzing](scripts/SEMANTIC_CI.md#continuous-fuzzing) repeats random
@@ -354,6 +354,22 @@ and compound writes keep the integer profiles' panics. All 288 and 144 fixed
 cases and 384 random cases of 32 functions each match on O0, O2 and Yul
 ([Solcore memory arrays](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-arrays-and-their-abi)).
 
+The `runtime-closure-captures` and `runtime-closure-factories` profiles check
+that closures capture by value, as solcore-rs #120 decided: a write in a
+closure's body reaches only that call's copy, and each call starts again from
+the values its captures had when it was created. Their plans combine Word
+locals, lambdas nested two deep, aliases, rebindings, writes to captured
+locals, parameters and a contract field, direct calls, calls through generic
+helpers and in a loop, and checked `uint256` `+` and `/`, which panic with
+`0x11` and `0x12`. The factory profile adds free and method factories that
+return closures over their parameter and locals. Their original Core
+references snapshot the captured cells when a closure is made and copy each
+snapshot into a fresh cell at every call. Admission keeps to the closures the
+pin lowers, those that are statically one lambda; the pin rejects the others
+with `SC0422`. All 80 and 112 fixed cases and 384 random cases of 32 functions
+each match on O0, O2 and Yul
+([Solcore closures by value](scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-closures-by-value-and-closure-factories)).
+
 The `runtime-call-graphs` profile generates expressions directly with the
 runtime input in scope. One to three helpers may call any earlier helper inside
 operands, local bindings and branches. Its 56-case corpus checks shared callees,
@@ -374,7 +390,7 @@ recorded ABI inputs. Identity and input-dependent branch cases agree across all
 three paths at zero, one, maximum Word and the high bit, with identical source
 for each function's inputs. Random campaigns of the runtime-input profiles also
 run each function at four inputs derived from the case seed after its boundary
-inputs, and in the twenty-two profiles whose functions can be identities they
+inputs, and in the twenty-four profiles whose functions can be identities they
 exclude a function that returns every boundary input unchanged
 ([boundary identities](scripts/SEMANTIC_DIFFERENTIAL.md#boundary-identities)).
 A further profile supports one to three acyclic
