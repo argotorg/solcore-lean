@@ -131,6 +131,8 @@ theorem preserves_body (budget : Nat)
       prepared diagnostic aligned receiver (by simpa only [stages.source selected] using receipt) location
   have children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow bridge header.context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
       stages child (CallableIndexedOwnedPreparedStagedReadProductTreeBounds.Certificate compiled.indexed.fuel (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) child.source header.context header.solved header.reasonAt) (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) budget := by
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
     intro childSize _smaller
     exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves bridge functions
       completion.result.extension sameLedger runtimeLedger (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) readFault
@@ -203,6 +205,8 @@ theorem reflects_body (budget : Nat)
       prepared diagnostic aligned receiver (by simpa only [stages.source selected] using receipt) location
   have children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow bridge header.context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
       stages child (CallableIndexedOwnedPreparedStagedReadProductTreeBounds.Certificate compiled.indexed.fuel (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) child.source header.context header.solved header.reasonAt) (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) budget := by
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
     intro childSize _smaller
     exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects bridge functions
       completion.result.extension sameLedger runtimeLedger (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) readFault
@@ -1408,7 +1412,7 @@ include receiver prepared stagePrepared sourceEq occurrence certified found sour
   sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations extension semantic in
 /-- One original native completion gives full staged Source parent meaning,
 including the actual named global branch and restored caller post. -/
-theorem reflects_parent
+theorem reflects_parent [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
@@ -1444,7 +1448,7 @@ include receiver prepared stagePrepared sourceEq occurrence certified found sour
 /-- One original staged Source parent constructs its native completion and
 full caller post. The authentic named branch constructs its finite application
 meaning internally; Source and native grades remain independent. -/
-theorem preserves_parent (budget : Nat)
+theorem preserves_parent [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
       bridge context model stages invocation certificate callFaults budget)
     (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
@@ -1571,7 +1575,7 @@ include bridge receiver stagePrepared sourceEq profile wellFormed runtime covers
   actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers in
 /-- Reuse the original whole-call producer at the supplied genuine Source
 grade. The returned caller state and post are retained literally. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)
     (port : Port (compiled := compiled) (invocation := invocation) compiler)
@@ -1609,7 +1613,7 @@ include bridge receiver stagePrepared sourceEq profile wellFormed runtime covers
   actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers in
 /-- The native completion keeps its independent Source grade and exact
 staged fault scope. Only the duplicate native evaluation witness is omitted. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)

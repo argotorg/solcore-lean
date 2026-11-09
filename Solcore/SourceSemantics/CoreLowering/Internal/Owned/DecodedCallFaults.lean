@@ -40,6 +40,14 @@ def stagedSemanticFaults (table : SourceCoreFaultSites.Table) : RecursiveStageMe
     | .semantic reason => faults table reason token
     | .stage .. => False
 
+theorem tokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
+    FunctionCalls.FaultTokens (faults table) :=
+  ⟨fun code => ⟨_, SourceCoreFaultSites.Table.panic_diagnostic free code, .assignment (.panic code)⟩⟩
+
+theorem stagedTokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
+    RecursiveStageMeaning.FaultTokens (stagedSemanticFaults table) :=
+  ⟨fun code => (tokens free).panic code⟩
+
 theorem of_decoded {table : SourceCoreFaultSites.Table} {reason : Dynamic.SemanticFault}
     {token : Word} {diagnostic : SourceCoreFaultSites.Diagnostic}
     (decoded : table.diagnostic? token = some diagnostic)

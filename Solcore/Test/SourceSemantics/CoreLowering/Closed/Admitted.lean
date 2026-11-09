@@ -237,7 +237,7 @@ include definitions registered owner active onError found form conditionFound co
 /-- A literal constructs the genuine false Source prefix. The admitted for
 producer returns the same actual pool, successful deep typing and snapshots;
 no execution or body meaning is assumed. -/
-theorem source_false_exists
+theorem source_false_exists [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location}
@@ -475,7 +475,7 @@ private theorem acquire (location : Location) (native : NativeFrame)
 include wellFormed prepared member extension faithful observations in
 /-- The same existing mutual proof closes this real named origin internally.
 The nested wrapper uses its actual catalog slots and authenticated hook seed. -/
-theorem nested_preserves (size : Nat) :
+theorem nested_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.PreservesAt (registry := registry) (faults := faults) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) functions (Program.ofChecked compiled.sourceProgram)
       (receipt.nested_entry wellFormed captureZero globals).original size := by
@@ -496,7 +496,7 @@ theorem nested_preserves (size : Nat) :
 include wellFormed prepared member extension faithful observations functionTypes in
 /-- Native reflection keeps its original completion size and independently
 returns a Source body grade at the exact same wrapped parameter entry. -/
-theorem nested_reflects (size : Nat) :
+theorem nested_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.ReflectsAt (registry := registry) (faults := faults) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) functions (Program.ofChecked compiled.sourceProgram)
       (receipt.nested_entry wellFormed captureZero globals).original size := by
@@ -517,7 +517,7 @@ theorem nested_reflects (size : Nat) :
 include wellFormed prepared member captureZero globals extension faithful observations in
 /-- This is exactly the revised Source callback target, including ReachedExit.
 Only the nested proof is forgotten beside the same actual returned pool. -/
-theorem parameter_preserves (size : Nat) :
+theorem parameter_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.PreservesAt (registry := registry) (faults := faults) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) functions (Program.ofChecked compiled.sourceProgram)
       (receipt.admitted_entry wellFormed).original size :=
@@ -527,7 +527,7 @@ theorem parameter_preserves (size : Nat) :
 
 include wellFormed prepared member captureZero globals extension faithful observations functionTypes in
 /-- This is exactly the revised native callback target with its actual post. -/
-theorem parameter_reflects (size : Nat) :
+theorem parameter_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.ReflectsAt (registry := registry) (faults := faults) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) functions (Program.ofChecked compiled.sourceProgram)
       (receipt.admitted_entry wellFormed).original size :=
@@ -538,7 +538,7 @@ theorem parameter_reflects (size : Nat) :
 include wellFormed prepared member captureZero globals extension faithful observations in
 /-- A finished Source callback is available at every genuine closed receipt;
 its supplied continuation agreement is retained by the production interface. -/
-theorem source_callbacks (budget : Nat) :
+theorem source_callbacks [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.SourceBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := fun _ => noExpressions)
@@ -550,7 +550,7 @@ theorem source_callbacks (budget : Nat) :
 include wellFormed prepared member captureZero globals extension faithful observations functionTypes in
 /-- The genuine native prefix and saved write select that same exact callback.
 No comparison with its reflected Source grade is required. -/
-theorem native_callbacks (budget : Nat) :
+theorem native_callbacks [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.NativeBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := fun _ => noExpressions)
@@ -563,7 +563,7 @@ theorem native_callbacks (budget : Nat) :
 include wellFormed prepared member captureZero globals extension faithful observations in
 /-- All observations concern the same actual returned pool. The original
 argument pool and the real parameter pool both retain their ordered records. -/
-theorem source_post (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem source_post [FunctionCalls.FaultTokens faults] (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) size
       header.function header.context receipt.body.environment receipt.body.heap outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -600,7 +600,7 @@ theorem source_post (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : 
 include wellFormed prepared member captureZero globals extension faithful observations functionTypes in
 /-- Reflection returns its independent Source trace and adds successful deep
 typing from that trace at the exact native post, alongside snapshot reads. -/
-theorem native_post (size : Nat) {value : Value} {finalStore : Store}
+theorem native_post [FunctionCalls.FaultTokens faults] (size : Nat) {value : Value} {finalStore : Store}
     (completed : EvaluationSize size receipt.body.actualBody receipt.body.store
       (header.body.rename receipt.body.embedding) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -797,7 +797,7 @@ include definitions registered owner active onError found form conditionFound co
 /-- A literal constructs the genuine false Source prefix. The admitted while
 producer returns the same actual pool, successful deep typing and snapshots;
 no execution or body meaning is assumed. -/
-theorem source_false_exists
+theorem source_false_exists [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location}
@@ -1688,6 +1688,9 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
     fixture.recipe.compiled.indexed.ancestry.graph.inputs.callableSelected
   let registry := receiver.completion.result.context.registry
   let faults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics
+  haveI : FunctionCalls.FaultTokens faults := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal observed.expression.id observed.statement
     observed.roots observed.foundStatement observed.returnStatement
   obtain ⟨support⟩ := actual.support stages terminal diagnostic expression point (registry := registry) (faults := faults)
@@ -1976,7 +1979,7 @@ variable (extension : SourceCoreRawMetadata.Extends
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
 
 include prepared member extension faithful observations wellFormed in
-private theorem family_preserves (size : Nat) :
+private theorem family_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyReadyOrigins.PreservesAt (protocol headers keys)
       (CallableIndexedOwnedAdmittedLexicalReadiness.readiness (bridge (headers := headers) (keys := keys)))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -2006,7 +2009,7 @@ private theorem family_preserves (size : Nat) :
   exact closed ()
 
 include prepared member extension faithful observations wellFormed in
-private theorem family_reflects (functionTypes : FunctionRuntimeViews functions) (size : Nat) :
+private theorem family_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (size : Nat) :
     CallableRuntimeBodyReadyOrigins.ReflectsAt (protocol headers keys)
       (CallableIndexedOwnedAdmittedLexicalReadiness.readiness (bridge (headers := headers) (keys := keys)))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -2077,7 +2080,7 @@ private theorem frame_kept {finalMap : LocationMap} {finalStore : Store}
 include body wellFormed prepared member extension faithful observations in
 /-- A genuine false-while Source trace is constructed internally, then the
 shared Ready Family returns complete semantics and the actual reached pool. -/
-theorem source_post :
+theorem source_post [FunctionCalls.FaultTokens faults] :
     ∃ sourceSize value finalStore finalMap finalWorld,
       RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) sourceSize
         header.function header.context receipt.body.environment receipt.body.heap (.value .unit) receipt.body.heap ∧
@@ -2098,7 +2101,7 @@ theorem source_post :
 include body wellFormed prepared member extension faithful observations in
 /-- Native reflection calls the shared Ready Family independently. Its Source
 grade, whole result and post admission accompany the same actual native post. -/
-theorem native_post (functionTypes : FunctionRuntimeViews functions) (size : Nat)
+theorem native_post [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (size : Nat)
     {value : Value} {finalStore : Store}
     (completed : EvaluationSize size receipt.body.actualBody receipt.body.store
       (header.body.rename receipt.body.embedding) value finalStore) :

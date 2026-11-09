@@ -1056,7 +1056,7 @@ end NamedFamily
 include extension faithful observations escaped in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_with_family
+theorem preserves_at_with_family [FunctionCalls.FaultTokens faults]
     (P : Header prepared values ambient.definitions program → ProtectedExpressionMeaning.Entry)
     (transports : ∀ header, ProtectedExpressionMeaning.Transport (P header))
     (binders : ∀ header, ProtectedExpressionMeaning.Binds (P header))
@@ -1114,7 +1114,7 @@ theorem preserves_at_with_family
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_with_evidence (size : Nat) :
+theorem preserves_at_with_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   have bodies := preserves_at_with_family runtime functions extension faithful observations escaped
@@ -1149,7 +1149,7 @@ theorem preserves_at_with_evidence (size : Nat) :
 include extension faithful observations runtimeViews escaped in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_with_family
+theorem reflects_at_with_family [FunctionCalls.FaultTokens faults]
     (P : Header prepared values ambient.definitions program → ProtectedExpressionMeaning.Entry)
     (transports : ∀ header, ProtectedExpressionMeaning.Transport (P header))
     (binders : ∀ header, ProtectedExpressionMeaning.Binds (P header))
@@ -1207,7 +1207,7 @@ theorem reflects_at_with_family
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_with_evidence (size : Nat) :
+theorem reflects_at_with_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   have bodies := reflects_at_with_family runtime functions extension faithful observations runtimeViews escaped
@@ -1251,7 +1251,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- The same structural expression family can now call every catalog body,
 including itself and mutual targets, without an external body meaning law. -/
-theorem expression_preserves_at_with_evidence (size : Nat) :
+theorem expression_preserves_at_with_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (ExpressionsForWith authenticated runtime evidence headers callerCompilation fuel source context solved reasonAt) faults
@@ -1271,7 +1271,7 @@ theorem expression_preserves_at_with_evidence (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Native expression completion reflects through the closed catalog. Its
 source grade is produced independently by the reflected child derivations. -/
-theorem expression_reflects_at_with_evidence (size : Nat) :
+theorem expression_reflects_at_with_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (ExpressionsForWith authenticated runtime evidence headers callerCompilation fuel source context solved reasonAt) faults
@@ -1325,7 +1325,7 @@ variable (runtime : Bool) {checked : Checked} {base : Base checked}
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_with (size : Nat) :
+theorem preserves_at_with [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact preserves_at_with_evidence false runtime functions extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles size
@@ -1333,7 +1333,7 @@ theorem preserves_at_with (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_with (size : Nat) :
+theorem reflects_at_with [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact reflects_at_with_evidence false runtime functions extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles size
@@ -1350,7 +1350,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- The same structural expression family can now call every catalog body,
 including itself and mutual targets, without an external body meaning law. -/
-theorem expression_preserves_at_with (size : Nat) :
+theorem expression_preserves_at_with [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (ExpressionsFor runtime headers callerCompilation fuel source context solved reasonAt) faults
@@ -1360,7 +1360,7 @@ theorem expression_preserves_at_with (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Native expression completion reflects through the closed catalog. Its
 source grade is produced independently by the reflected child derivations. -/
-theorem expression_reflects_at_with (size : Nat) :
+theorem expression_reflects_at_with [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (ExpressionsFor runtime headers callerCompilation fuel source context solved reasonAt) faults
@@ -1404,7 +1404,7 @@ variable {checked : Checked} {base : Base checked}
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_match (size : Nat) :
+theorem preserves_at_match [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact preserves_at_with false functions extension faithful observations runtimeViews owners
@@ -1415,7 +1415,7 @@ theorem preserves_at_match (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_match (size : Nat) :
+theorem reflects_at_match [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact reflects_at_with false functions extension faithful observations runtimeViews
@@ -1435,7 +1435,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- The same structural expression family can now call every catalog body,
 including itself and mutual targets, without an external body meaning law. -/
-theorem expression_preserves_at_match (size : Nat) :
+theorem expression_preserves_at_match [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Expressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1448,7 +1448,7 @@ theorem expression_preserves_at_match (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Native expression completion reflects through the closed catalog. Its
 source grade is produced independently by the reflected child derivations. -/
-theorem expression_reflects_at_match (size : Nat) :
+theorem expression_reflects_at_match [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Expressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1494,7 +1494,7 @@ variable {checked : Checked} {base : Base checked}
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_runtime (size : Nat) :
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact preserves_at_with true functions extension faithful observations runtimeViews owners
@@ -1504,7 +1504,7 @@ theorem preserves_at_runtime (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_runtime (size : Nat) :
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact reflects_at_with true functions extension faithful observations runtimeViews
@@ -1523,7 +1523,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- The same structural expression family can now call every catalog body,
 including itself and mutual targets, without an external body meaning law. -/
-theorem expression_preserves_at_runtime (size : Nat) :
+theorem expression_preserves_at_runtime [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedExpressionCompilerCertificates.RuntimeExpressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1535,7 +1535,7 @@ theorem expression_preserves_at_runtime (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Native expression completion reflects through the closed catalog. Its
 source grade is produced independently by the reflected child derivations. -/
-theorem expression_reflects_at_runtime (size : Nat) :
+theorem expression_reflects_at_runtime [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedExpressionCompilerCertificates.RuntimeExpressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1580,7 +1580,7 @@ variable {checked : Checked} {base : Base checked}
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
-theorem preserves_at_runtime_evidence (size : Nat) :
+theorem preserves_at_runtime_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact preserves_at_with_evidence true true functions extension faithful observations runtimeViews owners
@@ -1590,7 +1590,7 @@ theorem preserves_at_runtime_evidence (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
 Reflection constructs independent source grades; preservation is not an input. -/
-theorem reflects_at_runtime_evidence (size : Nat) :
+theorem reflects_at_runtime_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact reflects_at_with_evidence true true functions extension faithful observations runtimeViews
@@ -1609,7 +1609,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- The same structural expression family can now call every catalog body,
 including itself and mutual targets, without an external body meaning law. -/
-theorem expression_preserves_at_runtime_evidence (size : Nat) :
+theorem expression_preserves_at_runtime_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith (some evidence) headers callerCompilation fuel source context solved reasonAt) faults
@@ -1621,7 +1621,7 @@ theorem expression_preserves_at_runtime_evidence (size : Nat) :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Native expression completion reflects through the closed catalog. Its
 source grade is produced independently by the reflected child derivations. -/
-theorem expression_reflects_at_runtime_evidence (size : Nat) :
+theorem expression_reflects_at_runtime_evidence [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith (some evidence) headers callerCompilation fuel source context solved reasonAt) faults
@@ -1663,7 +1663,7 @@ variable {checked : Checked} {base : Base checked}
         (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
-theorem preserves_at (size : Nat) :
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact preserves_at_match functions extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches
@@ -1671,7 +1671,7 @@ theorem preserves_at (size : Nat) :
       (profiles header member entry).to_match) size
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
-theorem reflects_at (size : Nat) :
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAt
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   exact reflects_at_match functions extension faithful observations runtimeViews uninitialized missing escaped prefixMatches
@@ -1688,7 +1688,7 @@ variable {callerCompilation : SourceCoreFunctions.Context} {source : TypedSource
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
-theorem expression_preserves_at (size : Nat) :
+theorem expression_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Expressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1698,7 +1698,7 @@ theorem expression_preserves_at (size : Nat) :
       (profiles header member entry).to_match) evidence valid sourceUnique callerUninitialized callerMissing size
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
-theorem expression_reflects_at (size : Nat) :
+theorem expression_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Expressions headers callerCompilation fuel source context solved reasonAt) faults
@@ -1757,7 +1757,7 @@ variable (authenticated : Bool)
 include complete alignments extension owners uninitialized missing escaped profiles in
 /-- The same strong induction closes formation inside every actual named callee.
 Its static provider is restricted to independently aligned parameter states. -/
-theorem preserves_at_formation (size : Nat) :
+theorem preserves_at_formation [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAtWith
       (headers := headers) (locations := locations) (capturePrefix := 0) (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry header faults
       (RecursiveNamedLambdaFormationEntries.BodyAligned (indexed := indexed) (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry) size := by
@@ -1775,7 +1775,7 @@ theorem preserves_at_formation (size : Nat) :
 include complete alignments extension uninitialized missing escaped profiles in
 /-- Reflection consumes original strict body children and returns independent
 source grades. No body preservation or source trace is an input. -/
-theorem reflects_at_formation (size : Nat) :
+theorem reflects_at_formation [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAtWith
       (headers := headers) (locations := locations) (capturePrefix := 0) (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry header faults
       (RecursiveNamedLambdaFormationEntries.BodyAligned (indexed := indexed) (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry) size := by
@@ -1805,7 +1805,7 @@ variable {caller : Header indexed.ancestry values indexed.layouts.definitions pr
 include complete alignments extension owners uninitialized missing escaped profiles callerAligned valid callerUninitialized callerMissing in
 /-- Whole expressions use the same closed named-callee induction. Formation
 receipts stay in the fixed model through both arguments and full heaps. -/
-theorem expression_preserves_at_formation (size : Nat) :
+theorem expression_preserves_at_formation [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.PreservesAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry
         (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile))
@@ -1823,7 +1823,7 @@ theorem expression_preserves_at_formation (size : Nat) :
 include complete alignments extension uninitialized missing escaped profiles callerAligned valid callerUninitialized callerMissing in
 /-- Original native completion returns source evaluation through that same
 closed family; no source trace or body law is supplied. -/
-theorem expression_reflects_at_formation (size : Nat) :
+theorem expression_reflects_at_formation [FunctionCalls.FaultTokens faults] (size : Nat) :
     RecursiveNamedBoundedContracts.ReflectsAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry
         (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile))
@@ -2609,7 +2609,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- The source derivation chooses its own grade. All callee meaning is
 provided by the catalog theorem for every grade, rather than a fixed budget. -/
-theorem preserves_with_evidence {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves_with_evidence [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -2630,7 +2630,7 @@ theorem preserves_with_evidence {outcome : Dynamic.ExpressionOutcome} {after : D
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_sized_with_evidence (budget size : Nat) (within : size ≤ budget)
+theorem reflects_sized_with_evidence [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (measured : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2653,7 +2653,7 @@ theorem reflects_sized_with_evidence (budget size : Nat) (within : size ≤ budg
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_with_evidence
+theorem reflects_with_evidence [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (completed : Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2673,7 +2673,7 @@ theorem reflects_with_evidence
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Sufficient fuel follows from a finite independent source execution,
 including language faults represented by the normal result carrier. -/
-theorem has_sufficient_fuel_with_evidence {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem has_sufficient_fuel_with_evidence [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -2695,7 +2695,7 @@ theorem has_sufficient_fuel_with_evidence {outcome : Dynamic.ExpressionOutcome} 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Every machine completion reflects. No relation between source and
 native fuel, and no assumption of source termination, enters this consumer. -/
-theorem completed_run_reflects_with_evidence
+theorem completed_run_reflects_with_evidence [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {fuel : Nat} {value : Value} {finalStore : Store}
     (completed : runStateful fuel
@@ -2756,7 +2756,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- The source derivation chooses its own grade. All callee meaning is
 provided by the catalog theorem for every grade, rather than a fixed budget. -/
-theorem preserves_with {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves_with [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -2773,7 +2773,7 @@ theorem preserves_with {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.He
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_sized_with (budget size : Nat) (within : size ≤ budget)
+theorem reflects_sized_with [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (measured : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2791,7 +2791,7 @@ theorem reflects_sized_with (budget size : Nat) (within : size ≤ budget)
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_with
+theorem reflects_with [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (completed : Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2809,7 +2809,7 @@ theorem reflects_with
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Sufficient fuel follows from a finite independent source execution,
 including language faults represented by the normal result carrier. -/
-theorem has_sufficient_fuel_with {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem has_sufficient_fuel_with [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -2827,7 +2827,7 @@ theorem has_sufficient_fuel_with {outcome : Dynamic.ExpressionOutcome} {after : 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Every machine completion reflects. No relation between source and
 native fuel, and no assumption of source termination, enters this consumer. -/
-theorem completed_run_reflects_with
+theorem completed_run_reflects_with [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {fuel : Nat} {value : Value} {finalStore : Store}
     (completed : runStateful fuel
@@ -2887,7 +2887,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- The source derivation chooses its own grade. All callee meaning is
 provided by the catalog theorem for every grade, rather than a fixed budget. -/
-theorem preserves_match {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves_match [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -2905,7 +2905,7 @@ theorem preserves_match {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.H
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_sized_match (budget size : Nat) (within : size ≤ budget)
+theorem reflects_sized_match [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (measured : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2924,7 +2924,7 @@ theorem reflects_sized_match (budget size : Nat) (within : size ≤ budget)
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects_match
+theorem reflects_match [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (completed : Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2943,7 +2943,7 @@ theorem reflects_match
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Sufficient fuel follows from a finite independent source execution,
 including language faults represented by the normal result carrier. -/
-theorem has_sufficient_fuel_match {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem has_sufficient_fuel_match [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -2962,7 +2962,7 @@ theorem has_sufficient_fuel_match {outcome : Dynamic.ExpressionOutcome} {after :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Every machine completion reflects. No relation between source and
 native fuel, and no assumption of source termination, enters this consumer. -/
-theorem completed_run_reflects_match
+theorem completed_run_reflects_match [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {fuel : Nat} {value : Value} {finalStore : Store}
     (completed : runStateful fuel
@@ -3023,7 +3023,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- The source derivation chooses its own grade. All callee meaning is
 provided by the catalog theorem for every grade, rather than a fixed budget. -/
-theorem preserves {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -3042,7 +3042,7 @@ theorem preserves {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Reflection consumes only the original native completion and runtime
 representation inputs. Its independent source grade is erased after induction. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (completed : Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
@@ -3062,7 +3062,7 @@ theorem reflects
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Sufficient fuel follows from a finite independent source execution,
 including language faults represented by the normal result carrier. -/
-theorem has_sufficient_fuel {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3082,7 +3082,7 @@ theorem has_sufficient_fuel {outcome : Dynamic.ExpressionOutcome} {after : Dynam
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Every machine completion reflects. No relation between source and
 native fuel, and no assumption of source termination, enters this consumer. -/
-theorem completed_run_reflects
+theorem completed_run_reflects [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {fuel : Nat} {value : Value} {finalStore : Store}
     (completed : runStateful fuel
@@ -3219,7 +3219,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel_evidence {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel_evidence [FunctionCalls.FaultTokens faults] {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
     (evaluated : Dynamic.ProgramEvaluates program (RecursiveNamedProgramEntrySource.entry header arguments) before sourceValue after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3239,7 +3239,7 @@ theorem program_has_sufficient_native_fuel_evidence {sourceValue : Dynamic.Value
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- A native success reconstructs an independent whole-program source run.
 Source staging and raw initial-input validity are separate entry conditions. -/
-theorem native_success_reflects_program_evidence
+theorem native_success_reflects_program_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -3311,7 +3311,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel [FunctionCalls.FaultTokens faults] {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
     (evaluated : Dynamic.ProgramEvaluates program (RecursiveNamedProgramEntrySource.entry header arguments) before sourceValue after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3330,7 +3330,7 @@ theorem program_has_sufficient_native_fuel {sourceValue : Dynamic.Value} {after 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- A native success reconstructs an independent whole-program source run.
 Source staging and raw initial-input validity are separate entry conditions. -/
-theorem native_success_reflects_program
+theorem native_success_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -3459,7 +3459,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel_with_evidence {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel_with_evidence [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (entry header arguments) before outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3481,7 +3481,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- Every native result, including a language fault, reconstructs an admitted
 source outcome with the same final heap correspondence. Fuel exhaustion is a
 separate machine result and is not an input to this theorem. -/
-theorem completed_run_reflects_program_with_evidence
+theorem completed_run_reflects_program_with_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -3548,7 +3548,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel_with {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel_with [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (entry header arguments) before outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3567,7 +3567,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- Every native result, including a language fault, reconstructs an admitted
 source outcome with the same final heap correspondence. Fuel exhaustion is a
 separate machine result and is not an input to this theorem. -/
-theorem completed_run_reflects_program_with
+theorem completed_run_reflects_program_with [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -3629,7 +3629,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel_match {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel_match [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (entry header arguments) before outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3649,7 +3649,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- Every native result, including a language fault, reconstructs an admitted
 source outcome with the same final heap correspondence. Fuel exhaustion is a
 separate machine result and is not an input to this theorem. -/
-theorem completed_run_reflects_program_match
+theorem completed_run_reflects_program_match [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -3712,7 +3712,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem program_has_sufficient_native_fuel {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem program_has_sufficient_native_fuel [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (entry header arguments) before outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -3733,7 +3733,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- Every native result, including a language fault, reconstructs an admitted
 source outcome with the same final heap correspondence. Fuel exhaustion is a
 separate machine result and is not an input to this theorem. -/
-theorem completed_run_reflects_program
+theorem completed_run_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)

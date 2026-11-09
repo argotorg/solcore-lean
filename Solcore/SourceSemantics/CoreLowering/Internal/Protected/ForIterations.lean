@@ -527,7 +527,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
         program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size) →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -559,7 +559,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
   induction size using Nat.strongRecOn generalizing context finalContext evidence source environment before after condition post statements outcome with
   | ind size ih =>
     intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults _
       meaning conditionTree found valid unique agrees reference correct postCorrect conditionFacts bodyFacts state fixedRead guarded ready
     cases trace with
     | done conditionEvaluation =>
@@ -661,7 +661,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
         program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size) →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -698,7 +698,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
   induction size using Nat.strongRecOn generalizing context evidence source environment before after condition post statements reason with
   | ind size ih =>
     intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults _
       meaning conditionTree found valid unique agrees reference correct postCorrect postFailed conditionFacts bodyFacts state fixedRead guarded ready
     cases trace with
     | condition conditionFault =>
@@ -991,7 +991,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults size) →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -1021,7 +1021,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
         protocol.Relates state.retained reached.retained := by
 
   intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults _
       meaning conditionTree found valid unique agrees reference correct postCorrect state fixedRead guarded
   obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained, _post⟩ :=
     WithReady.iterations_success_bounded_for (protocol := protocol) (guard := guard)
@@ -1045,7 +1045,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults size) →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -1080,7 +1080,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
         protocol.Relates state.retained reached.retained := by
 
   intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node native faults _
       meaning conditionTree found valid unique agrees reference correct postCorrect postFailed state fixedRead guarded
   obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained, _post⟩ :=
     WithReady.iterations_fault_bounded_for (protocol := protocol) (guard := guard)
@@ -1263,7 +1263,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry) →
       ProtectedExpressionMeaning.Transport entry →
@@ -1288,7 +1288,7 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro budget bounded entry certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning transport conditionTree found valid unique agrees reference correct postCorrect state
   obtain ⟨native, fixedRead⟩ := state.1.contextRead
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress, _reached, _retained⟩ :=
@@ -1315,7 +1315,7 @@ theorem iterations_success_bounded
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry) →
       ProtectedExpressionMeaning.Transport entry →
@@ -1340,7 +1340,7 @@ theorem iterations_success_bounded
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       meaning transport conditionTree found valid unique agrees reference correct postCorrect state
   exact iterations_success_bounded_for (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
     trace budget bounded meaning transport conditionTree found valid unique agrees reference correct postCorrect state
@@ -1356,7 +1356,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry) →
       ProtectedExpressionMeaning.Transport entry →
@@ -1386,7 +1386,7 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro budget bounded entry certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
   obtain ⟨native, fixedRead⟩ := state.1.contextRead
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress, _reached, _retained⟩ :=
@@ -1414,7 +1414,7 @@ theorem iterations_fault_bounded
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry) →
       ProtectedExpressionMeaning.Transport entry →
@@ -1444,7 +1444,7 @@ theorem iterations_fault_bounded
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
   exact iterations_fault_bounded_for (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
     trace budget bounded meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
@@ -1549,7 +1549,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry →
       ProtectedExpressionMeaning.Transport entry →
@@ -1574,7 +1574,7 @@ theorem iterations_success
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning transport conditionTree found valid unique agrees reference correct postCorrect state
   obtain ⟨size, sized⟩ := SourceExecutionSize.ForLoopExecutes.has_size trace
   exact iterations_success_bounded sized size (Nat.le_refl _)
@@ -1593,7 +1593,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults entry →
       ProtectedExpressionMeaning.Transport entry →
@@ -1623,7 +1623,7 @@ theorem iterations_fault
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
   obtain ⟨size, sized⟩ := SourceExecutionSize.ForLoopFaults.has_size trace
   exact iterations_fault_bounded sized size (Nat.le_refl _)
@@ -1775,7 +1775,7 @@ def LoopReflectsAtFor (protocol : Protocol.{u, v} Records) (readiness : Readines
 variable {scope : Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
 
 include transport activation in
-theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+theorem loop_preserves_bounded_for [FunctionCalls.FaultTokens faults] (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaningB : Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
       program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size)) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -1989,7 +1989,7 @@ def LoopReflectsAtFor (protocol : Protocol.{u, v} Records) (guard : Location →
 variable {scope : Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
 
 include transport in
-theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+theorem loop_preserves_bounded_for [FunctionCalls.FaultTokens faults] (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaningB : Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults size)) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -2172,7 +2172,7 @@ def LoopReflects {scope : Scope} (condition : ExpressionId) (post : List ForItem
 variable {scope : Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
 
 include transport in
-theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+theorem loop_preserves_bounded_for [FunctionCalls.FaultTokens faults] (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaningB : Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -2227,7 +2227,7 @@ theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop)
   obtain ⟨reached, _related⟩ := transition
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata, reached.down⟩
 include transport in
-theorem loop_preserves_bounded (budget : Nat)
+theorem loop_preserves_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaningB : Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -2345,7 +2345,7 @@ theorem loop_reflects_bounded (budget : Nat)
   all_goals assumption
 
 include transport meaning in
-theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)

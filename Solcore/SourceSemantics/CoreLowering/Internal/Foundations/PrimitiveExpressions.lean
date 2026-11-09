@@ -119,14 +119,16 @@ theorem binary_left_failure {operator : Syntax.BinaryOp} {environment : Core.Env
     | exact Core.LocalPrimitiveResults.logicalAnd_failure evaluation
     | exact Core.LocalPrimitiveResults.logicalOr_failure evaluation
     | exact Core.LocalPrimitiveResults.binaryWith_left_failure evaluation
+    | exact SourceCorePrimitive.binaryPanicking_left_failure evaluation
 
 theorem binary_nonstrict {operator : Syntax.BinaryOp}
-    (nonstrict : ¬ Dynamic.StrictBinaryOperator operator) :
+    (nonstrict : ¬ Dynamic.StrictBinaryOperator operator) (total : operator.mayPanic = false) :
     operator = .logicalAnd ∨ operator = .logicalOr := by
   cases operator <;> first
     | exact Or.inl rfl
     | exact Or.inr rfl
     | exact False.elim (nonstrict (by constructor))
+    | cases total
 
 theorem bool_of_type (value : SourceStagedValue.Value)
     (typed : SourceStagedValue.coreType value = .bool) : ∃ boolean, value = .bool boolean := by
@@ -251,6 +253,7 @@ inductive Tree (compilation : SourceCorePrimitive.Context) (source : TypedSource
       (operator : Syntax.BinaryOp)
       (metadata : Metadata source id node (SourceCorePrimitive.binaryResultType operator))
       (form : node.form = .binary left operator right)
+      (total : operator.mayPanic = false)
       (leftTree : Tree compilation source scope reasonAt left (SourceCorePrimitive.binaryOperandType operator) leftCode leftDepth)
       (rightTree : Tree compilation source scope reasonAt right (SourceCorePrimitive.binaryOperandType operator) rightCode rightDepth) :
       Tree compilation source scope reasonAt id (SourceCorePrimitive.binaryResultType operator)
@@ -293,7 +296,7 @@ theorem Tree.hasType {compilation : SourceCorePrimitive.Context} {source : Typed
   | control tree => exact tree.hasType
   | integerLiteral => exact Core.LanguageResult.success_hasType .word
   | unary _ _ _ _ ih => exact Core.LocalPrimitiveResults.unary_hasType ih
-  | binary _ _ _ _ _ left right => exact SourceCorePrimitive.binary_hasType left right
+  | binary _ _ _ _ _ _ left right => exact SourceCorePrimitive.binary_hasType left right
   | group _ _ _ ih => exact ih
   | pair _ _ leftTree rightTree left right =>
       exact Core.LocalSequence.pair_hasType leftTree.cellPayload.wellFormed rightTree.cellPayload.wellFormed left right
@@ -541,7 +544,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
               · rw [form, metadata.requirements, metadata.coercions]
                 exact .unary (owned := []) rfl sourceEvaluation (.primitive sourceApplied)
               · rw [metadata.coercions]; exact .nil
-  | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form
+  | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form total
       leftTree rightTree leftIH rightIH =>
       obtain ⟨leftOutcome, leftValue, leftSource, leftRelated, leftCore⟩ := leftIH
       cases leftRelated with
@@ -574,7 +577,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
                           .value result resultTyped, ?_⟩
                         rw [binary_strict strict]
                         exact Core.LocalPrimitiveResults.binaryWith_success leftCore shifted (bodyEvaluation _ _)
-              · rcases binary_nonstrict strict with isAnd | isOr
+              · rcases binary_nonstrict strict total with isAnd | isOr
                 · subst operator
                   obtain ⟨leftBoolean, rfl⟩ := bool_of_type leftValue leftTyped
                   cases leftBoolean with
@@ -816,6 +819,10 @@ theorem tree_of_lowerExpression
                     .unary operator ((ensureType_ok resultChecked).symm ▸ metadata) form operandTree⟩
               | binary left operator right =>
                   simp only [form] at accepted
+                  split at accepted
+                  · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+                  next panics =>
+                  have total : operator.mayPanic = false := by simpa using panics
                   obtain ⟨leftResult, leftAccepted, accepted⟩ := bind_ok accepted
                   obtain ⟨rightResult, rightAccepted, accepted⟩ := bind_ok accepted
                   obtain ⟨checkedUnit, leftChecked, accepted⟩ := bind_ok accepted
@@ -831,7 +838,7 @@ theorem tree_of_lowerExpression
                   rw [← ensureType_ok rightChecked] at rightTree
                   rw [← ensureType_ok resultChecked]
                   exact ⟨max leftDepth rightDepth + 1, by omega,
-                    .binary operator ((ensureType_ok resultChecked).symm ▸ metadata) form leftTree rightTree⟩
+                    .binary operator ((ensureType_ok resultChecked).symm ▸ metadata) form total leftTree rightTree⟩
               | conditional condition thenId elseId =>
                   simp only [form] at accepted
                   obtain ⟨condition, conditionAccepted, accepted⟩ := bind_ok accepted
@@ -935,7 +942,7 @@ theorem Tree.metadata {compilation : SourceCorePrimitive.Context} {source : Type
       exact ⟨node, Metadata.root metadata⟩
   | integerLiteral metadata _ =>
       exact ⟨_, metadata.contains, metadata.owned, metadata.type ▸ .word, metadata.coercions⟩
-  | unary _ metadata _ _ | binary _ metadata _ _ _
+  | unary _ metadata _ _ | binary _ metadata _ _ _ _
   | group metadata _ _ | pair metadata _ _ _ | conditional metadata _ _ _ _ =>
       exact ⟨_, Metadata.root metadata⟩
 

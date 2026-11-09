@@ -114,6 +114,13 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ childSize right currentCell initial currentSelected code,
+      size = Size.stepSize [childSize] ∧ finalContext = context ∧
+      outcome = .fault (.semantic (.panic code)) ∧
+      Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
@@ -133,12 +140,17 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
   | assignment actualSnapshot child write remaining =>
       have targets := target_functional snapshot actualSnapshot
       cases targets
-      exact .inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩)
+      exact .inr (.inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩))
   | assignmentOperands actualSnapshot child currentRead rootType initialValue pathRead invalid =>
       have targets := target_functional snapshot actualSnapshot
       cases targets
       exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, rfl, child,
         currentRead, rootType, initialValue, pathRead, invalid⟩)
+  | assignmentPanic actualSnapshot child currentRead rootType initialValue pathRead panics =>
+      have targets := target_functional snapshot actualSnapshot
+      cases targets
+      exact .inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, child,
+        currentRead, rootType, initialValue, pathRead, panics⟩))
   | assignmentFailure _ child => exact .inl ⟨_, _, rfl, rfl, rfl, child⟩
   | unbound _ missing =>
       cases snapshot with
@@ -342,7 +354,7 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | ifReturned actual same _ _ | ifFault actual same _ _
@@ -506,7 +518,7 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _ =>
@@ -678,7 +690,7 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _ =>
@@ -813,7 +825,7 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | ifReturned actual same _ _ | ifFault actual same _ _
@@ -964,7 +976,7 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -1058,7 +1070,7 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -1126,7 +1138,7 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -1185,7 +1197,7 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -1284,7 +1296,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | letGeneralized actual same _ _ _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
-  | assignBareOperands actual same _ _ _ _ _ _ _
+  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _ | assignProjectedKeysFault actual same _ _ _
@@ -1415,6 +1427,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       cases impossible
   | assignBare actual same snapshot _ _ _
   | assignBareOperands actual same snapshot _ _ _ _ _ _
+  | assignBarePanic actual same snapshot _ _ _ _ _ _
   | assignBareFault actual same snapshot _ =>
       cases (shape actual).symm.trans same
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
@@ -1512,7 +1525,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _
   | assignBareFault actual same _ _ | assignBareUnbound actual same _ _
   | assignBareDangling actual same _ _ _ =>
       cases (shape actual).symm.trans same
@@ -1637,7 +1650,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBarePanic actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same
@@ -1727,7 +1740,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBarePanic actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same
@@ -1862,7 +1875,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
-  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _ =>
+  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _ =>
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
@@ -1905,8 +1918,9 @@ private theorem target_functional {environment : Dynamic.Environment} {heap : Dy
       cases valueEq
       rfl
 
-/-- The actual Source rule retains RHS failure, operand rejection after a
-successful RHS, or the genuine write and suffix. The target snapshot is fixed. -/
+/-- The actual Source rule retains RHS failure, operand rejection or a panic
+after a successful RHS, or the genuine write and suffix. The target snapshot is
+fixed. -/
 theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {invocation : Scope}
     {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {id : StatementId} {rest : List StatementId}
@@ -1928,6 +1942,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ childSize right currentCell initial currentSelected code,
+      size = Size.stepSize [childSize] ∧ finalContext = context ∧
+      outcome = .fault (.semantic (.panic code)) ∧
+      Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
@@ -1979,7 +2000,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       cases equal
       have targetEq := target_functional snapshot actualSnapshot
       cases targetEq
-      exact .inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩)
+      exact .inr (.inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩))
   | assignBareOperands actual same actualSnapshot child currentRead rootType initialValue pathRead invalid =>
       have equal := (shape actual).symm.trans same
       cases equal
@@ -1987,6 +2008,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       cases targetEq
       exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, rfl, child,
         currentRead, rootType, initialValue, pathRead, invalid⟩)
+  | assignBarePanic actual same actualSnapshot child currentRead rootType initialValue pathRead panics =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      have targetEq := target_functional snapshot actualSnapshot
+      cases targetEq
+      exact .inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, child,
+        currentRead, rootType, initialValue, pathRead, panics⟩))
   | assignBareFault actual same _ child =>
       have equal := (shape actual).symm.trans same
       cases equal

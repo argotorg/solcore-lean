@@ -2873,7 +2873,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches catalog inputs caller selected started data sameChecked programTyped record meanings heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel_evidence
+theorem has_sufficient_fuel_evidence [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -2905,7 +2905,7 @@ theorem has_sufficient_fuel_evidence
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches catalog inputs caller selected started data sameChecked programTyped record meanings heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program_evidence
+theorem completed_reflects_program_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -2995,7 +2995,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches catalog inputs caller selected started data sameChecked programTyped record meanings heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -3012,7 +3012,7 @@ theorem has_sufficient_fuel
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches catalog inputs caller selected started data sameChecked programTyped record meanings heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program
+theorem completed_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)

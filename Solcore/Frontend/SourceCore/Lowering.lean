@@ -3,6 +3,7 @@ import Solcore.Core.Internal.ConventionLaws
 import Solcore.Frontend.SourceCompilationPlan
 import Solcore.SourceSemantics.CaptureBinders
 import Solcore.Frontend.SourceCore.Internal.Carriers
+import Solcore.Frontend.SourceCore.Panics
 
 /-!
 # Lowering of expressions and statements
@@ -855,7 +856,7 @@ abbrev ExpressionLowerer := Nat → TypedSource → Scope → ExpressionId → E
 
 def operator? : Syntax.ValueAssignOp → Option Core.LocalAssignment.Operator
   | .equal | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract
-  | .uncheckedMultiply => none
+  | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo => none
   | .add => some .add
   | .subtract => some .subtract
   | .multiply => some .multiply
@@ -874,18 +875,34 @@ def wordOnly? : Syntax.ValueAssignOp → Option Core.BinaryOp
   | .uncheckedAdd => some .wordAdd
   | .uncheckedSubtract => some .wordSub
   | .uncheckedMultiply => some .wordMul
+  | .uncheckedDivide => some .wordDiv
+  | .uncheckedModulo => some .wordMod
   | _ => none
+
+/-- The write of a Word-only compound assignment, under the stored Word, the
+right-hand side, the loaded cell and the reference. When the operator may
+panic, a zero right-hand side fails with `Panic(0x12)` and writes nothing. -/
+def wordOnlyWrite (outputType : Core.Ty) (operation : Core.BinaryOp) (panics : Bool)
+    (next : Core.Expr) : Core.Expr :=
+  let write := .letE (.storeCell (.var 3) (.inRight .unit (.binary operation (.var 0) (.var 1))))
+    (Core.LocalAssignment.weakenFive next)
+  if panics then
+    .ifE (.binary .wordEq (.var 1) (.word Core.Word.zero))
+      (Core.LanguageResult.failure outputType
+        (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+      write
+  else write
 
 /-- `Core.LocalAssignment.compound` with any Core Word operation in place of
 its arithmetic operator: the stored Word is read before the right-hand side is
-evaluated, and an uninitialized target fails with the assignment's reason. -/
-def wordOnlyCompound (outputType : Core.Ty) (operation : Core.BinaryOp)
+evaluated, an uninitialized target fails with the assignment's reason, and a
+panicking operator then checks its divisor. -/
+def wordOnlyCompound (outputType : Core.Ty) (operation : Core.BinaryOp) (panics : Bool)
     (reference rhs next : Core.Expr) (invalidReason : Core.Word) : Core.Expr :=
   .letE reference (.letE (.loadCell (.var 0))
     (Core.LanguageResult.bind outputType (Core.LocalAssignment.weakenTwo rhs)
       (.caseE (.var 1) (Core.LanguageResult.failure outputType (.word invalidReason))
-        (.letE (.storeCell (.var 3) (.inRight .unit (.binary operation (.var 0) (.var 1))))
-          (Core.LocalAssignment.weakenFive next)))))
+        (wordOnlyWrite outputType operation panics next))))
 
 /-- Scalar target validation checks the owner, binding, declared payload type,
 empty requirements and absence of projections. Equal function assignments
@@ -923,7 +940,8 @@ def assignValue (lowerExpression : ExpressionLowerer) (fuel : Nat)
       SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
       let rhs ← lowerExpression fuel source scope rhs
       SourceCoreBasic.ensureType (.binder assignment.target.root) .word rhs.type
-      pure (wordOnlyCompound outputType operation (.var index) rhs.expression next invalidReason)
+      pure (wordOnlyCompound outputType operation operator.mayPanic (.var index) rhs.expression
+        next invalidReason)
   | none, none =>
       let rhs ← lowerExpression fuel source scope rhs
       SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
@@ -993,7 +1011,8 @@ def binaryOperandType : Syntax.BinaryOp → Core.Ty
 
 def binaryResultType : Syntax.BinaryOp → Core.Ty
   | .multiply | .divide | .modulo | .add | .subtract | .shiftLeft | .shiftRight
-  | .bitAnd | .bitXor | .bitOr | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .word
+  | .bitAnd | .bitXor | .bitOr | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .uncheckedDivide | .uncheckedModulo => .word
   | _ => .bool
 
 /-- Comparisons swap already evaluated payloads, so operand side effects keep
@@ -1009,6 +1028,8 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .uncheckedAdd => .binary .wordAdd (.var 1) (.var 0)
   | .uncheckedSubtract => .binary .wordSub (.var 1) (.var 0)
   | .uncheckedMultiply => .binary .wordMul (.var 1) (.var 0)
+  | .uncheckedDivide => .binary .wordDiv (.var 1) (.var 0)
+  | .uncheckedModulo => .binary .wordMod (.var 1) (.var 0)
   | .bitAnd => .binary .wordAnd (.var 1) (.var 0)
   | .bitXor => .binary .wordXor (.var 1) (.var 0)
   | .bitOr => .binary .wordOr (.var 1) (.var 0)
@@ -1021,10 +1042,25 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .logicalAnd => .ifE (.var 1) (.var 0) (.bool false)
   | .logicalOr => .ifE (.var 1) (.bool true) (.var 0)
 
+/-- The body of unchecked `/` and `%`, under the right payload, the left payload
+and the outer scope: a zero divisor fails with `Panic(0x12)`, and any other
+divisor gives the Word operation. -/
+def panickingBody (operator : Syntax.BinaryOp) : Core.Expr :=
+  .ifE (.binary .wordEq (.var 0) (.word Core.Word.zero))
+    (Core.LanguageResult.failure .word
+      (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+    (Core.LanguageResult.success (strictBinaryBody operator))
+
+/-- `binaryWith` with a body that may fail. -/
+def binaryPanicking (operator : Syntax.BinaryOp) (left right : Core.Expr) : Core.Expr :=
+  Core.LanguageResult.bind .word left
+    (Core.LanguageResult.bind .word (right.weakenAt 0) (panickingBody operator))
+
 def binary (operator : Syntax.BinaryOp) (left right : Core.Expr) : Core.Expr :=
   match operator with
   | .logicalAnd => Core.LocalPrimitiveResults.logicalAnd left right
   | .logicalOr => Core.LocalPrimitiveResults.logicalOr left right
+  | .uncheckedDivide | .uncheckedModulo => binaryPanicking operator left right
   | _ => Core.LocalPrimitiveResults.binaryWith (binaryResultType operator) left right
       (strictBinaryBody operator)
 
@@ -1038,6 +1074,112 @@ theorem strictBinaryBody_hasType {definitions : Core.DataEnvironment} {scope : C
     | exact .ifE (.var rfl) (.var rfl) .bool
     | exact .ifE (.var rfl) .bool (.var rfl)
 
+theorem panickingBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {operator : Syntax.BinaryOp} (word : binaryResultType operator = .word)
+    (operand : binaryOperandType operator = .word) :
+    Core.HasType (.word :: .word :: scope) (panickingBody operator)
+      (Core.LanguageResult.resultType .word) definitions := by
+  have body := strictBinaryBody_hasType (definitions := definitions) (scope := scope) operator
+  rw [word, operand] at body
+  exact .ifE (.binary (.var rfl) .word)
+    (Core.LanguageResult.failure_hasType .word .word) (Core.LanguageResult.success_hasType body)
+
+theorem binaryPanicking_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
+    (rightTyped : Core.HasType scope right (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
+    (word : binaryResultType operator = .word) (operand : binaryOperandType operator = .word) :
+    Core.HasType scope (binaryPanicking operator left right)
+      (Core.LanguageResult.resultType (binaryResultType operator)) definitions := by
+  rw [operand] at leftTyped rightTyped
+  rw [word]
+  apply Core.LanguageResult.bind_hasType .word leftTyped
+  apply Core.LanguageResult.bind_hasType .word
+  · simpa [Core.Context.insertAt] using rightTyped.weakenAt (inserted := .word) 0
+  · exact panickingBody_hasType word operand
+
+/-- A nonzero divisor gives the Word operation. -/
+theorem binaryPanicking_success {environment : Core.Environment}
+    {before middle after : Core.Store} {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    {leftValue rightValue : Core.Word} {result : Core.Value}
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word (.word leftValue)) middle)
+    (rightEvaluation : Core.Evaluates (.word leftValue :: environment) middle (right.weakenAt 0)
+      (.inRight .word (.word rightValue)) after)
+    (nonzero : rightValue ≠ Core.Word.zero)
+    (bodyEvaluation : ∀ store, Core.Evaluates (.word rightValue :: .word leftValue :: environment) store
+      (strictBinaryBody operator) result store) :
+    Core.Evaluates environment before (binaryPanicking operator left right) (.inRight .word result) after :=
+  Core.LanguageResult.bind_success _ leftEvaluation
+    (Core.LanguageResult.bind_success _ rightEvaluation
+      (.ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero]))
+        (.inRight (bodyEvaluation after))))
+
+/-- A zero divisor fails with `Panic(0x12)`. -/
+theorem binaryPanicking_panic {environment : Core.Environment}
+    {before middle after : Core.Store} {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    {leftValue : Core.Value}
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inRight .word (.word Core.Word.zero)) after) :
+    Core.Evaluates environment before (binaryPanicking operator left right)
+      (.inLeft .word (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) after :=
+  Core.LanguageResult.bind_success _ leftEvaluation
+    (Core.LanguageResult.bind_success _ rightEvaluation
+      (.ifTrue (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply]))
+        (.inLeft .word)))
+
+/-- The divisor check under the right and left Word payloads either panics on
+a zero divisor or continues with the body. -/
+theorem panickingBody_inv {environment : Core.Environment} {before after : Core.Store}
+    {operator : Syntax.BinaryOp} {left right : Core.Word} {value : Core.Value}
+    (evaluated : Core.Evaluates (.word right :: .word left :: environment) before
+      (panickingBody operator) value after) :
+    (right = Core.Word.zero ∧
+      value = .inLeft .word (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
+      after = before) ∨
+    (right ≠ Core.Word.zero ∧ Core.Evaluates (.word right :: .word left :: environment) before
+      (Core.LanguageResult.success (strictBinaryBody operator)) value after) := by
+  unfold panickingBody at evaluated
+  cases evaluated with
+  | ifTrue condition branch =>
+    cases condition with
+    | binary leftEvaluation zeroEvaluation applied =>
+      cases leftEvaluation with
+      | var found =>
+        cases zeroEvaluation
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        subst found
+        simp only [Core.BinaryOp.apply, Option.some.injEq, Core.Value.bool.injEq, beq_iff_eq] at applied
+        cases branch with
+        | inLeft reason => cases reason; exact .inl ⟨applied, rfl, rfl⟩
+  | ifFalse condition branch =>
+    cases condition with
+    | binary leftEvaluation zeroEvaluation applied =>
+      cases leftEvaluation with
+      | var found =>
+        cases zeroEvaluation
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        subst found
+        simp only [Core.BinaryOp.apply, Option.some.injEq, Core.Value.bool.injEq, beq_eq_false_iff_ne] at applied
+        exact .inr ⟨applied, branch⟩
+
+theorem binaryPanicking_left_failure {environment : Core.Environment}
+    {before after : Core.Store} {operator : Syntax.BinaryOp} {left right : Core.Expr} {reason : Core.Word}
+    (evaluation : Core.Evaluates environment before left (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (binaryPanicking operator left right)
+      (.inLeft .word (.word reason)) after :=
+  Core.LanguageResult.bind_failure _ evaluation
+
+theorem binaryPanicking_right_failure {environment : Core.Environment}
+    {before middle after : Core.Store} {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    {leftValue : Core.Value} {reason : Core.Word}
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (binaryPanicking operator left right)
+      (.inLeft .word (.word reason)) after :=
+  Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
+
 theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     {operator : Syntax.BinaryOp} {left right : Core.Expr}
     (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
@@ -1049,6 +1191,7 @@ theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Contex
     | exact Core.LocalPrimitiveResults.logicalOr_hasType leftTyped rightTyped
     | exact Core.LocalPrimitiveResults.binaryWith_hasType (by constructor) leftTyped rightTyped
         (strictBinaryBody_hasType _)
+    | exact binaryPanicking_hasType leftTyped rightTyped rfl rfl
 
 /-- Conditional/group/tuple children use this same policy recursively, so an
 operator can occur at any expression position without losing read reasons. -/
@@ -1077,6 +1220,8 @@ def lowerExpressionWithReasons : Nat → Context → TypedSource → Scope → E
               SourceCoreBasic.ensureType site coreOperator.resultType type
               pure ⟨type, Core.LocalPrimitiveResults.unary coreOperator operand.expression⟩
           | .binary left operator right =>
+              -- This profile's certificate has no panic, so unchecked `/` and `%` stay unsupported.
+              if operator.mayPanic then throw (.unsupportedExpression id node.form) else
               let left ← lowerExpressionWithReasons fuel context source scope left reasonAt
               let right ← lowerExpressionWithReasons fuel context source scope right reasonAt
               SourceCoreBasic.ensureType site (binaryOperandType operator) left.type
@@ -1462,7 +1607,8 @@ def strictBinaryBody : Syntax.BinaryOp → Core.Expr
   | .logicalOr => .ifE (.var 1) (.bool true) (.var 0)
   -- Shifts and unchecked arithmetic take Words only; typing never lowers one
   -- at Integer.
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .bool false
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .uncheckedDivide | .uncheckedModulo => .bool false
 
 def binaryOperandType : Syntax.BinaryOp → Core.Ty
   | .logicalAnd | .logicalOr => .bool

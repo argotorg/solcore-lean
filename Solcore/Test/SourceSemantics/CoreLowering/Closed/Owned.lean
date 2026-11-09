@@ -403,7 +403,7 @@ private theorem acquire (location : Location) (native : NativeFrame)
 include extension faithful observations layouts in
 /-- The single authentic anonymous origin closes its own body family. No
 smaller body or expression execution meaning is assumed. -/
-theorem empty_preserves (size : Nat) :
+theorem empty_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (emptyBodyOrigin code inputs body emptyBody unitResult).origin size := by
@@ -419,7 +419,7 @@ theorem empty_preserves (size : Nat) :
 include extension faithful observations functionTypes layouts in
 /-- Native reflection uses the same shared closer and keeps its independent
 source grade and exact reached state. -/
-theorem empty_reflects (size : Nat) :
+theorem empty_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (emptyBodyOrigin code inputs body emptyBody unitResult).origin size := by
@@ -480,7 +480,7 @@ def poolObservations {firstIndex lastIndex : Index}
 include captured code history support escaped emptyBody unitResult extension faithful observations represented heaps reference carried in
 /-- Actual source lambda formation supplies capture validity at this heap.
 The stored carrier then runs the genuine parameter/body/restore application. -/
-theorem formed_application_source_post
+theorem formed_application_source_post [FunctionCalls.FaultTokens faults]
     {formationContext callContext : SourceSemantics.Context} {formationSource : TypedSource}
     {formationEvidence callerEvidence : Dynamic.EvidenceEnvironment} {formationEnvironment : Dynamic.Environment}
     {requirements : List RequirementId} {coercions : List CoercionStep}
@@ -513,7 +513,7 @@ include captured code history support escaped emptyBody unitResult extension fai
 /-- Source closure typing authenticates raw capture declarations separately
 from its stored native carrier. Reflection returns the original source call
 at its own grade and retains the actual restored pool. -/
-theorem typed_application_native_post
+theorem typed_application_native_post [FunctionCalls.FaultTokens faults]
     {typingContext callContext : SourceSemantics.Context} {parameter result : TypeSystem.Ty}
     {callerEvidence : Dynamic.EvidenceEnvironment}
     (sourceTyped : Dynamic.ValueHasType typingContext before (.closure function) (.function parameter result))
@@ -637,7 +637,7 @@ private def kernel : CallableRuntimeBodyKernel.BodyFor compiled.indexed.layouts 
 include definitions registered extension faithful observations valid unitResult admission tree emitted unique escapedFault in
 /-- Source body execution closes through the real lexical Tree and native
 finish. Every state callback is derived here from static receipts. -/
-theorem closed_kernel_preserves (size : Nat)
+theorem closed_kernel_preserves [FunctionCalls.FaultTokens faults] (size : Nat)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -693,7 +693,7 @@ theorem closed_kernel_preserves (size : Nat)
 include definitions registered extension faithful observations functionTypes valid unitResult admission tree emitted unique escapedFault in
 /-- Reflection consumes the original native completion and constructs an
 independent Source body grade, preserving its actual reached pool. -/
-theorem closed_kernel_reflects (budget size : Nat) (within : size ≤ budget)
+theorem closed_kernel_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -775,7 +775,7 @@ private def origin : CallableRuntimeBodyOrigins.StaticOrigin values ambient regi
 include definitions registered extension faithful observations valid unitResult admission tree emitted unique escapedFault in
 /-- A nonempty actual origin family closes with the static empty expression
 certificate. No smaller callee or body semantic law is supplied. -/
-theorem closed_family_preserves (size : Nat) :
+theorem closed_family_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (origin (registry := registry) (administrative := administrative) definitions registered valid unitResult admission tree emitted unique escapedFault) size := by
@@ -792,7 +792,7 @@ theorem closed_family_preserves (size : Nat) :
 include definitions registered extension faithful observations functionTypes valid unitResult admission tree emitted unique escapedFault in
 /-- Actual native family reflection closes separately and returns an
 independent source grade from the original measured completion. -/
-theorem closed_family_reflects (size : Nat) :
+theorem closed_family_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (origin (registry := registry) (administrative := administrative) definitions registered valid unitResult admission tree emitted unique escapedFault) size := by
@@ -926,7 +926,7 @@ def conditions (header : CallableIndexedOwnedFunctionValues.Header compiled (Pro
 include extension faithful observations receipts body_nil unit_result escaped in
 /-- The actual named family closes the bodies; only impossible expression
 certificate leaves are discharged. No body law is a test premise. -/
-theorem bodies_preserve (size : Nat) : ∀ header, header ∈ headers →
+theorem bodies_preserve [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -948,7 +948,7 @@ theorem bodies_preserve (size : Nat) : ∀ header, header ∈ headers →
     (by intro header member context valid budget child within below scope id lowered impossible; cases impossible) size
 
 include extension faithful observations functionTypes receipts body_nil unit_result escaped in
-theorem bodies_reflect (size : Nat) : ∀ header, header ∈ headers →
+theorem bodies_reflect [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -977,7 +977,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} {evidence : 
 include extension faithful observations receipts body_nil unit_result escaped in
 /-- Real ordinary/direct metadata chooses the callee; its nil Unit body is
 closed by the named family above, with no semantic child assumption. -/
-theorem closed_head_preserves (size : Nat)
+theorem closed_head_preserves [FunctionCalls.FaultTokens faults] (size : Nat)
     (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
     (owners : ((Program.ofChecked compiled.sourceProgram).functions.map (fun definition => definition.body.owner)).Nodup) :
     PreservesAtWithGlobals (headers := headers) (registry := registry) (faults := faults)
@@ -997,7 +997,7 @@ theorem closed_head_preserves (size : Nat)
 include extension faithful observations functionTypes receipts body_nil unit_result escaped in
 /-- Native reflection derives its source grade independently and uses the
 same real metadata, actual body family and reached caller pool. -/
-theorem closed_head_reflects (size : Nat) :
+theorem closed_head_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     ReflectsAtWithGlobals (headers := headers) (registry := registry) (faults := faults)
       (source := source) (context := context) (evidence := evidence) functions owner compilation.administrativePrefix
       (RecursiveNamedCallEvidenceHeads.Head (prepared := compiled.indexed.ancestry)
@@ -1043,7 +1043,7 @@ variable {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : Express
 include extension faithful observations receipts body_nil unit_result escaped head found environments heaps locals agrees typed initial globals in
 /-- A genuine source call trace drives the actual argument, parameter and body
 receipts. The caller is restored in that returned pool. -/
-theorem closed_head_source_post (size : Nat)
+theorem closed_head_source_post [FunctionCalls.FaultTokens faults] (size : Nat)
     (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
     (owners : ((Program.ofChecked compiled.sourceProgram).functions.map (fun definition => definition.body.owner)).Nodup)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -1067,7 +1067,7 @@ theorem closed_head_source_post (size : Nat)
 include extension faithful observations functionTypes receipts body_nil unit_result escaped head found environments heaps locals agrees typed initial globals in
 /-- The original measured native completion reconstructs full source evidence
 at its independent grade, retaining the exact returned caller pool. -/
-theorem closed_head_native_post (size : Nat) {value : Value} {finalStore : Store}
+theorem closed_head_native_post [FunctionCalls.FaultTokens faults] (size : Nat) {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize context evidence source
@@ -1137,7 +1137,7 @@ abbrev Expressions := CompatibleExpressionCalls.Tree (Calls (headers := headers)
 include extension faithful observations functionTypes receipts body_nil unit_result escaped valid unique owners uninitialized missing in
 /-- All literal and callee callbacks are proved from static receipts. The
 original Tree fold closes every expression child at its actual post-state. -/
-theorem closed_tree_preserves (size : Nat) (idsUnique : RequirementIdsUnique context) :
+theorem closed_tree_preserves [FunctionCalls.FaultTokens faults] (size : Nat) (idsUnique : RequirementIdsUnique context) :
     ProtectedStateTransition.PreservesAt (argumentProtocol (headers := headers) owner compilation.administrativePrefix)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       (Program.ofChecked compiled.sourceProgram) context evidence source
@@ -1158,7 +1158,7 @@ theorem closed_tree_preserves (size : Nat) (idsUnique : RequirementIdsUnique con
 include extension faithful observations functionTypes receipts body_nil unit_result escaped valid uninitialized missing in
 /-- Native children select their own grades; the reconstructed source grade
 and actual reached pool come from the same closed Tree. -/
-theorem closed_tree_reflects (size : Nat) :
+theorem closed_tree_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     ProtectedStateTransition.ReflectsAt (argumentProtocol (headers := headers) owner compilation.administrativePrefix)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       (Program.ofChecked compiled.sourceProgram) context evidence source
@@ -1314,7 +1314,7 @@ include fuel extension faithful observations functionTypes receipts body_nil uni
   call tupleMetadata tupleForm rightFound tupleType rightLiteral environments heaps locals agrees typed initial globals in
 /-- A source execution of the composed Tree obtains the actual parameter,
 callee and restored caller states. All semantic callbacks are closed above. -/
-theorem boolean_call_tuple_source_post (size : Nat) (idsUnique : RequirementIdsUnique context)
+theorem boolean_call_tuple_source_post [FunctionCalls.FaultTokens faults] (size : Nat) (idsUnique : RequirementIdsUnique context)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) size context evidence source
       environment before tupleId outcome after) :
@@ -1340,7 +1340,7 @@ include fuel extension faithful observations functionTypes receipts body_nil uni
   call tupleMetadata tupleForm rightFound tupleType rightLiteral environments heaps locals agrees typed initial globals in
 /-- Native completion reconstructs the complete source tuple and call evidence
 at an independent source grade. The observations use the actual returned pool. -/
-theorem boolean_call_tuple_native_post (size : Nat) {value : Value} {finalStore : Store}
+theorem boolean_call_tuple_native_post [FunctionCalls.FaultTokens faults] (size : Nat) {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
       ((LocalSequence.pair header.output .bool expression (booleanCode rightBoolean).expression).rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -1432,7 +1432,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : SourceSem
 include emptyBody unitResult extension faithful observations layouts in
 /-- The original selected body receipt is closed by the actual empty-body
 family; its full source, captured entry, code and reached state are identical. -/
-theorem original_body_preserves (size : Nat) :
+theorem original_body_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program body.origin size := by
   intro entry outcome after trace
@@ -1445,7 +1445,7 @@ theorem original_body_preserves (size : Nat) :
 include emptyBody unitResult extension faithful observations functionTypes layouts in
 /-- Native completion reconstructs the independent source grade at the same
 original entry through the internally proved empty anonymous body family. -/
-theorem original_body_reflects (size : Nat) :
+theorem original_body_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program body.origin size := by
   intro entry value finalStore completed
@@ -1534,7 +1534,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : SourceSem
 include extension faithful observations functionTypes sameLedger runtime unique uninitialized missing in
 /-- Real read/literal certificates supply the finite child family. This
 administrative lift applies only to the original builtin/data/read grammar. -/
-private theorem children_preserve (size : Nat) :
+private theorem children_preserve [FunctionCalls.FaultTokens faults] (size : Nat) :
     ProtectedStateTransition.PreservesAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source
@@ -1549,7 +1549,7 @@ private theorem children_preserve (size : Nat) :
 include extension faithful observations functionTypes sameLedger runtime uninitialized missing in
 /-- Original native read/literal completion reconstructs its own Source grade.
 All child callbacks are proved here from static builtin certificates. -/
-private theorem children_reflect (size : Nat) :
+private theorem children_reflect [FunctionCalls.FaultTokens faults] (size : Nat) :
     ProtectedStateTransition.ReflectsAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source
@@ -1720,7 +1720,7 @@ include parent parameters emptyBody unitResult escaped rawResult nativeResult st
 children, the call's copies of the captured cells and a genuine nonempty
 Source allocation. Its body and child meaning families are closed internally;
 the returned pool is the actual restored post. -/
-theorem parent_source_post :
+theorem parent_source_post [FunctionCalls.FaultTokens faults] :
     ∃ copies copiedHeap sourceSize value finalStore finalMap finalWorld,
       Dynamic.EnvironmentCopies function.source function.captured before copies copiedHeap ∧
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment before id
@@ -1780,7 +1780,7 @@ include parent parameters emptyBody unitResult escaped rawResult nativeResult st
 /-- Original whole native completion reflects through the same accepted
 parent and selected body. The Source size is independent, and every row is
 observed on the actual restored final pool. -/
-theorem parent_native_post {size : Nat} {value : Value} {finalStore : Store}
+theorem parent_native_post [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment before id outcome after ∧
@@ -1982,7 +1982,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include profile represented physical extension faithful observations functionTypes escaped uninitialized missing in
 /-- This Source method invocation uses the genuine bootstrap and internally
 closed builtin body family; its actual reached pool supplies restoration. -/
-theorem selected_source_post {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem selected_source_post [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome (Program.ofChecked compiled.sourceProgram) size
       (sourceBody (compiled := compiled) (method := method)) dictionary ⟨[]⟩ arguments outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -2012,7 +2012,7 @@ theorem selected_source_post {size : Nat} {outcome : Dynamic.ExpressionOutcome} 
 include profile represented physical extension faithful observations functionTypes escaped uninitialized missing in
 /-- Original whole hook completion reconstructs its independent Source grade
 and retains the exact restored pool with every reached snapshot authenticated. -/
-theorem selected_native_post {size : Nat} {value : Value} {finalStore : Store}
+theorem selected_native_post [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: bootstrap.capture.installed.captured)
       (RecursiveNamedCatalogPreparedInitialization.store compiled)
       (cached.compilation.output.rename bootstrap.capture.installed.embedding.lift) value finalStore) :
@@ -2151,7 +2151,7 @@ variable {project : SourceCoreEvidence.Projector} {compilation : SourceCoreFunct
 include profile selected extension faithful observations functionTypes escaped uninitialized missing physical emission sameMethod in
 /-- A real Source method outcome enters the same observed global slot. The
 closed builtin producer supplies the actual parameter/body/restoration pool. -/
-theorem source_invoke {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem source_invoke [FunctionCalls.FaultTokens faults] {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (represented : ValueRep compiled.compatible.checked registry
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag)
       [] bootstrap.world step.source input native call.signature.parameterType)
@@ -2199,7 +2199,7 @@ theorem source_invoke {input : Dynamic.Value} {native : Value} {outcome : Dynami
 include profile selected extension faithful observations functionTypes escaped uninitialized missing physical emission sameMethod in
 /-- The real InvokeSized child remains strict in the native budget. Shared
 reflection supplies an independent Source grade and the same restored pool. -/
-theorem native_invoke {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word} {finalStore : Store}
+theorem native_invoke [FunctionCalls.FaultTokens faults] {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word} {finalStore : Store}
     (represented : ValueRep compiled.compatible.checked registry
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag)
       [] bootstrap.world step.source input native call.signature.parameterType)
@@ -2378,7 +2378,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include extension faithful observations functionTypes escaped uninitialized missing in
 /-- Every method callback is derived here from the actual captured slot and
 proved closed builtin body family; it is never a semantic hypothesis. -/
-private theorem steps_preserve (reason : Word) :
+private theorem steps_preserve [FunctionCalls.FaultTokens faults] (reason : Word) :
     ProtectedCoercionPathMeaning.StepPreserves (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (row := CheckedRow.coercion_row profileFlag) (registry := registry) (faults := faults)
       (caller := (RecursiveNamedCatalogPreparedInitialization.environment compiled)) (reason := reason) (pathProtocol profileFlag rows) [] (RecursiveNamedCatalogPreparedInitialization.environment compiled) (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag) (SourceSemantics.Program.ofChecked compiled.sourceProgram) rows := by
@@ -2418,7 +2418,7 @@ private theorem steps_preserve (reason : Word) :
 include extension faithful observations functionTypes escaped uninitialized missing in
 /-- The original InvokeSized child remains native-strict, while the closed
 reflection independently supplies the Source outcome and actual reached pool. -/
-private theorem steps_reflect (budget : Nat) (reason : Word) :
+private theorem steps_reflect [FunctionCalls.FaultTokens faults] (budget : Nat) (reason : Word) :
     ProtectedCoercionPathMeaning.StepReflects (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (row := CheckedRow.coercion_row profileFlag) (registry := registry) (faults := faults)
       (pathProtocol profileFlag rows) [] (RecursiveNamedCatalogPreparedInitialization.environment compiled) (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag) (SourceSemantics.Program.ofChecked compiled.sourceProgram) (CallableCoercionSpine.InvokeSized budget (RecursiveNamedCatalogPreparedInitialization.environment compiled) reason) rows := by
@@ -2547,7 +2547,7 @@ include extension faithful observations functionTypes pairEscaped pairUninitiali
 /-- Two closed checked methods use the actual first post as the second input.
 Both success and faults return the true final pool and the same ordered source
 path; every retained record still has its live snapshot observation. -/
-theorem pair_preserves {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem pair_preserves [FunctionCalls.FaultTokens faults] {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (represented : ValueRep compiled.compatible.checked registry
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag)
       [] first.bootstrap.world first.step.source input native first.call.signature.parameterType)
@@ -2593,7 +2593,7 @@ include extension faithful observations functionTypes pairEscaped pairUninitiali
 /-- Actual measured native invocations reflect the same two selected Source
 methods. Source grading remains independent of the native budget, and final
 records come only from the returned state of the shared ordered fold. -/
-theorem pair_reflects {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word} {finalStore : Store}
+theorem pair_reflects [FunctionCalls.FaultTokens faults] {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word} {finalStore : Store}
     (represented : ValueRep compiled.compatible.checked registry
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profileFlag)
       [] first.bootstrap.world first.step.source input native first.call.signature.parameterType)
@@ -2717,7 +2717,7 @@ variable
 include profile physical locations bindings binderType extension faithful observations functionTypes escaped uninitialized missing in
 /-- Actual Source method execution consumes a genuine Bool parameter and the
 closed principal packet family. It restores the same reached body pool. -/
-theorem boolean_source_post {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem boolean_source_post [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome (Program.ofChecked compiled.sourceProgram) size
       principal.sourceBody principal.dictionary ⟨[]⟩ [.bool boolean] outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -2754,7 +2754,7 @@ theorem boolean_source_post {size : Nat} {outcome : Dynamic.ExpressionOutcome} {
 include profile physical locations bindings binderType extension faithful observations functionTypes escaped uninitialized missing in
 /-- Whole native completion reflects through the actual authentic parameter
 packet, closed builtin body and reached-pool restoration. Source grade is independent. -/
-theorem boolean_native_post {size : Nat} {value : Value} {finalStore : Store}
+theorem boolean_native_post [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues [Value.bool boolean] :: bootstrap.capture.installed.captured)
       (RecursiveNamedCatalogPreparedInitialization.store compiled)
       (principal.cached.compilation.output.rename bootstrap.capture.installed.embedding.lift) value finalStore) :
@@ -2965,7 +2965,7 @@ private def profile {header} (member : header ∈ headers) (administrative : Cor
 include extension faithful observations functionTypes receipts bodies owners uninitialized missing escaped prefixMatches in
 /-- The closed named family proves every body callback from the static shapes
 above, including the parent call and its real nonempty parameter prefix. -/
-theorem family_preserves (size : Nat) : ∀ header, header ∈ headers →
+theorem family_preserves [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith (prepared := compiled.indexed.ancestry)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -2980,7 +2980,7 @@ theorem family_preserves (size : Nat) : ∀ header, header ∈ headers →
 include extension faithful observations functionTypes receipts bodies uninitialized missing escaped prefixMatches in
 /-- Native completion selects the strict callees independently and returns its
 own source grade together with the actual final pool. -/
-theorem family_reflects (size : Nat) : ∀ header, header ∈ headers →
+theorem family_reflects [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith (prepared := compiled.indexed.ancestry)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -3009,7 +3009,7 @@ variable {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.o
 include extension faithful observations functionTypes receipts bodies owners uninitialized missing escaped prefixMatches member parent entry initial seed in
 /-- A source parent-call execution yields genuine native completion and the
 live snapshots of the returned pool, with all earlier row records retained. -/
-theorem parent_source_post (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem parent_source_post [FunctionCalls.FaultTokens faults] (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) size header.function header.context
       entry.environment entry.heap outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -3032,7 +3032,7 @@ theorem parent_source_post (size : Nat) {outcome : Dynamic.ExpressionOutcome} {a
 include extension faithful observations functionTypes receipts bodies uninitialized missing escaped prefixMatches member parent entry initial seed in
 /-- Original native completion reflects the actual parent call at an
 independent source grade and observes the same authentic reached pool. -/
-theorem parent_native_post (size : Nat) {value : Value} {finalStore : Store}
+theorem parent_native_post [FunctionCalls.FaultTokens faults] (size : Nat) {value : Value} {finalStore : Store}
     (completed : EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) sourceSize header.function header.context
@@ -3222,7 +3222,7 @@ include captureZero profileFlag receipts bodies complete globals slots extension
   uninitialized missing escaped in
 /-- The original per-header mutual family closes actual lambda formation from
 these static profiles; no expression/body meaning family is a premise. -/
-theorem family_preserves (size : Nat) : ∀ header, header ∈ headers →
+theorem family_preserves [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith (prepared := compiled.indexed.ancestry)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -3240,7 +3240,7 @@ include captureZero profileFlag receipts bodies complete globals slots extension
   uninitialized missing escaped in
 /-- Native reflection returns an independently graded Source body and the same
 actual reached pool from the closed nested family. -/
-theorem family_reflects (size : Nat) : ∀ header, header ∈ headers →
+theorem family_reflects [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith (prepared := compiled.indexed.ancestry)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix)
@@ -3274,7 +3274,7 @@ include captureZero profileFlag receipts bodies complete globals slots extension
   uninitialized missing escaped member parent entry initial allowed in
 /-- Original Source execution of the named formation body runs the genuine
 compiled lambda leaf and observes every ordered record in the actual post. -/
-theorem parent_source_post (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem parent_source_post [FunctionCalls.FaultTokens faults] (size : Nat) {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) size header.function header.context
       entry.environment entry.heap outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -3300,7 +3300,7 @@ include captureZero profileFlag receipts bodies complete globals slots extension
   uninitialized missing escaped member parent entry initial allowed in
 /-- Original native completion reflects the real formation-containing Source
 body at its independent grade and retains the same actual reached pool. -/
-theorem parent_native_post (size : Nat) {value : Value} {finalStore : Store}
+theorem parent_native_post [FunctionCalls.FaultTokens faults] (size : Nat) {value : Value} {finalStore : Store}
     (completed : EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) sourceSize header.function header.context
@@ -3463,7 +3463,7 @@ variable {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.S
 
 include definitions registered found form conditionFound conditionReceipt codeTyped tree unique in
 /-- Source head execution consumes literal and closed Tree proofs internally. -/
-theorem closed_while_preserves (size : Nat)
+theorem closed_while_preserves [FunctionCalls.FaultTokens faults] (size : Nat)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -3783,7 +3783,7 @@ variable {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.S
 include definitions registered conditionFound conditionReceipt codeTyped tree unique in
 /-- The literal and closed lexical Tree supply every smaller preservation
 callback; the nil post's real source trace supplies its exact unchanged state. -/
-theorem closed_loop_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_loop_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     ProtectedFor.Body.Stateful.LoopPreservesAtFor (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       functions program evidence (fun _ => True) size (source := source) (context := context) (registry := registry)
       (faults := faults) (frameLayout := compiled.indexed.ancestry.layout.frame) (globals := globals) (administrative := administrative)

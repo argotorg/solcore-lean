@@ -135,7 +135,7 @@ include physical owners receiver prepared stagePrepared sourceEq occurrence cert
 /-- One original Source parent constructs its complete native result or
 retains the authentic named suffix. The concrete call producers reuse the
 literal callee and argument evaluations and their reached pool. -/
-theorem preserves_parent_or_global (budget : Nat)
+theorem preserves_parent_or_global [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
@@ -190,7 +190,7 @@ include physical owners receiver prepared stagePrepared sourceEq occurrence cert
 /-- One original native parent completion either gives full Source parent
 meaning or retains its actual named application prefix. Concrete call branches
 share the same reached state; no caller or argument trace is replayed. -/
-theorem reflects_parent_or_global (budget : Nat)
+theorem reflects_parent_or_global [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
@@ -1471,7 +1471,7 @@ include physical owners receiver prepared stagePrepared sourceEq occurrence cert
   sourceParent tree unique parentTyped bodyTyping certificates runtime actualFunctionType observations semantic assignmentInterpretation in
 /-- One original native completion gives full staged Source parent meaning,
 including the actual named global branch and restored caller post. -/
-theorem reflects_parent
+theorem reflects_parent [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
@@ -1518,7 +1518,7 @@ include physical owners receiver prepared stagePrepared sourceEq occurrence cert
 /-- One original staged Source parent constructs its native completion and
 full caller post. The authentic named branch uses its actual strict application
 child; Source and native grades remain independent. -/
-theorem preserves_parent (budget : Nat)
+theorem preserves_parent [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
       bridge context model stages invocation certificate callFaults budget)
     (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
@@ -1645,7 +1645,7 @@ include physical owners bridge receiver stagePrepared sourceEq profile bodyTypin
   actualFunctionType observations closurePackets closureSupport namedTerminals semantic assignmentInterpretation in
 /-- Reuse the original whole-call producer at the supplied genuine Source
 grade. The returned caller state and post are retained literally. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)
     (port : Port (compiled := compiled) (invocation := invocation) compiler)
@@ -1698,7 +1698,7 @@ include physical owners bridge receiver stagePrepared sourceEq profile bodyTypin
   actualFunctionType observations closurePackets closureSupport namedTerminals semantic assignmentInterpretation in
 /-- The native completion keeps its independent Source grade and exact
 staged fault scope. Only the duplicate native evaluation witness is omitted. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
       id callee ids metadata reasonAt lowered)

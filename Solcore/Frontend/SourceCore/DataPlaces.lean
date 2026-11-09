@@ -298,37 +298,135 @@ def setter (prepared : Prepared) (keyType : Core.Ty) : Core.Expr :=
           (update prepared steps prepared.route.rootType (.var 0)
             (.first (.second (.var 1))) (.second (.second (.var 1)))))
 
-def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Core.BinaryOp
+/-- A compound modifier: its total Core operation on the old leaf and the
+right-hand side, and whether a zero right-hand side panics with `Panic(0x12)`.
+The panic is checked by `guard`, after the structural update, because the
+source semantics traverses the latest root before it applies the operation. -/
+structure Modifier where
+  operation : Core.BinaryOp
+  panics : Bool
+  deriving Repr, DecidableEq
+
+/-- A modifier that never panics. -/
+def Modifier.total (operation : Core.BinaryOp) : Modifier := ⟨operation, false⟩
+
+/-- The check of a panicking modifier, after the structural update and before
+the write, under the updated root, the modified leaf and the right-hand side.
+A zero right-hand side fails with `Panic(0x12)` and writes nothing. -/
+def guard (outputType : Core.Ty) (operator : Option Modifier) (write : Core.Expr) : Core.Expr :=
+  match operator with
+  | some ⟨_, true⟩ => .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
+      (Core.LanguageResult.failure outputType
+        (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) write
+  | _ => write
+
+/-- The right-hand sides that pass a modifier's check. -/
+inductive Passes : Option Modifier → Core.Value → Prop where
+  | total {operator : Option Modifier} {right : Core.Value}
+      (total : ∀ modifier, operator = some modifier → modifier.panics = false) : Passes operator right
+  | nonzero {operation : Core.BinaryOp} {right : Core.Word}
+      (nonzero : right ≠ Core.Word.zero) : Passes (some ⟨operation, true⟩) (.word right)
+
+theorem guard_passes {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operator : Option Modifier} {write : Core.Expr} {result : Core.Value}
+    {updated changed right : Core.Value} (passes : Passes operator right)
+    (written : Core.Evaluates (updated :: changed :: right :: environment) before write result after) :
+    Core.Evaluates (updated :: changed :: right :: environment) before (guard outputType operator write)
+      result after := by
+  cases passes with
+  | total total =>
+    match operator, total with
+    | none, _ => exact written
+    | some ⟨_, false⟩, _ => exact written
+    | some ⟨_, true⟩, total => cases total _ rfl
+  | nonzero nonzero =>
+    exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero])) written
+
+theorem guard_panic {environment : Core.Environment} {store : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {write : Core.Expr} {updated changed : Core.Value} :
+    Core.Evaluates (updated :: changed :: .word Core.Word.zero :: environment) store
+      (guard outputType (some ⟨operation, true⟩) write)
+      (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store :=
+  .ifTrue (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply])) (.inLeft .word)
+
+/-- A completed check either passed and wrote, or panicked on a zero
+right-hand side without changing the store. -/
+theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operator : Option Modifier} {write : Core.Expr} {result : Core.Value}
+    {updated changed right : Core.Value}
+    (evaluated : Core.Evaluates (updated :: changed :: right :: environment) before
+      (guard outputType operator write) result after) :
+    (Passes operator right ∧
+      Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
+    (∃ operation, operator = some ⟨operation, true⟩ ∧ right = .word Core.Word.zero ∧
+      result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
+      after = before) := by
+  match operator, evaluated with
+  | none, evaluated => exact .inl ⟨.total (fun _ none => by cases none), evaluated⟩
+  | some ⟨operation, false⟩, evaluated =>
+    exact .inl ⟨.total (fun _ same => by cases same; rfl), evaluated⟩
+  | some ⟨operation, true⟩, evaluated =>
+    cases evaluated with
+    | ifTrue condition failed =>
+      cases condition with
+      | binary left zero applied =>
+        cases left with
+        | var found =>
+          cases zero
+          simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+          subst found
+          cases right <;> simp [Core.BinaryOp.apply] at applied
+          rename_i word
+          have same : word = Core.Word.zero := by simpa using applied
+          subst same
+          cases failed with
+          | inLeft reason => cases reason; exact .inr ⟨operation, rfl, rfl, rfl, rfl⟩
+    | ifFalse condition written =>
+      cases condition with
+      | binary left zero applied =>
+        cases left with
+        | var found =>
+          cases zero
+          simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+          subst found
+          cases right <;> simp [Core.BinaryOp.apply] at applied
+          rename_i word
+          have different : word ≠ Core.Word.zero := by simpa using applied
+          exact .inl ⟨.nonzero different, written⟩
+
+def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .equal => none
-  | .add => some (if integer then .integerAdd else .wordAdd)
-  | .subtract => some (if integer then .integerSub else .wordSub)
-  | .multiply => some (if integer then .integerMul else .wordMul)
-  | .divide => some (if integer then .integerDiv else .wordDiv)
-  | .modulo => some (if integer then .integerMod else .wordMod)
-  | .bitAnd => some (if integer then .integerAnd else .wordAnd)
-  | .bitOr => some (if integer then .integerOr else .wordOr)
-  | .bitXor => some (if integer then .integerXor else .wordXor)
+  | .add => some (.total (if integer then .integerAdd else .wordAdd))
+  | .subtract => some (.total (if integer then .integerSub else .wordSub))
+  | .multiply => some (.total (if integer then .integerMul else .wordMul))
+  | .divide => some (.total (if integer then .integerDiv else .wordDiv))
+  | .modulo => some (.total (if integer then .integerMod else .wordMod))
+  | .bitAnd => some (.total (if integer then .integerAnd else .wordAnd))
+  | .bitOr => some (.total (if integer then .integerOr else .wordOr))
+  | .bitXor => some (.total (if integer then .integerXor else .wordXor))
   -- Shifts and unchecked arithmetic take Words only; `lower` rejects them at
   -- Integer leaves.
-  | .shiftLeft => some .wordShl
-  | .shiftRight => some .wordShr
-  | .uncheckedAdd => some .wordAdd
-  | .uncheckedSubtract => some .wordSub
-  | .uncheckedMultiply => some .wordMul
+  | .shiftLeft => some (.total .wordShl)
+  | .shiftRight => some (.total .wordShr)
+  | .uncheckedAdd => some (.total .wordAdd)
+  | .uncheckedSubtract => some (.total .wordSub)
+  | .uncheckedMultiply => some (.total .wordMul)
+  | .uncheckedDivide => some ⟨.wordDiv, true⟩
+  | .uncheckedModulo => some ⟨.wordMod, true⟩
 
-def modified (type : Core.Ty) (operator : Option Core.BinaryOp) (bitNot : Bool)
+def modified (type : Core.Ty) (operator : Option Modifier) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
     (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
   else match operator with
     | none => Core.LanguageResult.success rhs
-    | some operator => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-        (Core.LanguageResult.success (.binary operator (.var 0) (shift 1 rhs)))
+    | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
+        (Core.LanguageResult.success (.binary modifier.operation (.var 0) (shift 1 rhs)))
 
 /-- Internal binders: reference, keys, snapshot, RHS, modified leaf, updated
 root, store result. Source expressions are shifted only at their insertion. -/
 def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Core.BinaryOp)
+    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Modifier)
     (bitNot : Bool) (invalidOperand : Core.Word) : Core.Expr :=
   .letE reference
     (Core.LanguageResult.bind outputType (shift 1 keys.expression)
@@ -340,7 +438,8 @@ def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasi
             (Core.LanguageResult.bind outputType
               (.apply (setter prepared keys.type)
                 (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-              (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))))))
+              (guard outputType operator
+                (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))))))
 
 def lower (checked : Checked) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)

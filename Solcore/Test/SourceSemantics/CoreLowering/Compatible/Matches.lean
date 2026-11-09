@@ -187,7 +187,7 @@ def run : IO Unit := do
     (.letE (.storeCell (.var 2) (.inRight .unit (.word (w 9)))) (LanguageResult.success (.word (w 3))))
   let snapshotCode := SourceCoreCompatibleDataPlaces.execute prepared (.var 0)
     ⟨key.type, LanguageResult.success (← quote key.value)⟩ rhs
-    (LanguageResult.success (.loadCell (.var 0))) (OptionalCell.cellType rawMap.type) (some .wordAdd) false (w 202)
+    (LanguageResult.success (.loadCell (.var 0))) (OptionalCell.cellType rawMap.type) (some (.total .wordAdd)) false (w 202)
   let snapshot : Core.Program := ⟨LanguageResult.resultType (OptionalCell.cellType rawMap.type),
     ← bindInputs [(.word, .word Word.zero), (rawMap.type, rawMap.value)] snapshotCode, checked.catalog.definitions⟩
   let snapshotStore ← done snapshot (.inRight .word (.inRight .unit expectedRoot.value))

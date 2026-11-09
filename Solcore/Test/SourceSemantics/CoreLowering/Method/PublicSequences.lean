@@ -72,6 +72,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget :=
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   CallableIndexedOwnedPreparedStagedPhysicalNamedFamilyPorts.preserves issued observed.profile
     fixture.source_wellFormed (support.toOrdinaryInventory.observations receiver)
     (static_extension receiver extension) (semantic_extension receiver support issued extension)
@@ -84,6 +86,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget :=
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   CallableIndexedOwnedPreparedStagedPhysicalNamedFamilyPorts.reflects issued (actualStagePrepared fixture) observed.profile
     fixture.source_wellFormed (support.toOrdinaryInventory.observations receiver)
     (static_extension receiver extension) (semantic_extension receiver support issued extension)
@@ -420,6 +424,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -442,6 +448,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -975,6 +983,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -997,6 +1007,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -1530,6 +1542,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -1552,6 +1566,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -2085,6 +2101,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -2107,6 +2125,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -2640,6 +2660,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -2662,6 +2684,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -3195,6 +3219,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -3217,6 +3243,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -3750,6 +3778,8 @@ theorem preserves_bodies (header) (member : header ∈ headers support.toOrdinar
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)
@@ -3772,6 +3802,8 @@ theorem reflects_bodies (header) (member : header ∈ headers support.toOrdinary
       (headers := headers support.toOrdinaryInventory.rows) (keys := keys fixture.recipe.compiled) header
       (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked receiving.result.context.registry functions)
       actualRegistry child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let chosen := fun {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association
       (headers support.toOrdinaryInventory.rows) (keys fixture.recipe.compiled)

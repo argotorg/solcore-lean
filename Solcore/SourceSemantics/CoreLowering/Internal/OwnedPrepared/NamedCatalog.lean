@@ -88,7 +88,7 @@ theorem post_receipt {context scope items type code}
   exact GenericForHeader.Structural.of_coupled coupled tokens
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded in
-theorem preserving_loops
+theorem preserving_loops [FunctionCalls.FaultTokens faults]
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -129,7 +129,7 @@ theorem reflecting_loops
     reflection
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded runtimeOf in
-theorem preserving_heads
+theorem preserving_heads [FunctionCalls.FaultTokens faults]
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -627,7 +627,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -661,7 +661,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -695,7 +695,7 @@ theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certifica
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers →
       CallableIndexedOwnedPreparedNamedParameterReceipts.SourceBodiesFor
@@ -712,7 +712,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers →
       CallableIndexedOwnedPreparedNamedParameterReceipts.NativeBodiesFor

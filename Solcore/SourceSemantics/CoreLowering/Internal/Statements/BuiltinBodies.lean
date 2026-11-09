@@ -466,7 +466,7 @@ include definitions registered extension faithful functionLeaves functionTypes u
 /-- Concrete recursive builtin trees close every expression position, including
 let initializers and conditions after lexical extension. No child execution or
 universal expression meaning is a premise of this public consumer. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code)
@@ -486,7 +486,7 @@ include definitions registered extension faithful functionLeaves functionTypes u
 /-- Every finite native flow completion constructs independent source
 execution. The real typed captures and frame/metadata protection are retained
 while the recursive builtin expression theorem discharges all child reflection. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code) :
@@ -807,7 +807,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem SemanticReceipt.preserves
+theorem SemanticReceipt.preserves [FunctionCalls.FaultTokens faults]
     (certificate : SemanticReceipt layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -846,7 +846,7 @@ theorem SemanticReceipt.preserves
     finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
 
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem SemanticReceipt.reflects
+theorem SemanticReceipt.reflects [FunctionCalls.FaultTokens faults]
     (certificate : SemanticReceipt layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -907,7 +907,7 @@ theorem SemanticReceipt.reflects
 
 /- The accepted compiler certificate keeps the original public interface. -/
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -938,7 +938,7 @@ theorem Certificate.preserves
 
 /- The accepted compiler certificate keeps the original completed reflection interface. -/
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -1156,7 +1156,7 @@ theorem reflects_with
 include definitions registered extension contextValid unique uninitialized missing faithful functionLeaves functionTypes in
 /-- Finite source body execution completes the actual parameter prefix. The
 source allocation is the one retained by the constructed entry. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     (entry : TypedMixedNamedParameters.Entry layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : BuiltinNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -1181,7 +1181,7 @@ theorem preserves
 include definitions registered extension contextValid unique uninitialized missing faithful functionLeaves functionTypes in
 /-- Completed native prefix execution constructs the independent source trace
 at the installed call context, without a universal body reflection premise. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (entry : TypedMixedNamedParameters.Entry layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : BuiltinNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -1409,7 +1409,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped in
 /-- A source allocation and its finite body trace execute the real full named
 hook. Parameters are compared with the independently constructed allocation. -/
-theorem hook_preserves {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+theorem hook_preserves [FunctionCalls.FaultTokens faults] {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function context environment bound outcome after) :
     ∃ origin index metadata value finalStore finalMap finalWorld,
@@ -1491,7 +1491,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped in
 /-- Completed actual native execution constructs both source parameter
 allocation and the independent body trace from the installed call context with its actual lexical stopping context. -/
-theorem hook_reflects {value : Value} {finalStore : Store}
+theorem hook_reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ origin index metadata environment bound outcome after finalMap finalWorld,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
@@ -1721,7 +1721,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- The concrete parameter/body certificates close this body invocation after
 the real argument effects. The only source execution premise is the particular
 independent invocation being preserved. -/
-theorem body_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem body_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {outcome : Dynamic.ExpressionOutcome}
     (installed : Installed functions body registry mapping world before store callerEnvironment)
@@ -1757,7 +1757,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Independent global application dispatches to the exact retained source
 body under actual program owner uniqueness. The concrete builtin body closes
 its semantics; an exact-body source trace is not a premise of this consumer. -/
-theorem body_dispatch_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem body_dispatch_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome}
@@ -1788,7 +1788,7 @@ theorem body_dispatch_preserves {mapping : LocationMap} {world : StoreTyping} {b
 include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Completed actual body execution constructs parameter allocation and the
 independent invocation from the concrete lexical tree, with frame restoration. -/
-theorem body_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem body_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {value : Value}
     (installed : Installed functions body registry mapping world before store callerEnvironment)
@@ -1836,7 +1836,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Concrete recursive builtin argument trees close all child meaning. Arguments are
 evaluated before the global read; their first fault skips the body. The body
 uses its actual static parameter/lexical certificates at the intervening heap. -/
-theorem preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {outcome : Dynamic.ExpressionOutcome}
@@ -1900,7 +1900,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Every finite native call completion reconstructs its ordered source
 argument trace and concrete independent named-body invocation. Neither child
 evaluations nor a universal body preservation hypothesis are supplied. -/
-theorem reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {value : Value}
@@ -1964,7 +1964,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
   children nativeTypes in
 /-- Actual compiler success, independent source attribution and concrete
 argument/body certificates close reflection at the emitted expression itself. -/
-theorem accepted_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem accepted_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {value : Value} {compilation : SourceCoreFunctions.Context}
@@ -2012,7 +2012,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Preservation starts with this exact independently instantiated source body
 and ordered argument trace. The actual accepted emitted expression is evaluated,
 including argument faults and lexical body faults with their preceding writes. -/
-theorem accepted_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome} {compilation : SourceCoreFunctions.Context}

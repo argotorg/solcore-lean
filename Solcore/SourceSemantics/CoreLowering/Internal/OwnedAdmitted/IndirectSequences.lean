@@ -420,7 +420,7 @@ include parent form calleeContains calleeForm sourceTyped parameterType resultTy
   transport extension faithful observations functionTypes valid reads missing unique typing tree in
 /-- The concrete branch derives its actual argument packet from strict builtin
 children. No completed sequence law or category-wide origin supplier is assumed. -/
-theorem preserves_builtin :
+theorem preserves_builtin [FunctionCalls.FaultTokens faults] :
     PreservesBranch bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       context evidence source faults (ReachedNamedArgumentFaultPaths.model_expressionPost compiled.compatible.checked functions registry)
       scope ids id node lowered budget := by
@@ -437,7 +437,7 @@ include parent form calleeContains calleeForm sourceTyped parameterType resultTy
   transport extension faithful observations functionTypes valid reads missing unique typing tree in
 /-- Reflection exposes the original first-bind child and a conditional fault
 route. Successful arguments retain their original sequence receipt. -/
-theorem reflects_builtin :
+theorem reflects_builtin [FunctionCalls.FaultTokens faults] :
     ReflectsArgumentsBranch bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       context evidence source faults (ReachedNamedArgumentFaultPaths.model_expressionPost compiled.compatible.checked functions registry)
       scope ids codes id node lowered budget

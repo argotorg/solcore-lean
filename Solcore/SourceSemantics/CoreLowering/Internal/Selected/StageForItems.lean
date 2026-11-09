@@ -158,6 +158,22 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
               exact ⟨_, _, _, .projectedAssignmentRhsFault projected keys snapshot lifted, .rejected origin call reason _ reached⟩
           | completed =>
               exact ⟨_, _, _, .projectedAssignmentWriteFault projected keys snapshot lifted (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := children _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              exact ⟨_, _, _, .projectedAssignmentRhsFault projected keys snapshot lifted, .rejected origin call reason _ reached⟩
+          | completed =>
+              exact ⟨_, _, _, .projectedAssignmentWriteFault projected keys snapshot lifted (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -699,6 +715,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     ⟨childSize, reason, strict, rfl, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, strict, rfl, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, strict, rfl, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, strict, tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
@@ -715,6 +733,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     cases adapted with
     | completed => exact ⟨_, _, _, .assignmentOperands snapshot lifted
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, .assignmentFailure snapshot lifted, .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted evaluated
+    cases adapted with
+    | completed => exact ⟨_, _, _, .assignmentPanic snapshot lifted
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       exact ⟨_, _, _, .assignmentFailure snapshot lifted, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
@@ -1230,6 +1256,8 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
     ⟨childSize, reason, strict, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, strict, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, strict, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, strict, tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
@@ -1251,6 +1279,18 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
       obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
       exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_operands snapshot measured
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+      exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot measured,
+        .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted evaluated
+    cases adapted with
+    | completed =>
+      obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+      exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_panic snapshot measured
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       obtain ⟨grade, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
       exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_fault snapshot measured,
@@ -1294,7 +1334,7 @@ variable {identities : Dynamic.Value → Word → Prop}
 include definitions registered transport extension faithful observations diagnostics in
 /-- Empty initialization enters the same finite loop. Its post-header lifting
 is built from the actual compiler tree, including all original allocations. -/
-theorem done {budget : Nat} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+theorem done [RecursiveStageMeaning.FaultTokens faults] {budget : Nat} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     (bindings : ProtectedStateTransition.Bindings callerProtocol)
     (marked : ProtectedStateTransition.MarkedAllocation.Producer callerProtocol layouts frame model)
     (markedAcquire : ∀ location native, condition location native →
@@ -1417,7 +1457,7 @@ def PositionLifts {administrative : Core.Context} (context : SourceSemantics.Con
       (context := context) (scope := scope) bridge functions condition items test post statements budget
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in
-theorem preserves_position
+theorem preserves_position [RecursiveStageMeaning.FaultTokens faults]
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
     (unique : NodeOccurrencesUnique invocation.source)
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
@@ -1447,7 +1487,7 @@ theorem preserves_position
     unique tree catalogSites shape sourceTyped projection
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in
-theorem lifts_position {budget : Nat}
+theorem lifts_position [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget → LiftsAt bridge context model stages invocation (certificates context) childSize)
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
     (unique : NodeOccurrencesUnique invocation.source)
@@ -1782,7 +1822,7 @@ theorem lifts_position {budget : Nat}
       (ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection) within ready trace
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in
-theorem lifts_at {budget : Nat}
+theorem lifts_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget → LiftsAt bridge context model stages invocation (certificates context) childSize)
     (preservation : ∀ context size, PreservesAt bridge context model stages invocation (certificates context) faults size)
     (unique : NodeOccurrencesUnique invocation.source)

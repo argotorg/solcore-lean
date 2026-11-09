@@ -436,7 +436,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource} {conte
 include extension contextValid unique uninitialized missing in
 /-- The entire finite source sequence determines a native execution. No child
 execution or universal child meaning is a certificate premise. -/
-theorem Tree.preserves {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -517,7 +517,7 @@ theorem Tree.preserves {scope : Scope} {statements : List StatementId} {expected
 include extension contextValid uninitialized missing in
 /-- Every completed generated flow constructs its independent source trace.
 The returned expression trace is derived from the actual native subtree. -/
-theorem Tree.reflects {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -664,7 +664,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 
 include extension contextValid unique uninitialized missing in
 /-- Finite preservation for the complete production function wrapper. -/
-theorem Tree.body_preserves {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type flow)
     (fellThrough escaped : Word)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -692,7 +692,7 @@ theorem Tree.body_preserves {scope : Scope} {statements : List StatementId} {exp
 include extension contextValid uninitialized missing in
 /-- Completed full-body execution reflects into the independent source function
 sequence, with the same final heap and all administrative-frame obligations. -/
-theorem Tree.body_reflects {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type flow)
     (fellThrough escaped : Word)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -1310,7 +1310,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 include definitions registered extension uninitialized missing in
 /-- Every independent finite source trace through the binding prefix and its
 concrete body is preserved under the real full native definition table. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -1388,7 +1388,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {stat
 include definitions registered extension uninitialized missing in
 /-- Reflection constructs the independent source allocations from a completed
 native run; no prior source trace or child expression execution is supplied. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -1502,7 +1502,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 include definitions registered extension uninitialized missing in
 /-- Initialization failure preserves its exact old-context effects. Success
 allocates only afterward, then uses the concrete remaining binding tree. -/
-theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -1539,7 +1539,7 @@ theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} 
 include definitions registered extension uninitialized missing in
 /-- Every completed generated expression determines whether initialization
 failed in the old scope or the allocated binding's tail ran in the new scope. -/
-theorem Tree.body_reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)

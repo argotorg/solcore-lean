@@ -1121,6 +1121,13 @@ open FunctionArguments FunctionCallBody
 
 abbrev FaultRep := Dynamic.SemanticFault → Word → Prop
 
+/-- The fault-to-token laws that hold at every site, unlike the per-site
+`uninitialized` hypotheses. `Panic(code)` fails with the code's own reason in
+every function. Theorems whose code may panic take this class as an instance
+argument, which callers pass on from their own binder. -/
+class FaultTokens (faults : FaultRep) : Prop where
+  panic (code : UInt8) : faults (.panic code) (SourceCorePanics.reason code)
+
 inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
     {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (sourceType : TypeSystem.Ty) (type : Ty) (faults : FaultRep) :

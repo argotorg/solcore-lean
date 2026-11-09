@@ -123,6 +123,8 @@ private theorem functionLeaves : CompatibleEquality.FunctionObservations checked
 private theorem functionTypes : FunctionRuntimeViews functions := fun impossible => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures]
@@ -782,7 +784,7 @@ theorem actual_reflects :
 include accepted read unique declarations typed form declaration declaredType sameSource extension in
 /-- Successful source evaluation and semantic failure use the same actual read
 receipt. The complete source and native stores are related after initialization. -/
-theorem actual_preserves
+theorem actual_preserves [FunctionCalls.FaultTokens faults]
     (uninitialized : ∀ expression location, faults (.uninitializedLocation location) (reasonAt expression))
     {root : ExpressionNode} (found : invocation.source.lookupExpression? id = some root)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
@@ -1091,7 +1093,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (uninitialized : ∀ child location, faults (.uninitializedLocation location) (reasonAt child))
 
 include unique found form typed special readPolicy leafPolicy accepted extract sameSource sameLedger extension runtime uninitialized in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {admin : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -1112,7 +1114,7 @@ theorem accepted_reflects
     (sameSource ▸ found) environments heaps locals agrees evaluated
 
 include unique found form typed special readPolicy leafPolicy accepted extract sameSource sameLedger extension runtime uninitialized in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {admin : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Staging.Recursive.Outcome}
@@ -1312,7 +1314,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (uninitialized : ∀ child location, faults (.uninitializedLocation location) (reasonAt child))
 
 include readFuel sameSource uninitialized sameLedger runtime found atomic stageAtomic unitType special readPolicy leafPolicy accepted metadata form pairType in
-theorem actual_pair_reflects :
+theorem actual_pair_reflects [FunctionCalls.FaultTokens faults] :
     ReflectsCode functions program stages invocation (context := context) (registry := registry) (faults := faults) scope pairId
       ⟨.product lowered.type lowered.type, LocalSequence.pair lowered.type lowered.type lowered.expression lowered.expression⟩ := by
   obtain ⟨tree, supported⟩ := accepted_pair (readFuel := readFuel) (context := context) (reasonAt := reasonAt)
@@ -1352,7 +1354,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (uninitialized : ∀ child location, faults (.uninitializedLocation location) (reasonAt child))
 
 include readFuel found form type special readPolicy leafPolicy accepted sameSource sameLedger runtime uninitialized in
-theorem actual_unit_reflects :
+theorem actual_unit_reflects [FunctionCalls.FaultTokens faults] :
     ReflectsCode functions program stages invocation (context := context) (registry := registry)
       (faults := faults) scope id lowered := by
   obtain ⟨tree, supported⟩ := accepted_unit (readFuel := readFuel) (context := context)
@@ -1360,7 +1362,7 @@ theorem actual_unit_reflects :
   exact RecursiveStagePrimitiveMeaning.reflects functions program stages invocation sameSource uninitialized sameLedger runtime supported
 
 include readFuel found form type special readPolicy leafPolicy accepted sameSource sameLedger runtime uninitialized in
-theorem actual_unit_preserves (unique : NodeOccurrencesUnique source)
+theorem actual_unit_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (extension : SourceCoreRawMetadata.Extends values.registry registry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -1621,7 +1623,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include sameSource sameLedger runtime uninitialized in
-theorem primitive_reflects :
+theorem primitive_reflects [FunctionCalls.FaultTokens faults] :
     RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Children fuel values source context solved reasonAt) (semanticFaults faults) := by
   intro scope id code certified node found mapping world admin environment canonical actual before store ξ value finalStore
@@ -1636,7 +1638,7 @@ theorem primitive_reflects :
   | fault reason => exact .fault reason
 
 include sameSource sameLedger runtime uninitialized in
-theorem primitive_preserves (unique : NodeOccurrencesUnique source)
+theorem primitive_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (extension : SourceCoreRawMetadata.Extends values.registry registry) :
     RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Children fuel values source context solved reasonAt) (semanticFaults faults) := by
@@ -1656,7 +1658,7 @@ variable {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {types : 
   (tree : DataExpressionSequence.Tree invocation.source (Children fuel values source context solved reasonAt) scope ids types codes)
 
 include sameSource sameLedger runtime uninitialized tree in
-theorem pack_reflects
+theorem pack_reflects [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -1677,7 +1679,7 @@ theorem pack_reflects
     environments heaps locals agrees evaluated
 
 include sameSource sameLedger runtime uninitialized tree in
-theorem pack_preserves (unique : NodeOccurrencesUnique source)
+theorem pack_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (extension : SourceCoreRawMetadata.Extends values.registry registry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -1827,7 +1829,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (uninitialized : ∀ child location, faults (.uninitializedLocation location) (reasonAt child))
 
 include unique found form typed special readPolicy leafPolicy accepted extract sameSource sameLedger runtime uninitialized in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {admin : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -1848,7 +1850,7 @@ theorem accepted_reflects
     (sameSource ▸ found) environments heaps locals agrees evaluated
 
 include unique found form typed special readPolicy leafPolicy accepted extract sameSource sameLedger runtime uninitialized in
-theorem accepted_preserves (extension : SourceCoreRawMetadata.Extends values.registry registry)
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] (extension : SourceCoreRawMetadata.Extends values.registry registry)
     {mapping : LocationMap} {world : StoreTyping} {admin : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Staging.Recursive.Outcome}

@@ -293,7 +293,7 @@ include bridge bindings definitions registered producer acquire transport extens
 /-- Native completion determines the actual ordered lexical Source trace,
 including the distinct context after successful allocation and initializer
 faults before allocation. The returned caller state retains the entire heap. -/
-theorem reflects_position {budget : Nat}
+theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       ReflectsAt bridge context model stages invocation (certificates context) faults childSize)
     (graph : OccurrenceGraphWellFormed invocation.source)
@@ -476,6 +476,13 @@ theorem reflects_position {budget : Nat}
               .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
             exact fault_post bridge (context := context) (expected := expected)
               (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
+        | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata reached related stable =>
+            cases same
+            refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+              .assignBarePanic (lookupStatement?_sound found) form snapshot trace currentRead rootType initialized path panics,
+              .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+            exact fault_post bridge (context := context) (expected := expected)
+              (failure := .semantic (.panic _)) reached stable
         | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
             have tailTyped := ProtectedStateImperativeStatementSuffixTyping.assignment graph.nodeOccurrencesUnique sourceTyped found form
             obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
@@ -925,6 +932,13 @@ theorem reflects_position {budget : Nat}
               .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
             exact fault_post bridge (context := context) (expected := expected)
               (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
+        | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata reached related stable =>
+            cases same
+            refine ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
+              CallableIndexedOwnedAdmittedStagedForInitializerSource.assignment_panic snapshot trace currentRead rootType initialized path panics,
+              .fault matched, finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+            exact fault_post bridge (context := context) (expected := expected)
+              (failure := .semantic (.panic _)) reached stable
         | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
             have tailTyped := (InitializerTyping.assignment sourceTyped).2
             obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
@@ -1072,7 +1086,7 @@ theorem reflects_position {budget : Nat}
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 
 include bridge bindings definitions registered producer acquire transport extension functionTypes faithful observations in
-theorem reflects_at {budget : Nat}
+theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       ReflectsAt bridge context model stages invocation (certificates context) faults childSize)
     (graph : OccurrenceGraphWellFormed invocation.source)
@@ -1688,6 +1702,8 @@ theorem preserves_at {budget : Nat}
         ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
         ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
           currentRead, rootType, initialized, path, invalid⟩ |
+        ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, contextEq, outcomeEq, childTrace,
+          currentRead, rootType, initialized, path, panics⟩ |
         ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
       · subst finalContext
         subst outcome
@@ -1704,6 +1720,7 @@ theorem preserves_at {budget : Nat}
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge reached stable⟩
       · exact (AssignmentOperandDiagnostics.invalid_not_equal invalid rfl).elim
+      · exact (CallableIndexedOwnedAdmittedStagedImperativeFlow.equal_no_panic panics).elim
       · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
           rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
         have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by

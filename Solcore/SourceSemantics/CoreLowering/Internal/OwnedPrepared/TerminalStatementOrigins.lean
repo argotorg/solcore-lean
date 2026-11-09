@@ -174,7 +174,7 @@ include profile members wellFormed runtime covers unique sameLayouts owners idsU
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem tree_preserve
+theorem tree_preserve [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -208,7 +208,7 @@ include profile members wellFormed runtime covers unique sameLayouts complete gl
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem tree_reflect
+theorem tree_reflect [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -259,7 +259,7 @@ theorem support_preserve
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -289,7 +289,7 @@ theorem support_reflect
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -395,7 +395,7 @@ include profile members wellFormed runtime covers unique sameLayouts owners idsU
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem preserves_tree_at_runtime
+theorem preserves_tree_at_runtime [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -412,7 +412,7 @@ include profile members wellFormed runtime covers unique sameLayouts complete gl
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem reflects_tree_at_runtime
+theorem reflects_tree_at_runtime [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -446,7 +446,7 @@ theorem preserves_at_support
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -469,7 +469,7 @@ theorem reflects_at_support
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -568,7 +568,7 @@ include profile members wellFormed runtime covers unique sameLayouts owners idsU
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem preserves_tree_on
+theorem preserves_tree_on [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -585,7 +585,7 @@ include profile members wellFormed runtime covers unique sameLayouts complete gl
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem reflects_tree_on
+theorem reflects_tree_on [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -619,7 +619,7 @@ theorem preserves_support_on
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -642,7 +642,7 @@ theorem reflects_support_on
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
     (functionTypes : FunctionRuntimeViews functions)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -739,7 +739,7 @@ include wellFormed runtime covers unique sameLayouts owners idsUnique complete g
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem preserves_tree_at_runtime
+theorem preserves_tree_at_runtime [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -758,7 +758,7 @@ include wellFormed runtime covers unique sameLayouts complete globals slots pref
   extension faithful observations functionTypes uninitialized missing in
 /-- The original admitted support fold consumes the finite BodyCalls producer.
 Runtime literal evidence is derived from the complete actual ledger. -/
-theorem reflects_tree_at_runtime
+theorem reflects_tree_at_runtime [FunctionCalls.FaultTokens faults]
     (valid : CompatibleRuntimeContextValidity.Valid solved sourceContext evidence)
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -794,7 +794,7 @@ theorem preserves_at_support
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) identities)
     (functionTypes : FunctionRuntimeViews (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile))
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)
@@ -819,7 +819,7 @@ theorem reflects_at_support
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) identities)
     (functionTypes : FunctionRuntimeViews (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile))
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id))
     (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((rootReasonAt id).add tag))
     (outer budget size : Nat) (headWithin : size ≤ budget) (within : budget ≤ outer)

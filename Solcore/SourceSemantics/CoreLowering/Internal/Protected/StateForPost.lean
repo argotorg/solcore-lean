@@ -1068,7 +1068,7 @@ end WithFacts
 
 include extension faithful functionLeaves functionTypes unique missing in
 /-- Compositional heads consume the actual ordered child states. -/
-theorem head_preserves_at_with_calls
+theorem head_preserves_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     {Records : Type v} (stateProtocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (transport : ProtectedStateTransition.AdministrativeTransport stateProtocol)
@@ -1120,7 +1120,7 @@ theorem head_preserves_at_with_calls
 
 include extension faithful functionLeaves functionTypes missing in
 /-- Reflection uses the same actual child posts at their native grades. -/
-theorem head_reflects_at_with_calls
+theorem head_reflects_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     {Records : Type v} (stateProtocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (transport : ProtectedStateTransition.AdministrativeTransport stateProtocol)

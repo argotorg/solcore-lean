@@ -1381,8 +1381,15 @@ def run : IO Unit := do
           require (decide (diagnostic.error = .typeMismatch rawMissingType none) && diagnostic.span.isSome)
             "missing default diagnostic changed raw type or source site"
       | none => throw (IO.userError "missing default reason was not decoded")
-      require ((← get "unknown reason" (session.diagnostic missingKey (Core.Word.ofNatModulo (Core.wordModulus - 1)))).isNone)
+      -- A reason below the panic range that no table issues is unknown.
+      require ((← get "unknown reason" (session.diagnostic missingKey
+          (Core.Word.ofNatModulo (Solcore.Frontend.SourceCorePanics.base - 1)))).isNone)
         "unknown language reason was silently accepted"
+      -- A reason in the panic range is that code's panic.
+      match ← get "panic reason" (session.diagnostic missingKey (Core.Word.ofNatModulo (Core.wordModulus - 1))) with
+      | some diagnostic =>
+          require (decide (diagnostic.error = .panic 0xff)) "the top reason did not decode as Panic(0xff)"
+      | none => throw (IO.userError "the top reason was not decoded as a panic")
   | _ => throw (IO.userError "missing default changed result classification")
   let freshBoot ← artifact.bootstrapFresh
   let fresh ← match freshBoot.resume 300000 with
@@ -2958,7 +2965,7 @@ variable (bodyUninitialized : ∀ id location, faults (.uninitializedLocation lo
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes owners
   uninitialized missing escaped profiles callerGlobals related agrees typed heaps bodyUninitialized bodyMissing in
 /-- The exact argument post selects the internally closed authentic body. -/
-private theorem closed_source (formedRecord : Record)
+private theorem closed_source [FunctionCalls.FaultTokens faults] (formedRecord : Record)
     (reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
       ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore, canonical⟩)
     (budget : Nat) :
@@ -2973,7 +2980,7 @@ private theorem closed_source (formedRecord : Record)
 
 include prefixZero profile initial complete globals slots sameLayouts extension faithful observations functionTypes
   uninitialized missing escaped profiles callerGlobals related agrees typed heaps bodyUninitialized bodyMissing in
-private theorem closed_native (formedRecord : Record)
+private theorem closed_native [FunctionCalls.FaultTokens faults] (formedRecord : Record)
     (reached : (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller).State
       ⟨scope, formedRecord.finalMap, formedRecord.finalWorld, formedRecord.finalHeap, formedRecord.finalStore, canonical⟩)
     (budget : Nat) :
@@ -3074,7 +3081,7 @@ include prefixZero profile initial complete globals slots sameLayouts extension 
   wellFormed runtime covers unique bodyUninitialized bodyMissing noArguments noParameters emptyBody unitResult in
 /-- This whole literal call has no expression or body execution law as input.
 The same actual callee, argument and body posts supply the restored caller pool. -/
-theorem literal_call_source_post :
+theorem literal_call_source_post [FunctionCalls.FaultTokens faults] :
     ∃ sourceSize after,
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment heap id
         (.value .unit) after ∧
@@ -3118,7 +3125,7 @@ include prefixZero profile initial complete globals slots sameLayouts extension 
   wellFormed runtime covers bodyUninitialized bodyMissing in
 /-- Native completion follows the same actual selection and body family and
 returns a genuine independently graded whole Source parent at the real post. -/
-theorem literal_call_native_post {size : Nat} {value : Value} {finalStore : Store}
+theorem literal_call_native_post [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment heap id outcome after ∧

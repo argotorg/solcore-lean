@@ -1370,7 +1370,7 @@ private def primitive (op : Syntax.BinaryOp) (a b : Core.Word) :
   | .notEqual => some ⟨.bool (!(a==b)),.notEqual⟩
   | .lessEqual => some ⟨.bool (!(decide (a>b))),.lessEqual⟩
   | .greaterEqual => some ⟨.bool (!(decide (a<b))),.greaterEqual⟩
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo
   | .logicalAnd | .logicalOr => none
 private theorem original (f : Syntax.SourceFile) (op : Syntax.BinaryOp) (w : Nat)
     (a b : Core.Word) (value : Core.Value) (meaning : StrictWordBinaryDenotes op a b value)
@@ -1606,7 +1606,7 @@ private def primitive (op : Syntax.BinaryOp) (a b : Core.Word) :
   | .notEqual => some ⟨.bool (!(a==b)),.notEqual⟩
   | .lessEqual => some ⟨.bool (!(decide (a>b))),.lessEqual⟩
   | .greaterEqual => some ⟨.bool (!(decide (a<b))),.greaterEqual⟩
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo
   | .logicalAnd | .logicalOr => none
 private theorem original (f : Syntax.SourceFile) (op : Syntax.BinaryOp) (w : Nat)
     (a b : Core.Word) (value : Core.Value) (meaning : StrictWordBinaryDenotes op a b value)
@@ -1918,7 +1918,7 @@ private def meaning (op : Syntax.BinaryOp) (l r : Core.Word) : IO {v : Core.Valu
   | .notEqual => pure ⟨.bool (!(l==r)),.notEqual⟩
   | .lessEqual => pure ⟨.bool (!(decide (l>r))),.lessEqual⟩
   | .greaterEqual => pure ⟨.bool (!(decide (l<r))),.greaterEqual⟩
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo
   | .logicalAnd | .logicalOr => throw (IO.userError "not a strict Word operator")
 
 private def invoke (fs : Syntax.Expr) (made : RuntimeValue) (argument other : Core.Word)

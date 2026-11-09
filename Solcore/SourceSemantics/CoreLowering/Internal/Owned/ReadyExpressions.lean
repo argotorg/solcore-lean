@@ -80,7 +80,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -124,7 +124,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -222,7 +222,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} (evidence : 
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)
@@ -246,7 +246,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)
@@ -393,7 +393,7 @@ include extension faithful observations functionTypes wellFormed owners sameLayo
   uninitialized missing escaped profiles syntaxTrees in
 /-- The same measured family closes arbitrary authentic named bodies. Its
 only expression children are proved internally by the original support fold. -/
-theorem preserves_at (size : Nat) : ∀ index : Index (headers := headers) (registry := registry) (faults := faults)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ index : Index (headers := headers) (registry := registry) (faults := faults)
     (expressionSyntax := expressionSyntax) compilation,
     CallableRuntimeBodyReadyOrigins.PreservesAt (body_protocol (headers := headers) owner)
       (readiness (bridge (headers := headers) owner)) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -430,7 +430,7 @@ include extension faithful observations functionTypes wellFormed sameLayouts pre
   uninitialized missing escaped profiles syntaxTrees in
 /-- Native body and expression grades keep their original strict children;
 the same measured family returns an independent Source trace and actual post. -/
-theorem reflects_at (size : Nat) : ∀ index : Index (headers := headers) (registry := registry) (faults := faults)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ index : Index (headers := headers) (registry := registry) (faults := faults)
     (expressionSyntax := expressionSyntax) compilation,
     CallableRuntimeBodyReadyOrigins.ReflectsAt (body_protocol (headers := headers) owner)
       (readiness (bridge (headers := headers) owner)) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -474,7 +474,7 @@ include extension faithful observations functionTypes wellFormed owners sameLayo
   uninitialized missing escaped profiles syntaxTrees in
 /-- The actual named parameter receipt consumes the internally closed family
 and retains full semantic fields and admission at the same returned pool. -/
-theorem parameter_preserves (member : header ∈ headers) {size : Nat}
+theorem parameter_preserves [FunctionCalls.FaultTokens faults] (member : header ∈ headers) {size : Nat}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyTrace program size header.function header.context
       receipt.body.environment receipt.body.heap outcome after) :
@@ -491,7 +491,7 @@ include extension faithful observations functionTypes wellFormed sameLayouts pre
   uninitialized missing escaped profiles syntaxTrees in
 /-- The same actual native completion yields its independent Source grade
 from the internally closed family and the unchanged rich parameter result. -/
-theorem parameter_reflects (member : header ∈ headers) {size : Nat} {value : Value} {finalStore : Store}
+theorem parameter_reflects [FunctionCalls.FaultTokens faults] (member : header ∈ headers) {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size receipt.body.actualBody receipt.body.store
       (header.body.rename receipt.body.embedding) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -509,7 +509,7 @@ include extension faithful observations functionTypes wellFormed owners sameLayo
   uninitialized missing escaped profiles syntaxTrees in
 /-- Named call body callbacks are closed internally at genuine parameter
 receipts; there is no external expression or body meaning premise. -/
-theorem source_bodies (member : header ∈ headers) (budget : Nat) :
+theorem source_bodies [FunctionCalls.FaultTokens faults] (member : header ∈ headers) (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.SourceBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := certificates (headers := headers) compilation)
@@ -524,7 +524,7 @@ include extension faithful observations functionTypes wellFormed sameLayouts pre
   uninitialized missing escaped profiles syntaxTrees in
 /-- Native callbacks retain the original prefix and saved caller write while
 using the same internally closed actual body family. -/
-theorem native_bodies (member : header ∈ headers) (budget : Nat) :
+theorem native_bodies [FunctionCalls.FaultTokens faults] (member : header ∈ headers) (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.NativeBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := certificates (headers := headers) compilation)
@@ -613,7 +613,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -657,7 +657,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -701,7 +701,7 @@ theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certifica
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (keys := keys) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)
@@ -725,7 +725,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (keys := keys) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)
@@ -824,7 +824,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -868,7 +868,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (budget size : Nat) (within : size ≤ budget)
@@ -912,7 +912,7 @@ theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certifica
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)
@@ -936,7 +936,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ index : Index (headers := headers) (certificates := certificates)
       (expressionSyntax := expressionSyntax) (diagnosticPolicy := .reachable)

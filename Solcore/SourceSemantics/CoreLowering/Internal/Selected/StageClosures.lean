@@ -1313,7 +1313,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
     (fun reason token => faults (.semantic reason) token))
 
 include support selected ownerPhysical semantic faithful observations assignmentInterpretation in
-theorem lifts
+theorem lifts [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
     (children : ∀ size, size < budget → LiftsRootsAt (headers := headers) (keys := keys) model stages semanticFaults size)
@@ -1395,7 +1395,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
     (fun reason token => faults (.semantic reason) token))
 
 include semantic faithful observations assignmentInterpretation in
- theorem packet_of_roots (packet : Packet code stages)
+ theorem packet_of_roots [RecursiveStageMeaning.FaultTokens faults] (packet : Packet code stages)
     (support : SelectedCompilationPhysicalClosureStaticSupport.Support (headers := headers) code inputs stages packet semanticFaults)
     (owner : OwnedKey keys)
     (ownerPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
@@ -1420,7 +1420,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry}
   {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
 
 include semantic faithful observations assignmentInterpretation in
- theorem association_of_roots
+ theorem association_of_roots [RecursiveStageMeaning.FaultTokens faults]
     (association : CallableIndexedOwnedPreparedPhysicalClosureAssociation.Association headers keys
       bodyRegistry semanticFaults mapping world function native bindings parameter result)
     (packet : PacketFor association stages)

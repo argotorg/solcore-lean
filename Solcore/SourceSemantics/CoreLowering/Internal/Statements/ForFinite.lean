@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
+import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.PlaceWriteback
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.LoopCertificates
@@ -60,7 +61,7 @@ theorem discard_body {size : Nat} {environment : Environment} {before middle aft
 continuation. The premises are the same phase executions as execute_success,
 with the actual compatible getter and setter. No child source meaning is used. -/
 theorem execute_continuation {size : Nat} {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalidOperand : Word}
+    {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
     {environment : Environment} {before keyStore snapshotStore rhsStore modifiedStore setterStore written finalStore : Store}
     {location : Location} {keyValue snapshot right changed updated old result : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
@@ -76,6 +77,7 @@ theorem execute_continuation {size : Nat} {prepared : Prepared} {reference rhs n
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0)))) (.inRight .word updated) setterStore)
     (read : setterStore.read? location = some old)
     (write : setterStore.write? location (.inRight .unit updated) = some written)
+    (passes : Frontend.SourceCoreDataPlaces.Passes operator right)
     (completed : EvaluationSize size environment before
       (execute prepared reference keys rhs next outputType operator bitNot invalidOperand) result finalStore) :
     ∃ remainingSize, remainingSize < size ∧
@@ -88,6 +90,12 @@ theorem execute_continuation {size : Nat} {prepared : Prepared} {reference rhs n
   obtain ⟨rhsSize, fourth, rhsRest⟩ := snapshotRest.bind_success rhsEvaluated
   obtain ⟨modifiedSize, fifth, modifiedRest⟩ := rhsRest.bind_success modifiedEvaluated
   obtain ⟨setterSize, sixth, setterRest⟩ := modifiedRest.bind_success setterEvaluated
+  rcases DataPlaceGuard.inv_sized setterRest with ⟨_, guarded, guardedBound, setterRest⟩ | ⟨_, selected, zero, _, _⟩
+  case inr =>
+    subst selected zero
+    cases passes with
+    | total total => cases total _ rfl
+    | nonzero nonzero => exact (nonzero rfl).elim
   obtain ⟨remainingSize, seventh, remaining⟩ := setterRest.let_body
     (.storeCell (.var rfl) read (.inRight (.var rfl)) write)
   exact ⟨remainingSize, by omega, remaining⟩

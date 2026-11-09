@@ -2695,7 +2695,7 @@ private theorem sequence_stopped_reflects (_unique : NodeOccurrencesUnique sourc
       _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
 include definitions registered extension meaning faithful observations catalogValid in
-theorem Tree.preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem Tree.preservesAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -2895,7 +2895,7 @@ theorem Tree.preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (un
       (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
 
 include definitions registered extension meaning faithful observations catalogValid in
-theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
+theorem Tree.preservesAt [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -2909,7 +2909,7 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations catalogValid in
-theorem Tree.reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem Tree.reflectsAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3132,7 +3132,7 @@ theorem Tree.reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (fun
       (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
 
 include definitions registered extension meaning reflection faithful observations catalogValid in
-theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem Tree.reflectsAt [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3146,7 +3146,7 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
   all_goals assumption
 
 include definitions registered extension meaning faithful observations catalogValid in
-theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -3179,7 +3179,7 @@ theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Sc
     contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension meaning faithful observations catalogValid in
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -3212,7 +3212,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations catalogValid in
-theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -3244,7 +3244,7 @@ theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
     contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
 include definitions registered extension meaning reflection faithful observations catalogValid in
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope (.statements mode statements) expected type code)

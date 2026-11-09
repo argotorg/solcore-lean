@@ -34,7 +34,7 @@ theorem word_success
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
     {environment : Environment} {snapshot rhs : Expr}
     (selected : DataEquality.Selects environment snapshot (.inRight .unit value))
-    (operator : Option BinaryOp) (store : Store) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
     ∃ result native, ValueRep checked registry functions mapping world sourceType result native type ∧
       Dynamic.BitNotSnapshot (some source) result ∧
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧
@@ -83,7 +83,7 @@ theorem success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
     {environment : Environment} {snapshot rhs : Expr}
     (selected : DataEquality.Selects environment snapshot (.inRight .unit value))
-    (operator : Option BinaryOp) (store : Store) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
     ∃ result native, ValueRep checked registry functions mapping world sourceType result native type ∧
       Dynamic.BitNotSnapshot (some source) result ∧
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧
@@ -111,7 +111,7 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
     (functions : FunctionModel checked.catalog ambient) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
     (environment : Environment) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (target : Location) (keys : List Value) (snapshot : Value) (before after : Dynamic.Heap)
-    (updated : Dynamic.Value) (operator : Option BinaryOp) (invalid : Word) where
+    (updated : Dynamic.Value) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) where
   replacement : Value
   value : Value
   helperStore : Store
@@ -173,7 +173,7 @@ theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     Nonempty (Execution compilation.checked registry functions prepared codes coreEnvironment resolution.store resolution.mapping resolution.world
       resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid) := by
   have snapshotRep := resolution.snapshotRelated
@@ -250,7 +250,7 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     Nonempty (Execution compilation.checked registry functions prepared codes coreEnvironment resolution.store resolution.mapping resolution.world
       resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid) :=
   of_write_numeric layout registryExtension faithful observations (.inl profile) environments resolution written operator invalid
@@ -272,7 +272,7 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {functions : FunctionModel checked.catalog ambient} {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr}
   {environment : Environment} {store : Store} {mapping : LocationMap} {world : StoreTyping}
   {target : Location} {keys : List Value} {snapshot : Value} {before after : Dynamic.Heap}
-  {updated : Dynamic.Value} {operator : Option BinaryOp} {invalid : Word}
+  {updated : Dynamic.Value} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
 
 private theorem unit_rhs (environment : Environment) (store : Store) :
     Evaluates environment store (shift 3 (LanguageResult.success .unit)) (.inRight .word .unit) store := by
@@ -280,7 +280,7 @@ private theorem unit_rhs (environment : Environment) (store : Store) :
     (Evaluates.inRight (leftType := .word) (environment := environment) (initialStore := store) Evaluates.unit)
 
 theorem Execution.plug (execution : Execution checked registry functions prepared codes environment store mapping world
-    target keys snapshot before after updated operator invalid)
+    target keys snapshot before after updated operator invalid) (passes : SourceCoreDataPlaces.Passes operator .unit)
     {next : Expr} {outputType : Ty} {result : Value} {finalStore : Store}
     (continuation : Evaluates (writtenEnvironment prepared.route.rootType target (packValues keys)
       (.inRight .unit snapshot) .unit execution.replacement execution.value environment)
@@ -291,7 +291,8 @@ theorem Execution.plug (execution : Execution checked registry functions prepare
   obtain ⟨optional, read⟩ := execution.read
   exact LanguageResult.bind_success _ (unit_rhs _ _) (LanguageResult.bind_success _ execution.modified
     (LanguageResult.bind_success _ execution.setter
-      (.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) execution.written) continuation)))
+      (SourceCoreDataPlaces.guard_passes passes
+        (.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) execution.written) continuation))))
 
 /-- A completed absent-RHS tail must reach the exact generated mapped commit.
 The remaining seven-slot continuation is recovered as an output witness. -/
@@ -328,17 +329,20 @@ theorem Execution.reflects (execution : Execution checked registry functions pre
         obtain ⟨same, stores⟩ := evaluation_deterministic setterEvaluated execution.setter
         cases same
         subst_vars
-        cases remaining with
-        | letE written continuation =>
-          obtain ⟨optional, read⟩ := execution.read
-          have actual : Evaluates
-              (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
-                (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
-              (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
-            .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
-          obtain ⟨same, stores⟩ := evaluation_deterministic written actual
-          subst_vars
-          exact continuation
+        -- The right-hand side is Unit, so no modifier check can fail.
+        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨_, remaining⟩ | ⟨_, _, impossible, _, _⟩
+        · cases remaining with
+          | letE written continuation =>
+            obtain ⟨optional, read⟩ := execution.read
+            have actual : Evaluates
+                (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
+                  (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
+                (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
+              .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
+            obtain ⟨same, stores⟩ := evaluation_deterministic written actual
+            subst_vars
+            exact continuation
+        · cases impossible
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCommit
 end
@@ -409,7 +413,8 @@ theorem preserves_numeric
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
       environment before place updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    (passes : SourceCoreDataPlaces.Passes operator .unit) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments codes)
         (LanguageResult.success .unit) (LanguageResult.success .unit) .unit operator true invalid)
@@ -426,7 +431,7 @@ theorem preserves_numeric
     refine ⟨commit.finalStore, resolution.mapping, commit.finalWorld, ?_, commit.heaps, resolution.maps,
       resolution.worlds.trans commit.worlds, resolution.frame.trans commit.frame, resolution.metadata.trans commit.metadata⟩
     exact .letE (.var reference) (LanguageResult.bind_success _ resolution.keysEvaluated
-      (LanguageResult.bind_success _ resolution.snapshotEvaluated (commit.plug
+      (LanguageResult.bind_success _ resolution.snapshotEvaluated (commit.plug passes
         (by simpa only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] using
           (Evaluates.inRight (leftType := .word) (initialStore := commit.finalStore)
             (environment := writtenEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
@@ -445,7 +450,7 @@ theorem reflects_numeric
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
@@ -454,7 +459,7 @@ theorem reflects_numeric
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {next : Expr} {outputType : Ty} {operator : Option BinaryOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments codes)
       (LanguageResult.success .unit) next outputType operator true invalid) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults place environment coreEnvironment
@@ -496,7 +501,8 @@ theorem preserves
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
       environment before place updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    (passes : SourceCoreDataPlaces.Passes operator .unit) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments codes)
         (LanguageResult.success .unit) (LanguageResult.success .unit) .unit operator true invalid)
@@ -504,7 +510,8 @@ theorem preserves
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  preserves_numeric layout registryExtension meaning faithful observations (.inl profile) environments heaps locals slot rootTyped trace operator invalid
+  preserves_numeric layout registryExtension meaning faithful observations (.inl profile) environments heaps locals slot rootTyped trace
+    operator invalid passes
 
 /-- Word-only compatibility API. -/
 theorem reflects
@@ -517,7 +524,7 @@ theorem reflects
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
@@ -526,7 +533,7 @@ theorem reflects
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {next : Expr} {outputType : Ty} {operator : Option BinaryOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments codes)
       (LanguageResult.success .unit) next outputType operator true invalid) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults place environment coreEnvironment
@@ -552,7 +559,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
     {expression : ExpressionLowerer} {scope : Scope} {reasonAt : ExpressionId → Word}
     {codes : List SourceCoreBasic.LoweredExpr} {certificate : GenericExpressionMeaning.Certificate}
     {administrativeContext : Core.Context} {reference rhs next : Expr} {outputType resultType : Ty}
-    {operator : Option BinaryOp} {bitNot : Bool} {invalidOperand : Word}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
@@ -855,7 +862,7 @@ theorem preserves_numeric
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -925,7 +932,7 @@ theorem preserves
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -988,7 +995,7 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
       (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
         prepare compilation fuel route invalid missing = .ok prepared) →
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
     (operatorProfile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -1041,7 +1048,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
         prepare compilation fuel route invalid missing = .ok prepared) →
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
     (operatorProfile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value}

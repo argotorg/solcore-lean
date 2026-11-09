@@ -50,6 +50,9 @@ private theorem forward_initial {fixture : CompiledFixture} {observed : Observed
     {invocation : Staging.Recursive.Scope} {source : Dynamic.Value} {after : Dynamic.Heap}
     (trace : SourceCall support support.makeHeader.header invocation ⟨[]⟩ [.word seed] (.value source) after) :
     ForwardFunctionAt support first source after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ :=
     fixture.actual_start first.opened first.started
@@ -341,6 +344,9 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
         SourceCall support support.failedHeader.header
           (RecursiveStageRegistry.scope stages.sidecar [] support.failedHeader.header.function)
           ⟨[]⟩ [] (.fault failure) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -418,6 +424,9 @@ theorem RetainedState.identity {fixture : CompiledFixture} {observed : ObservedP
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.identityHeader.header invocation state.heap [.word seed]
         (.value (.word seed)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.failedInput, support.identityInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -587,6 +596,9 @@ private theorem forward_failure {fixture : CompiledFixture} {observed : Observed
     {invocation : Staging.Recursive.Scope} {failure : Staging.Recursive.Failure} {after : Dynamic.Heap}
     (trace : SourceCall support support.failedHeader.header invocation ⟨[]⟩ [] (.fault failure) after) :
     ForwardFailureAt support first failure after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started

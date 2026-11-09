@@ -531,7 +531,7 @@ private theorem prefix_agrees
 
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
-theorem source_continuation
+theorem source_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)
@@ -632,7 +632,7 @@ theorem source_continuation
 
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic functionTypes faithful observations assignmentInterpretation in
 /-- Native completion is inverted through the same real flow and footer. -/
-theorem native_continuation
+theorem native_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)
@@ -966,7 +966,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
-theorem source_continuation
+theorem source_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)
@@ -991,7 +991,7 @@ theorem source_continuation
       beforeTyped argumentsTyped stable extension budget children
 
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic functionTypes faithful observations assignmentInterpretation in
-theorem native_continuation
+theorem native_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)

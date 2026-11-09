@@ -2915,7 +2915,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include extension uninitialized missing in
-theorem Entry.preserves
+theorem Entry.preserves [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {copies environment : Dynamic.Environment} {copied bound after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
@@ -2954,7 +2954,7 @@ theorem Entry.preserves
   exact ⟨result, _, finalMap, finalWorld, callEval, related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include extension uninitialized missing in
-theorem Entry.reflects
+theorem Entry.reflects [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -3003,7 +3003,7 @@ theorem Entry.reflects
       related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
       store applyPayload result finalStore) :
@@ -3021,7 +3021,7 @@ theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dyn
   exact ⟨outcome, after, finalMap, finalWorld, trace.call body.frame body.extended copy allocated, rest⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem preserves [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,

@@ -340,7 +340,7 @@ include callerBridge receiver functions runtime unique
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves_reached_with_functions
+theorem preserves_reached_with_functions [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -352,6 +352,8 @@ theorem preserves_reached_with_functions
     PreservesIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -727,7 +729,7 @@ include callerBridge receiver functions runtime unique
   observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects_reached_with_functions
+theorem reflects_reached_with_functions [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
@@ -740,6 +742,8 @@ theorem reflects_reached_with_functions
     ReflectsIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -1177,7 +1181,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include callerBridge receiver profile runtime unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
-theorem preserves_reached
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -1195,7 +1199,7 @@ theorem preserves_reached
 
 include callerBridge receiver profile runtime unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
-theorem reflects_reached
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}

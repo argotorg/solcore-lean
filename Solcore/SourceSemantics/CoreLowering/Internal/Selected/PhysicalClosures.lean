@@ -1287,7 +1287,7 @@ private theorem forget_post (callerPrefix : Nat) {index : ProtectedStateTransiti
 include support capturedSlots physical ownerPhysical stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
-theorem source_body_at
+theorem source_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry
       arguments nativeArguments before store owner.key.frameLocation
@@ -1308,6 +1308,9 @@ theorem source_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.SourceBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached bodySize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro child finalContext bodyOutcome outcome after selected valid trace matched
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
@@ -1373,7 +1376,7 @@ theorem source_body_at
 include support capturedSlots physical ownerPhysical stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
-theorem native_body_at
+theorem native_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry arguments before store
       owner.key.frameLocation (caller.rows owner.position).authority.current)
@@ -1390,6 +1393,9 @@ theorem native_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.NativeBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached packet.child nativeSize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro value bodyStore completed
   have rawTypes := Dynamic.MonoBindersExtend.bodyTypes_eq inputs.extended
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
@@ -1554,7 +1560,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token →
 include support capturedSlots physical ownerPhysical stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic faithful observations assignmentInterpretation in
 /-- The genuine Source application chooses its own scope and parameter entry.
 The same internally constructed body port returns through the saved caller. -/
-theorem application_preserves {budget : Nat}
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] {budget : Nat}
     (children : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
         (headers := headers) (keys := keys)
@@ -1586,7 +1592,7 @@ theorem application_preserves {budget : Nat}
 include support capturedSlots physical ownerPhysical stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic functionTypes faithful observations assignmentInterpretation in
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
-theorem application_reflects
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults]
     (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     {budget : Nat}
     (children : ∀ childSize, childSize < budget →
@@ -2156,7 +2162,7 @@ variable (association : Association headers keys bodyRegistry semanticFaults map
 include physical owners supported raw represented heaps stable runtime semantic assignmentInterpretation in
 /-- The actual Association and chosen packet retain the original parameter
 context. Each body branch constructs its application port from the strict Root IH. -/
-theorem application_preserves (budget : Nat)
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
         (headers := headers) (keys := keys)
@@ -2426,7 +2432,7 @@ theorem application_preserves (budget : Nat)
 include physical owners supported raw represented heaps stable runtime semantic assignmentInterpretation in
 /-- Reflection uses the packet-selected Source scope. The original parameter
 installation, independent Source grade and literal returned caller are preserved. -/
-theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults] (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     (budget : Nat)
     (children : ∀ childSize, childSize < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
@@ -2797,7 +2803,7 @@ include physical owners bridge profile compiler prepared sourceParent occurrence
   actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The genuine argument endpoint feeds the actual closure application once.
 Its native suffix and original three binds complete the whole parent. -/
-theorem preserves_parent
+theorem preserves_parent [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
         bindings parameterCore resultCore), PacketFor association stages)
@@ -2908,7 +2914,7 @@ include physical owners bridge profile compiler prepared sourceParent occurrence
   actualFunctionType calleeRelated represented bundle originalResult semantic assignmentInterpretation in
 /-- The concrete selected closure suffix constructs the original applied
 parent. Both numeric grades and every transient reached effect are retained. -/
-theorem reflects_suffix
+theorem reflects_suffix [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
         bindings parameterCore resultCore), PacketFor association stages)
@@ -3090,7 +3096,7 @@ include physical owners sourceParent occurrence preparedStages receiver runtime 
 /-- Authentic Source application and prefix witnesses construct the original
 closure parent. Physical count rejection keeps the reached argument heap and
 literal receiving arity word; success preserves the actual selected body once. -/
-theorem preserves_closure_or_global
+theorem preserves_closure_or_global [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
         bindings parameterCore resultCore), PacketFor association stages)
@@ -3221,7 +3227,7 @@ include physical owners sourceParent occurrence preparedStages receiver runtime 
 /-- User classification and physical arity happen inside the actual retained
 prefix. The closure branch constructs full parent meaning; only the literal
 global application remains for the separate named producer. -/
-theorem reflects_closure_or_global
+theorem reflects_closure_or_global [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
         bindings parameterCore resultCore), PacketFor association stages)

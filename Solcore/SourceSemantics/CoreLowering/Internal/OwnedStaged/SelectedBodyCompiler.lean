@@ -346,6 +346,8 @@ def at_scope_sites {fuel : Nat}
       terminal.expression terminal.receipt.child faults //
       support.rawType = header.function.resultType ∧ support.reasonAt = header.reasonAt ∧
       support.compilation.administrativePrefix = 1 } := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   have sourceEq := stages.source selected
   have unique : NodeOccurrencesUnique child.source := sourceEq ▸ header.unique
   have declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
@@ -1030,7 +1032,7 @@ include receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
 /-- This family constructs every recursive called-body preservation law.
   Only static original compiler authority and chosen terminal support enter. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (completion := completion) (stages := stages)
       (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size := by
   induction size using Nat.strongRecOn with
@@ -1050,7 +1052,7 @@ include receiver stagePrepared observations extension semantic
 /-- Native grades decrease through called bodies. The structural fold handles
   equal-grade native group and singleton tuple children without changing the
   independent Source grade returned by reflection. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (size : Nat) :
     ReflectsRootsAt (completion := completion) (stages := stages)
       (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size := by
@@ -1136,7 +1138,7 @@ include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
 /-- Source traces retain every reached caller effect and their original
   admission receipt while recursive body meaning is supplied internally. -/
-theorem preserves {context invocation scope expression lowered}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults)
     (size : Nat) :
     PreservesAt bridge context model stages invocation
@@ -1165,7 +1167,7 @@ include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
 /-- Native completion returns its authentic independently graded Source
   trace, exact nested failure scope and restored caller relation and post. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults)
     (size : Nat) :
@@ -2099,7 +2101,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (stages := stages))
 
 include bridge receiver stagePrepared observations extension semantic factories in
-private theorem preserves_issued {context invocation scope expression lowered}
+private theorem preserves_issued [FunctionCalls.FaultTokens semanticFaults] {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults) (size : Nat) :
     PreservesAt bridge context
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry
@@ -2113,7 +2115,7 @@ private theorem preserves_issued {context invocation scope expression lowered}
     (closureSupport := closure_support factories) (namedSupport := fun header member => .recursive (named_support factories header member)) root size
 
 include bridge receiver stagePrepared observations extension semantic factories in
-private theorem reflects_issued
+private theorem reflects_issued [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults) (size : Nat) :
@@ -2140,7 +2142,7 @@ variable {function : Dynamic.Closure} {localScope : SourceCoreLocalCell.Scope}
 include bridge receiver stagePrepared observations extension semantic factories in
 /-- Frame typing, the actual terminal compiler action and original-source
 transport construct this caller root internally at the literal parameter entry. -/
-theorem preserves_closure
+theorem preserves_closure [FunctionCalls.FaultTokens semanticFaults]
     (authority : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.ClosureAuthority
       code inputs packet (semanticFaults := semanticFaults))
     (ready : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.ClosureReady authority)
@@ -2166,7 +2168,7 @@ theorem preserves_closure
 include bridge receiver stagePrepared observations extension semantic factories in
 /-- Reflection keeps its own native grade and authentic selected Source scope;
 the independent Source grade and full returned post come from the checked family. -/
-theorem reflects_closure
+theorem reflects_closure [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (authority : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.ClosureAuthority
       code inputs packet (semanticFaults := semanticFaults))
@@ -2198,7 +2200,7 @@ variable {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.o
 include bridge receiver stagePrepared observations extension semantic factories in
 /-- The actual Header source, ordered physical bindings and terminal receipt
 issue the named root before recursive caller/body meaning is invoked. -/
-theorem preserves_named
+theorem preserves_named [FunctionCalls.FaultTokens semanticFaults]
     (authority : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.NamedAuthority
       header packet (stages := stages) (semanticFaults := semanticFaults))
     (ready : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.NamedReady authority)
@@ -2224,7 +2226,7 @@ theorem preserves_named
 include bridge receiver stagePrepared observations extension semantic factories in
 /-- The chosen Header and returned child pool stay literal. Registry equality
 is required only for reflection; no Source/native grade equality is introduced. -/
-theorem reflects_named
+theorem reflects_named [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (authority : CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.NamedAuthority
       header packet (stages := stages) (semanticFaults := semanticFaults))

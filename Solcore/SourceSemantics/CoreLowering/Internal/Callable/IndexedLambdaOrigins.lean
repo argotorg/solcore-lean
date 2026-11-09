@@ -1213,7 +1213,7 @@ include body functions functionObservations functionViews extension uninitialize
 /-- The actual reached state consumes the canonical static receipt. Its builtin
 children are closed by the runtime literal certificate at each reached site.
 The original native body size is used directly; the source size is independent. -/
-theorem reached_reflects_for
+theorem reached_reflects_for [FunctionCalls.FaultTokens faults]
     (reached : CallableIndexedLambdaEntryBounds.PrefixFor captured code history body.toContext functions registry arguments before store location current)
     {size : Nat} {result : Value} {bodyStore : Store}
     (evaluated : EvaluationSize size reached.actual reached.store
@@ -1267,7 +1267,7 @@ include body functions functionObservations functionViews extension uninitialize
 native body child. The independent source closure call uses that prefix's real
 allocation and the same source frame; its source grade is separately retained.
 Full store restoration then transports the original caller catalog Entry. -/
-theorem reflects_original_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_original_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1303,7 +1303,7 @@ theorem reflects_original_for {callerContext : SourceSemantics.Context} {callerE
 include body functions functionObservations functionViews extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
 /-- The public independent call outcome is a projection of the original sized
 completion theorem. No older Entry agreement or preservation theorem is used. -/
-theorem reflects_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1350,7 +1350,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   (sameFrame : initial.authority.frameLocation = location)
 
 include body family functions functionObservations functionViews extension uninitialized missing escaped initial sameFrame in
-theorem reached_reflects_named_for
+theorem reached_reflects_named_for [FunctionCalls.FaultTokens faults]
     (reached : CallableIndexedLambdaEntryBounds.PrefixFor captured code history body.toContext functions registry arguments before store location current)
     {size : Nat} {result : Value} {bodyStore : Store}
     (evaluated : EvaluationSize size reached.actual reached.store
@@ -1387,7 +1387,7 @@ include body family functions functionObservations functionViews family extensio
 native body child. The independent source closure call uses that prefix's real
 allocation and the same source frame; its source grade is separately retained.
 Full store restoration then transports the original caller catalog Entry. -/
-theorem reflects_original_named_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_original_named_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1423,7 +1423,7 @@ theorem reflects_original_named_for {callerContext : SourceSemantics.Context} {c
 include body family functions functionObservations functionViews family extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
 /-- The public independent call outcome is a projection of the original sized
 completion theorem. No older Entry agreement or preservation theorem is used. -/
-theorem reflects_named_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_named_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1473,7 +1473,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   (sameFrame : initial.authority.frameLocation = location)
 
 include body complete globals slots metadataSource family extension uninitialized missing escaped initial sameFrame in
-theorem reached_reflects_nested_for
+theorem reached_reflects_nested_for [FunctionCalls.FaultTokens faults]
     (reached : CallableIndexedLambdaEntryBounds.PrefixFor captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) registry arguments before store location current)
     {size : Nat} {result : Value} {bodyStore : Store}
     (evaluated : EvaluationSize size reached.actual reached.store
@@ -1511,7 +1511,7 @@ include body complete globals slots metadataSource family family extension unini
 native body child. The independent source closure call uses that prefix's real
 allocation and the same source frame; its source grade is separately retained.
 Full store restoration then transports the original caller catalog Entry. -/
-theorem reflects_original_nested_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_original_nested_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1547,7 +1547,7 @@ theorem reflects_original_nested_for {callerContext : SourceSemantics.Context} {
 include body complete globals slots metadataSource family family extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
 /-- The public independent call outcome is a projection of the original sized
 completion theorem. No older Entry agreement or preservation theorem is used. -/
-theorem reflects_nested_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_nested_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1650,7 +1650,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
 
 include body profile extension uninitialized missing escaped initial sameFrame in
 
-theorem reached_reflects
+theorem reached_reflects [FunctionCalls.FaultTokens faults]
     (reached : CallableIndexedLambdaEntryBounds.Prefix captured code history body.toContext profile registry arguments before store location current)
     {size : Nat} {result : Value} {bodyStore : Store}
     (evaluated : EvaluationSize size reached.actual reached.store
@@ -1680,7 +1680,7 @@ variable {nativeArguments : List Value}
 
 include body profile extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
 
-theorem reflects_original {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects_original [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1706,7 +1706,7 @@ theorem reflects_original {callerContext : SourceSemantics.Context} {callerEvide
 
 include body profile extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
 
-theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -1835,7 +1835,7 @@ include extension uninitialized missing escaped functionLeaves functionTypes in
 /-- The independent source allocation is identified with this actual prefix.
 The shared finite statement proof closes the body once; the real wrap then
 completes the application and restores every unmapped caller cell. -/
-theorem entry_preserves_for
+theorem entry_preserves_for [FunctionCalls.FaultTokens faults]
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.toContext functions registry arguments nativeArguments before store location current currentGhost)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     {copies : Dynamic.Environment} {copied : Dynamic.Heap}
@@ -1891,7 +1891,7 @@ include body extension uninitialized missing escaped functionLeaves functionType
 /-- The source call supplies its own context, ordered allocation and body trace.
 Only those static contexts and allocations are identified with the actual
 prefix. The full original caller catalog is transported after restoration. -/
-theorem preserves_for {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem preserves_for [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,
@@ -1955,7 +1955,7 @@ include body family owners extension uninitialized missing escaped functionLeave
 /-- The actual ordered prefix retains its catalog source entry. The original
 source child grade feeds the shared kernel, then the sole wrap/restore adapter
 returns the complete caller store. -/
-theorem entry_preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
+theorem entry_preserves_named_sized_for [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.toContext functions registry arguments nativeArguments before store location current currentGhost)
     {added copiedCanonical : Environment} (length : added.length = code.receipt.loweredParameters.length)
     (spine : entry.entry.canonical = added ++ copiedCanonical)
@@ -2002,7 +2002,7 @@ include body family owners extension uninitialized missing escaped functionLeave
 /-- The original source body child supplies its grade independently of the
 native application. Its actual prefix spine closes catalog installation and
 full caller restoration without any unsized-to-sized conversion. -/
-theorem preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
+theorem preserves_named_sized_for [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     {environment : Dynamic.Environment} {bound : Dynamic.Heap}
     {copies : Dynamic.Environment} {copied : Dynamic.Heap}
@@ -2064,7 +2064,7 @@ include body complete globals slots metadataSource family owners extension unini
 /-- The actual ordered prefix retains its catalog source entry. The original
 source child grade feeds the shared kernel, then the sole wrap/restore adapter
 returns the complete caller store. -/
-theorem entry_preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
+theorem entry_preserves_nested_sized_for [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) registry arguments nativeArguments before store location current currentGhost)
     {added copiedCanonical : Environment} (length : added.length = code.receipt.loweredParameters.length)
     (spine : entry.entry.canonical = added ++ copiedCanonical)
@@ -2112,7 +2112,7 @@ include body complete globals slots metadataSource family owners extension unini
 /-- The original source body child supplies its grade independently of the
 native application. Its actual prefix spine closes catalog installation and
 full caller restoration without any unsized-to-sized conversion. -/
-theorem preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
+theorem preserves_nested_sized_for [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     {environment : Dynamic.Environment} {bound : Dynamic.Heap}
     {copies : Dynamic.Environment} {copied : Dynamic.Heap}
@@ -2160,7 +2160,7 @@ include extension uninitialized missing escaped in
 /-- The independent source allocation is identified with this actual prefix.
 The shared finite statement proof closes the body once; the real wrap then
 completes the application and restores every unmapped caller cell. -/
-theorem entry_preserves
+theorem entry_preserves [FunctionCalls.FaultTokens faults]
     (entry : CallableIndexedLambdaRuntimeBody.Entry captured code history body profile arguments nativeArguments before store location current currentGhost)
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     {copies : Dynamic.Environment} {copied : Dynamic.Heap}
@@ -2200,7 +2200,7 @@ include body extension uninitialized missing escaped initial sameFrame represent
 /-- The source call supplies its own context, ordered allocation and body trace.
 Only those static contexts and allocations are identified with the actual
 prefix. The full original caller catalog is transported after restoration. -/
-theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem preserves [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,

@@ -154,7 +154,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include extension unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -204,7 +204,7 @@ theorem preserves_with_literals_and_post
             receipt form valid count nodes failed retained⟩
 
 include extension in
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -261,7 +261,7 @@ theorem reflects_with_literals_and_post
           receipt.selected projected receipt.registered (valuesRep payloads))
 
 include extension unique uninitialized in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -281,7 +281,7 @@ theorem preserves_with_literals
           exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension contextValid unique uninitialized in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -290,7 +290,7 @@ theorem preserves :
 
 
 include extension uninitialized in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -310,7 +310,7 @@ theorem reflects_with_literals
           exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension contextValid uninitialized in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -1149,7 +1149,7 @@ theorem preserves_type {context : SourceSemantics.Context} {heap : Dynamic.Heap}
 
 theorem native_success (value : Int) {environment : Environment} {snapshot rhs : Expr}
     (selected : Selects environment snapshot (.inRight .unit (.integer value)))
-    (operator : Option Core.BinaryOp) (store : Store) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
     Dynamic.BitNotSnapshot (some (.integer value)) (.integer (~~~value)) ∧
       Evaluates environment store (modified .integer operator true snapshot rhs invalid)
         (.inRight .word (.integer (~~~value))) store ∧
@@ -1161,7 +1161,7 @@ theorem native_success (value : Int) {environment : Environment} {snapshot rhs :
 snapshot result and keeps the store unchanged. No source runtime is imported. -/
 theorem native_reflects (value : Int) {environment : Environment} {snapshot rhs : Expr}
     (selected : Selects environment snapshot (.inRight .unit (.integer value)))
-    (operator : Option Core.BinaryOp) {store after : Store} (invalid : Word) {result : Value}
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) {store after : Store} (invalid : Word) {result : Value}
     (completed : Evaluates environment store (modified .integer operator true snapshot rhs invalid) result after) :
     result = .inRight .word (.integer (~~~value)) ∧ after = store ∧
       Dynamic.BitNotSnapshot (some (.integer value)) (.integer (~~~value)) := by
@@ -1177,7 +1177,7 @@ theorem compatible_success {checked : Checked} {registry : SourceCoreRawMetadata
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
     {environment : Environment} {snapshot rhs : Expr}
     (selected : Selects environment snapshot (.inRight .unit value))
-    (operator : Option BinaryOp) (store : Store) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
     ∃ result native, ValueRep checked registry functions mapping world sourceType result native type ∧
       Dynamic.BitNotSnapshot (some source) result ∧
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧

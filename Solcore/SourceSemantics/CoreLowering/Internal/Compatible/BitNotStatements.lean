@@ -696,7 +696,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
         next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _ _
     rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
     simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
-      commit.prefix_agreement resolution coreLookup (next.rename ξ) output
+      commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatements
@@ -745,6 +745,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
   obtain ⟨_, finalStore, slots, _, finalHeaps, frame, metadata, count, typed, continuation⟩ :=
     CompatibleRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare head.profile
       environments heaps locals agrees actualTyped head.slot head.writable trace (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
+      (CompatiblePlaceModifier.passes_of_total rfl _ _)
   exact ⟨finalStore, mapping, world, slots, finalHeaps, .refl _, .refl _, frame, metadata, count, typed, continuation⟩
 
 include environments heaps locals agrees in
@@ -1154,7 +1155,7 @@ variable {calls : CallHeads} {certificate : GenericExpressionMeaning.Certificate
 
 include transport extension faithful functionLeaves functionTypes unique missing in
 theorem Head.preserves
-    (meaning : ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+    [FunctionCalls.FaultTokens faults] (meaning : ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)
     (callMeaning : ∀ {children},
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1287,7 +1288,7 @@ theorem Head.preserves
 
 include transport extension faithful functionLeaves functionTypes missing in
 theorem Head.reflects
-    (meaning : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+    [FunctionCalls.FaultTokens faults] (meaning : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)
     (callMeaning : ∀ {children},
       ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1458,7 +1459,7 @@ include extension faithful functionLeaves functionTypes valid uninitialized miss
 /-- The finite tree induction supplies every recursive child meaning. The
 call-head interface is an inner composition law supplied by a concrete caller
 adapter; it is not stored in an expression certificate. -/
-theorem preserves (unique : NodeOccurrencesUnique source)
+theorem preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (callMeaning : ∀ {children},
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source children faults entry →
@@ -1485,7 +1486,7 @@ theorem preserves (unique : NodeOccurrencesUnique source)
 include extension faithful functionLeaves functionTypes valid uninitialized missing transport in
 /-- Native completion recursively builds all source child traces, including
 skipped branches and first argument faults, with the actual protected entry. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (callMeaning : ∀ {children},
       ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source children faults entry →
@@ -1552,7 +1553,7 @@ include extension faithful functionLeaves functionTypes valid uninitialized miss
 /-- All recursive child and named body meanings are discharged by the finite
 Tree and concrete builtin-lexical body certificates. Actual global/frame
 provenance, context/evidence validity and static source ownership stay explicit. -/
-theorem Tree.preserves (unique : NodeOccurrencesUnique source)
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup) :
     ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context caller source (Tree bodies compilation fuel source context solved reasonAt) faults
@@ -1568,7 +1569,7 @@ include extension faithful functionLeaves functionTypes valid uninitialized miss
 /-- Native finite completion constructs the complete independent expression
 outcome, including named calls at arbitrary child positions and first faults.
 No external recursive child or body meaning is required. -/
-theorem Tree.reflects :
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] :
     ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context caller source (Tree bodies compilation fuel source context solved reasonAt) faults
       (Entry functions registry bodies compilation.administrativePrefix) := by
@@ -1634,7 +1635,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (trace : Dynamic.SourcePlaceBitNotFaults program context evidence source environment before place reason after)
-    (next : Expr) (outputType : Ty) (operator : Option BinaryOp) (invalid : Word) :
+    (next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     reason = .invalidUnaryOperand .bitNot ∧ after = before ∧
       Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments [])
         (LanguageResult.success .unit) next outputType operator true invalid) (.inLeft outputType (.word invalid)) store := by
@@ -1737,6 +1738,7 @@ theorem reflects
 /-- An independent successful snapshot trace executes to Unit and the related
 written heap through the actual compiler output, at the same world and map. -/
 theorem preserves
+    (total : operator.mayPanic = false)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none
       .unit (LanguageResult.success .unit) reasonAt invalid invalidOperand missing = .ok lowered)
     {updated : Dynamic.Value}
@@ -1749,7 +1751,7 @@ theorem preserves
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   rw [lowering]
   exact CompatibleBareBitNotMeaning.preserves layout bare (view ▸ profile) environments heaps locals slot
-    (rootEq ▸ rootTyped binder binding) trace _ _
+    (rootEq ▸ rootTyped binder binding) trace _ _ (CompatiblePlaceModifier.passes_of_total total _ _)
 
 /-- A source fault is exactly the absent unary operand; actual generated code
 returns its token and preserves the entire native store. -/

@@ -218,15 +218,15 @@ Worked example: e8d28e957, `unchecked { … }` blocks.
 
 - `Unchecked.prepare` finds each `unchecked` at a statement start followed by `{`, and replaces the
   keyword's bytes with spaces. The parser reads a plain block, and every span stays the same.
-- After parsing, `Unchecked.mark` gives the block's `+ - *` and `+= -= *=` the unchecked operators
-  of `Syntax/Operator` (`uncheckedAdd` and the others), which the parser never produces.
+- After parsing, `Unchecked.mark` gives the block's `+ - * / %` and `+= -= *= /= %=` the unchecked
+  operators of `Syntax/Operator` (`uncheckedAdd` and the others), which the parser never produces.
 - The frontend's `parseWorkspaceFile` runs `prepare`, `parse` and `mark` in that order, and reports
   a pass error as `ProgramLoadError.uncheckedBlock`.
 - No grammar, parser or proof changed: the parser theorems describe the blanked file. In exchange,
   the grammar says nothing about `unchecked`, and `Syntax/Unchecked` has no theorems.
 - A statement form was not used because inference's proofs name the numbered cases of its
   traversal; see
-  [the integer design note](../design/integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented-without-division).
+  [the integer design note](../design/integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented).
 - Tests: `Tests.SourceCoreUncheckedExecution`, in the same test file, includes programs that the
   pass rejects while loading.
 

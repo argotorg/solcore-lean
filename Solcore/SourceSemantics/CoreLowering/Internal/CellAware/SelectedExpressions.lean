@@ -261,7 +261,7 @@ theorem reflects_local (size : Nat) :
 
 include extension ordinaryCells uninitialized semantic unique in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context model cells registry invocation reads faults size := by
   intro scope id lowered receipt
   exact preserves_local bridge functions extension ordinaryCells semantic unique size
@@ -269,7 +269,7 @@ theorem preserves (size : Nat) :
 
 include extension ordinaryCells uninitialized semantic unique in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context model cells registry invocation reads faults size := by
   intro scope id lowered receipt
   exact reflects_local bridge functions extension ordinaryCells semantic unique size
@@ -752,7 +752,7 @@ theorem source_children
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -1022,7 +1022,7 @@ private theorem product_values :
 include extension ordinaryCells sameLedger runtimeLedger uninitializedOn semantic unique in
 /-- LiteralSites recursion proves each actual Source child internally. A read
 uses its genuine local certificate; no read or whole-child meaning is supplied. -/
-theorem preserves_reached (size : Nat) :
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel cells registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -1071,7 +1071,7 @@ theorem preserves_reached (size : Nat) :
 include extension ordinaryCells sameLedger runtimeLedger uninitializedOn semantic unique in
 /-- Reflection follows the same finite sites at independent native grades.
 Grouping recurses at the same grade; actual pair binds supply strict children. -/
-theorem reflects_reached (size : Nat) :
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel cells registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -1119,7 +1119,7 @@ theorem reflects_reached (size : Nat) :
 
 include extension ordinaryCells sameLedger runtimeLedger uninitialized semantic unique in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel cells registry invocation trees faults size := by
   intro scope id lowered tree
   exact preserves_reached (faultRoot := id) bridge functions extension ordinaryCells sameLedger runtimeLedger faults
@@ -1128,7 +1128,7 @@ theorem preserves (size : Nat) :
 
 include extension ordinaryCells sameLedger runtimeLedger uninitialized semantic unique in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel cells registry invocation trees faults size := by
   intro scope id lowered tree
   exact reflects_reached (faultRoot := id) bridge functions extension ordinaryCells sameLedger runtimeLedger faults

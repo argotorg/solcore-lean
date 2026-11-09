@@ -2778,6 +2778,16 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
   | integer strict =>
     rw [Mode.binary_strict .integer strict.toStrict] at typed
     exact binary_children typed
+  | panicking panicking =>
+    -- Unchecked `/` and `%` bind both operands before the checked body.
+    have shape : Mode.word.binary operator left right =
+        SourceCorePrimitive.binaryPanicking operator left right := by
+      cases panicking <;> rfl
+    rw [shape] at typed
+    cases typed with
+    | caseE first failure remaining =>
+      cases remaining with
+      | caseE second failure returned => exact ⟨⟨_, first⟩, ⟨_, remove_front second⟩⟩
   | logicalAnd =>
     have children := choose_children (show HasType nativeContext
       (LocalControl.choose .bool left right (LanguageResult.success (.bool false))) nativeType definitions from typed)

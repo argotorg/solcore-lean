@@ -237,7 +237,7 @@ variable {readFuel : Nat} {values : SourceCoreCompatibleValues.Context} {source 
     CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason token count → faults reason token)
   (placeUninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection)
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped placeMissing placeUninitialized in
-theorem preserves_fault
+theorem preserves_fault [FunctionCalls.FaultTokens faults]
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target .equal rhs reason after)
     (next : Expr) (output : Ty) :
@@ -252,7 +252,7 @@ theorem preserves_fault
     (GenericAssignmentStatements.Head.ReachableErrors.equal placeMissing placeUninitialized) trace next output
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped placeMissing placeUninitialized in
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -2416,7 +2416,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_prefix_reflects {administrative : Core.Context} {type : Ty}
+theorem concrete_named_prefix_reflects [FunctionCalls.FaultTokens faults] {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -2450,7 +2450,7 @@ theorem concrete_named_prefix_reflects {administrative : Core.Context} {type : T
 
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_post_reflects
+theorem concrete_named_post_reflects [FunctionCalls.FaultTokens faults]
     {administrative : Core.Context} {type : Ty}
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt) ambient.definitions administrative type (TypedForHeader.Fallthrough type)
@@ -2500,7 +2500,7 @@ theorem concrete_named_post_reflects
     faithful observations runtimeViews tree errors valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_prefix_fault {administrative : Core.Context} {type : Ty}
+theorem concrete_named_prefix_fault [FunctionCalls.FaultTokens faults] {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
     {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
@@ -2552,7 +2552,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 include missing uninitialized in
 /-- Equal is valid in the very same static header even when its nonexistent
 operand failure has no diagnostic interpretation. -/
-theorem equal_header_receipt :
+theorem equal_header_receipt [FunctionCalls.FaultTokens faults] :
     GenericForHeader.Tree.ReachableErrors registry faults
       (GenericForHeader.Tree.assign (layouts := layouts) (owner := owner) (active := active) (frame := frame)
         (globals := globals) (onError := onError) (type := type) (continuation := TypedForHeader.Fallthrough type)
@@ -5925,7 +5925,7 @@ theorem full_successful_head_discharges_header :
     budget meaning trace bounded
 
 include extension transport faithful observations meaning in
-theorem full_fault_head_discharges_header :
+theorem full_fault_head_discharges_header [FunctionCalls.FaultTokens faults] :
     ProtectedForHeader.Stateful.AssignmentFaultPreservesAt protocol functions (registry := registry)
       program evidence source certificate context administrative faults budget := by
   intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
@@ -5935,7 +5935,7 @@ theorem full_fault_head_discharges_header :
     budget meaning errors trace bounded next output
 
 include extension transport faithful observations in
-theorem full_reflected_head_discharges_header
+theorem full_reflected_head_discharges_header [FunctionCalls.FaultTokens faults]
     (functionTypes : FunctionRuntimeViews functions)
     (reflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions)

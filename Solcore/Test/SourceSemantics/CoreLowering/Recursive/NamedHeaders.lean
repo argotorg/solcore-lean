@@ -74,7 +74,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
 
 include accepted generated tree projection unique errors definitions registered extension faithful observations runtimeViews uninitialized missing escapedFault transport in
-theorem closed_preserves_at (size : Nat)
+theorem closed_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat)
     (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -108,7 +108,7 @@ theorem closed_preserves_at (size : Nat)
     currentEnvironments currentHeaps currentLocals currentAgrees currentTyped currentReference currentRead currentUnmapped currentTrace.sound
 
 include accepted generated tree projection unique errors definitions registered extension faithful observations runtimeViews uninitialized missing escapedFault transport in
-theorem closed_reflects_at (budget size : Nat) (within : size ≤ budget)
+theorem closed_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -279,7 +279,7 @@ theorem initializer_fault_context (mono : binder.scheme.quantified = [])
 end SourceFault
 
 theorem assignment_continuation_below {size budget : Nat} {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalidOperand : Word}
+    {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
     {environment : Environment} {before keyStore snapshotStore rhsStore modifiedStore setterStore written finalStore : Store}
     {location : Location} {keyValue snapshot right changed updated old result : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
@@ -295,6 +295,7 @@ theorem assignment_continuation_below {size budget : Nat} {prepared : Prepared} 
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0)))) (.inRight .word updated) setterStore)
     (read : setterStore.read? location = some old)
     (write : setterStore.write? location (.inRight .unit updated) = some written)
+    (passes : Frontend.SourceCoreDataPlaces.Passes operator right)
     (completed : EvaluationSize size environment before
       (execute prepared reference keys rhs next outputType operator bitNot invalidOperand) result finalStore) (bounded : size ≤ budget) :
     ∃ remainingSize, remainingSize < budget ∧
@@ -302,7 +303,7 @@ theorem assignment_continuation_below {size budget : Nat} {prepared : Prepared} 
         (writtenEnvironment prepared.route.rootType location keyValue snapshot right changed updated environment)
         written (shift 7 next) result finalStore := by
   obtain ⟨remainingSize, smaller, remaining⟩ := ForHeaderNativeBounds.execute_continuation
-    referenceSelected keysEvaluated snapshotEvaluated rhsEvaluated modifiedEvaluated setterEvaluated read write completed
+    referenceSelected keysEvaluated snapshotEvaluated rhsEvaluated modifiedEvaluated setterEvaluated read write passes completed
   exact ⟨remainingSize, Nat.lt_of_lt_of_le smaller bounded, remaining⟩
 
 /-- The post witness is a strict child of the original loop body. Renaming it
@@ -1079,7 +1080,7 @@ variable (authenticated : Bool)
 
 
 include complete alignments extension owners uninitialized missing escaped profiles in
-theorem actual_preserves_at
+theorem actual_preserves_at [FunctionCalls.FaultTokens faults]
     (alignment : RecursiveNamedLambdaFormationEntries.FormationHeader
       (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller
       (CallableIndexedNamedGeneration.context indexed caller.named) 0)
@@ -1136,7 +1137,7 @@ theorem actual_preserves_at
 
 
 include complete alignments extension uninitialized missing escaped profiles in
-theorem actual_reflects_at
+theorem actual_reflects_at [FunctionCalls.FaultTokens faults]
     (alignment : RecursiveNamedLambdaFormationEntries.FormationHeader
       (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller
       (CallableIndexedNamedGeneration.context indexed caller.named) 0)
@@ -1482,7 +1483,7 @@ variable {compilation : SourceCoreCompatibleDataMatches.Context}
     GenericImperativeFor.Tree.ReachableErrors registry faults (trees request member childContext related))
 include allocator definitions registered extension ordinary valid catalogValid found casesTyped defaultTyped faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing errors in
 include owners in
-theorem named_preserves (budget size : Nat) (bounded : size ≤ budget) :
+theorem named_preserves [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget) :
     RecursiveNamedMatchSourceBounds.Head.HeadPreservesAt functions program evidence (values := compilation.values) (source := source) (context := context)
       (registry := registry) (solved := solved) (administrative := administrative)
       (frameLayout := frame) (globals := globals) (faults := faults)
@@ -1506,7 +1507,7 @@ theorem named_preserves (budget size : Nat) (bounded : size ≤ budget) :
       .reachable unique (trees request member childContext related) (errors request member childContext related) child smaller
 
 include allocator definitions registered extension ordinary valid catalogValid found casesTyped defaultTyped faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing errors in
-theorem named_reflects (budget size : Nat) (bounded : size ≤ budget) :
+theorem named_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget) :
     RecursiveNamedMatchSourceBounds.Head.HeadReflectsAt functions program evidence (values := compilation.values) (source := source) (context := context)
       (registry := registry) (solved := solved) (administrative := administrative)
       (frameLayout := frame) (globals := globals) (faults := faults)
@@ -1830,7 +1831,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem actual_call_has_fuel
+theorem actual_call_has_fuel [FunctionCalls.FaultTokens faults]
     {actual : Environment} {ξ : Renaming} (agrees : EnvironmentsAgree ξ canonical actual)
     {argumentCode : Expr} {reason : Word}
     (argumentsEvaluated : Evaluates actual store argumentCode
@@ -1854,7 +1855,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem actual_completed_call
+theorem actual_completed_call [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -1879,7 +1880,7 @@ theorem actual_completed_call
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- The original native body grade stays strictly below its enclosing call. -/
-theorem original_body_reflects (budget size : Nat) (strict : size < budget)
+theorem original_body_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (strict : size < budget)
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {value : Value} {finalStore : Store}
     (measured : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -2341,7 +2342,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped unique owners in
 /-- Original source children are below one fixed outer budget. -/
-theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before place rhs updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
@@ -2367,7 +2368,7 @@ theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynami
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped unique owners missingTokens invalidTokens in
 /-- Fault prefixes retain the effects of earlier keys and RHS calls. -/
-theorem named_fault (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator rhs reason after)
     (bounded : size ≤ budget) (next : Expr) (outputType : Ty) (invalid : Word) :
     ∃ token finalStore finalMap finalWorld,
@@ -2390,7 +2391,7 @@ include extension faithful observations environments heaps locals agrees actualT
   uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped missingTokens invalidTokens in
 /-- Reflection uses concrete named reflection only; source preservation is not
 replayed to obtain the continuation slots or a native cost. -/
-theorem named_reflects (budget : Nat) {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
+theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
         (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore)
@@ -2568,7 +2569,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments heaps locals agrees typed installed in
 /-- The concrete recursive Tree eliminates every child/body runtime premise.
 The actual protected entry still has to be supplied at the key phase. -/
-theorem named_key_preserves (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+theorem named_key_preserves [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
@@ -2595,7 +2596,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments heaps locals agrees typed installed in
 /-- Key completion reconstructs source projection evaluation/fault in order,
 using protected lookup/current-frame facts at the actual current key prefix. -/
-theorem named_key_reflects (budget size : Nat) (bounded : size < budget)
+theorem named_key_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size < budget)
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
       scope (DataPlaceKeyOrder.sourceKeys projections) types codes)
@@ -2618,7 +2619,7 @@ theorem named_key_reflects (budget size : Nat) (bounded : size < budget)
 include extension faithful leaves runtimeViews valid uninitialized missing bodyUninitialized bodyMissing
   environments heaps locals agrees typed installed in
 /-- Actual successful key effects preceding the fault remain in the result. -/
-theorem named_key_fault (budget size : Nat) (bounded : size ≤ budget)
+theorem named_key_fault [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (tree : DataExpressionSequence.Tree source

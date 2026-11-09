@@ -421,7 +421,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support observed origin prefixContext stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
-theorem source_body_at
+theorem source_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry
       arguments nativeArguments before store owner.key.frameLocation
@@ -446,6 +446,9 @@ theorem source_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.SourceBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached bodySize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro child finalContext bodyOutcome outcome after selected valid trace matched
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
@@ -515,7 +518,7 @@ theorem source_body_at
 include support observed origin prefixContext stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
-theorem native_body_at
+theorem native_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry arguments before store
       owner.key.frameLocation (caller.rows owner.position).authority.current)
@@ -536,6 +539,9 @@ theorem native_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.NativeBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached packet.child nativeSize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro value bodyStore completed
   have rawTypes := Dynamic.MonoBindersExtend.bodyTypes_eq ordinary.body.extended
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
@@ -700,7 +706,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support observed origin prefixContext stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- The genuine Source application chooses its own scope and parameter entry.
 The same internally constructed body port returns through the saved caller. -/
-theorem application_preserves {budget : Nat}
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] {budget : Nat}
     (recursiveChildren : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
@@ -739,7 +745,7 @@ theorem application_preserves {budget : Nat}
 include support observed origin prefixContext stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
-theorem application_reflects
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults]
     (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     {budget : Nat}
     (recursiveChildren : ∀ childSize, childSize < budget →
@@ -862,7 +868,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support observed stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
-theorem source_body_at
+theorem source_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry
       arguments nativeArguments before store owner.key.frameLocation
@@ -883,6 +889,9 @@ theorem source_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.SourceBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached bodySize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro child finalContext bodyOutcome outcome after selected valid trace matched
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
@@ -949,7 +958,7 @@ theorem source_body_at
 include support observed stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
-theorem native_body_at
+theorem native_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry arguments before store
       owner.key.frameLocation (caller.rows owner.position).authority.current)
@@ -966,6 +975,9 @@ theorem native_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.NativeBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached packet.child nativeSize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro value bodyStore completed
   have rawTypes := Dynamic.MonoBindersExtend.bodyTypes_eq inputs.extended
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
@@ -1124,7 +1136,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support observed stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- The genuine Source application chooses its own scope and parameter entry.
 The same internally constructed body port returns through the saved caller. -/
-theorem application_preserves {budget : Nat}
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] {budget : Nat}
     (children : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
         (headers := headers) (keys := keys)
@@ -1158,7 +1170,7 @@ theorem application_preserves {budget : Nat}
 include support observed stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
-theorem application_reflects
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults]
     (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     {budget : Nat}
     (children : ∀ childSize, childSize < budget →
@@ -1573,7 +1585,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support stable beforeTyped argumentsTyped semantic faithful observations assignmentInterpretation in
 /-- Preservation receives the actual Source-selected scope and allocation.
 The already constructed parameter admission feeds the strict recursive whole-body port. -/
-theorem source_body_at
+theorem source_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry
       arguments nativeArguments before store owner.key.frameLocation
@@ -1590,6 +1602,9 @@ theorem source_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.SourceBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached bodySize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro child finalContext bodyOutcome outcome after selected valid trace matched
   have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
     captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
@@ -1644,7 +1659,7 @@ theorem source_body_at
 include support stable beforeTyped argumentsTyped semantic functionTypes faithful observations assignmentInterpretation in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
-theorem native_body_at
+theorem native_body_at [FunctionCalls.FaultTokens semanticFaults]
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry arguments before store
       owner.key.frameLocation (caller.rows owner.position).authority.current)
@@ -1660,6 +1675,9 @@ theorem native_body_at
     CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.NativeBodyAt
       (stages := stages) (faults := callFaults)
       captured code history inputs functions owner caller entry reached packet.child nativeSize := by
+  haveI : RecursiveStageMeaning.FaultTokens
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) :=
+    ⟨fun code => semantic _ _ (FunctionCalls.FaultTokens.panic code)⟩
   intro value bodyStore completed
   have rawTypes := Dynamic.MonoBindersExtend.bodyTypes_eq inputs.extended
   have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
@@ -1804,7 +1822,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → CallableI
 include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- The genuine Source application chooses its own scope and parameter entry.
 The same internally constructed body port returns through the saved caller. -/
-theorem application_preserves {budget : Nat}
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] {budget : Nat}
     (children : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
@@ -1837,7 +1855,7 @@ theorem application_preserves {budget : Nat}
 include support stable beforeTyped argumentsTyped represented heaps locals reference currentCarried allowed callerRuntime semantic assignmentInterpretation in
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
-theorem application_reflects
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults]
     (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     {budget : Nat}
     (children : ∀ childSize, childSize < budget →
@@ -1989,6 +2007,7 @@ include support stable beforeTyped argumentsTyped in
 /-- Reflection uses the literal chosen scope and real prefix allocation. It
 constructs the original body trace and full post without a new body callback. -/
 theorem native_body_at
+    [RecursiveStageMeaning.FaultTokens (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics)]
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
       captured code history inputs functions completion.result.context.registry arguments before store
       owner.key.frameLocation (caller.rows owner.position).authority.current)
@@ -2165,6 +2184,7 @@ include support stable beforeTyped argumentsTyped represented heaps locals refer
 /-- Native application selects its real strict body child. The packet's
 chosen Source scope supplies that body and the original returned caller post. -/
 theorem application_reflects
+    [RecursiveStageMeaning.FaultTokens (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics)] [FunctionCalls.FaultTokens semanticFaults]
     (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     {budget : Nat}
     (children : ∀ childSize, childSize < budget →
@@ -3669,7 +3689,7 @@ theorem at_selected_scope
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     {readFuel : Nat} {reasonAt : ExpressionId → Word}
     {child : Staging.Recursive.Scope} (selected : stages.Closure function child)
-    (uninitialized : ∀ current id lowered,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id lowered,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         child.source body.toContext.context reasonAt current id lowered →
@@ -3708,7 +3728,7 @@ theorem at_selected_scope_on
     {roots : List NodeId}
     {readFuel : Nat} {reasonAt : ExpressionId → Word}
     {child : Staging.Recursive.Scope} (selected : stages.Closure function child)
-    (uninitialized : ∀ current id lowered,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id lowered,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         child.source body.toContext.context reasonAt current id lowered →
@@ -3864,7 +3884,7 @@ def conditions_on
     (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
       scope function.context)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (uninitialized : ∀ current id lowered,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id lowered,
       CompatibleExpressionReads.LoweredRead compiled.indexed.fuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         function.source body.context code.reasonAt current id lowered →
@@ -3909,7 +3929,7 @@ def conditions
     (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
       scope function.context)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (uninitialized : ∀ current id lowered,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id lowered,
       CompatibleExpressionReads.LoweredRead compiled.indexed.fuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         function.source body.context code.reasonAt current id lowered →

@@ -87,7 +87,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem equal_named_preserves_fault
+theorem equal_named_preserves_fault [FunctionCalls.FaultTokens faults]
     (placeMissing : ∀ {root resolved reason token count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason token count → faults reason token)
     (placeUninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection)
@@ -104,7 +104,7 @@ theorem equal_named_preserves_fault
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem equal_named_reflects
+theorem equal_named_reflects [FunctionCalls.FaultTokens faults]
     (placeMissing : ∀ {root resolved reason token count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason token count → faults reason token)
     (placeUninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection)
@@ -274,7 +274,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem concrete_named_preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
@@ -289,7 +289,7 @@ theorem concrete_named_preserves_prefix {updated : Dynamic.Value} {after : Dynam
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_preserves_fault (errors : head.Errors registry faults)
+theorem concrete_named_preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -303,7 +303,7 @@ theorem concrete_named_preserves_fault (errors : head.Errors registry faults)
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_reflects (errors : head.Errors registry faults)
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -494,7 +494,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_empty_post_preserves {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_empty_post_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {reason : Word} {administrative : Core.Context}
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -521,7 +521,7 @@ theorem concrete_named_empty_post_preserves {context : SourceSemantics.Context} 
   · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid
     exact empty_post_faults functions program evidence
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_empty_post_reflects {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_empty_post_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {reason : Word} {administrative : Core.Context}
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -684,7 +684,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_prefix_preserves {administrative : Core.Context} {type : Ty}
+theorem concrete_named_prefix_preserves [FunctionCalls.FaultTokens faults] {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop} {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -716,7 +716,7 @@ theorem concrete_named_prefix_preserves {administrative : Core.Context} {type : 
     faithful observations tree valid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_prefix_reflects {administrative : Core.Context} {type : Ty}
+theorem concrete_named_prefix_reflects [FunctionCalls.FaultTokens faults] {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -749,7 +749,7 @@ theorem concrete_named_prefix_reflects {administrative : Core.Context} {type : T
     faithful observations runtimeViews tree errors valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_post_loop_preserves {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_post_loop_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {post : List ForItemForm} {reason : Word} {administrative : Core.Context}
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -793,7 +793,7 @@ theorem concrete_named_post_loop_preserves {context : SourceSemantics.Context} {
       faithful observations postTree postErrors valid agrees reference state continued executed
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_post_loop_reflects {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_post_loop_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {post : List ForItemForm} {reason : Word} {administrative : Core.Context}
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -971,7 +971,7 @@ include extension faithful observations runtimeViews valid unique owners uniniti
 /-- Static named argument/body trees and the real installed entry close the
 entire projected assignment and fixed-scope tail. All fault prefixes are
 included; no runtime child/body meaning is an external premise. -/
-theorem concrete_named_preserves {mode : Bool} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree bodies compilation fuel source context solved reasonAt scope administrative mode statements expected type code)
     (errors : ProtectedAssignmentTails.Tree.Errors registry faults tree)
@@ -1002,7 +1002,7 @@ include extension faithful observations runtimeViews valid unique owners uniniti
 /-- Actual completed Core code supplies key, getter, RHS and tail outcomes in
 source order. Installed closure payloads and frame history are retained from
 the real administrative preservation receipts. -/
-theorem concrete_named_reflects {mode : Bool} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree bodies compilation fuel source context solved reasonAt scope administrative mode statements expected type code)
     (errors : ProtectedAssignmentTails.Tree.Errors registry faults tree)
@@ -1169,7 +1169,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem concrete_named_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -1186,7 +1186,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -1203,7 +1203,7 @@ theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Sco
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Initializers and the nested body inhabit the same recursive grammar. The
 head is followed by its concrete tail with no runtime endpoint premise. -/
-theorem concrete_for_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_for_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {items post : List ForItemForm}
     {condition : ExpressionId} {statements rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {initialCode body : Expr} {administrative : Core.Context}
@@ -1226,7 +1226,7 @@ theorem concrete_for_preserves {context : SourceSemantics.Context} {scope : Scop
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Completed initializers, finite iterations and post are inverted before the
 tail. Break/return skip post and continue/fallthrough run it in source order. -/
-theorem concrete_for_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_for_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {items post : List ForItemForm}
     {condition : ExpressionId} {statements rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {initialCode body : Expr} {administrative : Core.Context}
@@ -1403,7 +1403,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings and condition
 slots. The actual protected entry is retained as a runtime boundary. -/
-theorem concrete_named_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt
       context scope mode statements expected type code) :
@@ -1418,7 +1418,7 @@ include definitions registered extension faithful observations runtimeViews unin
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt
       context scope mode statements expected type code) :
@@ -1552,7 +1552,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem concrete_named_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1568,7 +1568,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1583,7 +1583,7 @@ theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Sco
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- A real head, including an empty projection path, composes with the same
 concrete recursive tail. No projected-path or runtime child premise is needed. -/
-theorem concrete_named_assignment_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_assignment_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
@@ -1605,7 +1605,7 @@ theorem concrete_named_assignment_preserves {context : SourceSemantics.Context} 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Whole completed code is reflected through a bare or projected head before
 the recursive tail; its seven real slots and protected entry come from the head. -/
-theorem concrete_named_assignment_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_assignment_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
@@ -1798,7 +1798,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem concrete_named_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1814,7 +1814,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1829,7 +1829,7 @@ theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Sco
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- A real head, including an empty projection path, composes with the same
 concrete recursive tail. No projected-path or runtime child premise is needed. -/
-theorem concrete_named_assignment_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_assignment_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
@@ -1851,7 +1851,7 @@ theorem concrete_named_assignment_preserves {context : SourceSemantics.Context} 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Whole completed code is reflected through a bare or projected head before
 the recursive tail; its seven real slots and protected entry come from the head. -/
-theorem concrete_named_assignment_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_named_assignment_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
@@ -1874,7 +1874,7 @@ theorem concrete_named_assignment_reflects {context : SourceSemantics.Context} {
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Both the loop body and the enclosing tail belong to this same tree. The
 finite native loop proof receives the body IH, not a supplied runtime theorem. -/
-theorem concrete_nested_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_nested_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty}
     {conditionCode loopCode tailCode : Expr} {reason : Word} {administrative : Core.Context}
@@ -1900,7 +1900,7 @@ theorem concrete_nested_preserves {context : SourceSemantics.Context} {scope : S
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- A whole native completion reflects the same recursively certified loop
 body and tail, with the source control/fault distinction derived internally. -/
-theorem concrete_nested_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem concrete_nested_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty}
     {conditionCode loopCode tailCode : Expr} {reason : Word} {administrative : Core.Context}
@@ -2080,7 +2080,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments heaps locals agrees typed installed in
 /-- The concrete recursive Tree eliminates every child/body runtime premise.
 The actual protected entry still has to be supplied at the key phase. -/
-theorem named_key_preserves (unique : NodeOccurrencesUnique source)
+theorem named_key_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
@@ -2106,7 +2106,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments heaps locals agrees typed installed in
 /-- Key completion reconstructs source projection evaluation/fault in order,
 using protected lookup/current-frame facts at the actual current key prefix. -/
-theorem named_key_reflects
+theorem named_key_reflects [FunctionCalls.FaultTokens faults]
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
       scope (DataPlaceKeyOrder.sourceKeys projections) types codes)
@@ -2136,7 +2136,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments locals agrees typed installed in
 /-- The concrete named Tree supplies RHS meaning after the real key/getter
 prefix, including all three hidden slots and the live post-RHS root. -/
-theorem named_rhs_preserves (unique : NodeOccurrencesUnique source)
+theorem named_rhs_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (tree : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope id lowered)
     (found : source.lookupExpression? id = some node)
@@ -2156,7 +2156,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   environments locals agrees typed installed in
 /-- Actual RHS completion yields its independent source outcome and exact
 post-prefix heap. No source execution or body meaning is a premise. -/
-theorem named_rhs_reflects
+theorem named_rhs_reflects [FunctionCalls.FaultTokens faults]
     (tree : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope id lowered)
     (found : source.lookupExpression? id = some node)
     {value : Core.Value} {finalStore : Core.Store}
@@ -2329,7 +2329,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {administrative act
 
 include extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- All condition child/body meaning follows from concrete accepted named Trees. -/
-theorem concrete_condition_preserves
+theorem concrete_condition_preserves [FunctionCalls.FaultTokens faults]
     {condition : ExpressionId} {node : ExpressionNode}
     (tree : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
@@ -2351,7 +2351,7 @@ theorem concrete_condition_preserves
 
 include extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
 /-- Actual condition completion reconstructs its source trace and retained entry. -/
-theorem concrete_condition_reflects
+theorem concrete_condition_reflects [FunctionCalls.FaultTokens faults]
     {condition : ExpressionId} {node : ExpressionNode}
     (tree : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
@@ -2374,7 +2374,7 @@ theorem concrete_condition_reflects
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The concrete lexical body closes child meaning at every reached context;
 its outer entry and body-local source context are retained separately. -/
-theorem concrete_body_preserves
+theorem concrete_body_preserves [FunctionCalls.FaultTokens faults]
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (tree : NamedLexicalAssignments.Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt
       administrative registry faults context scope false statements expected type bodyCode)
@@ -2399,7 +2399,7 @@ theorem concrete_body_preserves
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The concrete lexical body closes child meaning at every reached context;
 its outer entry and body-local source context are retained separately. -/
-theorem concrete_body_reflects
+theorem concrete_body_reflects [FunctionCalls.FaultTokens faults]
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (tree : NamedLexicalAssignments.Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt
       administrative registry faults context scope false statements expected type bodyCode)
@@ -2565,7 +2565,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {administrative : C
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- All condition and body runtime obligations are discharged by the concrete
 named Trees. The actual native head type is retained as a separate static fact. -/
-theorem concrete_whole_preserves {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem concrete_whole_preserves [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -2586,7 +2586,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Native completion reconstructs the independent source head and its effects.
 Successful body control excludes faults by static Tree inversion, rather than
 by a caller-supplied body execution or universal semantic contract. -/
-theorem concrete_whole_reflects {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem concrete_whole_reflects [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
     (conditionFound : source.lookupExpression? condition = some conditionNode)

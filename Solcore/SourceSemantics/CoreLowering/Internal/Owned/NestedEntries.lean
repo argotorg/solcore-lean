@@ -877,7 +877,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 include singleton nativeType source rows extension faithful observations functionTypes valid reads missing unique wellFormed in
 /-- The actual sized Source singleton selects its strict child, whose builtin
 producer returns the same full tuple and causal path at the body store. -/
-theorem source_body_with_post (size : Nat) :
+theorem source_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
   intro outcome after bodyTrace
@@ -944,7 +944,7 @@ theorem source_body_with_post (size : Nat) :
 include singleton nativeType source rows extension faithful observations functionTypes valid reads missing unique wellFormed in
 /-- The actual finish and returnValue children supply strict native bounds.
 The singleton Source grade is constructed independently from its real child. -/
-theorem native_body_with_post (size : Nat) :
+theorem native_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
   intro value finalStore bodyCompletion
@@ -1033,7 +1033,7 @@ theorem native_body_with_post (size : Nat) :
 
 include singleton nativeType source rows extension faithful observations functionTypes valid reads missing unique wellFormed in
 /-- Every strict Source member is produced by the same concrete singleton theorem. -/
-theorem source_below (budget : Nat) :
+theorem source_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1043,7 +1043,7 @@ theorem source_below (budget : Nat) :
 
 include singleton nativeType source rows extension faithful observations functionTypes valid reads missing unique wellFormed in
 /-- Native strict membership uses its actual measured body completion. -/
-theorem native_below (budget : Nat) :
+theorem native_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1333,7 +1333,7 @@ variable
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes unique owners uninitialized missing sameLayouts authorized in
 /-- The unchanged static Tree fold closes every expression child. Actual call
 bodies remain only at genuine strict Source child grades. -/
-theorem preserves_at_with_literals
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults]
     (idsUnique : RequirementIdsUnique context)
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
@@ -1384,7 +1384,7 @@ theorem preserves_at_with_literals
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes uninitialized missing sameLayouts authorized in
 /-- Core children and named hook bodies supply their independent strict grades;
 the existing fold returns the separately measured Source trace and real pool. -/
-theorem reflects_at_with_literals
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       program context evidence source literals faults)
@@ -1433,7 +1433,7 @@ theorem reflects_at_with_literals
 
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes valid unique owners uninitialized missing sameLayouts authorized in
 /-- The original compiler Tree supplies its complete literal receipts. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (idsUnique : RequirementIdsUnique context)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -1458,7 +1458,7 @@ theorem preserves_at
 
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes valid uninitialized missing sameLayouts authorized in
 /-- The original compiler Tree supplies its complete literal receipts. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
@@ -1482,7 +1482,7 @@ theorem reflects_at
 
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes unique owners uninitialized missing sameLayouts authorized in
 /-- Genuine runtime ledger receipts supply every literal leaf of the same Tree. -/
-theorem preserves_at_runtime
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -1508,7 +1508,7 @@ theorem preserves_at_runtime
 
 include prefixZero complete globals slots sameSource extension faithful functionLeaves functionTypes uninitialized missing sameLayouts authorized in
 /-- Genuine runtime ledger receipts supply every literal leaf of the same Tree. -/
-theorem reflects_at_runtime
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -1568,7 +1568,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 
 include transport extension faithful functionLeaves functionTypes unique missing wellFormed runtime covers
 
-theorem preserves_at_with_calls
+theorem preserves_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -1612,7 +1612,7 @@ theorem preserves_at_with_calls
   · intro branch parentFound parentTyped actualAdmission childTrace
     exact callMeaning branch parentFound parentTyped environments heaps locals agrees typed initial actualAdmission childTrace
 
-theorem reflects_at_with_calls
+theorem reflects_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge

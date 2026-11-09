@@ -432,7 +432,7 @@ include parentTyped wellFormed runtime covers locals admitted tree unique parent
   rebuilt operandIncluded unaryIncluded interprets in
 /-- The known selected ordinary index supplies its strict native expression
 members. The original whole fourth bind and current caller restore run once. -/
-theorem prepared_application_reflects (budget : Nat)
+theorem prepared_application_reflects [FunctionCalls.FaultTokens faults] (budget : Nat)
     (outer : Nat) (within : budget ≤ outer)
     (ih : ∀ i, RecursiveNamedCatalogInvocationBounds.Below outer
       (CallableIndexedOwnedPreparedRuntimeFamilyMembers.Family (headers := headers) (keys := keys)
@@ -479,7 +479,7 @@ include parentTyped wellFormed runtime covers locals admitted tree unique parent
   dispatch selected extension faithful observations rebuilt operandIncluded unaryIncluded interprets in
 /-- Only the actual called suffix requests ordinary strict expression members.
 An argument fault has no physical count or body-child demand. -/
-theorem prepared_selected_preserves (budget : Nat)
+theorem prepared_selected_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)) context evidence source certificate faults size)
     {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -1320,7 +1320,7 @@ variable
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- The same prepared flow is closed from E at sizes at most budget. The
 original finite head and loop operations are constructed internally once. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt (Origin.bridge (headers := headers) origin owner)
@@ -1346,7 +1346,7 @@ theorem preserves_flow (budget : Nat)
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- F reflection consumes the native strict E family; its Source grade is
 independent. The same actual JointBody and receiving table are retained. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt (Origin.bridge (headers := headers) origin owner)

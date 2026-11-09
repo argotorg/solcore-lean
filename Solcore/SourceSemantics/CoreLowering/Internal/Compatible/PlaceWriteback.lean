@@ -11,6 +11,176 @@ Write-back, target and setter faults, getter and prefix reflection, and continua
 -/
 
 section
+-- The check of a panicking compound modifier, on the source side.
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
+open Core Frontend SourceInference GeneralHeap DataEquality CompatiblePayload CompatibleEquality
+open SourceCoreCompatibleDataPlaces
+
+variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+  {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
+  {identities : Dynamic.Value → Word → Prop}
+
+/-- An applied source operation passes the check of its modifier. -/
+theorem passes_of_applies
+    (observations : FunctionObservations checked.catalog functions identities)
+    {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value} {right result : Dynamic.Value}
+    {rightCore : Value} {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
+    (applies : Dynamic.AssignmentValueApplies operator snapshot right result) (integer : Bool) :
+    SourceCoreDataPlaces.Passes (binaryOperator integer operator) rightCore := by
+  by_cases panics : operator.mayPanic = true
+  · have word := DataPlaceModifier.panicking_word profile panics
+    have projected : checked.catalog.project sourceType = .ok .word := by
+      rw [← checked.catalog.project_runtimeType sourceType, word]; rfl
+    have same := Except.ok.inj (rightRep.projection.symm.trans projected)
+    subst type
+    obtain ⟨word, rfl, rfl⟩ := word_fields observations rightRep
+    rcases DataPlaceModifier.assignment_divisor applies with total | different
+    · rw [panics] at total; cases total
+    · have nonzero : word ≠ Word.zero := fun same => different (same ▸ rfl)
+      cases operator <;> simp [Syntax.ValueAssignOp.mayPanic] at panics
+      · exact .nonzero nonzero
+      · exact .nonzero nonzero
+  · apply SourceCoreDataPlaces.Passes.total
+    intro modifier selected
+    cases operator <;>
+      simp only [binaryOperator, SourceCoreDataPlaces.Modifier.total, Option.some.injEq, reduceCtorEq] at selected <;>
+      first | (subst selected; rfl) | simp [Syntax.ValueAssignOp.mayPanic] at panics
+
+/-- A source operator that never panics passes its check on any right-hand side. -/
+theorem passes_of_total {operator : Syntax.ValueAssignOp} (total : operator.mayPanic = false) (integer : Bool)
+    (right : Value) : SourceCoreDataPlaces.Passes (binaryOperator integer operator) right := by
+  apply SourceCoreDataPlaces.Passes.total
+  intro modifier selected
+  cases operator <;>
+    simp only [binaryOperator, SourceCoreDataPlaces.Modifier.total, Option.some.injEq, reduceCtorEq] at selected <;>
+    first | (subst selected; rfl) | simp [Syntax.ValueAssignOp.mayPanic] at total
+
+/-- A compound assignment that panics gives no result. -/
+theorem panic_excludes_applies {operator : Syntax.ValueAssignOp} {snapshot : Option Dynamic.Value}
+    {right result : Dynamic.Value} {code : UInt8}
+    (panics : Dynamic.AssignmentOperandsPanic operator snapshot right code)
+    (applied : Dynamic.AssignmentValueApplies operator snapshot right result) : False := by
+  cases panics with
+  | compound corresponds panics =>
+    cases corresponds <;> cases applied <;> exact panics.excludes_application (by assumption)
+
+theorem panic_functional {operator : Syntax.ValueAssignOp} {snapshot : Option Dynamic.Value}
+    {right : Dynamic.Value} {first second : UInt8}
+    (firstPanic : Dynamic.AssignmentOperandsPanic operator snapshot right first)
+    (secondPanic : Dynamic.AssignmentOperandsPanic operator snapshot right second) : first = second := by
+  cases firstPanic with
+  | compound corresponds panics =>
+    cases secondPanic with
+    | compound other otherPanics =>
+      cases corresponds <;> cases other <;> exact panics.functional otherPanics
+
+/-- Represented initialized operands are never invalid, whether the operation
+applies or panics. -/
+theorem initialized_valid
+    (observations : FunctionObservations checked.catalog functions identities)
+    {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
+    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type) :
+    ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
+  obtain ⟨_, _, _, _, outcome⟩ := initialized_outcome observations profile leftRep rightRep
+    (environment := [rightCore, .inRight .unit leftCore]) (.var (index := 1) rfl) (.var (index := 0) rfl) [] Word.zero
+  rcases outcome with ⟨_, valid⟩ | ⟨_, _, _, panics⟩
+  · exact valid
+  · exact DataPlaceModifier.panic_excludes_invalid panics
+
+end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
+end
+
+section
+-- The check of a panicking modifier as a continuation step.
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.DataPlaceGuard
+open Core Frontend CoreProof
+
+/-- A passing check exposes its write as the continuation. -/
+theorem agreement {environment : Environment} {store : Store} {outputType : Ty}
+    {operator : Option SourceCoreDataPlaces.Modifier} {write : Expr} {updated changed right : Value}
+    (passes : SourceCoreDataPlaces.Passes operator right) :
+    ContinuationAgreement (updated :: changed :: right :: environment) store
+      (SourceCoreDataPlaces.guard outputType operator write) (updated :: changed :: right :: environment) store write := by
+  refine ⟨fun written => SourceCoreDataPlaces.guard_passes passes written, fun evaluated => ?_⟩
+  rcases SourceCoreDataPlaces.guard_inv evaluated with ⟨_, written⟩ | ⟨operation, selected, zero, _, _⟩
+  · exact written
+  · subst selected zero
+    cases passes with
+    | total total => cases total _ rfl
+    | nonzero nonzero => exact (nonzero rfl).elim
+
+/-- A sized check either passed, with its write no larger, or panicked. -/
+theorem inv_sized {environment : Environment} {before after : Store} {outputType : Ty}
+    {operator : Option SourceCoreDataPlaces.Modifier} {write : Expr} {result : Value}
+    {updated changed right : Value} {size : Nat}
+    (evaluated : EvaluationSize size (updated :: changed :: right :: environment) before
+      (SourceCoreDataPlaces.guard outputType operator write) result after) :
+    (SourceCoreDataPlaces.Passes operator right ∧ ∃ child, child ≤ size ∧
+      EvaluationSize child (updated :: changed :: right :: environment) before write result after) ∨
+    (∃ operation, operator = some ⟨operation, true⟩ ∧ right = .word Word.zero ∧
+      result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
+      after = before) := by
+  rcases SourceCoreDataPlaces.guard_inv evaluated.sound with ⟨passes, _⟩ | panic
+  · refine .inl ⟨passes, ?_⟩
+    match operator, passes, evaluated with
+    | none, _, evaluated => exact ⟨size, Nat.le_refl _, evaluated⟩
+    | some ⟨_, false⟩, _, evaluated => exact ⟨size, Nat.le_refl _, evaluated⟩
+    | some ⟨_, true⟩, passes, evaluated =>
+      cases evaluated with
+      | ifTrue condition _ =>
+        exfalso
+        cases passes with
+        | total total => cases total _ rfl
+        | nonzero nonzero =>
+          cases condition with
+          | binary left zero applied =>
+            cases left with
+            | var found =>
+              cases zero
+              simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+              subst found
+              simp [Core.BinaryOp.apply, nonzero] at applied
+      | ifFalse condition branch =>
+        cases condition with
+        | binary left zero _ =>
+          cases left
+          cases zero
+          refine ⟨_, ?_, branch⟩
+          omega
+  · exact .inr panic
+
+/-- A selected panicking modifier with a zero right-hand side fails at the check. -/
+theorem panic_of_selected {environment : Environment} {store : Store} {outputType : Ty}
+    {operator : Option SourceCoreDataPlaces.Modifier} {operation : BinaryOp} {write : Expr} {updated changed : Value}
+    (selected : operator = some ⟨operation, true⟩) :
+    Evaluates (updated :: changed :: .word Word.zero :: environment) store
+      (SourceCoreDataPlaces.guard outputType operator write)
+      (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store := by
+  subst selected
+  exact SourceCoreDataPlaces.guard_panic
+
+/-- The check reads only its own three binders, so renaming under them reaches
+the write alone. -/
+theorem rename_lift (outputType : Ty) (operator : Option SourceCoreDataPlaces.Modifier) (write : Expr) (ξ : Renaming) :
+    (SourceCoreDataPlaces.guard outputType operator write).rename ξ.lift.lift.lift =
+      SourceCoreDataPlaces.guard outputType operator (write.rename ξ.lift.lift.lift) := by
+  rcases operator with _ | ⟨operation, _ | _⟩ <;>
+    simp [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift]
+
+end Solcore.SourceSemantics.CoreLowering.DataPlaceGuard
+end
+
+section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CompatiblePlaceFailures
 /-! Whole emitted assignments short-circuit on key and RHS faults, retaining
 all preceding source effects. The executions of children are obtained from the
@@ -216,6 +386,46 @@ theorem preserves
   exact ⟨native, helperStore, finalStore, futureWorld, related, evaluated, nativeRead, nativeWrite,
     finalHeaps, extension, frame.trans writeFrame, Dynamic.HeapMetadataExtend.of_write written⟩
 
+/-- A readable latest path runs the setter; nothing is written yet, since the
+modifier's check follows the setter. -/
+theorem setter_preserves
+    (root : RootRead checked registry functions mapping world prepared heap store location target cell optional sourceRoot rootValue)
+    (heaps : HeapRepresents checked registry functions mapping world heap store)
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {leaf : TypeSystem.Ty}
+    {sourceProjections : List PlaceProjection} {position : Nat} {keySites : List (ExpressionId × Ty)}
+    {path : PreparedPath checked source site cell.type sourceProjections position prepared.steps keySites leaf}
+    {keys : List Value} {projections : List Dynamic.EvaluatedProjection}
+    (arguments : Arguments checked registry functions mapping world source site keys path projections)
+    {replacementSource updated : Dynamic.Value} {replacement : Value}
+    (replacementRep : ValueRep checked registry functions mapping world leaf replacementSource replacement prepared.route.leafType)
+    (changed : Dynamic.ProjectionsUpdate (fun _ value => value = replacementSource) (some sourceRoot) projections updated)
+    (nonempty : prepared.steps ≠ [])
+    {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
+    (observations : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
+    {environment : Environment} {context : Core.Context} {keyType : Ty}
+    {referenceExpression keyExpression replacementExpression : Expr}
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    (setterTyped : HasType context
+      (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
+    (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysSelected : Selects environment keyExpression (packValues keys))
+    (replacementSelected : Selects environment replacementExpression replacement) :
+    ∃ native helperStore futureWorld,
+      Evaluates environment store
+        (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+        (.inRight .word native) helperStore ∧
+      HeapRepresents checked registry functions mapping futureWorld heap helperStore ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping helperStore := by
+  have tree := arguments.updateTree root.payload replacementRep changed prepared
+  obtain ⟨native, helperStore, administrative, _, evaluated, appended, _⟩ :=
+    setter_at root tree nonempty faithful observations keyLength environment keyType referenceExpression keyExpression replacementExpression
+      referenceSelected keysSelected replacementSelected
+  obtain ⟨futureWorld, extension, storeTyped, _, frame⟩ :=
+    evaluation_frame (mapping := mapping) heaps.runtime_hasTypes environmentTyped setterTyped evaluated appended
+  exact ⟨native, helperStore, futureWorld, evaluated,
+    CompatibleHeap.HeapRepresents.after_snapshot heaps extension storeTyped appended, extension, frame⟩
+
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceWriteback
 end
 
@@ -347,6 +557,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
+        have passes := CompatiblePlaceModifier.passes_of_applies observations operatorProfile rightRep applies
+          (prepared.route.leafType = .integer)
         have present : ∃ sourceRoot, initial = some sourceRoot := by
           cases initial with
           | some value => exact ⟨value, rfl⟩
@@ -392,12 +604,12 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
               (LanguageResult.bind_success _ rhsResult.evaluated
                 (LanguageResult.bind_success _ modifiedEvaluated
                   (LanguageResult.bind_success _ setterEvaluated
-                    (.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten)
+                    (SourceCoreDataPlaces.guard_passes passes (.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten)
                       (by simpa only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment,
                         snapshotEnvironment, keysEnvironment, referenceEnvironment] using
                         (Evaluates.inRight (environment := writtenEnvironment prepared.route.rootType resolution.target
                           (packValues resolution.values) (.inRight .unit resolution.snapshot) rightValue replacementValue updatedValue coreEnvironment)
-                          (initialStore := finalStore) (leftType := .word) Evaluates.unit))))))))
+                          (initialStore := finalStore) (leftType := .word) Evaluates.unit)))))))))
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceAssignmentSuccess
 end
@@ -737,8 +949,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     obtain ⟨latest⟩ := rhsResult.latest
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
-    obtain ⟨replacement, replacementValue, replacementRep, _, modifiedEvaluated, valid⟩ :=
-      CompatiblePlaceModifier.initialized_success observations operatorProfile snapshotRep rightRep
+    obtain ⟨replacement, replacementValue, replacementRep, modifiedEvaluated, _⟩ :=
+      CompatiblePlaceModifier.initialized_outcome observations operatorProfile snapshotRep rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -981,13 +1193,14 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType : Ty)
-    (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) : Expr :=
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) : Expr :=
   LanguageResult.bind outputType (shift 3 rhs)
     (LanguageResult.bind outputType
       (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid)
       (LanguageResult.bind outputType
         (.apply (setter prepared keyType) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-        (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))
+        (Frontend.SourceCoreDataPlaces.guard outputType operator
+          (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))))
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -996,7 +1209,7 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word)
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
     (result : Value) (finalStore : Store) : Prop where
   | fault {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -1037,7 +1250,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -1045,7 +1258,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalid) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
@@ -1143,7 +1356,7 @@ open Core Frontend SourceCoreCompatibleDataPlaces
 
 theorem getter_of_execute {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType resultType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
       resultType definitions) :
     HasType (keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
@@ -1175,7 +1388,7 @@ theorem getter_of_execute {definitions : DataEnvironment} {context : Core.Contex
 /-- Direct consumer of an actual successful whole-expression inference. -/
 theorem getter_of_infer {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType resultType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     (accepted : infer? context (execute prepared reference keys rhs next outputType operator bitNot invalid)
       definitions = some resultType) :
     HasType (keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
@@ -1187,7 +1400,7 @@ theorem getter_of_infer {definitions : DataEnvironment} {context : Core.Context}
 static compiler obligation and does not assume any child evaluation. -/
 theorem setter_of_execute_rhs {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType resultType rhsType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {outputType resultType rhsType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
       resultType definitions)
     (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
@@ -1241,7 +1454,7 @@ theorem setter_of_execute_rhs {definitions : DataEnvironment} {context : Core.Co
 
 theorem setter_of_execute {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType resultType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
       resultType definitions)
     (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
@@ -1330,7 +1543,7 @@ open GenericExpressionMeaning SourceCoreCompatibleDataPlaces
 arbitrary continuation at the resulting store. All prefix evaluations are
 reused exactly once, including the latest-root load and final write. -/
 theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {environment : Environment} {before after : Store}
     (completed : Evaluates environment before
       (execute prepared reference keys rhs (LanguageResult.success .unit) .unit operator bitNot invalid)
@@ -1362,18 +1575,20 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
             | caseLeft _ impossible => cases impossible
             | caseRight setterEvaluated tail =>
               rename_i setterStore setterType updatedValue
-              cases tail with
-              | letE writeEvaluated terminal =>
-                rename_i writtenStore writtenValue
-                simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] at terminal
-                cases terminal with
-                | inRight unitEvaluated =>
-                  cases unitEvaluated
-                  refine ⟨[writtenValue, updatedValue, modifiedValue, rightValue, snapshotValue, keyValue, referenceValue], rfl, ?_⟩
-                  intro next outputType value finalStore continuation
-                  exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
-                    (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
-                      (.letE writeEvaluated continuation))))))
+              rcases SourceCoreDataPlaces.guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩
+              · cases tail with
+                | letE writeEvaluated terminal =>
+                  rename_i writtenStore writtenValue
+                  simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] at terminal
+                  cases terminal with
+                  | inRight unitEvaluated =>
+                    cases unitEvaluated
+                    refine ⟨[writtenValue, updatedValue, modifiedValue, rightValue, snapshotValue, keyValue, referenceValue], rfl, ?_⟩
+                    intro next outputType value finalStore continuation
+                    exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
+                      (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
+                        (SourceCoreDataPlaces.guard_passes passes (.letE writeEvaluated continuation)))))))
+              · cases impossible
 
 /-- A universal expression IH supplies the continuation evaluation at the
 actual temporary slots. `completed` is an already proved assignment result,
@@ -1385,7 +1600,7 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
     {scope : Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {coreEnvironment : Environment} {initialStore store : Store}
     (completed : Evaluates coreEnvironment initialStore
       (execute prepared reference keys rhs (LanguageResult.success .unit) .unit operator bitNot invalid)

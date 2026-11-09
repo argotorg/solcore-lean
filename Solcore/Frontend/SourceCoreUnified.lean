@@ -382,7 +382,26 @@ inductive Error where
   | compatible (error : SourceCoreCompatibleFunctions.Error)
   | indexed (error : SourceCoreCallableIndexedPrograms.Error)
   | runtime (error : SourceCoreUnifiedRuntime.PrepareError)
+  /-- A fault-site table would issue a reason in the panic range. -/
+  | panicRange
   deriving Repr
+
+/-- Every reason that a public fault-site table can issue lies below the panic
+range: the compatible inventory, including its reserved metadata ranges, ends
+below it, and so does every row of the callable inventory. -/
+def PanicFree {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : SourceCoreCompatibleFunctions.Prepared checked) : Prop :=
+  (match prepared.diagnostics with
+    | some diagnostics => diagnostics.nextReason ≤ SourceCorePanics.base
+    | none => True) ∧
+  match prepared.callableDiagnostics with
+    | some callable => ∀ item ∈ callable.rootTable.additional, item.1.val < SourceCorePanics.base
+    | none => True
+
+instance {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : SourceCoreCompatibleFunctions.Prepared checked) : Decidable (PanicFree prepared) := by
+  unfold PanicFree
+  split <;> split <;> infer_instance
 
 structure Compiled where private mk ::
   sourceProgram : CheckedProgram
@@ -394,6 +413,8 @@ structure Compiled where private mk ::
   indexedPrepared : SourceCoreCallableIndexedPrograms.prepare compatible.prepared compilationFuel = .ok indexed
   runtime : SourceCoreUnifiedRuntime.Prepared indexed
   runtimePrepared : SourceCoreUnifiedRuntime.prepare indexed = .ok runtime
+  /-- Every panic reason decodes as its panic in every public table. -/
+  panicFree : PanicFree indexed.base
 
 /-- All generated code and restoration metadata are cached before the first
 invocation. Factory equations retain the actual owning compiler artifacts. -/
@@ -410,8 +431,10 @@ def prepare (program : CheckedProgram) (plan : Plan) (fuel : Nat) : Except Error
     | .error error => throw (.runtime error)
     | .ok runtime => pure (⟨runtime, accepted⟩ : {runtime //
         SourceCoreUnifiedRuntime.prepare indexed.val = .ok runtime})
-  pure ⟨program, plan, fuel, compatible.val, compatible.property, indexed.val, indexed.property,
-    runtime.val, runtime.property⟩
+  if panicFree : PanicFree indexed.val.base then
+    pure ⟨program, plan, fuel, compatible.val, compatible.property, indexed.val, indexed.property,
+      runtime.val, runtime.property, panicFree⟩
+  else throw .panicRange
 
 def Compiled.keys (compiled : Compiled) : List Key := compiled.indexed.entries.map (·.key)
 
@@ -729,8 +752,10 @@ theorem prepare_fields {source : CheckedProgram} {plan : Plan} {fuel : Nat}
     · simp [throw, throwThe, MonadExceptOf.throw] at prepared
     · split at prepared
       · simp [throw, throwThe, MonadExceptOf.throw] at prepared
-      · cases prepared
-        exact ⟨rfl, rfl, rfl⟩
+      · split at prepared
+        · cases prepared
+          exact ⟨rfl, rfl, rfl⟩
+        · simp [throw, throwThe, MonadExceptOf.throw] at prepared
 
 /-- The cached Core adapter's actual successful request has the original
 artifact's public source inputs and result, rather than inferred ownership

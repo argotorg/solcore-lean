@@ -42,18 +42,21 @@ inductive BinaryOp where
   | notEqual
   | logicalAnd
   | logicalOr
-  /-- `+`, `-` and `*` written in an `unchecked` block. The parser never
-  produces them; `Syntax.Unchecked.mark` does. -/
+  /-- `+`, `-`, `*`, `/` and `%` written in an `unchecked` block. The parser
+  never produces them; `Syntax.Unchecked.mark` does. -/
   | uncheckedAdd
   | uncheckedSubtract
   | uncheckedMultiply
+  | uncheckedDivide
+  | uncheckedModulo
   deriving Repr, BEq, DecidableEq
 
 namespace BinaryOp
 
 /-- Larger values bind more tightly. -/
 def precedence : BinaryOp → Nat
-  | .multiply | .divide | .modulo | .uncheckedMultiply => 9
+  | .multiply | .divide | .modulo | .uncheckedMultiply | .uncheckedDivide
+  | .uncheckedModulo => 9
   | .add | .subtract | .uncheckedAdd | .uncheckedSubtract => 8
   | .shiftLeft | .shiftRight => 7
   | .bitAnd => 6
@@ -92,6 +95,13 @@ def symbol : BinaryOp → Symbol
   | .uncheckedAdd => .plus
   | .uncheckedSubtract => .minus
   | .uncheckedMultiply => .star
+  | .uncheckedDivide => .slash
+  | .uncheckedModulo => .percent
+
+/-- `/` and `%` of an `unchecked` block, which panic on a zero divisor. -/
+def mayPanic : BinaryOp → Bool
+  | .uncheckedDivide | .uncheckedModulo => true
+  | _ => false
 
 /-- `<<` and `>>` repeat their symbol in a second, adjacent token. -/
 def secondSymbol? : BinaryOp → Option Symbol
@@ -118,11 +128,13 @@ inductive ValueAssignOp where
   | bitOr
   | shiftLeft
   | shiftRight
-  /-- `+=`, `-=` and `*=` written in an `unchecked` block, produced by
-  `Syntax.Unchecked.mark` only. -/
+  /-- `+=`, `-=`, `*=`, `/=` and `%=` written in an `unchecked` block,
+  produced by `Syntax.Unchecked.mark` only. -/
   | uncheckedAdd
   | uncheckedSubtract
   | uncheckedMultiply
+  | uncheckedDivide
+  | uncheckedModulo
   deriving Repr, BEq, DecidableEq
 
 namespace ValueAssignOp
@@ -143,6 +155,8 @@ def symbol : ValueAssignOp → Symbol
   | .uncheckedAdd => .plusEqual
   | .uncheckedSubtract => .minusEqual
   | .uncheckedMultiply => .starEqual
+  | .uncheckedDivide => .slashEqual
+  | .uncheckedModulo => .percentEqual
 
 /-- `<<=` and `>>=` are `<` before an adjacent `<=`, and `>` before an
 adjacent `>=`. -/
@@ -158,7 +172,13 @@ def tokenCount (operator : ValueAssignOp) : Nat :=
 /-- The compound assignments that take Words only: `<<=`, `>>=` and the
 arithmetic of an `unchecked` block. -/
 def wordOnly : ValueAssignOp → Bool
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => true
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .uncheckedDivide | .uncheckedModulo => true
+  | _ => false
+
+/-- `/=` and `%=` of an `unchecked` block, which panic on a zero divisor. -/
+def mayPanic : ValueAssignOp → Bool
+  | .uncheckedDivide | .uncheckedModulo => true
   | _ => false
 
 end ValueAssignOp

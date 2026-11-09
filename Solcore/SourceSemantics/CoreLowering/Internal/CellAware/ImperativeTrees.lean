@@ -1505,7 +1505,7 @@ variable
   (unitValue : ∀ mapping world, (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions).Represents mapping world .unit .unit .unit .unit)
 
 include record bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics booleans unitValue in
-theorem preserves {budget : Nat}
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
@@ -1852,7 +1852,7 @@ theorem preserves {budget : Nat}
       initial admitted authority physical owner sameLocation ready trace
 
 include record bindings transport extension registered operandIncluded faithful observations assignmentDiagnostics booleans unitValue in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) {budget : Nat}
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) {budget : Nat}
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →
@@ -2241,7 +2241,7 @@ variable
   (unitValue : ∀ mapping world, (CompatibleAmbientHeap.payloadModel whole.compatible.checked receiving functions).Represents mapping world .unit .unit .unit .unit)
 
 include record registered bindings transport extension operandIncluded faithful observations assignmentDiagnostics booleans unitValue in
-theorem lifts
+theorem lifts [RecursiveStageMeaning.FaultTokens faults]
     (children : ∀ context, Dynamic.SourceRuntimeValid program context (source named) →
       invocation.evidence.Covers context →
       context.solvedRequirements = (CallableIndexedNamedGeneration.context whole.indexed named).solvedRequirements →

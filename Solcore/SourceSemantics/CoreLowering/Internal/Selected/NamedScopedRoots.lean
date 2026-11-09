@@ -78,7 +78,7 @@ local notation "physicalBridge" =>
 include support globals selected semantic faithful observations assignmentInterpretation in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
-theorem preserves
+theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget →
@@ -192,7 +192,7 @@ theorem preserves
 include support globals selected semantic functionTypes faithful observations assignmentInterpretation in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
-theorem reflects
+theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget →

@@ -683,7 +683,7 @@ include extension faithful observations runtimeViews owners uninitialized missin
   certified environments heaps locals agrees actualTyped installed in
 /-- Every raw argument/body obligation is supplied by catalog mutual induction.
 The only source execution input is the independent original raw-form trace. -/
-private theorem raw_preserves_with_children
+private theorem raw_preserves_with_children [FunctionCalls.FaultTokens faults]
     (argumentMeaning : ProtectedExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) (Program.ofChecked compilerProgram)
       context evidence source children faults (protectedEntry headers locations capturePrefix compilation.administrativePrefix)) :
@@ -714,7 +714,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
   certified environments heaps locals agrees actualTyped installed in
 /-- Only the actual native completion is measured. Reflection constructs its
 independent source trace and never consumes preservation or a source run. -/
-private theorem raw_reflects_with_children
+private theorem raw_reflects_with_children [FunctionCalls.FaultTokens faults]
     (argumentMeaning : ProtectedExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) (Program.ofChecked compilerProgram)
       context evidence source children faults (protectedEntry headers locations capturePrefix compilation.administrativePrefix)) :
@@ -786,7 +786,7 @@ variable {compilation : SourceCoreFunctions.Context} {source : TypedSource}
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles sourceUnique in
-private theorem head_preserves {children : GenericExpressionMeaning.Certificate}
+private theorem head_preserves [FunctionCalls.FaultTokens faults] {children : GenericExpressionMeaning.Certificate}
     (argumentMeaning : ProtectedExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) (Program.ofChecked compilerProgram)
       context evidence source children faults (protectedEntry headers locations capturePrefix compilation.administrativePrefix)) :
@@ -823,7 +823,7 @@ private theorem head_preserves {children : GenericExpressionMeaning.Certificate}
     · simpa only [sourceType, outputType] using represented
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
-private theorem head_reflects {children : GenericExpressionMeaning.Certificate}
+private theorem head_reflects [FunctionCalls.FaultTokens faults] {children : GenericExpressionMeaning.Certificate}
     (argumentMeaning : ProtectedExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) (Program.ofChecked compilerProgram)
       context evidence source children faults (protectedEntry headers locations capturePrefix compilation.administrativePrefix)) :
@@ -863,7 +863,7 @@ private theorem head_reflects {children : GenericExpressionMeaning.Certificate}
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles valid sourceUnique callerUninitialized callerMissing in
 /-- Every child law comes from the generic structural Tree induction. The
 ordinary catalog body family is closed by the existing all-grade mutual theorem. -/
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       (Program.ofChecked compilerProgram) context evidence source
       (Tree headers compilerProgram compilation readFuel source context reasonAt)
@@ -877,7 +877,7 @@ theorem preserves :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles valid callerUninitialized callerMissing in
 /-- Reflection consumes only the original native completion, reconstructing
 independent source grades and the exact first-fault state. -/
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       (Program.ofChecked compilerProgram) context evidence source
       (Tree headers compilerProgram compilation readFuel source context reasonAt)

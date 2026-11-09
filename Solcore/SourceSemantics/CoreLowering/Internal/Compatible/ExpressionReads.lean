@@ -1213,7 +1213,7 @@ theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : T
     (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason) :
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason) :
     ∃ outcome after value finalStore,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
       Evaluates actual store (code.rename ξ) value finalStore ∧
@@ -1546,7 +1546,7 @@ theorem Certificate.completed {fuel : Nat} {context : ValuesContext} {source : T
     (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
     {value : Value} {finalStore : Store} (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ outcome after,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
@@ -1739,7 +1739,7 @@ theorem Certificate.preserves {fuel : Nat} {context : ValuesContext} {source : T
     (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
     (unique : NodeOccurrencesUnique source)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after) :
@@ -1775,7 +1775,7 @@ theorem Certificate.reflects {fuel : Nat} {context : ValuesContext} {source : Ty
     (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
     {value : Value} {finalStore : Store} (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ outcome after,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
@@ -1828,7 +1828,7 @@ theorem loweredRead_preserves {fuel : Nat} {context : ValuesContext} {source : T
     {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends context.registry registry)
     (program : Program) (sourceContext : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (reasonAt : ExpressionId → Word) {faults : FunctionCalls.FaultRep}
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
     (unique : NodeOccurrencesUnique source) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel context.checked registry functions)
       program sourceContext evidence source (LoweredRead fuel context source sourceContext reasonAt) faults := by
@@ -1849,7 +1849,7 @@ theorem loweredRead_reflects {fuel : Nat} {context : ValuesContext} {source : Ty
     {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends context.registry registry)
     (program : Program) (sourceContext : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (reasonAt : ExpressionId → Word) {faults : FunctionCalls.FaultRep}
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id)) :
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id)) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel context.checked registry functions)
       program sourceContext evidence source (LoweredRead fuel context source sourceContext reasonAt) faults := by
   intro scope id lowered receipt node found mapping world administrative environment canonical actual before store ξ value finalStore

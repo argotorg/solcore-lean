@@ -92,7 +92,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- The retained closure's actual binder row determines the source argument
 vector, including the distinction between zero arguments and one Unit argument.
 The existing numeric body family reflects the same complete native application. -/
-theorem reflects_packed {invocation : Staging.Recursive.Scope}
+theorem reflects_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
@@ -173,7 +173,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- A Source application of the exact packed input constructs finite native
 execution at the original caller store. The real Source arity disambiguates
 zero, singleton and longer packs before the existing body preservation proof. -/
-theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+theorem preserves_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource)
     (arity : sources.length = function.parameters.length)
@@ -335,7 +335,7 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- Actual direct completion reflects the same global function, dictionary,
 ordered arguments, captured native environment and full returned caller. -/
-theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
+theorem reflects_packed_at_arity [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
@@ -346,6 +346,8 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
           invocation context before (.global function) sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
           outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   classical
   obtain ⟨owner, header, rawD, identity, capture, descriptor, member, sourceAt, _installed,
     _number, _projection, _nativeTyped, _rawType, nativeEq, nativeType⟩ :=
@@ -434,7 +436,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
-theorem reflects_packed {invocation : Staging.Recursive.Scope}
+theorem reflects_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
@@ -452,7 +454,7 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- An independent named application at the authentic declared arity drives
 the original native payload, retaining success or failure and the full caller post. -/
-theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+theorem preserves_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
     (arityAt : RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) (.global function) sources.length)
     {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
@@ -462,6 +464,8 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
         outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   classical
   obtain ⟨owner, header, rawD, identity, capture, descriptor, member, sourceAt, _installed,
     _number, _projection, _nativeTyped, _rawType, nativeEq, nativeType⟩ :=
@@ -551,7 +555,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- Successful Source execution supplies the genuine arity automatically. -/
-theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+theorem preserves_value_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
@@ -858,7 +862,7 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- The authentic source function branch supplies its actual ordered argument
 row; the same native completion reflects independent Source application. -/
-theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
+theorem reflects_packed_at_arity [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
@@ -889,7 +893,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
-theorem reflects_packed {invocation : Staging.Recursive.Scope}
+theorem reflects_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
@@ -907,7 +911,7 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- An independent Source application at the genuine callable arity preserves
 its complete outcome and reached heap. Packing alone does not fix arity. -/
-theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+theorem preserves_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
     (arity : RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) function sources.length)
     {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
@@ -938,7 +942,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- Successful Source execution supplies the genuine callable arity. -/
-theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+theorem preserves_value_packed [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize

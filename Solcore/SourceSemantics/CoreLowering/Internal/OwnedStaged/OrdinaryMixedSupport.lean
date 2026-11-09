@@ -487,7 +487,7 @@ private theorem continued_arguments :
 include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
   prepared selected previousSuccess requested previousHandle continued previousResult atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual returned-state admission feeds the existing public endpoint. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -535,7 +535,7 @@ theorem public_run_succeeded_reflects
 include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
   prepared selected previousSuccess requested previousHandle continued previousResult atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual returned-state admission feeds the existing public endpoint. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -580,7 +580,7 @@ theorem public_run_failed_reflects
 include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
   prepared selected previousSuccess requested previousHandle continued previousResult atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual returned-state admission feeds the existing public endpoint. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     {source : Dynamic.Value} (previousSource : previousOutcome = .value source)
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)

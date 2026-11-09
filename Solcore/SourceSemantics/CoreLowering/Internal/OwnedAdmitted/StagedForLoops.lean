@@ -212,7 +212,7 @@ theorem preserves_value (budget : Nat)
           next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _ _
       rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
       simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
-        commit.prefix_agreement resolution coreLookup (next.rename ξ) output
+        commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
 
 include environments heaps locals agrees actualTyped initial admitted unique assignmentTyped projected in
 theorem preserves_key_fault (budget : Nat)
@@ -679,6 +679,20 @@ theorem assignment_operands {assignment : AssignmentResolution} {operator : Synt
       (Size.stepSize [Size.stepSize [childSize]]) (.fault (.semantic (.invalidAssignmentOperands operator))) after :=
   .initializerFault (.assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid)
 
+theorem assignment_panic {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {target : Dynamic.ResolvedPlace} {right : Dynamic.Value} {currentCell : Dynamic.Cell}
+    {initial currentSelected : Option Dynamic.Value} {code : UInt8}
+    (snapshot : BareTarget environment before assignment.target target)
+    (child : Size.Expression program stages childSize invocation context environment before rhs (.value right) after)
+    (currentRead : Dynamic.Heap.Reads after target.location currentCell)
+    (rootType : currentCell.type = target.rootType)
+    (initialValue : Dynamic.RootInitialValue currentCell initial)
+    (pathRead : Dynamic.ProjectionsRead initial target.projections currentSelected)
+    (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code) :
+    Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
+      (Size.stepSize [Size.stepSize [childSize]]) (.fault (.semantic (.panic code))) after :=
+  .initializerFault (.assignmentPanic snapshot child currentRead rootType initialValue pathRead panics)
+
 /-- Empty initialization contributes its genuine empty-items grade. -/
 theorem nil
     (trace : Trace program stages invocation context environment before [] test post body size outcome after) :
@@ -779,6 +793,13 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ childSize right currentCell initial currentSelected code,
+      size = Size.stepSize [Size.stepSize [childSize]] ∧
+      outcome = .fault (.semantic (.panic code)) ∧
+      Size.Expression program stages childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ childSize nextSize value middle written updated,
       size = Size.stepSize [childSize, nextSize] ∧
       Size.Expression program stages childSize invocation context environment before rhs (.value value) middle ∧
@@ -788,7 +809,7 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
       Trace program stages invocation context environment written items test post body nextSize outcome after) := by
   cases trace with
   | initializerFault initial =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | panicked | continued
       · obtain ⟨childSize, failure, rfl, _, same, child⟩ := failed
         cases same
         exact .inl ⟨_, _, rfl, rfl, child⟩
@@ -796,18 +817,24 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
           child, currentRead, rootType, initialValue, pathRead, operands⟩ := invalid
         cases same
         exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, child, currentRead, rootType, initialValue, pathRead, operands⟩)
+      · obtain ⟨childSize, right, currentCell, initial, currentSelected, code, rfl, _, same,
+          child, currentRead, rootType, initialValue, pathRead, panics⟩ := panicked
+        cases same
+        exact .inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, child, currentRead, rootType, initialValue, pathRead, panics⟩))
       · obtain ⟨childSize, tailSize, value, middle, written, updated, rfl, child, write, next⟩ := continued
-        refine .inr (.inr ⟨_, _, _, _, _, _, ?_, child, write, .initializerFault next⟩)
+        refine .inr (.inr (.inr ⟨_, _, _, _, _, _, ?_, child, write, .initializerFault next⟩))
         simp only [Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]
         omega
   | loop initial loop =>
-      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | continued
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.assignment snapshot initial with failed | invalid | panicked | continued
       · obtain ⟨_, _, _, _, same, _⟩ := failed
         cases same
       · obtain ⟨_, _, _, _, _, _, _, same, _⟩ := invalid
         cases same
+      · obtain ⟨_, _, _, _, _, _, _, _, same, _⟩ := panicked
+        cases same
       · obtain ⟨childSize, tailSize, value, middle, written, updated, rfl, child, write, next⟩ := continued
-        exact .inr (.inr ⟨_, _, _, _, _, _, grade_prefix _ _ _, child, write, .loop next loop⟩)
+        exact .inr (.inr (.inr ⟨_, _, _, _, _, _, grade_prefix _ _ _, child, write, .loop next loop⟩))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerSource
 end
@@ -2624,7 +2651,7 @@ include bridge bindings definitions registered producer acquire transport extens
 /-- Native completion determines the actual ordered lexical Source trace,
 including the distinct context after successful allocation and initializer
 faults before allocation. The returned caller state retains the entire heap. -/
-theorem reflects_at {budget : Nat}
+theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       ReflectsAt bridge context model stages invocation (certificates context) faults childSize)
     (unique : NodeOccurrencesUnique invocation.source)
@@ -2809,6 +2836,13 @@ theorem reflects_at {budget : Nat}
               finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
             exact fault_post bridge (context := context) (expected := expected)
               (failure := .semantic (.invalidAssignmentOperands operator)) reached stable
+        | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata reached related stable =>
+            cases same
+            refine ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+              .assignmentPanic snapshot trace currentRead rootType initialized path panics, .fault matched,
+              finalHeaps, maps, worlds, preservation, metadata, reached, related, ?_⟩
+            exact fault_post bridge (context := context) (expected := expected)
+              (failure := .semantic (.panic _)) reached stable
         | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
             have tailTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2
             obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
@@ -3024,7 +3058,7 @@ include bridge bindings definitions registered producer acquire transport extens
 /-- Preservation follows the original staged Source children and allocation.
 Lexical restoration preserves the returned value's captured cells and the
 same native store; it changes only the caller's lexical observations. -/
-theorem preserves_at {budget : Nat}
+theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       PreservesAt bridge context model stages invocation (certificates context) faults childSize)
     (unique : NodeOccurrencesUnique invocation.source)
@@ -3225,6 +3259,8 @@ theorem preserves_at {budget : Nat}
           ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
           ⟨childSize, right, currentCell, initialValue, selected, sameSize, contextEq, outcomeEq,
             childTrace, _currentRead, _rootType, _initialized, _path, invalidOperands⟩ |
+          ⟨childSize, right, currentCell, initialValue, selected, code, sameSize, contextEq, outcomeEq,
+            childTrace, _currentRead, _rootType, _initialized, _path, panics⟩ |
           ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
         · subst finalContext
           subst outcome
@@ -3255,6 +3291,21 @@ theorem preserves_at {budget : Nat}
           exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
             preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected)
               (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
+        · subst finalContext
+          subst outcome
+          have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+          obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_panic
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected)
+              (failure := .semantic (.panic _)) reached stable⟩
         · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
             rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
           have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -3284,7 +3335,7 @@ theorem preserves_at {budget : Nat}
         cases trace with
         | assignment snapshot _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
         | assignmentFailure snapshot _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
-        | assignmentOperands snapshot _ _ _ _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
+        | assignmentOperands snapshot _ _ _ _ _ _ | assignmentPanic snapshot _ _ _ _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
         | unbound empty _ => exact (bare empty).elim
         | dangling empty _ _ => exact (bare empty).elim
         | projectedAssignmentRootFault _ failed => exact (failed.excluded head.writable locals).elim
@@ -3639,7 +3690,7 @@ theorem projected_assignment {program : Program} {registry : Registry} {invocati
   cases trace with
   | initializerFault initial =>
     cases initial with
-    | assignment snapshot _ _ _ | assignmentFailure snapshot _ | assignmentOperands snapshot _ _ _ _ _ _ =>
+    | assignment snapshot _ _ _ | assignmentFailure snapshot _ | assignmentOperands snapshot _ _ _ _ _ _ | assignmentPanic snapshot _ _ _ _ _ _ =>
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
     | unbound empty _ | dangling empty _ _ => exact (projected empty).elim

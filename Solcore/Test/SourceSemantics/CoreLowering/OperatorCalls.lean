@@ -1679,6 +1679,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
       SourceCall support support.identityHeader.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.identityHeader.header.function)
         ⟨[]⟩ [.word seed] (.value (.word seed)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -1777,6 +1779,8 @@ theorem RetainedState.select {fixture : CompiledFixture} {observed : ObservedPro
     ∃ after : RetainedState support call.completion.session entries,
       SourceCall support support.selectHeader.header invocation state.heap
         [entry.source, .bool flag, .word value] (.value (.word returned)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.selectInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -1897,6 +1901,8 @@ theorem forward_select {fixture : CompiledFixture} {observed : ObservedProgram f
     (trace : SourceCall support support.selectHeader.header invocation state.heap
       [entry.source, .bool flag, .word value] (.value (.word returned)) after) :
     ForwardAt support entries call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.selectInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

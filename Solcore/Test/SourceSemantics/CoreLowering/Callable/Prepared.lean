@@ -80,7 +80,7 @@ include initial sameFrame length spine owned history sourceFrame sameSource prof
   faithful observations functionTypes uninitialized missing escapedFault in
 /-- The expression induction interface is closed by concrete static leaves;
 there is no body meaning premise in this test. -/
-theorem closed_builtin_prefix (budget : Nat) (strict : reached.childSize < budget)
+theorem closed_builtin_prefix [FunctionCalls.FaultTokens faults] (budget : Nat) (strict : reached.childSize < budget)
     (caller : CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost store) :
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.BodyTrace program sourceSize function context reached.environment reached.heap outcome after ∧
@@ -162,7 +162,7 @@ variable (profile : CallablePreparedMethodRuntimeMeaning.Profile compiled values
     faults (.missingMappingDefault value) (((diagnostics.reasonAt named.signature.key) id).add tag))
 
 include profile extension faithful observations functionTypes escaped uninitialized missing in
-theorem closed_builtin_compiled {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem closed_builtin_compiled [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {size : Nat} {value : Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -273,7 +273,7 @@ def builtinOrigin : CallableRuntimeBodyOrigins.Origin values ambient registry fa
 
 include profile extension faithful observations functionTypes escaped uninitialized missing in
 /-- Concrete builtin leaves internally close the source family at the original body grade. -/
-theorem closed_builtin_source (size : Nat) : CallableRuntimeBodyOrigins.PreservesAt functions program
+theorem closed_builtin_source [FunctionCalls.FaultTokens faults] (size : Nat) : CallableRuntimeBodyOrigins.PreservesAt functions program
     (builtinOrigin (headers := headers) (locations := locations) (capturePrefix := capturePrefix)
       (callerPrefix := callerPrefix) compiled profile escaped) size := by
   apply CallableRuntimeBodyMutualMeaning.preserves_at
@@ -288,7 +288,7 @@ theorem closed_builtin_source (size : Nat) : CallableRuntimeBodyOrigins.Preserve
 
 include profile extension faithful observations functionTypes escaped uninitialized missing in
 /-- The native family starts from its own completed body and returns an independent source grade. -/
-theorem closed_builtin_native (size : Nat) : CallableRuntimeBodyOrigins.ReflectsAt functions program
+theorem closed_builtin_native [FunctionCalls.FaultTokens faults] (size : Nat) : CallableRuntimeBodyOrigins.ReflectsAt functions program
     (builtinOrigin (headers := headers) (locations := locations) (capturePrefix := capturePrefix)
       (callerPrefix := callerPrefix) compiled profile escaped) size := by
   apply CallableRuntimeBodyMutualMeaning.reflects_at
@@ -302,7 +302,7 @@ theorem closed_builtin_native (size : Nat) : CallableRuntimeBodyOrigins.Reflects
     (scope := scope) (id := id) (lowered := lowered)
 
 include profile extension faithful observations functionTypes escaped uninitialized missing in
-theorem closed_builtin_compiled {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem closed_builtin_compiled [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {size : Nat} {value : Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -916,7 +916,7 @@ variable (alignment : OperatorAlignment (named := named) (sourceBody := sourceBo
 
 include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
   children nativeTypes profile alignment selected selection in
-theorem actual_source {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem actual_source [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -955,7 +955,7 @@ theorem actual_source {mapping : LocationMap} {world : StoreTyping} {before afte
 
 include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
   children nativeTypes profile alignment selected selection in
-theorem actual_native {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem actual_native [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {value : Value} {size : Nat}
@@ -1077,7 +1077,7 @@ variable (profile : CallablePreparedMethodRuntimeMeaning.Profile compiled values
 
 
 include profile extension faithful observations functionTypes escaped uninitialized missing in
-theorem closed_builtin_hook (budget child : Nat) (strict : child < budget)
+theorem closed_builtin_hook [FunctionCalls.FaultTokens faults] (budget child : Nat) (strict : child < budget)
     {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -1119,7 +1119,7 @@ theorem closed_builtin_hook (budget child : Nat) (strict : child < budget)
 include profile extension faithful observations functionTypes escaped uninitialized missing in
 /-- The parent source derivation supplies the original child and strict bound.
 The resulting native hook is ungraded; no native grade is inferred from it. -/
-theorem original_method_body (size : Nat)
+theorem original_method_body [FunctionCalls.FaultTokens faults] (size : Nat)
     {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -1632,7 +1632,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- The original raw operator and every selected output conversion are closed
 by their actual runtime trees. No child or body execution law is an input. -/
-theorem actual_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem actual_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {outcome : Dynamic.ExpressionOutcome}
@@ -1674,7 +1674,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- Completed output code supplies the original measured operand and each
 actual suffix body. Reflection does not require a source completion. -/
-theorem actual_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem actual_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {value : Value} {size : Nat}
@@ -1970,7 +1970,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- The original raw operator and every selected output conversion are closed
 by their actual runtime trees. No child or body execution law is an input. -/
-theorem actual_preserves {rawWorkspace : Workspace.RawWorkspace} {checkFuel : Nat}
+theorem actual_preserves [FunctionCalls.FaultTokens faults] {rawWorkspace : Workspace.RawWorkspace} {checkFuel : Nat}
     (checkedAccepted : checkProgram rawWorkspace checkFuel = .ok checkedProgram)
     (sourceProgram : program = SourceSemantics.Program.ofChecked checkedProgram)
     (ledger : callerContext.solvedRequirements = caller.function.solvedRequirements) {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
@@ -2016,7 +2016,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- Completed output code supplies the original measured operand and each
 actual suffix body. Reflection does not require a source completion. -/
-theorem actual_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem actual_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {value : Value} {size : Nat}

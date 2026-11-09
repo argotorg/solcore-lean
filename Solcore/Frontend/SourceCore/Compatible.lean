@@ -1171,37 +1171,39 @@ def setter (prepared : Prepared) (keyType : Core.Ty) : Core.Expr :=
           (update prepared steps prepared.route.rootType (.var 0)
             (.first (.second (.var 1))) (.second (.second (.var 1)))))
 
-def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Core.BinaryOp
+def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option SourceCoreDataPlaces.Modifier
   | .equal => none
-  | .add => some (if integer then .integerAdd else .wordAdd)
-  | .subtract => some (if integer then .integerSub else .wordSub)
-  | .multiply => some (if integer then .integerMul else .wordMul)
-  | .divide => some (if integer then .integerDiv else .wordDiv)
-  | .modulo => some (if integer then .integerMod else .wordMod)
-  | .bitAnd => some (if integer then .integerAnd else .wordAnd)
-  | .bitOr => some (if integer then .integerOr else .wordOr)
-  | .bitXor => some (if integer then .integerXor else .wordXor)
+  | .add => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerAdd else .wordAdd))
+  | .subtract => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerSub else .wordSub))
+  | .multiply => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerMul else .wordMul))
+  | .divide => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerDiv else .wordDiv))
+  | .modulo => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerMod else .wordMod))
+  | .bitAnd => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerAnd else .wordAnd))
+  | .bitOr => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerOr else .wordOr))
+  | .bitXor => some (SourceCoreDataPlaces.Modifier.total (if integer then .integerXor else .wordXor))
   -- Shifts and unchecked arithmetic take Words only; `lower` rejects them at
   -- Integer leaves.
-  | .shiftLeft => some .wordShl
-  | .shiftRight => some .wordShr
-  | .uncheckedAdd => some .wordAdd
-  | .uncheckedSubtract => some .wordSub
-  | .uncheckedMultiply => some .wordMul
+  | .shiftLeft => some (SourceCoreDataPlaces.Modifier.total .wordShl)
+  | .shiftRight => some (SourceCoreDataPlaces.Modifier.total .wordShr)
+  | .uncheckedAdd => some (SourceCoreDataPlaces.Modifier.total .wordAdd)
+  | .uncheckedSubtract => some (SourceCoreDataPlaces.Modifier.total .wordSub)
+  | .uncheckedMultiply => some (SourceCoreDataPlaces.Modifier.total .wordMul)
+  | .uncheckedDivide => some ⟨.wordDiv, true⟩
+  | .uncheckedModulo => some ⟨.wordMod, true⟩
 
-def modified (type : Core.Ty) (operator : Option Core.BinaryOp) (bitNot : Bool)
+def modified (type : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
     (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
   else match operator with
     | none => Core.LanguageResult.success rhs
-    | some operator => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-        (Core.LanguageResult.success (.binary operator (.var 0) (shift 1 rhs)))
+    | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
+        (Core.LanguageResult.success (.binary modifier.operation (.var 0) (shift 1 rhs)))
 
 /-- Internal binders: reference, keys, snapshot, RHS, modified leaf, updated
 root, store result. Source expressions are shifted only at their insertion. -/
 def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Core.BinaryOp)
+    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier)
     (bitNot : Bool) (invalidOperand : Core.Word) : Core.Expr :=
   .letE reference
     (Core.LanguageResult.bind outputType (shift 1 keys.expression)
@@ -1213,7 +1215,8 @@ def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasi
             (Core.LanguageResult.bind outputType
               (.apply (setter prepared keys.type)
                 (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-              (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))))))
+              (SourceCoreDataPlaces.guard outputType operator
+                (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))))))
 
 def lower (context : Context) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
@@ -1247,7 +1250,7 @@ def lower (context : Context) (signatures : ProgramSignatures) (expression : Exp
 The premise uses the actual inserted reference environment. -/
 theorem execute_key_failure {environment : Core.Environment} {before middle after : Core.Store}
     (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Core.BinaryOp)
+    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier)
     (bitNot : Bool) (invalidOperand reason : Core.Word) (ref : Core.Value)
     (referenceEvaluated : Core.Evaluates environment before reference ref middle)
     (failed : Core.Evaluates (ref :: environment) middle (shift 1 keys.expression)
@@ -1262,7 +1265,7 @@ latest-root reconstruction or write. No weakening of an exact store is assumed. 
 theorem execute_rhs_failure {environment : Core.Environment}
     {before referenced keyed selected after : Core.Store}
     (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Core.BinaryOp)
+    (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier)
     (bitNot : Bool) (invalidOperand reason : Core.Word) (ref key snapshot : Core.Value)
     (referenceEvaluated : Core.Evaluates environment before reference ref referenced)
     (keysEvaluated : Core.Evaluates (ref :: environment) referenced (shift 1 keys.expression)

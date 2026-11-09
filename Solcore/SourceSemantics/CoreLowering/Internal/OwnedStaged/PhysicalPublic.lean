@@ -135,7 +135,7 @@ theorem current_arguments :
 include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -177,7 +177,7 @@ theorem public_run_succeeded_reflects
 include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -216,7 +216,7 @@ theorem public_run_failed_reflects
 include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -345,7 +345,7 @@ local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Successful calls retain every earlier export at their real returned state. -/
-theorem public_run_succeeded_retains
+theorem public_run_succeeded_retains [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -391,7 +391,7 @@ theorem public_run_succeeded_retains
 include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- A newly exported function joins the history of the real returned session. -/
-theorem public_run_succeeded_remembers
+theorem public_run_succeeded_remembers [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -451,7 +451,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Selected function leaves inside product outputs join the history of the
 actual returned session, keeping their captures and recursive codec budgets. -/
-theorem public_run_succeeded_collects
+theorem public_run_succeeded_collects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -1630,7 +1630,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared selected savedHistory captured atSaved restored atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- The captured branch's history is produced from the actual restore and then
 consumed by the complete public execution theorem. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -1669,7 +1669,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared selected savedHistory captured atSaved restored atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- The captured branch's history is produced from the actual restore and then
 consumed by the complete public execution theorem. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -1705,7 +1705,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared selected savedHistory captured atSaved restored atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- The captured branch's history is produced from the actual restore and then
 consumed by the complete public execution theorem. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -1787,6 +1787,8 @@ def sequence_on
     (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
     (sourceOwner : function.source.owner = signature.id) :
     OrdinarySequence stagePrepared support.caller.named code support.body := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   let body := support.body
   have retained := provenance.policy_recipe
   have bodyView := provenance.body_view

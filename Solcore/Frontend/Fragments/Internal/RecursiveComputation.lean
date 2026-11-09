@@ -2235,7 +2235,7 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
             exact .binary operator (sound leftAccepted) (sound rightAccepted)
         | none =>
             cases sourceOp <;> simp [directWordBinary?] at mapped
-            case shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply =>
+            case shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply | uncheckedDivide | uncheckedModulo =>
               exact pure_sound (by
                 simpa [elaborateRecursiveLocalComputation?, directWordBinary?] using accepted)
             case logicalAnd =>

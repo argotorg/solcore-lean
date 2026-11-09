@@ -211,6 +211,8 @@ theorem inferAssignedValueFuel_children_actual_invariants
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success
+      | uncheckedDivide => exact finishNonEqual success
+      | uncheckedModulo => exact finishNonEqual success
 
 /-- The actual inferred place and RHS are typed in one enclosing statement
 source.  The place is inferred before the RHS; its recorded type is finally

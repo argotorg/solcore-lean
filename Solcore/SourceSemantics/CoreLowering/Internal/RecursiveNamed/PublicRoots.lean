@@ -544,7 +544,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem has_sufficient_fuel_with_evidence
+theorem has_sufficient_fuel_with_evidence [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -567,7 +567,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_reflects_program_with_evidence
+theorem completed_reflects_program_with_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -637,7 +637,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem has_sufficient_fuel_with
+theorem has_sufficient_fuel_with [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -657,7 +657,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_reflects_program_with
+theorem completed_reflects_program_with [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -724,7 +724,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem has_sufficient_fuel
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -745,7 +745,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_reflects_program
+theorem completed_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)

@@ -1158,7 +1158,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   sameLedger runtimeLedger uninitialized in
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. No semantic continuation appears in the public inputs. -/
-theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
@@ -1166,6 +1166,8 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
     NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size,
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction root with
   | proxy receipt =>
       intro _noMethods _noDirect _noIndexes _ports size current child code point
@@ -1407,7 +1409,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   sameLedger runtimeLedger uninitialized in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -1416,6 +1418,8 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
     NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size,
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction root with
   | proxy receipt =>
       intro _noMethods _noDirect _noIndexes _ports size current child code point
@@ -1737,7 +1741,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers
   sameLedger runtimeLedger uninitialized in
 /-- The accepted compiler action issues the actual tree used for Source preservation. -/
-theorem preserves_compiled
+theorem preserves_compiled [FunctionCalls.FaultTokens semanticFaults]
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)
     (policyFor : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor policy
@@ -1772,7 +1776,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers
   sameLedger runtimeLedger uninitialized in
 /-- The same issued tree reflects native completion to its independent Source grade. -/
-theorem reflects_compiled
+theorem reflects_compiled [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)

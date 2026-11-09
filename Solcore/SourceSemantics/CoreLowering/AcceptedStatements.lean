@@ -782,7 +782,7 @@ end Empty
 include bindings transport registered in
 /-- Induction over the accepted update items of one actual `for` statement.
 The parent statement and the original compilation authenticate declarations. -/
-theorem post_correct (budget : Nat)
+theorem post_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
@@ -1026,7 +1026,7 @@ theorem post_correct (budget : Nat)
 include bindings transport registered in
 /-- Induction over the accepted initializer items of one actual `for` statement.
 The exhausted list enters the loop terminal at the final initializer context. -/
-theorem initial_correct (budget : Nat)
+theorem initial_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
@@ -1702,7 +1702,7 @@ include bindings transport registered in
 existing flow theorem to the compiler's read, lowered children and allocation
 receipt; nested statement lists inherit reachability, checker typing and native
 typing from the enclosing compiled code. -/
-theorem correct (budget : Nat)
+theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
@@ -2365,7 +2365,7 @@ include bindings transport registered in
 /-- The complete accepted body of an actual named or contextual invocation:
 its compiler tree, footer and native result. Source executions of the original
 statements are related in both directions at the actual reached heap. -/
-theorem body_preserves (budget : Nat)
+theorem body_preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
@@ -2441,7 +2441,7 @@ theorem body_preserves (budget : Nat)
 include bindings transport registered in
 /-- Native completion of the same complete accepted body reconstructs an
 original Source execution, its body result and the reached heap. -/
-theorem body_reflects (budget : Nat)
+theorem body_reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)

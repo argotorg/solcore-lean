@@ -726,7 +726,7 @@ variable {table : SourceCoreFaultSites.Table}
   (signatures : context.signatures = compiled.compatible.checked.signatures)
 
 include extension transport faithful observations unique wellFormed issued rebuilt interprets included signatures in
-theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+theorem assignment_fault [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
     (covers : evidence.Covers context) (budget : Nat)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -755,7 +755,7 @@ theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid (Program.ofChecke
           (interprets head initial admitted payload' bare)) trace bounded next output
 
 include extension transport faithful observations unique wellFormed issued rebuilt interprets included signatures in
-theorem assignment_reflection (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+theorem assignment_reflection [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
     (covers : evidence.Covers context) (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -878,7 +878,7 @@ variable (interprets : ∀ context, (Validity (compiled := compiled) (source := 
     (factory := factory) (faults := faults) (registry := registry) issued bridge functions table)
 
 include definitions registered extension faithful observations producer acquire transport bindings wellFormed unique rebuilt operandIncluded unaryIncluded interprets in
-theorem preserves_flow (budget : Nat) {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat) {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
     (meaning : ∀ context, (Validity (compiled := compiled) (source := source) (solved := solved) evidence) context → RecursiveNamedHeaderContracts.AtMost budget
@@ -986,7 +986,7 @@ theorem preserves_flow (budget : Nat) {context : SourceSemantics.Context} {scope
     eliminator
 
 include definitions registered extension faithful observations producer acquire transport bindings wellFormed unique rebuilt operandIncluded unaryIncluded interprets in
-theorem reflects_flow (budget : Nat) {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
     (functionTypes : FunctionRuntimeViews functions)
@@ -1152,7 +1152,7 @@ private theorem acquire (location : Location) (native : NativeFrame)
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- All head and loop recipes come from this same prepared body. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt (bridge (headers := headers) (keys := keys))
@@ -1177,7 +1177,7 @@ theorem preserves_flow (budget : Nat)
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Native children keep their strict grades; the Source grade remains independent. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt (bridge (headers := headers) (keys := keys))
@@ -1210,7 +1210,7 @@ variable (history : History code) (owner : CallableIndexedOwnedFunctionValues.Ow
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets beforeTyped argumentsTyped stable in
 /-- The strict expression family yields the local flow family and typed Source
 finish at the actual parameter entry; no completed body premise is supplied. -/
-theorem source_continuation (budget : Nat)
+theorem source_continuation [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt (bridge (headers := headers) (keys := keys))
@@ -1228,7 +1228,7 @@ theorem source_continuation (budget : Nat)
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets beforeTyped argumentsTyped stable in
 /-- The native flow and typed finish are derived from the same strict family. -/
-theorem native_continuation (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem native_continuation [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt (bridge (headers := headers) (keys := keys))

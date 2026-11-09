@@ -84,7 +84,7 @@ theorem checked_path_run_reflects {compilation : SourceCoreCompatibleDataPlaces.
     {functions : FunctionModel compilation.checked.catalog (CallableIndexedAmbient.ambientDefinitions artifact)}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {certificate : Certificate} {faults : FaultRep} {assignment : AssignmentResolution}
+    {certificate : Certificate} {faults : FaultRep} [FunctionCalls.FaultTokens faults] {assignment : AssignmentResolution}
     {administrativeContext : Core.Context} {expression : ExpressionLowerer} {fuel : Nat}
     {operator : Syntax.ValueAssignOp}
     {reasonAt : ExpressionId → Word} {invalid invalidOperand : Word} {missing : TypeSystem.Ty → Word}
@@ -176,12 +176,13 @@ theorem checked_bare_run_reflects
 /-- The source trace constructs the actual finite Core execution and final
 related heap without changing location identities or the world. -/
 theorem checked_bare_preserves {updated : Dynamic.Value} {after : Dynamic.Heap}
+    (total : operator.mayPanic = false)
     (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
       environment before assignment.target updated after) :
     ∃ finalStore, Evaluates coreEnvironment store certified.expression (.inRight .word .unit) finalStore ∧
       CompatibleAmbientHeap.HeapRepresents compilation.checked registry functions mapping world after finalStore ∧
       AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  CompatibleBareBitNotLowering.preserves rootTyped bare profile environments heaps locals
+  CompatibleBareBitNotLowering.preserves rootTyped bare profile environments heaps locals total
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) trace
 
 /-- The only bare numeric source fault is the missing unary operand. Its
@@ -391,7 +392,7 @@ theorem checked_run_reflects {compilation : SourceCoreCompatibleDataPlaces.Conte
     {functions : FunctionModel compilation.checked.catalog (CallableIndexedAmbient.ambientDefinitions artifact)}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {certificate : Certificate} {faults : FaultRep} {assignment : AssignmentResolution}
+    {certificate : Certificate} {faults : FaultRep} [FunctionCalls.FaultTokens faults] {assignment : AssignmentResolution}
     {administrativeContext : Core.Context} {expression : ExpressionLowerer} {fuel : Nat}
     {rhs : ExpressionId} {operator : Syntax.ValueAssignOp}
     {reasonAt : ExpressionId → Word} {invalid invalidOperand : Word} {missing : TypeSystem.Ty → Word}
@@ -1514,7 +1515,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
 
 variable {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
 
-theorem preserves_prefix
+theorem preserves_prefix [FunctionCalls.FaultTokens faults]
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -1555,7 +1556,7 @@ theorem preserves_prefix
   exact CompatibleBareAssignment.preserves_prefix layout bare extension meaning observations generated found rhsView rhsCore profile
     environments heaps locals agrees actualTyped slot rootTyped trace invalid
 
-theorem preserves_fault
+theorem preserves_fault [FunctionCalls.FaultTokens faults]
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -1595,7 +1596,7 @@ theorem preserves_fault
   exact CompatibleBareAssignment.preserves_fault layout bare extension meaning observations generated found rhsView rhsCore profile
     environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid invalidToken
 
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -1969,7 +1970,7 @@ theorem actual_preserves {code : Expr}
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [] (scope .word) sourceEnvironment (nativeEnvironment .word) :=
     .cons reference (.nil .nil)
   exact CompatibleBareBitNotLowering.preserves writable rfl (.inl rfl) environments heaps
-    (localAgrees (some (.word seven))) accepted sourceUpdate
+    (localAgrees (some (.word seven))) (by rfl) accepted sourceUpdate
 
 private def exercise (raw : TypeSystem.Ty) (type : Core.Ty) (initial expected : Value) (succeeds : Bool) : IO Unit := do
   match compile raw type with
@@ -2143,6 +2144,8 @@ theorem actual_lower_reflects {code : Expr}
   have binding : ∀ actual, rootBinder source assignment.target.root = .ok actual → actual = binder := by
     intro actual found
     exact Except.ok.inj (found.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
+  -- The trivial relation relates every panic too.
+  haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
   have reflected := CompatiblePlaceBitNotLowerReflection.reflects (compilation := compilation)
     (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _))
@@ -2367,6 +2370,8 @@ theorem actual_lower_reflects {code : Expr}
   have binding : ∀ actual, rootBinder source assignment.target.root = .ok actual → actual = binder := by
     intro actual found
     exact Except.ok.inj (found.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
+  -- The trivial relation relates every panic too.
+  haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
   have reflected := CompatiblePlaceBitNotLowerReflection.reflects_numeric (compilation := compilation)
     (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _))
@@ -2605,7 +2610,7 @@ private def code (prepared : Prepared) (initial latest : Expr) (keyFails rhsFail
           (.letE (.storeCell (.var 1) (.binary .wordAdd (.loadCell (.var 1)) (.word (w 10))))
             (if rhsFails then LanguageResult.failure .word (.word (w 32)) else LanguageResult.success (.word (w 5)))))
         (LanguageResult.success (.pair (.loadCell (.var 0)) (.loadCell (.var 1))))
-        (.product .word (OptionalCell.cellType prepared.route.rootType)) (some .wordAdd) false (w 33)))
+        (.product .word (OptionalCell.cellType prepared.route.rootType)) (some (.total .wordAdd)) false (w 33)))
 
 private def verify (prepared : Prepared) (context : SourceCoreCompatibleValues.Context)
     (initial latest : Expr) (keyFails rhsFails : Bool) (expected : SourceCoreDataValues.Value)

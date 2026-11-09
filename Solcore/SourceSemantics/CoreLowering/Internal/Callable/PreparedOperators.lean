@@ -492,7 +492,7 @@ private theorem arguments {method : Method prepared values ambient registry faul
   simpa only [method.inputType] using represented
 
 include extension faithful observations runtimeViews uninitialized missing escaped in
-theorem method_preserves {method : Method prepared values ambient registry faults program context evidence}
+theorem method_preserves [FunctionCalls.FaultTokens faults] {method : Method prepared values ambient registry faults program context evidence}
     (member : method ∈ methods) {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome}
     (entry : Entry methods functions caller mapping world before store)
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
@@ -544,7 +544,7 @@ theorem Capture.completed_sized {method : Method prepared values ambient registr
     exact ⟨_, smaller, body⟩
 
 include extension faithful observations runtimeViews uninitialized missing escaped in
-theorem method_reflects {method : Method prepared values ambient registry faults program context evidence}
+theorem method_reflects [FunctionCalls.FaultTokens faults] {method : Method prepared values ambient registry faults program context evidence}
     (member : method ∈ methods) {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word}
     (entry : Entry methods functions caller mapping world before store)
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
@@ -570,7 +570,7 @@ theorem method_reflects {method : Method prepared values ambient registry faults
     finalHeaps, maps, worlds, frame, metadata, ⟨entry.extend maps worlds frame metadata⟩⟩
 
 include extension faithful observations runtimeViews uninitialized missing escaped in
-theorem path_preserves {source target : TypeSystem.Ty} {inputType outputType : Ty}
+theorem path_preserves [FunctionCalls.FaultTokens faults] {source target : TypeSystem.Ty} {inputType outputType : Ty}
     (chain : ChainFor Method.row source inputType methods target outputType)
     {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome}
     (entry : Entry methods functions caller mapping world before store)
@@ -593,7 +593,7 @@ theorem path_preserves {source target : TypeSystem.Ty} {inputType outputType : T
     chain entry heaps represented trace
 
 include extension faithful observations runtimeViews uninitialized missing escaped in
-theorem path_reflects {source target : TypeSystem.Ty} {inputType outputType : Ty}
+theorem path_reflects [FunctionCalls.FaultTokens faults] {source target : TypeSystem.Ty} {inputType outputType : Ty}
     (chain : ChainFor Method.row source inputType methods target outputType)
     {input : Dynamic.Value} {native value : Value} {budget : Nat} {reason : Word}
     (entry : Entry methods functions caller mapping world before store)
@@ -770,7 +770,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- The original raw operator and every selected output conversion are closed
 by their actual runtime trees. No child or body execution law is an input. -/
-theorem preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {outcome : Dynamic.ExpressionOutcome}
@@ -830,7 +830,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- Completed output code supplies the original measured operand and each
 actual suffix body. Reflection does not require a source completion. -/
-theorem reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {value : Value} {size : Nat}
@@ -968,7 +968,7 @@ variable {methods : Methods (prepared := prepared) (values := values) (ambient :
 include extension faithful observations runtimeViews uninitialized missing escaped in
 /-- The concrete body is evaluated at the independent source dictionary. Its
 saved closure, original physical slot and every future suffix capture stay fixed. -/
-theorem method_preserves_at_source {method : Method prepared values ambient registry faults program context evidence}
+theorem method_preserves_at_source [FunctionCalls.FaultTokens faults] {method : Method prepared values ambient registry faults program context evidence}
     (member : method ∈ methods) {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome}
     (entry : Entry methods functions caller mapping world before store)
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
@@ -1026,7 +1026,7 @@ variable (catalog : CallableCoercionSelectionIdentity.Catalog program)
 include extension faithful observations runtimeViews uninitialized missing escaped catalog ledger in
 /-- An independently evaluated path keeps each source-selected dictionary.
 The real compiler rows fix only its complete body and reached requirement rows. -/
-theorem path_preserves_source
+theorem path_preserves_source [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} {inputType outputType : Ty}
     (chain : ChainFor Method.row source inputType methods target outputType)
@@ -1250,7 +1250,7 @@ include extension faithful observations functionTypes uninitialized missing esca
 /-- An independent whole source outcome supplies its own raw and suffix
 dictionaries. Actual selection fixes the full bodies; their static runtime
 trees close every child and body execution obligation internally. -/
-theorem preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {outcome : Dynamic.ExpressionOutcome}
@@ -1322,7 +1322,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes profile alignment selected selection suffixUninitialized suffixMissing suffixEscaped emitted steps chain in
 /-- The original measured native completion uses the established suffix
 reflection directly, with no source execution or dictionary equality premise. -/
-theorem reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {value : Value} {size : Nat}

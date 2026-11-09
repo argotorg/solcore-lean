@@ -213,7 +213,7 @@ theorem setter_rename {checked : SourceCoreCompatibleCatalog.Checked} {source : 
   · simp only [Expr.rename, normalize_rename closed, update_rename path]
     simp [LanguageResult.failure, Expr.rename, Renaming.lift]
 
-private theorem modified_rename (type : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
+private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
     (modified type operator bitNot (.var 1) (.var 0) invalid).rename ξ.lift.lift =
       modified type operator bitNot (.var 1) (.var 0) invalid := by
   cases bitNot <;> cases operator <;> simp [modified, LanguageResult.success, LanguageResult.failure,
@@ -226,11 +226,11 @@ theorem execute_rename {checked : SourceCoreCompatibleCatalog.Checked} {source :
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat} {prepared : Prepared}
     (path : CompatibleMixedRoute.PreparedPath checked source site root projections position prepared.steps prepared.keys leaf)
     (closed : VirtualClosed prepared) (reference : Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
     (execute prepared reference keys rhs next outputType operator bitNot invalid).rename ξ =
       execute prepared (reference.rename ξ) (renamed keys ξ) (rhs.rename ξ) (next.rename ξ) outputType operator bitNot invalid := by
   simp [execute, renamed, LanguageResult.bind, shift, List.range, List.range.loop, List.foldl,
-    Expr.rename, getter_rename path closed, setter_rename path closed, modified_rename, Renaming.lift]
+    Expr.rename, getter_rename path closed, setter_rename path closed, modified_rename, DataPlaceGuard.rename_lift, Renaming.lift]
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlace
 end
@@ -706,6 +706,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
         have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
+        have passes := CompatiblePlaceModifier.passes_of_applies observations operatorProfile rightRep applies
+          (prepared.route.leafType = .integer)
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _⟩ :=
           CompatiblePlaceModifier.preserves observations operatorProfile snapshotRep rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
@@ -766,7 +768,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
                 ((ContinuationAgreement.bind rhsResult.evaluated).trans
                   ((ContinuationAgreement.bind modifiedEvaluated).trans
                     ((ContinuationAgreement.bind setterEvaluated).trans
-                      (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten)))))))
+                      ((DataPlaceGuard.agreement passes).trans
+                        (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten))))))))
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceSuccess
 end
@@ -860,7 +863,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
     Result checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
@@ -944,7 +947,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -954,7 +957,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -1065,7 +1068,7 @@ private theorem setter_rename (prepared : Prepared) (layout : Layout prepared) (
     (setter prepared .unit).rename ξ = setter prepared .unit := by
   simp [setter, layout.steps, LanguageResult.success, Expr.rename, Renaming.lift]
 
-private theorem modified_rename (type : Ty) (operator : Option BinaryOp) (invalid : Word) (ξ : Renaming) :
+private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming) :
     (modified type operator true (.var 1) (.var 0) invalid).rename ξ.lift.lift =
       modified type operator true (.var 1) (.var 0) invalid := by
   simp [modified, LanguageResult.success, LanguageResult.failure, Expr.rename, Renaming.lift]
@@ -1073,14 +1076,14 @@ private theorem modified_rename (type : Ty) (operator : Option BinaryOp) (invali
 /-- Only the free lexical reference and continuation move. The Unit RHS stays
 an administrative slot and is never represented as a source expression. -/
 theorem execute_rename {prepared : Prepared} (layout : Layout prepared) (index : Nat)
-    (next : Expr) (output : Ty) (operator : Option BinaryOp) (invalid : Word) (ξ : Renaming) :
+    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming) :
     (execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
       next output operator true invalid).rename ξ =
     execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
       (next.rename ξ) output operator true invalid := by
   simp [execute, SourceCoreCalls.packArguments, LanguageResult.bind, LanguageResult.success,
     shift, List.range, List.range.loop, List.foldl, Expr.rename, Expr.weakenAt,
-    getter_rename _ layout, setter_rename _ layout, modified_rename, Renaming.lift]
+    getter_rename _ layout, setter_rename _ layout, modified_rename, DataPlaceGuard.rename_lift, Renaming.lift]
 
 def writtenContext (prepared : Prepared) (context : Core.Context) : Core.Context :=
   .unit :: prepared.route.rootType :: prepared.route.rootType :: .unit ::

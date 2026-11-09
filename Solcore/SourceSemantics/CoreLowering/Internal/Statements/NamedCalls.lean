@@ -558,7 +558,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing actualTyped in
 /-- A source allocation and its finite body trace execute the real full named
 hook. Parameters are compared with the independently constructed allocation. -/
-theorem hook_preserves {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+theorem hook_preserves [FunctionCalls.FaultTokens faults] {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function context environment bound outcome after) :
     ∃ origin index metadata value finalStore finalMap finalWorld,
@@ -604,7 +604,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing actualTyped in
 /-- Completed actual native execution constructs both source parameter
 allocation and the independent body trace from the installed call context with its actual lexical stopping context. -/
-theorem hook_reflects {value : Value} {finalStore : Store}
+theorem hook_reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ origin index metadata environment bound outcome after finalMap finalWorld,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
@@ -736,7 +736,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
 /-- A finite independent named-body trace executes the actual installed
 global-cell call. Its nil argument pack is derived, and the concrete body
 certificate closes all body meaning beneath the real indexed frame wrapper. -/
-theorem nil_call_preserves
+theorem nil_call_preserves [FunctionCalls.FaultTokens faults]
     (nativeNil : nativeArguments = [])
     {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
@@ -787,7 +787,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
 /-- Every completed installed nil-argument call constructs an independent
 source global application, including body faults and exact shared-heap writes.
 The parameter prefix and lexical body are derived from their static receipts. -/
-theorem nil_call_reflects (nativeNil : nativeArguments = [])
+theorem nil_call_reflects [FunctionCalls.FaultTokens faults] (nativeNil : nativeArguments = [])
     (callerContext : SourceSemantics.Context) (callerEvidence : Dynamic.EvidenceEnvironment)
     {value : Value} {finalStore : Store}
     (evaluated : Evaluates callerEnvironment store (SourceCoreCalls.call signature globalIndex
@@ -834,7 +834,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
 /-- Preservation starts with the independent instantiated declaration body's
 outcome. Its real parameter allocation and trace are extracted at the concrete
 certified context, rather than supplied as a semantic body hypothesis. -/
-theorem nil_body_preserves (nativeNil : nativeArguments = [])
+theorem nil_body_preserves [FunctionCalls.FaultTokens faults] (nativeNil : nativeArguments = [])
     {after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (execution : BodyOutcome program bodyInstance function.evidence before arguments outcome after)
     (callerContext : SourceSemantics.Context) (callerEvidence : Dynamic.EvidenceEnvironment) :
@@ -877,7 +877,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
 canonical selected-key attribution and the concrete body tree. Every completed
 Core result reconstructs the independent source direct call, with the exact
 callee instantiation/evidence and restored indexed administration. -/
-theorem nil_expression_reflects
+theorem nil_expression_reflects [FunctionCalls.FaultTokens faults]
     (nativeNil : nativeArguments = [])
     {expressionPolicy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.BodyLowerer}
     {expressionFuel : Nat} {compilation : SourceCoreFunctions.Context}
@@ -946,7 +946,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
 /-- Preservation of the actual lowered expression starts with the independent
 instantiated declaration body. The concrete certificate constructs body/prefix
 meaning and preserves the exact source declaration and caller evidence. -/
-theorem nil_expression_preserves
+theorem nil_expression_preserves [FunctionCalls.FaultTokens faults]
     (nativeNil : nativeArguments = [])
     {expressionPolicy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.BodyLowerer}
     {expressionFuel : Nat} {compilation : SourceCoreFunctions.Context}
@@ -1435,7 +1435,7 @@ include extension uninitialized missing in
 /-- The concrete parameter/body certificates close this body invocation after
 the real argument effects. The only source execution premise is the particular
 independent invocation being preserved. -/
-theorem body_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem body_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {outcome : Dynamic.ExpressionOutcome}
     (installed : Installed functions body registry mapping world before store callerEnvironment)
@@ -1470,7 +1470,7 @@ theorem body_preserves {mapping : LocationMap} {world : StoreTyping} {before aft
 include extension uninitialized missing in
 /-- Completed actual body execution constructs parameter allocation and the
 independent invocation from the concrete lexical tree, with frame restoration. -/
-theorem body_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem body_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {value : Value}
     (installed : Installed functions body registry mapping world before store callerEnvironment)
@@ -1522,7 +1522,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Concrete General argument trees close all child meaning. Arguments are
 evaluated before the global read; their first fault skips the body. The body
 uses its actual static parameter/lexical certificates at the intervening heap. -/
-theorem preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {outcome : Dynamic.ExpressionOutcome}
@@ -1586,7 +1586,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Every finite native call completion reconstructs its ordered source
 argument trace and concrete independent named-body invocation. Neither child
 evaluations nor a universal body preservation hypothesis are supplied. -/
-theorem reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {value : Value}
@@ -1650,7 +1650,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
   children nativeTypes in
 /-- Actual compiler success, independent source attribution and concrete
 argument/body certificates close reflection at the emitted expression itself. -/
-theorem accepted_reflects {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem accepted_reflects [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {value : Value} {compilation : SourceCoreFunctions.Context}
@@ -1698,7 +1698,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes ca
 /-- Preservation starts with this exact independently instantiated source body
 and ordered argument trace. The actual accepted emitted expression is evaluated,
 including argument faults and lexical body faults with their preceding writes. -/
-theorem accepted_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {canonical : Environment}
     {administrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome} {compilation : SourceCoreFunctions.Context}

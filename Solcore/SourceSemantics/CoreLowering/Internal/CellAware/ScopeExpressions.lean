@@ -606,7 +606,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 /-- Strict Source children preserve the exact staged result and owned state. -/
-theorem preserves_at_selected (budget size : Nat) (bounded : size ≤ budget)
+theorem preserves_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : PreservesBelow bridge context model named stages invocation certificate faults budget) :
@@ -722,11 +722,30 @@ theorem preserves_at_selected (budget size : Nat) (bounded : size ≤ budget)
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second
+            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
             have same := actualApplied.functional applied
             subst sourceResult
             exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
               .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+              firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+      | panic firstTrace continues secondTrace panics firstSmaller secondSmaller =>
+        obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+          leftIH _ (Nat.lt_of_lt_of_le firstSmaller bounded) environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          rw [leftType] at payload
+          obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            rightIH _ (Nat.lt_of_lt_of_le secondSmaller bounded) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (GenericExpressionMeaning.agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+          rw [GenericExpressionMeaning.rename_prefix] at second
+          cases represented with
+          | value rightPayload =>
+            rw [rightType] at rightPayload
+            have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
+            exact ⟨_, finalStore, finalMap, finalWorld,
+              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics,
+              .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
               firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
       | invalid firstTrace continues secondTrace failed firstSmaller secondSmaller =>
         obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
@@ -743,8 +762,10 @@ theorem preserves_at_selected (budget size : Nat) (bounded : size ≤ budget)
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨_, _, applied, _, _⟩ := profile.right_success leftPayload rightPayload continues first second
-            exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            rcases profile.right_outcome leftPayload rightPayload continues first second with
+              ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
+            · exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            · exact False.elim (failed.excludes_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
@@ -804,7 +825,7 @@ theorem preserves_at_selected (budget size : Nat) (bounded : size ≤ budget)
     SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
 
 /-- Completed native children produce their own staged grades and exact state. -/
-theorem reflects_at_selected (budget size : Nat) (bounded : size ≤ budget)
+theorem reflects_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : ReflectsBelow bridge context model named stages invocation certificate faults budget) :
@@ -907,13 +928,18 @@ theorem reflects_at_selected (budget size : Nat) (bounded : size ≤ budget)
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              obtain ⟨sourceResult, result, applied, resultRep, combined⟩ :=
-                profile.right_success leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
-              have secondTrace := trace
-              exact ⟨_, _, after, finalMap, finalWorld, .binary occurrence firstTrace continues secondTrace applied,
-                .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+                ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨_, panics, combined⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                have secondTrace := trace
+                exact ⟨_, _, after, finalMap, finalWorld, .binary occurrence firstTrace continues secondTrace applied,
+                  .value (outputType ▸ resultRep),   finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                have secondTrace := trace
+                exact ⟨_, _, after, finalMap, finalWorld, .binaryPanic occurrence firstTrace continues secondTrace panics,
+                  .fault (RecursiveStageMeaning.FaultTokens.panic _),   finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
@@ -980,14 +1006,14 @@ theorem reflects_at_selected (budget size : Nat) (bounded : size ≤ budget)
     SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals sourceTyped trace frame⟩
 
 /- Compatibility adapters for callers with a whole-program receipt. -/
-theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : PreservesBelow bridge context model named stages invocation certificate faults budget) :
     PreservesAt bridge context model named stages invocation (Head compiled.compatible.checked invocation.source certificate) faults size := by
   apply preserves_at_selected (selectedBodies := Staging.Recursive.SelectedPreservation.SelectedBodies.of_program wellFormed)  <;> assumption
 
-theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : ReflectsBelow bridge context model named stages invocation certificate faults budget) :
@@ -1048,7 +1074,7 @@ private theorem unchanged {program : Program} {stages : Staging.Recursive.Regist
   | pair occurrence _ _ | tupleValue occurrence _ _ | constructorValue occurrence _ _
   | unary occurrence _ _ | unaryInvalid occurrence _ _
   | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | notCallable occurrence _ _ | sourceArity occurrence _ _ _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _
   | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _
@@ -1875,7 +1901,7 @@ theorem reflects_local (size : Nat) :
 
 include extension ordinaryCells uninitialized semantic unique in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context model named registry invocation reads faults size := by
   intro scope id lowered receipt
   exact preserves_local bridge functions extension ordinaryCells semantic unique size
@@ -1883,7 +1909,7 @@ theorem preserves (size : Nat) :
 
 include extension ordinaryCells uninitialized semantic unique in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context model named registry invocation reads faults size := by
   intro scope id lowered receipt
   exact reflects_local bridge functions extension ordinaryCells semantic unique size
@@ -1970,7 +1996,7 @@ private theorem source_group_inv
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -2522,7 +2548,7 @@ private theorem source_children
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -2795,7 +2821,7 @@ private theorem product_values :
 include extension ordinaryCells sameLedger runtimeLedger uninitializedOn semantic unique in
 /-- LiteralSites recursion proves each actual Source child internally. A read
 uses its genuine local certificate; no read or whole-child meaning is supplied. -/
-theorem preserves_reached (size : Nat) :
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel named registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -2844,7 +2870,7 @@ theorem preserves_reached (size : Nat) :
 include extension ordinaryCells sameLedger runtimeLedger uninitializedOn semantic unique in
 /-- Reflection follows the same finite sites at independent native grades.
 Grouping recurses at the same grade; actual pair binds supply strict children. -/
-theorem reflects_reached (size : Nat) :
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel named registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -2892,7 +2918,7 @@ theorem reflects_reached (size : Nat) :
 
 include extension ordinaryCells sameLedger runtimeLedger uninitialized semantic unique in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel named registry invocation trees faults size := by
   intro scope id lowered tree
   exact preserves_reached (faultRoot := id) bridge functions extension ordinaryCells sameLedger runtimeLedger faults
@@ -2901,7 +2927,7 @@ theorem preserves (size : Nat) :
 
 include extension ordinaryCells sameLedger runtimeLedger uninitialized semantic unique in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel named registry invocation trees faults size := by
   intro scope id lowered tree
   exact reflects_reached (faultRoot := id) bridge functions extension ordinaryCells sameLedger runtimeLedger faults
@@ -3237,6 +3263,7 @@ theorem binary (size : Nat)
       | completed =>
         cases failed with
         | primitive invalid => exact ⟨_, _, .binaryInvalid occurrence firstTrace continues secondTrace invalid, .completed⟩
+        | panic panics => exact ⟨_, _, .binaryPanic occurrence firstTrace continues secondTrace panics, .completed⟩
         | requirement failed => cases failed
         | method _ selected _ => cases selected
 

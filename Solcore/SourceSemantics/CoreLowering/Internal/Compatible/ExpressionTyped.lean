@@ -730,7 +730,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension valid unique uninitialized missing in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -916,7 +916,7 @@ theorem preserves :
 
 
 include extension valid uninitialized missing in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -1293,7 +1293,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -1502,7 +1502,7 @@ theorem preserves_with_literals_and_post
 
 
 include extension faithful functionLeaves functionTypes unique uninitialized missing in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1528,7 +1528,7 @@ theorem preserves_with_literals
         faithful functionLeaves functionTypes missing))
 
 include extension faithful functionLeaves functionTypes valid unique uninitialized missing in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -1536,7 +1536,7 @@ theorem preserves :
     (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) ⟨tree, tree.literalSites⟩
 
 include extension in
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -1759,7 +1759,7 @@ theorem reflects_with_literals_and_post
 
 
 include extension faithful functionLeaves functionTypes uninitialized missing in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1785,7 +1785,7 @@ theorem reflects_with_literals
         faithful functionLeaves functionTypes missing))
 
 include extension faithful functionLeaves functionTypes valid uninitialized missing in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree

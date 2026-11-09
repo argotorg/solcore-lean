@@ -605,7 +605,7 @@ include definitions registered extension meaning faithful observations in
 theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
-      context scope items code) (errors : Tree.ReachableErrors registry faults tree)
+      context scope items code) [FunctionCalls.FaultTokens faults] (errors : Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
@@ -744,7 +744,7 @@ theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.C
 
 include definitions registered extension meaning faithful observations in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : Tree.Errors registry faults tree)
@@ -810,7 +810,7 @@ include definitions registered extension meaning reflection faithful observation
 theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
-      context scope items code) (errors : Tree.ReachableErrors registry faults tree)
+      context scope items code) [FunctionCalls.FaultTokens faults] (errors : Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
@@ -923,7 +923,7 @@ theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension meaning reflection faithful observations in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : Tree.Errors registry faults tree)
@@ -1017,7 +1017,7 @@ theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {sc
     environments.extend maps worlds, locals.mono metadata, actualTyped.weaken worlds⟩
 
 include definitions registered extension meaning reflection faithful observations in
-theorem Tree.reflects_post_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_post_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : Tree.ReachableErrors registry faults tree)
@@ -1065,7 +1065,7 @@ theorem Tree.reflects_post_reachable (functionTypes : FunctionRuntimeViews funct
 
 include definitions registered extension meaning reflection faithful observations in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects_post (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_post [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : Tree.Errors registry faults tree)

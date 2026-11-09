@@ -1182,8 +1182,9 @@ private theorem target_functional {environment : Dynamic.Environment} {heap : Dy
       cases valueEq
       rfl
 
-/-- The actual Source rule retains RHS failure, operand rejection after a
-successful RHS, or the genuine write and suffix. The target snapshot is fixed. -/
+/-- The actual Source rule retains RHS failure, operand rejection or a panic
+after a successful RHS, or the genuine write and suffix. The target snapshot is
+fixed. -/
 theorem child_and_tail {program : Program} {registry : Registry} {invocation : Scope}
     {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {id : StatementId} {rest : List StatementId}
@@ -1205,6 +1206,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ childSize right currentCell initial currentSelected code,
+      size = Size.stepSize [childSize] ∧ finalContext = context ∧
+      outcome = .fault (.semantic (.panic code)) ∧
+      Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
@@ -1255,7 +1263,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
       cases equal
       have targetEq := target_functional snapshot actualSnapshot
       cases targetEq
-      exact .inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩)
+      exact .inr (.inr (.inr ⟨_, _, _, _, _, _, rfl, child, write, remaining⟩))
   | assignBareOperands actual same actualSnapshot child currentRead rootType initialValue pathRead invalid =>
       have equal := (shape actual).symm.trans same
       cases equal
@@ -1263,6 +1271,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
       cases targetEq
       exact .inr (.inl ⟨_, _, _, _, _, rfl, rfl, rfl, child,
         currentRead, rootType, initialValue, pathRead, invalid⟩)
+  | assignBarePanic actual same actualSnapshot child currentRead rootType initialValue pathRead panics =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      have targetEq := target_functional snapshot actualSnapshot
+      cases targetEq
+      exact .inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, child,
+        currentRead, rootType, initialValue, pathRead, panics⟩))
   | assignBareFault actual same _ child =>
       have equal := (shape actual).symm.trans same
       cases equal

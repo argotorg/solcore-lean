@@ -1406,7 +1406,7 @@ include transport extension faithful observations functionTypes unique reads mis
 /-- All non-call heads and exact builtin fragments are closed internally.
 Only the actual raw lambda/named/indirect alternatives remain in callLeaves;
 that dispatcher must consume the strict F induction at the retained body. -/
-private theorem preserves_with_literals
+private theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program sourceContext evidence (source named) literals faults)
@@ -1445,7 +1445,7 @@ private theorem preserves_with_literals
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- Reflection follows each actual Core grade; each head returns its own
 independent Source grade and the same admitted reached witness. -/
-private theorem reflects_with_literals
+private theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program sourceContext evidence (source named) literals faults)
@@ -1493,7 +1493,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- Actual runtime literal and non-call meanings are manufactured internally.
 The remaining three call alternatives must use the strict body family. -/
-theorem preserves_at (sameLedger : sourceContext.solvedRequirements = solved)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (sameLedger : sourceContext.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid sourceContext)
     (budget size : Nat) (within : size ≤ budget)
     (callLeaves : ∀ scope entries child, child ≤ budget →
@@ -1516,7 +1516,7 @@ theorem preserves_at (sameLedger : sourceContext.solvedRequirements = solved)
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- The same native Tree yields an independent Source grade and the actual
 reached admission. No literal or completed-expression execution law is input. -/
-theorem reflects_at (sameLedger : sourceContext.solvedRequirements = solved)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (sameLedger : sourceContext.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid sourceContext)
     (budget size : Nat) (within : size ≤ budget)
     (callLeaves : ∀ scope entries child, child ≤ budget →

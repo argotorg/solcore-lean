@@ -820,7 +820,7 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBarePanic actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same
@@ -912,7 +912,7 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       have same := shape actual
       rw [form] at same
       cases same
-    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
+    | assignBareOperands actual form _ _ _ _ _ _ _ | assignBarePanic actual form _ _ _ _ _ _ _ | assignBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
       cases same
@@ -2708,7 +2708,7 @@ theorem children
   | unary occurrence _ _ | unaryOperandFault occurrence _
   | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _
-  | binaryInvalid occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _
+  | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _
   | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence

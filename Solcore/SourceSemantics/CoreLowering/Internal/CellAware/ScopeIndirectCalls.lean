@@ -1530,7 +1530,7 @@ private theorem source_prefix
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _ => cases occurrence_form occurrence
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}

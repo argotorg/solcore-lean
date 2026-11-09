@@ -2583,7 +2583,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
   (missing : IndexFaultPostContracts.MissingPolicies values source functions registry program context evidence reasonAt faults)
 
 include extension faithful functionLeaves functionTypes unique reads missing in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -2608,7 +2608,7 @@ theorem preserves_with_literals
         faithful functionLeaves functionTypes missing))
 
 include extension faithful functionLeaves functionTypes unique reads missing in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)

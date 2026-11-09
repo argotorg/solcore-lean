@@ -1076,7 +1076,7 @@ variable
 
 include inclusion prefixOne prefixZero globalCounts complete slots extension faithful observations functionTypes
   wellFormed runtime covers unique uninitialized missing sameLayouts escaped profiles syntaxTrees owners idsUnique in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (model (registry := registry) functions)
       (Program.ofChecked compiled.sourceProgram) context principal.dictionary
@@ -1126,7 +1126,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
 
 include inclusion prefixOne prefixZero globalCounts complete slots extension faithful observations functionTypes
   wellFormed runtime covers unique uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (model (registry := registry) functions)
       (Program.ofChecked compiled.sourceProgram) context principal.dictionary
@@ -1178,7 +1178,7 @@ include inclusion prefixOne prefixZero globalCounts complete slots extension fai
   wellFormed runtime covers unique uninitialized missing sameLayouts escaped profiles syntaxTrees owners idsUnique in
 /-- The runtime literal producer and concrete heads discharge expression
 semantics internally through the original support fold. -/
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : PreservingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)
@@ -1206,7 +1206,7 @@ include inclusion prefixOne prefixZero globalCounts complete slots extension fai
   wellFormed runtime covers unique uninitialized missing sameLayouts escaped profiles syntaxTrees in
 /-- The runtime literal producer and concrete heads discharge expression
 semantics internally through the original support fold. -/
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : ReflectingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)

@@ -682,14 +682,17 @@ theorem preserves_roots (size : Nat) :
       (SelectedCompilationPhysicalProgramSupport.stages compiled)
       (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
       (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) size := by
-  exact SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
-    issued (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled)
-    support.profile support.bodyTyping support.certificates
-    (SelectedCompilationPhysicalProgramSupport.observations support)
-    (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
-    (SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
-    support.bodies support.bodySupport support.closurePackets support.closureSupport
-    support.owners support.methods size
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
+    SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
+      issued (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled)
+      support.profile support.bodyTyping support.certificates
+      (SelectedCompilationPhysicalProgramSupport.observations support)
+      (SelectedCompilationPhysicalProgramSupport.static_extension support extension)
+      (SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension)
+      support.bodies support.bodySupport support.closurePackets support.closureSupport
+      support.owners support.methods size
 end ActualPreservation
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
@@ -1817,6 +1820,8 @@ theorem exact_trace {scope id lowered} (certificate : trees scope id lowered) :
       intro a middle evaluated outcome after tail
       have lifted := leftIH leftFound leftTyped environments heaps locals agrees actualTyped initial admitted (.value evaluated)
       obtain ⟨size, measured⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+      -- The trivial relation relates every panic too.
+      haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
       obtain ⟨value, middleStore, middleMap, middleWorld, _, represented, middleHeaps,
         maps, worlds, _, metadata, reached, _, post⟩ :=
         SelectedCompilationReadProductBounds.preserves bridge functions extension sameLedger runtimeLedger
@@ -2245,6 +2250,7 @@ theorem binary (size : Nat)
       | completed =>
         cases failed with
         | primitive invalid => exact ⟨_, _, .binaryInvalid occurrence firstTrace continues secondTrace invalid, .completed⟩
+        | panic panics => exact ⟨_, _, .binaryPanic occurrence firstTrace continues secondTrace panics, .completed⟩
         | requirement failed => cases failed
         | method _ selected _ => cases selected
 

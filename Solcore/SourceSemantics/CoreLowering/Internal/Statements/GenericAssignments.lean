@@ -387,7 +387,7 @@ theorem ReachableErrors.equal
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (missing : ∀ {root resolved reason token count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason token count → faults reason token)
-    (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
     head.ReachableErrors registry faults :=
   ⟨missing, fun _ => uninitialized, AssignmentOperandDiagnostics.equal faults head.invalid⟩
 
@@ -499,7 +499,7 @@ theorem Head.reachable_of_token
     (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (missing : ∀ {root resolved reason word count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason word count → faults reason word)
-    (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
     head.ReachableErrors registry faults :=
   ⟨missing, fun _ => uninitialized, same.symm ▸ prepared_operands_included included prepared member occurs rawProfile⟩
 
@@ -611,7 +611,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
-theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -631,7 +631,7 @@ theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -643,7 +643,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
   exact preserves_fault_reachable functions extension program evidence meaning faithful observations head environments heaps locals agrees actualTyped errors.reachable trace next output
 
 include extension meaning reflection faithful observations environments heaps locals agrees actualTyped in
-theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
+theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -678,7 +678,7 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (err
     · exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
 include extension meaning reflection faithful observations environments heaps locals agrees actualTyped in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
+theorem reflects (functionTypes : FunctionRuntimeViews functions) [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,

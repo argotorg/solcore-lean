@@ -641,7 +641,7 @@ theorem source_success
           obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed
           exact ⟨rfl, result, Dynamic.UnaryPrimitiveApplies.functional primitiveApplied sourceApplied,
             resultTyped, Core.LocalPrimitiveResults.unary_success core coreApplied⟩
-  | binary operator metadata form leftTree rightTree leftIH rightIH =>
+  | binary operator metadata form total leftTree rightTree leftIH rightIH =>
       have raw := expression_evaluation_raw unique metadata.contains
         (by simp [form]) metadata.coercions evaluated
       rw [form, metadata.requirements, metadata.coercions] at raw
@@ -672,12 +672,12 @@ theorem source_success
             refine ⟨rfl, result, Dynamic.BinaryPrimitiveApplies.functional primitiveApplied sourceApplied, resultTyped, ?_⟩
             rw [binary_strict strict]
             exact Core.LocalPrimitiveResults.binaryWith_success leftCore shifted (bodyEvaluation _ _)
-          · rcases binary_nonstrict strict with isAnd | isOr
+          · rcases binary_nonstrict strict total with isAnd | isOr
             · subst operator
               obtain ⟨leftBoolean, rfl⟩ := bool_of_type leftValue leftTyped
               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
               cases evaluateRight with
-              | strict impossible => cases impossible
+              | strict impossible | panicking impossible => cases impossible
               | andTrue =>
                   exact ⟨rfl, .bool rightBoolean,
                     Dynamic.BinaryPrimitiveApplies.functional primitiveApplied (.logicalAnd true rightBoolean),
@@ -686,7 +686,7 @@ theorem source_success
               obtain ⟨leftBoolean, rfl⟩ := bool_of_type leftValue leftTyped
               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
               cases evaluateRight with
-              | strict impossible => cases impossible
+              | strict impossible | panicking impossible => cases impossible
               | orFalse =>
                   exact ⟨rfl, .bool rightBoolean,
                     Dynamic.BinaryPrimitiveApplies.functional primitiveApplied (.logicalOr false rightBoolean),
@@ -754,10 +754,12 @@ private theorem binary_fault_excluded
     (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) : False := by
   cases fault with
   | primitive invalid => exact invalid.excludes_application ⟨output, applied⟩
+  | panic panics => exact panics.excludes_application applied
   | requirement fault => cases fault
   | method _ selected _ => cases selected
 
 private theorem typed_binary_applies (operator : Syntax.BinaryOp) (left right : SourceStagedValue.Value)
+    (total : operator.mayPanic = false)
     (leftTyped : SourceStagedValue.coreType left = SourceCorePrimitive.binaryOperandType operator)
     (rightTyped : SourceStagedValue.coreType right = SourceCorePrimitive.binaryOperandType operator) :
     ∃ output, Dynamic.BinaryPrimitiveApplies operator (StagedValue.toSource left) (StagedValue.toSource right) output := by
@@ -766,7 +768,7 @@ private theorem typed_binary_applies (operator : Syntax.BinaryOp) (left right : 
     obtain ⟨rightWord, rfl⟩ := word_of_type right (rightTyped.trans (strict_operand_word strict))
     obtain ⟨result, _, applied, _⟩ := strict_binary_value strict leftWord rightWord
     exact ⟨_, applied⟩
-  · rcases binary_nonstrict strict with isAnd | isOr <;> subst operator
+  · rcases binary_nonstrict strict total with isAnd | isOr <;> subst operator
     · obtain ⟨leftBoolean, rfl⟩ := bool_of_type left leftTyped
       obtain ⟨rightBoolean, rfl⟩ := bool_of_type right rightTyped
       exact ⟨_, .logicalAnd leftBoolean rightBoolean⟩
@@ -824,7 +826,7 @@ theorem source_fault
           obtain ⟨rfl, staged, rfl, typed, _⟩ := source_success child unique environments heaps childEvaluation
           obtain ⟨result, _, applied, _⟩ := unary_value operator staged typed
           exact False.elim (unary_fault_excluded applied operationFault)
-  | binary operator metadata form leftTree rightTree leftIH rightIH =>
+  | binary operator metadata form total leftTree rightTree leftIH rightIH =>
       have raw := expression_fault_raw unique metadata.contains (by simp [form]) metadata.coercions fault
       rw [form, metadata.requirements, metadata.coercions] at raw
       cases raw with
@@ -847,6 +849,7 @@ theorem source_fault
           | strict strict =>
               rw [binary_strict strict]
               exact Core.LocalPrimitiveResults.binaryWith_right_failure leftCore shifted
+          | panicking panicking => cases panicking <;> cases total
           | andTrue =>
               obtain ⟨boolean, rfl⟩ := bool_of_type staged typed
               cases same
@@ -860,7 +863,7 @@ theorem source_fault
           subst_vars
           obtain ⟨rfl, left, rfl, leftTyped, _⟩ := source_success leftTree unique environments heaps leftEvaluation
           obtain ⟨rfl, right, rfl, rightTyped, _⟩ := source_success rightTree unique environments heaps rightEvaluation
-          obtain ⟨output, applied⟩ := typed_binary_applies operator left right leftTyped rightTyped
+          obtain ⟨output, applied⟩ := typed_binary_applies operator left right total leftTyped rightTyped
           exact False.elim (binary_fault_excluded applied operationFault)
   | group metadata form _ ih =>
       have raw := expression_fault_raw unique metadata.contains (by simp [form]) metadata.coercions fault
@@ -1151,6 +1154,11 @@ private theorem equal_operands_valid {previous : Option Dynamic.Value} {right : 
   | uninitialized notEqual => exact notEqual rfl
   | compound corresponds _ => cases corresponds
 
+private theorem equal_operands_no_panic {previous : Option Dynamic.Value} {right : Dynamic.Value} {code : UInt8}
+    (panics : Dynamic.AssignmentOperandsPanic .equal previous right code) : False := by
+  cases panics with
+  | compound corresponds _ => cases corresponds
+
 /-- Plain assignment ignores its old leaf, including an uninitialized leaf.
 Its only modeled fault under this profile is the RHS's exact read fault. -/
 theorem source_fault
@@ -1178,6 +1186,7 @@ theorem source_fault
       obtain ⟨rfl, _, _⟩ := resolve_bare bare resolve
       exact ScalarExpressionReflection.Primitive.source_fault value unique valid covers environments heaps fault
   | operands _ _ _ _ _ _ invalid => exact False.elim (equal_operands_valid invalid)
+  | panic _ _ _ _ _ _ panics => exact False.elim (equal_operands_no_panic panics)
   | structuralUpdate resolve _ _ _ _ fault =>
       obtain ⟨_, projections, _⟩ := resolve_bare bare resolve
       rw [projections] at fault

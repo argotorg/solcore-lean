@@ -304,12 +304,15 @@ inductive ShiftBinaryOperator : Syntax.BinaryOp → Prop where
   | shiftLeft : ShiftBinaryOperator .shiftLeft
   | shiftRight : ShiftBinaryOperator .shiftRight
 
-/-- `+`, `-` and `*` of an `unchecked` block. On `word` they wrap like the
-checked operators. -/
+/-- The arithmetic of an `unchecked` block. On `word`, `+`, `-` and `*` wrap
+like the checked operators, and `/` and `%` panic with `0x12` on a zero
+divisor. -/
 inductive UncheckedBinaryOperator : Syntax.BinaryOp → Prop where
   | uncheckedAdd : UncheckedBinaryOperator .uncheckedAdd
   | uncheckedSubtract : UncheckedBinaryOperator .uncheckedSubtract
   | uncheckedMultiply : UncheckedBinaryOperator .uncheckedMultiply
+  | uncheckedDivide : UncheckedBinaryOperator .uncheckedDivide
+  | uncheckedModulo : UncheckedBinaryOperator .uncheckedModulo
 
 /-- Comparison spellings whose primitive result is Boolean. -/
 inductive ComparisonBinaryOperator : Syntax.BinaryOp → Prop where
@@ -336,6 +339,8 @@ inductive BinaryTraitDispatch : Syntax.BinaryOp → String → String → Prop w
   | uncheckedAdd : BinaryTraitDispatch .uncheckedAdd "UncheckedAdd" "add"
   | uncheckedSubtract : BinaryTraitDispatch .uncheckedSubtract "UncheckedSub" "sub"
   | uncheckedMultiply : BinaryTraitDispatch .uncheckedMultiply "UncheckedMul" "mul"
+  | uncheckedDivide : BinaryTraitDispatch .uncheckedDivide "UncheckedDiv" "div"
+  | uncheckedModulo : BinaryTraitDispatch .uncheckedModulo "UncheckedMod" "mod"
 
 /-- Unary operator forms with trait dispatch. -/
 inductive UnaryTraitDispatch : Syntax.UnaryOp → String → String → Prop where
@@ -1082,6 +1087,8 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | uncheckedAdd : WordCompoundAssignmentOperator .uncheckedAdd
   | uncheckedSubtract : WordCompoundAssignmentOperator .uncheckedSubtract
   | uncheckedMultiply : WordCompoundAssignmentOperator .uncheckedMultiply
+  | uncheckedDivide : WordCompoundAssignmentOperator .uncheckedDivide
+  | uncheckedModulo : WordCompoundAssignmentOperator .uncheckedModulo
 
 /-- A value assignment validates its place and right-hand occurrence.  Plain
 assignment is homogeneous at any place type; current compound forms are

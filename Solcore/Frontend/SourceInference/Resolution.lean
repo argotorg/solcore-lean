@@ -437,6 +437,8 @@ def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
   | .uncheckedAdd => .traitMethod "UncheckedAdd" "add"
   | .uncheckedSubtract => .traitMethod "UncheckedSub" "sub"
   | .uncheckedMultiply => .traitMethod "UncheckedMul" "mul"
+  | .uncheckedDivide => .traitMethod "UncheckedDiv" "div"
+  | .uncheckedModulo => .traitMethod "UncheckedMod" "mod"
 
 def unaryOperatorDispatch : Syntax.UnaryOp → OperatorDispatch
   | .logicalNot => .function "not"
@@ -510,7 +512,8 @@ def isShiftOperator : Syntax.BinaryOp → Bool
 
 /-- The arithmetic operators of an `unchecked` block. -/
 def isUncheckedOperator : Syntax.BinaryOp → Bool
-  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => true
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+  | .uncheckedModulo => true
   | _ => false
 
 /-- Select a binary operator's builtin, deferred or trait meaning once its
@@ -580,11 +583,10 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     let state ← unify state right .word
     return { type := .word, requirements := [], state }
   if isUncheckedOperator operator then
-    -- Upstream's `UncheckedAdd`, `UncheckedSub` and `UncheckedMul` traits
-    -- cover `word` and the declared types that implement them, never
-    -- `integer`. A literal operand can only be a Word, so it is one at once,
-    -- and the operator never waits for its operands' type as the checked ones
-    -- may.
+    -- Upstream's `UncheckedAdd` … `UncheckedMod` traits cover `word` and the
+    -- declared types that implement them, never `integer`. A literal operand
+    -- can only be a Word, so it is one at once, and the operator never waits
+    -- for its operands' type as the checked ones may.
     let state ← unify state left right
     let state ← if isOpenIntegerLiteralTarget state integerLiterals left then
         unify state (state.resolve left) .word

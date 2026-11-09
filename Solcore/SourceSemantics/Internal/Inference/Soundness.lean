@@ -2382,6 +2382,8 @@ theorem inferAssignedValueFuel_success_sound
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply success
+      | uncheckedDivide => exact finishNonEqual .uncheckedDivide success
+      | uncheckedModulo => exact finishNonEqual .uncheckedModulo success
 
 /-- Alignment supplies the two semantic lookups for a guarded local name,
 while active formation supplies the corresponding closed scheme judgments. -/

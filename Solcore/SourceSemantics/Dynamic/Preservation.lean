@@ -383,6 +383,20 @@ theorem wordCompoundPreserves
           | some left_typed =>
               exact primitive.preserves (.wordUnchecked .uncheckedMultiply) left_typed
                 right_typed
+  | uncheckedDivide =>
+      cases applies with
+      | uncheckedDivide primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordUnchecked .uncheckedDivide) left_typed
+                right_typed
+  | uncheckedModulo =>
+      cases applies with
+      | uncheckedModulo primitive =>
+          cases current_typed with
+          | some left_typed =>
+              exact primitive.preserves (.wordUnchecked .uncheckedModulo) left_typed
+                right_typed
 
 end AssignmentValueApplies
 

@@ -409,7 +409,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
 /-- Independent method body execution drives the actual marked parameters,
 frame install, concrete body and restoration. The selected evidence is fixed. -/
-theorem preserves {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : BodyOutcome program sourceBody function.evidence before arguments outcome after) :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
@@ -443,7 +443,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
 /-- A completed real hook supplies source allocation and a concrete body
 trace. Source method invocation follows without ordinary global instantiation. -/
-theorem reflects {value : Value} {finalStore : Store}
+theorem reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
       BodyOutcome program sourceBody function.evidence before arguments outcome after ∧
@@ -473,7 +473,7 @@ theorem reflects {value : Value} {finalStore : Store}
 include certificate parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
-theorem invoke_preserves {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
+theorem invoke_preserves [FunctionCalls.FaultTokens faults] {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
     {input : Dynamic.Value} {nativeInput : Value} {reason : Word}
     (sourceArgument : arguments = [input]) (nativeArgument : nativeArguments = [nativeInput])
     (entry : actual = nativeInput :: captured)
@@ -506,7 +506,7 @@ theorem invoke_preserves {call : CallableCoercionSpine.Call} {callerEnvironment 
 include certificate parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
-theorem invoke_reflects {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
+theorem invoke_reflects [FunctionCalls.FaultTokens faults] {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
     {input : Dynamic.Value} {nativeInput : Value} {reason : Word}
     (sourceArgument : arguments = [input]) (nativeArgument : nativeArguments = [nativeInput])
     (entry : actual = nativeInput :: captured)
@@ -809,7 +809,7 @@ private theorem arguments {method : MethodProfile (prepared := prepared) (values
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- One reached call consumes only concrete body semantics. All future captures
 are transported from actual administrative preservation. -/
-theorem method_preserves {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
+theorem method_preserves [FunctionCalls.FaultTokens faults] {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
     (member : method ∈ methods) {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
     {before after : Dynamic.Heap} {store : Store} {input : Dynamic.Value} {native : Value}
     (entry : Entry methods ambient.definitions caller mapping world before store)
@@ -853,7 +853,7 @@ theorem method_preserves {method : MethodProfile (prepared := prepared) (values 
     finalHeaps, maps, worlds, frame, metadata, ⟨entry.extend maps worlds frame metadata⟩⟩
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
-theorem method_reflects {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
+theorem method_reflects [FunctionCalls.FaultTokens faults] {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
     (member : method ∈ methods) {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
     {before : Dynamic.Heap} {store finalStore : Store} {input : Dynamic.Value} {native value : Value} {reason : Word}
     (entry : Entry methods ambient.definitions caller mapping world before store)
@@ -1264,7 +1264,7 @@ include extension definitions registered faithful observations runtimeViews in
 /-- Forward preservation uses independent body traces at the actual selected
 method dictionaries. Arbitrary source dictionaries need a separate coherence
 or evidence-independence theorem. -/
-theorem preserves (uninitialized : ∀ method ∈ methods, ∀ id location,
+theorem preserves [FunctionCalls.FaultTokens faults] (uninitialized : ∀ method ∈ methods, ∀ id location,
       faults (.uninitializedLocation location) (method.diagnostics.reasonAt method.named.signature.key id))
     (missing : ∀ method ∈ methods, ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((method.diagnostics.reasonAt method.named.signature.key id).add tag))
@@ -1296,7 +1296,7 @@ theorem preserves (uninitialized : ∀ method ∈ methods, ∀ id location,
 include extension definitions registered faithful observations runtimeViews in
 /-- Every completed native path reconstructs an independent source path with
 its actual selected dictionaries. It needs no source completion premise. -/
-theorem reflects (uninitialized : ∀ method ∈ methods, ∀ id location,
+theorem reflects [FunctionCalls.FaultTokens faults] (uninitialized : ∀ method ∈ methods, ∀ id location,
       faults (.uninitializedLocation location) (method.diagnostics.reasonAt method.named.signature.key id))
     (missing : ∀ method ∈ methods, ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((method.diagnostics.reasonAt method.named.signature.key id).add tag))
@@ -1335,7 +1335,7 @@ variable {compilerProgram : CheckedProgram} {project : SourceCoreEvidence.Projec
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- The actual emitted expression, after a successful operand, preserves the
 annotated source path. The operand is outside this path-only theorem. -/
-theorem emitted_preserves
+theorem emitted_preserves [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -1364,7 +1364,7 @@ include extension definitions registered faithful observations runtimeViews unin
 /-- Completion of the actual renamed emitted code yields the independent source
 path at the real dictionaries. The known operand trace fixes its reached state
 by evaluation determinism; saved captures are never renamed. -/
-theorem emitted_reflects
+theorem emitted_reflects [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -1472,7 +1472,7 @@ include extension definitions registered faithful observations runtimeViews unin
 /-- An independent body derivation may use any covering dictionary for this
 exact source body. The same compiled call and saved capture execute it. No
 equality with the actual selected dictionary is required. -/
-theorem preserves {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
+theorem preserves [FunctionCalls.FaultTokens faults] {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
     (member : method ∈ methods) {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
     {before after : Dynamic.Heap} {store : Store} {input : Dynamic.Value} {native : Value}
     (entry : Entry methods ambient.definitions caller mapping world before store)
@@ -1520,7 +1520,7 @@ theorem preserves {method : MethodProfile (prepared := prepared) (values := valu
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- A completed actual call reflects at any covering dictionary for this exact
 body. This does not identify dictionary trees or source method selections. -/
-theorem reflects {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
+theorem reflects [FunctionCalls.FaultTokens faults] {method : MethodProfile (prepared := prepared) (values := values) (program := program) (context := context) (evidence := evidence)}
     (member : method ∈ methods) {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
     {before : Dynamic.Heap} {store finalStore : Store} {input : Dynamic.Value} {native value : Value} {reason : Word}
     (entry : Entry methods ambient.definitions caller mapping world before store)
@@ -1628,7 +1628,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 include checkedAccepted ledger emitted extension definitions registered faithful observations runtimeViews uninitialized missing member entry heaps represented in
 /-- Independent selection and body evaluation drive the actual call. Neither
 the source body nor the dictionary is required equal to a compiler annotation. -/
-theorem preserves {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
+theorem preserves [FunctionCalls.FaultTokens faults] {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
     (selected : Dynamic.OperatorMethodSelected (Program.ofChecked compilerProgram) context evidence "Coerce" "coerce"
       method.step.requirements selectedBody dictionary)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -1654,7 +1654,7 @@ include checkedAccepted ledger emitted extension definitions registered faithful
 /-- A completed actual call reflects at any independently selected source body
 and dictionary. Its source outcome and heap are existential, not identified by
 evidence equality or by a source/native fuel comparison. -/
-theorem reflects {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
+theorem reflects [FunctionCalls.FaultTokens faults] {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
     (selected : Dynamic.OperatorMethodSelected (Program.ofChecked compilerProgram) context evidence "Coerce" "coerce"
       method.step.requirements selectedBody dictionary)
     {result : Value} {finalStore : Store} {reason : Word}
@@ -1944,7 +1944,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 include checkedAccepted ledger emitted extension definitions registered faithful observations runtimeViews uninitialized missing member entry heaps represented in
 /-- Independent selection and body evaluation drive the actual call. Neither
 the source body nor the dictionary is required equal to a compiler annotation. -/
-theorem step_preserves {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+theorem step_preserves [FunctionCalls.FaultTokens faults] {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.CoercionStepExecutes (Program.ofChecked compilerProgram) context evidence before method.step value sourceResult after)
     (reason : Word) :
     ∃ result finalStore finalMap finalWorld,
@@ -1964,7 +1964,7 @@ theorem step_preserves {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
 include checkedAccepted ledger emitted extension definitions registered faithful observations runtimeViews uninitialized missing member entry heaps represented in
 /-- Independent selection and body evaluation drive the actual call. Neither
 the source body nor the dictionary is required equal to a compiler annotation. -/
-theorem step_fault_preserves {fault : Dynamic.SemanticFault} {after : Dynamic.Heap}
+theorem step_fault_preserves [FunctionCalls.FaultTokens faults] {fault : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.CoercionStepFaults (Program.ofChecked compilerProgram) context evidence before method.step value fault after)
     (reason : Word) :
     ∃ result finalStore finalMap finalWorld,
@@ -2027,7 +2027,7 @@ include checkedAccepted ledger extension definitions registered faithful observa
 /-- Preserve the original independent path, including its exact successful
 prefix and first fault. No selected-dictionary annotation is required. -/
 theorem preserves
-    (uninitialized : ∀ method ∈ methods, ∀ id location,
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ method ∈ methods, ∀ id location,
       faults (.uninitializedLocation location) (method.diagnostics.reasonAt method.named.signature.key id))
     (missing : ∀ method ∈ methods, ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
       faults (.missingMappingDefault value) ((method.diagnostics.reasonAt method.named.signature.key id).add tag))
@@ -2072,7 +2072,7 @@ variable {inputCode outputCode : SourceCoreBasic.LoweredExpr}
 include checkedAccepted ledger extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- The actual emitted expression, after a successful operand, preserves the
 independent source path. The operand is outside this path-only theorem. -/
-theorem emitted_preserves
+theorem emitted_preserves [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -2101,7 +2101,7 @@ include extension definitions registered faithful observations runtimeViews unin
 /-- Completion of the actual renamed emitted code yields the independent source
 path at the real dictionaries. The known operand trace fixes its reached state
 by evaluation determinism; saved captures are never renamed. -/
-theorem emitted_reflects
+theorem emitted_reflects [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}

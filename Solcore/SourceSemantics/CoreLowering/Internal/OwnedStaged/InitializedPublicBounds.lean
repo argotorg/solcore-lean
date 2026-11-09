@@ -114,7 +114,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Failure preserves all previously remembered function captures in the actual
 returned session, including heap changes made before the failure. -/
-theorem public_run_failed_retains
+theorem public_run_failed_retains [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -318,7 +318,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -364,7 +364,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -407,7 +407,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -620,7 +620,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -667,7 +667,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -711,7 +711,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes meanings sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -882,7 +882,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -927,7 +927,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -969,7 +969,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -1096,7 +1096,7 @@ include distinct receiver observations baseRegistry semantic family namedTermina
   prepared selected opened fresh ready authority atSession atCheckpoint started inputReceipts sourceAt in
 /-- The first completed call seeds an empty reusable history even when export
 fails. Initial state and arguments come from real bootstrap and input encoding. -/
-theorem public_run_export_error_seeds
+theorem public_run_export_error_seeds [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {error : SourceCoreIndexedSession.Error}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.exportError error returned)))
@@ -1286,7 +1286,7 @@ include distinct receiver observations extension semantic family namedTerminals 
 premise is supplied. Actual public resume receipts retain the resulting session
 and History at any output-validation budget. Diagnostic tokens need not be
 injective: the conclusion keeps the original Source/token relation. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {sourceSize : Nat} {failure : Staging.Recursive.Failure} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation header.function.context ⟨[]⟩
@@ -1464,7 +1464,7 @@ include distinct receiver observations extension semantic family namedTerminals 
 /-- Native completion and output export are conclusions. The independent Source
 trace supplies the result and heap; every sufficiently fueled real resume keeps
 that exact result in a singleton retained collection. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {outputParameter outputResult : TypeSystem.Ty}
     (functionResult : header.function.resultType = .function outputParameter outputResult)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
@@ -1653,7 +1653,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- A first failed public call yields a reusable empty history at the exact
 returned session, without assuming initial or final heap/input meaning. -/
-theorem public_run_failed_seeds
+theorem public_run_failed_seeds [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -1815,7 +1815,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- A first actual public function export seeds the complete continuation
 history, including its captured environment and real returned session. -/
-theorem public_run_succeeded_remembers
+theorem public_run_succeeded_remembers [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -1881,7 +1881,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- Selected function leaves from the first actual public product output
 seed a history with their original captures and recursive validation budgets. -/
-theorem public_run_succeeded_collects
+theorem public_run_succeeded_collects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -2081,7 +2081,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -2126,7 +2126,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -2168,7 +2168,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -2353,7 +2353,7 @@ include importedMember distinct receiver observations extension semantic family 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -2400,7 +2400,7 @@ include importedMember distinct receiver observations extension semantic family 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -2444,7 +2444,7 @@ include importedMember distinct receiver observations extension semantic family 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started issuance issuedSession sole rawType singleInput handleValue sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}
@@ -2576,7 +2576,7 @@ include distinct receiver observations baseRegistry semantic family namedTermina
 /-- Bootstrap and actual input encoding construct the initial heap and argument
 relation. General Source success supplies independent execution and export
 bounds. The genuine returned session starts a reusable history. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation header.function.context ⟨[]⟩
@@ -3074,7 +3074,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started simple sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -3121,7 +3121,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started simple sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned)))
@@ -3165,7 +3165,7 @@ include distinct receiver observations extension semantic family namedTerminals 
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started simple meanings sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     (outputWord : header.output = .word) (resultWord : header.function.resultType = .word)
     (outputBudget : Nat) (positive : 0 < outputBudget)
     {size : Nat} {word : Word} {after : Dynamic.Heap}

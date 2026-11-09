@@ -244,7 +244,13 @@ private theorem statement_fault (unique : NodeOccurrencesUnique source)
       SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs right after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsInvalid operator target.selected right) := by
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ child right currentCell initial currentSelected code, child < size ∧
+      reason = .panic code ∧
+      SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs right after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
     exact Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
@@ -264,7 +270,12 @@ private theorem statement_fault (unique : NodeOccurrencesUnique source)
     omega
   | operands resolved evaluated currentRead rootType initialValue pathRead invalid =>
     obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
-    refine .inr ⟨_, ?_, rfl, _, evaluated, _, currentRead, rootType, _, initialValue, ⟨_, pathRead⟩, invalid⟩
+    refine .inr (.inl ⟨_, ?_, rfl, _, evaluated, _, currentRead, rootType, _, initialValue, ⟨_, pathRead⟩, invalid⟩)
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]
+    omega
+  | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+    obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
+    refine .inr (.inr ⟨_, ?_, _, _, _, _, _, rfl, evaluated, currentRead, rootType, initialValue, pathRead, panics⟩)
     simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]
     omega
   | structuralUpdate resolved _ _ _ _ failed =>
@@ -292,6 +303,13 @@ theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ child right currentCell initial currentSelected code, child < size ∧ finalContext = context ∧
+      outcome = .fault (.panic code) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
@@ -305,27 +323,32 @@ theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
   · rcases statement_fault unique found form snapshot failed with
       ⟨child, childStrict, failed⟩ |
       ⟨child, right, currentCell, initial, currentSelected, childStrict, reasonEq, evaluated,
-        currentRead, rootType, initialValue, pathRead, invalid⟩
+        currentRead, rootType, initialValue, pathRead, invalid⟩ |
+      ⟨child, right, currentCell, initial, currentSelected, code, childStrict, reasonEq, evaluated,
+        currentRead, rootType, initialValue, pathRead, panics⟩
     · exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, equalContext, equalOutcome, .fault failed⟩
     · subst reason
       exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected, Nat.lt_trans childStrict strict,
         equalContext, equalOutcome, .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
+    · subst reason
+      exact .inr (.inr (.inl ⟨child, right, currentCell, initial, currentSelected, code, Nat.lt_trans childStrict strict,
+        equalContext, equalOutcome, .value evaluated, currentRead, rootType, initialValue, pathRead, panics⟩))
   · obtain ⟨child, value, middle, updated, childStrict, equalContext, equalOutcome, evaluated, written⟩ :=
       statement_value unique found form snapshot head
     subst finalContext
     subst outcome
     rcases stopped with impossible | rfl
     · cases impossible
-    · refine .inr (.inr ⟨child, SourceExecutionSize.stepSize [], value, middle, updated, after,
-        Nat.lt_trans childStrict strict, ?_, .value evaluated, written, ?_⟩)
+    · refine .inr (.inr (.inr ⟨child, SourceExecutionSize.stepSize [], value, middle, updated, after,
+        Nat.lt_trans childStrict strict, ?_, .value evaluated, written, ?_⟩))
       · simp only [SourceExecutionSize.stepSize, List.sum_nil]; omega
       · cases mode <;> exact .control .nil
   · obtain ⟨child, value, expressionHeap, updated, childStrict, equalContext, equalOutcome, evaluated, written⟩ :=
       statement_value unique found form snapshot head
     subst middleContext
     cases equalOutcome
-    exact .inr (.inr ⟨child, tailSize, value, expressionHeap, updated, middle,
-      Nat.lt_trans childStrict strict, tailStrict, .value evaluated, written, tail⟩)
+    exact .inr (.inr (.inr ⟨child, tailSize, value, expressionHeap, updated, middle,
+      Nat.lt_trans childStrict strict, tailStrict, .value evaluated, written, tail⟩))
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentInversion
 end
@@ -570,6 +593,22 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
               exact ⟨_, _, _, .assignProjectedRhsFault (lookupStatement?_sound found) form projected keys snapshot lifted, .rejected origin call reason _ reached⟩
           | completed =>
               exact ⟨_, _, _, .assignProjectedWriteFault (lookupStatement?_sound found) form projected keys snapshot lifted (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · exact ⟨_, _, _, .assignProjectedKeysFault (lookupStatement?_sound found) form projected ready keys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := children _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              exact ⟨_, _, _, .assignProjectedRhsFault (lookupStatement?_sound found) form projected keys snapshot lifted, .rejected origin call reason _ reached⟩
+          | completed =>
+              exact ⟨_, _, _, .assignProjectedWriteFault (lookupStatement?_sound found) form projected keys snapshot lifted (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -691,6 +730,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     ⟨childSize, reason, strict, rfl, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, strict, rfl, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, strict, rfl, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, strict, tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
@@ -707,6 +748,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     cases adapted with
     | completed => exact ⟨_, _, _, .assignBareOperands (lookupStatement?_sound found) form snapshot lifted
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted, .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children childSize (Nat.lt_of_lt_of_le strict within) head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted evaluated
+    cases adapted with
+    | completed => exact ⟨_, _, _, .assignBarePanic (lookupStatement?_sound found) form snapshot lifted
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
@@ -930,6 +979,27 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
               obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
               obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
               exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_write_fault projected measuredKeys snapshot measuredRhs (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+          exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := children _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+              obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+              exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_rhs_fault projected measuredKeys snapshot measuredRhs, .rejected origin call reason _ reached⟩
+          | completed =>
+              obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+              obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+              exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_write_fault projected measuredKeys snapshot measuredRhs (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with

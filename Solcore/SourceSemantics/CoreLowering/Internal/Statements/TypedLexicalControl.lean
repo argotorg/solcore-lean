@@ -1226,7 +1226,7 @@ theorem sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node
       _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
 include extension unique uninitialized missing in
-theorem conditional_preserves {scope : Scope} {id : StatementId} {node : StatementNode}
+theorem conditional_preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
     {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
@@ -1321,7 +1321,7 @@ theorem selected_intro {innerContext : SourceSemantics.Context} {id : StatementI
       | fault failed => exact .fault (.ifFalseBody (lookupStatement?_sound found) form conditionTrace failed)
 
 include extension uninitialized missing in
-theorem conditional_reflects {scope : Scope} {id : StatementId} {node : StatementNode}
+theorem conditional_reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
     {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
@@ -1409,7 +1409,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include definitions registered extension uninitialized missing in
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code)
@@ -1521,7 +1521,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
       contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing in
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code)
@@ -1866,7 +1866,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include definitions registered extension contextValid unique uninitialized missing in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -1905,7 +1905,7 @@ theorem Certificate.preserves
     finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
 
 include definitions registered extension contextValid unique uninitialized missing in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
@@ -2000,7 +2000,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 include definitions registered extension contextValid unique uninitialized missing in
 /-- Finite source body execution completes the actual parameter prefix. The
 source allocation is the one retained by the constructed entry. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     (entry : TypedMixedNamedParameters.Entry layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : TypedLexicalNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -2027,7 +2027,7 @@ theorem preserves
 include definitions registered extension contextValid unique uninitialized missing in
 /-- Completed native prefix execution constructs the independent source trace
 at the installed call context, without a universal body reflection premise. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (entry : TypedMixedNamedParameters.Entry layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : TypedLexicalNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -2140,7 +2140,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing actualTyped in
 /-- A source allocation and its finite body trace execute the real full named
 hook. Parameters are compared with the independently constructed allocation. -/
-theorem preserves {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+theorem preserves [FunctionCalls.FaultTokens faults] {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function context environment bound outcome after) :
     ∃ origin index metadata value finalStore finalMap finalWorld,
@@ -2182,7 +2182,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized missing actualTyped in
 /-- Completed actual native execution constructs both source parameter
 allocation and the independent body trace from the installed call context with its actual lexical stopping context. -/
-theorem reflects {value : Value} {finalStore : Store}
+theorem reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (evaluation : Evaluates actual store code value finalStore) :
     ∃ origin index metadata environment bound outcome after finalMap finalWorld,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧

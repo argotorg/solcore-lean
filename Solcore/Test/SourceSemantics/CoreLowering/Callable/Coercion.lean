@@ -374,7 +374,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include checkedAccepted extension definitions registered faithful observations runtimeViews uninitialized missing ledger emitted steps chain entry in
 /-- Preserve an independent whole source outcome with its original raw form and
 ordered coercions. The raw law is the remaining expression-grammar interface. -/
-theorem direct_expression_preserves
+theorem direct_expression_preserves [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     (rawMeaning : RawFormPreserves (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before caller mapping world store node ξ receipt.operand)
@@ -394,7 +394,7 @@ theorem direct_expression_preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry in
 /-- Reflect only finite completion of the real emitted expression. The source
 form and path derivations retain their separate heaps and independent costs. -/
-theorem direct_expression_reflects
+theorem direct_expression_reflects [FunctionCalls.FaultTokens faults]
     (rawMeaning : RawFormReflects (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before caller mapping world store node ξ receipt.operand)
     {value : Value} {finalStore : Store}
@@ -836,7 +836,7 @@ variable {checked : Checked} {base : Base checked}
 include bodyAccepted projection syntaxTree emitted tree parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
-theorem accepted_method_preserves {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
+theorem accepted_method_preserves [FunctionCalls.FaultTokens faults] {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
     {input : Dynamic.Value} {nativeInput : Value} {reason : Word}
     (sourceArgument : arguments = [input]) (nativeArgument : nativeArguments = [nativeInput])
     (entry : actual = nativeInput :: captured)
@@ -867,7 +867,7 @@ theorem accepted_method_preserves {call : CallableCoercionSpine.Call} {callerEnv
 include bodyAccepted projection syntaxTree emitted tree parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
-theorem accepted_method_reflects {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
+theorem accepted_method_reflects [FunctionCalls.FaultTokens faults] {call : CallableCoercionSpine.Call} {callerEnvironment captured : Environment}
     {input : Dynamic.Value} {nativeInput : Value} {reason : Word}
     (sourceArgument : arguments = [input]) (nativeArgument : nativeArguments = [nativeInput])
     (entry : actual = nativeInput :: captured)
@@ -1073,7 +1073,7 @@ variable {method : MethodProfile (prepared := prepared) (values := values) (prog
 include extension definitions registered faithful observations runtimeViews uninitialized missing member entry heaps represented in
 /-- The source selector supplies coverage. Its dictionary need not equal the
 one in the static Method receipt; the actual saved call is unchanged. -/
-theorem arbitrary_selected_preserves {dictionary : Dynamic.EvidenceEnvironment}
+theorem arbitrary_selected_preserves [FunctionCalls.FaultTokens faults] {dictionary : Dynamic.EvidenceEnvironment}
     (selected : Dynamic.OperatorMethodSelected program context evidence "Coerce" "coerce"
       method.step.requirements method.sourceBody dictionary)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -1096,7 +1096,7 @@ include extension definitions registered faithful observations runtimeViews unin
 /-- One completed actual call reflects under both covering dictionaries. The
 outcomes and heaps remain separately represented; no source determinism or
 source dictionary equality is inferred from native determinism. -/
-theorem completed_at_two_dictionaries
+theorem completed_at_two_dictionaries [FunctionCalls.FaultTokens faults]
     (first second : Dynamic.EvidenceEnvironment)
     (firstCovers : first.Covers method.sourceBody.context)
     (secondCovers : second.Covers method.sourceBody.context)
@@ -1277,7 +1277,7 @@ variable {compilerProgram : CheckedProgram} {project : SourceCoreEvidence.Projec
 
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
-theorem two_step_preserves
+theorem two_step_preserves [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode [first, second] outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type [first, second] target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -1301,7 +1301,7 @@ theorem two_step_preserves
   exact emitted_preserves functions extension definitions registered faithful observations runtimeViews uninitialized missing emitted chain entry heaps represented operand (.cons firstBody (.cons secondBody .nil))
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
-theorem two_step_reflects
+theorem two_step_reflects [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode [first, second] outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type [first, second] target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -1322,7 +1322,7 @@ theorem two_step_reflects
   exact emitted_reflects functions extension definitions registered faithful observations runtimeViews uninitialized missing emitted chain entry heaps represented operand completed
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing in
-theorem first_fault_skips_second
+theorem first_fault_skips_second [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode [first, second] outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type [first, second] target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -1845,7 +1845,7 @@ variable {representation : SourceCoreGeneralFunctions.Representation} {signature
   (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
 
 include checkedAccepted ledger extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry valid rawUninitialized rawMissing environments heaps locals agrees actualTyped childEq form typed avoids syntaxTree ordinary closed residual declarations sourceSignatures readPolicy lowerPolicy leafPolicy in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
@@ -1864,7 +1864,7 @@ theorem accepted_preserves
     environments heaps locals agrees actualTyped unique trace
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry valid rawUninitialized rawMissing environments heaps locals agrees actualTyped childEq form typed avoids syntaxTree ordinary closed residual declarations sourceSignatures readPolicy lowerPolicy leafPolicy in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     {value : Value} {finalStore : Store}
     (completed : Evaluates caller store (output.expression.rename ξ) value finalStore) :
@@ -2178,7 +2178,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes sourceSignatures typed children nativeTypes
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry checkedAccepted owners ledger in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -2204,7 +2204,7 @@ theorem accepted_preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes sourceSignatures typed children nativeTypes
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
@@ -2515,7 +2515,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached programTyped nativeProjections ordinaryEvidence sourceSignatures nativeSignatures typed lexical constructorRanges childEq syntaxTrees ordinary declarations readPolicy lowerPolicy leafPolicy
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry checkedAccepted owners ledger in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -2541,7 +2541,7 @@ theorem accepted_preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached programTyped nativeProjections ordinaryEvidence sourceSignatures nativeSignatures typed lexical constructorRanges childEq syntaxTrees ordinary declarations readPolicy lowerPolicy leafPolicy
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
@@ -2940,7 +2940,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes sourceSignatures typed childEq syntaxTrees ordinary declarations readPolicy lowerPolicy leafPolicy
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry checkedAccepted owners ledger in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -2966,7 +2966,7 @@ theorem accepted_preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes sourceSignatures typed childEq syntaxTrees ordinary declarations readPolicy lowerPolicy leafPolicy
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
@@ -3291,7 +3291,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes closed residual typed children nativeTypes
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry checkedAccepted owners ledger in
-theorem accepted_preserves
+theorem accepted_preserves [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -3317,7 +3317,7 @@ theorem accepted_preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles
   valid sourceUnique callerUninitialized callerMissing reached sourceTypes closed residual typed children nativeTypes
   environments heaps locals agrees actualTyped installed methodUninitialized methodMissing emitted steps chain methodEntry in
-theorem accepted_reflects
+theorem accepted_reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
@@ -3718,7 +3718,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 include checkedAccepted ledger emitted extension definitions registered faithful observations runtimeViews uninitialized missing member entry heaps represented in
 /-- Independent selection and body evaluation drive the actual call. Neither
 the source body nor the dictionary is required equal to a compiler annotation. -/
-theorem source_step_preserves {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+theorem source_step_preserves [FunctionCalls.FaultTokens faults] {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.CoercionStepExecutes (Program.ofChecked compilerProgram) context evidence before method.step value sourceResult after)
     (reason : Word) :
     ∃ result finalStore finalMap finalWorld,
@@ -3739,7 +3739,7 @@ include checkedAccepted ledger emitted extension definitions registered faithful
 /-- A completed actual call reflects at any independently selected source body
 and dictionary. Its source outcome and heap are existential, not identified by
 evidence equality or by a source/native fuel comparison. -/
-theorem arbitrary_selection_reflects {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
+theorem arbitrary_selection_reflects [FunctionCalls.FaultTokens faults] {selectedBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
     (selected : Dynamic.OperatorMethodSelected (Program.ofChecked compilerProgram) context evidence "Coerce" "coerce"
       method.step.requirements selectedBody dictionary)
     {result : Value} {finalStore : Store} {reason : Word}
@@ -3947,7 +3947,7 @@ variable {inputCode outputCode : SourceCoreBasic.LoweredExpr}
 include checkedAccepted ledger extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- The actual emitted expression, after a successful operand, preserves the
 independent source path. The operand is outside this path-only theorem. -/
-theorem independent_success
+theorem independent_success [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -3973,7 +3973,7 @@ theorem independent_success
 include checkedAccepted ledger extension definitions registered faithful observations runtimeViews uninitialized missing in
 /-- The actual emitted expression, after a successful operand, preserves the
 independent source path. The operand is outside this path-only theorem. -/
-theorem independent_fault
+theorem independent_fault [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}
@@ -4000,7 +4000,7 @@ include extension definitions registered faithful observations runtimeViews unin
 /-- Completion of the actual renamed emitted code yields the independent source
 path at the real dictionaries. The known operand trace fixes its reached state
 by evaluation determinism; saved captures are never renamed. -/
-theorem completed_reflects
+theorem completed_reflects [FunctionCalls.FaultTokens faults]
     (emitted : Emitted compilerProgram project compilation callerFunction available scope node policy ξ inputCode methods outputCode calls)
     {source target : TypeSystem.Ty} (chain : Chain source inputCode.type methods target outputCode.type)
     {caller : Environment} {mapping : LocationMap} {world : StoreTyping}

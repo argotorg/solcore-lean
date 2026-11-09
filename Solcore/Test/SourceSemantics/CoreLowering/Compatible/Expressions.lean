@@ -169,7 +169,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -382,12 +385,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 theorem accepted_conditional_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient)
@@ -598,7 +601,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -686,12 +692,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 theorem accepted_constructor_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient)
@@ -974,13 +980,16 @@ private def functions : FunctionModel checked.catalog ambient where
   extend := fun impossible _ _ _ => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by
@@ -1509,7 +1518,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -1600,12 +1612,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 theorem accepted_member_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) (catalogSignatures : checked.signatures = signatures)
@@ -1850,7 +1862,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -2023,12 +2038,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 theorem accepted_pair_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient)
@@ -2292,7 +2307,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -2418,12 +2436,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked values.registry functions)
       program context [] source (Tree 20 values source context [] (fun _ => reason)) faults :=
-  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values) (source := source) (fuel := 20) (reasonAt := fun _ => reason) (faults := faults) functions (.refl _) program [] valid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 theorem accepted_pair_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient)
@@ -2781,7 +2799,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
 
 include accepted read unique declarations typed extension in
 /-- All actual ordinary reads use the unchanged public reflection interface. -/
-theorem actual_completed (uninitialized : ∀ expression location, faults (.uninitializedLocation location) (reasonAt expression)) :
+theorem actual_completed [FunctionCalls.FaultTokens faults] (uninitialized : ∀ expression location, faults (.uninitializedLocation location) (reasonAt expression)) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (fun current occurrence code => current = scope ∧ occurrence = id ∧ code = lowered) faults := by
   intro current occurrence code receipt
@@ -2907,7 +2925,10 @@ private def program : SourceSemantics.Program := ⟨signatures, [], []⟩
 private def sourceEnvironment (type : TypeSystem.Ty) : Dynamic.Environment := [((binder type).id, ⟨0⟩)]
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique (type : TypeSystem.Ty) : NodeOccurrencesUnique (source type) := by
   simp [NodeOccurrencesUnique, nodeOccurrenceIds, source]
 private theorem contains (type : TypeSystem.Ty) : ContainsExpression (source type) id (node type) :=
@@ -2971,10 +2992,10 @@ private theorem boolCertificate : LoweredRead 100 context (source .bool) (source
 administrative environment insertions and arbitrary typed closure payloads. -/
 theorem universal_forward : GenericExpressionMeaning.Preserves model program (sourceContext .bool) [] (source .bool)
     (LoweredRead 100 context (source .bool) (sourceContext .bool) (fun _ => reason)) faults :=
-  loweredRead_preserves (context := context) (faults := faults) functions (.refl _) program _ [] _ (fun _ location => ⟨⟨location, rfl⟩, rfl⟩) (unique _)
+  loweredRead_preserves (context := context) (faults := faults) functions (.refl _) program _ [] _ (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩) (unique _)
 theorem universal_reverse : GenericExpressionMeaning.Reflects model program (sourceContext .bool) [] (source .bool)
     (LoweredRead 100 context (source .bool) (sourceContext .bool) (fun _ => reason)) faults :=
-  loweredRead_reflects (context := context) (faults := faults) functions (.refl _) program _ [] _ (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  loweredRead_reflects (context := context) (faults := faults) functions (.refl _) program _ [] _ (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 private def boolHeap (value : Option Dynamic.Value) : Dynamic.Heap := ⟨[⟨.bool, value, none⟩]⟩
 private def world (type : Ty) : StoreTyping := [administrativeType, OptionalCell.cellType type]
@@ -3064,7 +3085,7 @@ theorem lazy_mapping_read {code : Expr}
   have meaning : GenericExpressionMeaning.Preserves model program (sourceContext mappingType) [] (source mappingType)
       (LoweredRead 100 context (source mappingType) (sourceContext mappingType) (fun _ => reason)) faults :=
     loweredRead_preserves (context := context) (faults := faults) functions (.refl _) program
-    (sourceContext mappingType) [] (fun _ => reason) (fun _ location => ⟨⟨location, rfl⟩, rfl⟩) (unique mappingType)
+    (sourceContext mappingType) [] (fun _ => reason) (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩) (unique mappingType)
   have result := meaning (mappingCertificate accepted) (show (source mappingType).lookupExpression? id = some (node mappingType) by rfl)
     environments heaps locals (ξ := Renaming.id) (fun {_ _} found => found) sourceRun
   simpa only [Expr.rename_id, node, emptyMappingHeap] using result
@@ -3088,7 +3109,7 @@ theorem lazy_mapping_reflected {code : Expr} {value : Value} {finalStore : Store
   have meaning : GenericExpressionMeaning.Reflects model program (sourceContext mappingType) [] (source mappingType)
       (LoweredRead 100 context (source mappingType) (sourceContext mappingType) (fun _ => reason)) faults :=
     loweredRead_reflects (context := context) (faults := faults) functions (.refl _) program
-      (sourceContext mappingType) [] (fun _ => reason) (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+      (sourceContext mappingType) [] (fun _ => reason) (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
   exact meaning (mappingCertificate accepted) (show (source mappingType).lookupExpression? id = some (node mappingType) by rfl)
     environments heaps locals (ξ := Renaming.id) (fun {_ _} found => found)
     (by simpa only [Expr.rename_id] using completed)
@@ -3205,7 +3226,10 @@ private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  (∃ location, error = .uninitializedLocation location) ∧ token = reason
+  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem metadata {expression : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? expression = some node) :
@@ -3342,12 +3366,12 @@ theorem actual_preserves {ambient : AmbientDefinitions checked.catalog.definitio
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  preserves (values := values checked) functions (.refl _) program [] contextValid unique (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 theorem actual_reflects {ambient : AmbientDefinitions checked.catalog.definitions}
     (functions : FunctionModel checked.catalog ambient) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked (values checked).registry functions)
       program context [] source (Tree 20 (values checked) source context [] (fun _ => reason)) faults :=
-  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  reflects (values := values checked) functions (.refl _) program [] contextValid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
 
 private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
   | .ok value => pure value

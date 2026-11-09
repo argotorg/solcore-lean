@@ -44,7 +44,7 @@ theorem resolves_sized
 theorem snapshot_prefix_sized
     (layout : Layout compilation prepared)
     (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {invalid : Word}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs next outputType operator false invalid).rename ξ) value finalStore) :
@@ -59,11 +59,43 @@ theorem snapshot_prefix_sized
   obtain ⟨third, thirdBound, thirdEval⟩ := secondEval.bind_success (snapshot.getter layout)
   exact ⟨third, by omega, thirdEval⟩
 
+/-- A completed run whose right-hand side is Unit passes the modifier's check. -/
+theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Expr}
+    {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier}
+    {bitNot : Bool} {invalid : Word} {actual : Environment}
+    {before keyStore snapshotStore rhsStore modifiedStore setterStore finalStore : Store}
+    {target : Location} {keyValue saved changed updated value : Value}
+    (referenceSelected : DataEquality.Selects actual reference (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysEvaluated : Evaluates (referenceEnvironment prepared.route.rootType target actual) before
+      (shift 1 keys.expression) (.inRight .word keyValue) keyStore)
+    (snapshotEvaluated : Evaluates (keysEnvironment prepared.route.rootType target keyValue actual) keyStore
+      (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0))) (.inRight .word saved) snapshotStore)
+    (rightEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType target keyValue saved actual) snapshotStore
+      (shift 3 rhs) (.inRight .word .unit) rhsStore)
+    (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType target keyValue saved .unit actual) rhsStore
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid) (.inRight .word changed) modifiedStore)
+    (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType target keyValue saved .unit changed actual) modifiedStore
+      (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
+      (.inRight .word updated) setterStore)
+    {size : Nat}
+    (completed : EvaluationSize size actual before
+      (execute prepared reference keys rhs next outputType operator bitNot invalid) value finalStore) :
+    SourceCoreDataPlaces.Passes operator .unit := by
+  obtain ⟨_, _, firstEval⟩ := completed.let_body (referenceSelected.evaluates before)
+  obtain ⟨_, _, secondEval⟩ := firstEval.bind_success keysEvaluated
+  obtain ⟨_, _, thirdEval⟩ := secondEval.bind_success snapshotEvaluated
+  obtain ⟨_, _, fourthEval⟩ := thirdEval.bind_success rightEvaluated
+  obtain ⟨_, _, fifthEval⟩ := fourthEval.bind_success modifiedEvaluated
+  obtain ⟨_, _, sixthEval⟩ := fifthEval.bind_success setterEvaluated
+  rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, _⟩ | ⟨_, _, zero, _, _⟩
+  · exact passes
+  · cases zero
+
 /-- One inversion for the actual emitted prefix. The six supplied phase
 executions align values/stores; all costs come from the original derivation.
 The terminal Unit execution identifies only the store after its real write. -/
 theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : Expr}
-    {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option BinaryOp}
+    {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier}
     {bitNot : Bool} {invalid : Word} {actual : Environment}
     {before keyStore snapshotStore rhsStore modifiedStore setterStore commitStore finalStore : Store}
     {target : Location} {keyValue saved right changed updated value : Value}
@@ -93,7 +125,22 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
   obtain ⟨fourth, fourthBound, fourthEval⟩ := thirdEval.bind_success rightEvaluated
   obtain ⟨fifth, fifthBound, fifthEval⟩ := fourthEval.bind_success modifiedEvaluated
   obtain ⟨sixth, sixthBound, sixthEval⟩ := fifthEval.bind_success setterEvaluated
-  cases sixthEval with
+  rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, seventh, seventhBound, seventhEval⟩ |
+    ⟨operation, selected, zero, _, _⟩
+  case inr =>
+    -- The terminal run meets the same check, which fails.
+    subst selected zero
+    have failed : Evaluates actual before
+        (execute prepared reference keys rhs .unit outputType (some ⟨operation, true⟩) bitNot invalid)
+        (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
+      .letE (referenceSelected.evaluates before)
+        (LanguageResult.bind_success _ keysEvaluated
+          (LanguageResult.bind_success _ snapshotEvaluated
+            (LanguageResult.bind_success _ rightEvaluated
+              (LanguageResult.bind_success _ modifiedEvaluated
+                (LanguageResult.bind_success _ setterEvaluated SourceCoreDataPlaces.guard_panic)))))
+    cases (evaluation_deterministic terminal failed).1
+  cases seventhEval with
   | @letE writeSize remainingSize _ _ writtenStore _ _ _ _ _ write remaining =>
     cases write with
     | storeCell referenceEval read input written =>
@@ -105,10 +152,11 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
               (LanguageResult.bind_success _ rightEvaluated
                 (LanguageResult.bind_success _ modifiedEvaluated
                   (LanguageResult.bind_success _ setterEvaluated
+                    (SourceCoreDataPlaces.guard_passes passes
                     (.letE (.storeCell referenceEval.sound read input.sound written)
                       (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
                         (Evaluates.unit (environment := .unit :: updated :: changed :: right :: saved :: keyValue ::
-                          .cellRef (OptionalCell.cellType prepared.route.rootType) target :: actual) (store := writtenStore)))))))))
+                          .cellRef (OptionalCell.cellType prepared.route.rootType) target :: actual) (store := writtenStore))))))))))
       obtain ⟨_, sameStore⟩ := evaluation_deterministic nativePrefix terminal
       cases sameStore
       exact ⟨_, by omega, remaining⟩
@@ -118,7 +166,7 @@ prefix is used solely to identify its write store with the semantic commit. -/
 theorem continuation_sized
     (layout : Layout compilation prepared)
     (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {invalid : Word}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
     {right changed : Value} {rhsStore commitStore : Store} {optional : Value}
     (rightEvaluated : Evaluates
       (snapshotEnvironment prepared.route.rootType snapshot.target .unit snapshot.value actual) store
@@ -350,7 +398,7 @@ inductive KeyResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping) (index : Nat)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word)
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
     (result : Value) (finalStore : Store) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -380,7 +428,7 @@ inductive PrefixResultAt (size : Nat) (checked : Checked) (registry : SourceCore
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word)
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
     (result : Value) (finalStore : Store) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -479,7 +527,7 @@ theorem KeyResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCor
     {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     {place : PlaceResolution} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping} {index : Nat}
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {result : Value} {finalStore : Store}
     (receipt : KeyResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
         coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore) :
@@ -498,7 +546,7 @@ theorem PrefixResultAt.erase {size : Nat} {checked : Checked} {registry : Source
     {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     {place : PlaceResolution} {leaf : TypeSystem.Ty} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {result : Value} {finalStore : Store}
     (receipt : PrefixResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
         coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore) :
@@ -595,7 +643,7 @@ theorem initialized_prefix_sized (layout : Layout prepared)
     (represented : ValueRep checked registry functions mapping world prepared.route.rootSourceType sourceValue value prepared.route.rootType)
     (lookup : actual[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ updated replacement after finalStore slots,
       Dynamic.BitNotSnapshot (some sourceValue) updated ∧
       Dynamic.Heap.Writes heap location (some updated) after ∧
@@ -603,7 +651,7 @@ theorem initialized_prefix_sized (layout : Layout prepared)
       HeapRepresents checked registry functions mapping world after finalStore ∧
       AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
-      (∀ next output, ContinuationAgreement actual store
+      (SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
           next output operator true invalid).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
@@ -628,11 +676,11 @@ theorem initialized_prefix_sized (layout : Layout prepared)
   have modifier : Evaluates (rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
       store (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid)
       (.inRight .word replacement) store := by simpa only [← layout.sameType] using modified
-  have agreement : ∀ next output, ContinuationAgreement actual store
+  have agreement : SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
         next output operator true invalid).rename ξ)
       (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-    intro next output
+    intro passes next output
     rw [execute_rename layout]
     exact (ContinuationAgreement.letE (.var lookup)).trans
       ((ContinuationAgreement.bind (CompatibleBareBitNotNative.keys_evaluates _ _)).trans
@@ -641,7 +689,8 @@ theorem initialized_prefix_sized (layout : Layout prepared)
             ((ContinuationAgreement.bind modifier).trans
               ((ContinuationAgreement.bind (CompatibleBareBitNotNative.setter_evaluates layout
                 (.inRight .unit value) replacement nativeRead)).trans
-                (ContinuationAgreement.letE (.storeCell (.var rfl) nativeRead (.inRight (.var rfl)) coreWritten)))))))
+                ((DataPlaceGuard.agreement passes).trans
+                  (ContinuationAgreement.letE (.storeCell (.var rfl) nativeRead (.inRight (.var rfl)) coreWritten))))))))
 
   refine ⟨updated, replacement, _, finalStore, slots, applies, written, related, finalHeaps, frame,
     .of_write written, rfl, ?_, agreement, ?_⟩
@@ -649,10 +698,15 @@ theorem initialized_prefix_sized (layout : Layout prepared)
     exact .cons .unit (.cons related.runtime_hasType (.cons related.runtime_hasType
       (.cons .unit (.cons (.inRight represented.runtime_hasType) (.cons .unit (.cons (.cellRef reference.typed) actualTyped))))))
   · intro next output result after size completed
-    have terminal := (agreement .unit output).wrap
+    rw [execute_rename layout] at completed
+    have passes := RecursiveNamedBareAssignmentContracts.execute_unit_passes_sized
+      (.var lookup) (CompatibleBareBitNotNative.keys_evaluates _ _)
+      (CompatibleBareBitNotNative.getter_evaluates layout nativeRead) rhs modifier
+      (CompatibleBareBitNotNative.setter_evaluates layout (.inRight .unit value) replacement nativeRead) completed
+    have terminal := (agreement passes .unit output).wrap
       (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
         (Evaluates.unit (environment := slots ++ actual) (store := finalStore)))
-    rw [execute_rename layout] at terminal completed
+    rw [execute_rename layout] at terminal
     exact RecursiveNamedBareAssignmentContracts.execute_continuation_sized
       (.var lookup) (CompatibleBareBitNotNative.keys_evaluates _ _)
       (CompatibleBareBitNotNative.getter_evaluates layout nativeRead) rhs modifier
@@ -941,10 +995,11 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   cases profile with
   | word strict => cases strict <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | integer strict => cases strict <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | panicking panicking => cases panicking <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue =>
       cases original with
       | ifTrue condition right =>
@@ -956,7 +1011,7 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | logicalOr =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse =>
       cases original with
       | ifFalse condition right =>
@@ -1180,7 +1235,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {root : ExpressionNode} (tree : Head checked source certificate scope id lowered)
     (found : source.lookupExpression? id = some root)
-    (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
       ProtectedStateTransition.WithReady.PreservesAt protocol ready
         (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source
         (fun current expression code => expression = childId ∧ certificate current expression code) faults childSize) :
@@ -1335,7 +1390,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -1349,7 +1404,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, _, _, _, second, represented, _, maps, worlds, _⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
           rightIH _ (Nat.le_trans (Nat.le_of_lt secondSmaller) bounded) rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
             (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState (firstReady _ rfl) (.value secondTrace)
@@ -1358,8 +1413,14 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨_, _, applied, _, _⟩ := profile.right_success leftPayload rightPayload continues first second
-          exact False.elim (binary_fault_excluded applied failed)
+          rcases profile.right_outcome leftPayload rightPayload continues first second with
+            ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
+          · exact False.elim (binary_fault_excluded applied failed)
+          · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
+            exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
+              .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+              firstFrame.trans frame, firstMetadata.trans heapMetadata, ProtectedStateTransition.WithReady.Reached.continue protocol ready firstRelated
+                (ProtectedStateTransition.WithReady.Reached.of_value protocol ready transition _)⟩
 
   | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
     have same := Option.some.inj (metadata.found.symm.trans found)
@@ -1420,7 +1481,7 @@ theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {root : ExpressionNode} (tree : Head checked source certificate scope id lowered)
     (found : source.lookupExpression? id = some root)
-    (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
       ProtectedStateTransition.WithReady.ReflectsAt protocol ready
         (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source
         (fun current expression code => expression = childId ∧ certificate current expression code) faults childSize) :
@@ -1558,14 +1619,21 @@ theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              obtain ⟨sourceResult, result, applied, resultRep, combined⟩ :=
-                profile.right_success leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
-              cases trace with
-              | value secondTrace =>
-                exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace.sound continues secondTrace.sound applied),
-                  .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata, ProtectedStateTransition.WithReady.Reached.continue protocol ready firstRelated (ProtectedStateTransition.WithReady.Reached.of_value protocol ready transition _)⟩
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+                ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace.sound continues secondTrace.sound applied),
+                    .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata, ProtectedStateTransition.WithReady.Reached.continue protocol ready firstRelated (ProtectedStateTransition.WithReady.Reached.of_value protocol ready transition _)⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld,
+                    binary_intro metadata form (.invalid firstTrace.sound continues secondTrace.sound (.panic panics)),
+                    .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata, ProtectedStateTransition.WithReady.Reached.continue protocol ready firstRelated (ProtectedStateTransition.WithReady.Reached.of_value protocol ready transition _)⟩
 
   | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
     have same := Option.some.inj (metadata.found.symm.trans found)
@@ -1627,7 +1695,7 @@ theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {root : ExpressionNode} (tree : Head checked source certificate scope id lowered)
     (found : source.lookupExpression? id = some root)
-    (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childId, childId ∈ actualOperandIds root.form → ∀ childSize, childSize ≤ budget →
       ProtectedStateTransition.WithReady.ReflectsAt protocol ready
         (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source
         (fun current expression code => expression = childId ∧ certificate current expression code) faults childSize) :
@@ -1659,7 +1727,7 @@ end WithReady
 
 theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source)
-    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source certificate faults childSize) :
     ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults size := by
@@ -1676,7 +1744,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     reached, related⟩
 
 private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
-    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source certificate faults childSize) :
     ReflectsRawAt protocol size (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults := by
@@ -1694,7 +1762,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
 
 /-- Finite native completion yields an independently sized source trace. -/
 theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol
       (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source certificate faults childSize) :
     ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults size := by
@@ -1745,7 +1813,7 @@ private theorem lift_reflects_at {size : Nat}
 
 theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source)
-    (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.PreservesAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.PreservesAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source certificate faults entry) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults entry := by
@@ -1759,7 +1827,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
 
 /-- Finite native completion yields an independently sized source trace. -/
 theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt childSize
+    [FunctionCalls.FaultTokens faults] (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt childSize
       (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source certificate faults entry) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults entry := by

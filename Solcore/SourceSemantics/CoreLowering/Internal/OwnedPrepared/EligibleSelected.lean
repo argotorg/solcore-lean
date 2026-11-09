@@ -216,7 +216,7 @@ include transport extension faithful observations functionTypes unique reads mis
 /-- All non-call heads and exact builtin fragments are closed internally.
 Only the actual raw lambda/named/indirect alternatives remain in callLeaves;
 that dispatcher must consume the strict F induction at the retained body. -/
-private theorem preserves_with_literals
+private theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program sourceContext evidence (source named) literals faults)
@@ -255,7 +255,7 @@ private theorem preserves_with_literals
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- Reflection follows each actual Core grade; each head returns its own
 independent Source grade and the same admitted reached witness. -/
-private theorem reflects_with_literals
+private theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program sourceContext evidence (source named) literals faults)
@@ -303,7 +303,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- Actual runtime literal and non-call meanings are manufactured internally.
 The remaining three call alternatives must use the strict body family. -/
-theorem preserves_at (sameLedger : sourceContext.solvedRequirements = solved)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (sameLedger : sourceContext.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid sourceContext)
     (budget size : Nat) (within : size ≤ budget)
     (callLeaves : ∀ scope entries child, child ≤ budget →
@@ -326,7 +326,7 @@ theorem preserves_at (sameLedger : sourceContext.solvedRequirements = solved)
 include transport extension faithful observations functionTypes unique reads missing wellFormed runtime covers in
 /-- The same native Tree yields an independent Source grade and the actual
 reached admission. No literal or completed-expression execution law is input. -/
-theorem reflects_at (sameLedger : sourceContext.solvedRequirements = solved)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (sameLedger : sourceContext.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid sourceContext)
     (budget size : Nat) (within : size ≤ budget)
     (callLeaves : ∀ scope entries child, child ≤ budget →
@@ -509,7 +509,7 @@ def Receiving : Prop :=
 include qualified faithful observations wellFormed in
 /-- The actual selected occurrence factory builds the same Tree before one
 original F producer is invoked. Reflection keeps an independent Source grade. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (receiving : Receiving (headers := headers) (registry := registry) (faults := faults) functions captured code owner extension support)
 
     (expressionIH : ExpressionsPreserves (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
@@ -548,7 +548,7 @@ theorem preserves_flow (budget : Nat)
 include qualified faithful observations wellFormed in
 /-- The actual selected occurrence factory builds the same Tree before one
 original F producer is invoked. Reflection keeps an independent Source grade. -/
-theorem reflects_flow (budget : Nat)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (receiving : Receiving (headers := headers) (registry := registry) (faults := faults) functions captured code owner extension support)
     (functionTypes : FunctionRuntimeViews functions)
     (expressionIH : ExpressionsReflects (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
@@ -608,7 +608,7 @@ def Receiving : Prop :=
 include qualified faithful observations wellFormed in
 /-- The actual selected occurrence factory builds the same Tree before one
 original F producer is invoked. Reflection keeps an independent Source grade. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (receiving : Receiving (headers := headers) (registry := registry) (faults := faults) functions captured code owner extension support)
 
     (expressionIH : ExpressionsPreserves (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
@@ -648,7 +648,7 @@ theorem preserves_flow (budget : Nat)
 include qualified faithful observations wellFormed in
 /-- The actual selected occurrence factory builds the same Tree before one
 original F producer is invoked. Reflection keeps an independent Source grade. -/
-theorem reflects_flow (budget : Nat)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (receiving : Receiving (headers := headers) (registry := registry) (faults := faults) functions captured code owner extension support)
     (functionTypes : FunctionRuntimeViews functions)
     (expressionIH : ExpressionsReflects (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
@@ -867,7 +867,7 @@ variable {identities : Dynamic.Value → Word → Prop}
 
 include faithful observations wellFormed receiving in
 /-- E through n produces the actual closure F through n. -/
-theorem preserves_at_most (budget : Nat)
+theorem preserves_at_most [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressionIH : ExpressionsPreserves (headers := headers) (keys := keys)
       (registry := registry) (faults := faults) functions budget) :
     ∀ {mapping world function native bindings parameter result}
@@ -888,7 +888,7 @@ theorem preserves_at_most (budget : Nat)
 
 include faithful observations wellFormed receiving in
 /-- The application dispatcher consumes strictly smaller F grades. -/
-theorem preserves_below (budget : Nat)
+theorem preserves_below [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressionIH : ∀ child, child < budget → ExpressionsPreserves
       (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions child) :
     ClosurePreservesBelow (qualification := facet headers) (headers := headers)
@@ -900,7 +900,7 @@ theorem preserves_below (budget : Nat)
 
 include faithful observations wellFormed receiving in
 /-- Native strict E builds strict F with an independent reconstructed Source grade. -/
-theorem reflects_below (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_below [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (expressionIH : ExpressionsReflects (headers := headers) (keys := keys)
       (registry := registry) (faults := faults) functions budget) :
     ClosureReflectsBelow (qualification := facet headers) (headers := headers)

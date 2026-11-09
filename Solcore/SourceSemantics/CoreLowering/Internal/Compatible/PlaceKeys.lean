@@ -832,6 +832,7 @@ theorem initialized_success
     {operator : Syntax.ValueAssignOp}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
       SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero)
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshot rhs : Expr}
@@ -850,7 +851,9 @@ theorem initialized_success
     subst type
     obtain ⟨left, rfl, rfl⟩ := word_fields observations leftRep
     obtain ⟨right, rfl, rfl⟩ := word_fields observations rightRep
-    obtain ⟨result, applied, evaluated⟩ := DataPlaceModifier.word_success operator left right snapshotSelected rightSelected store invalid
+    obtain ⟨result, applied, evaluated⟩ := DataPlaceModifier.word_success operator left right
+      (divisor.imp_right fun different same => different (congrArg Dynamic.Value.word same))
+      snapshotSelected rightSelected store invalid
     exact ⟨_, _, .compatible (actual := .word) word (.word result), applied, evaluated, DataPlaceModifier.assignment_excludes_invalid applied⟩
   · have projected : checked.catalog.project sourceType = .ok .integer := by
       rw [← checked.catalog.project_runtimeType sourceType, integer]; rfl
@@ -879,10 +882,63 @@ theorem preserves
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
         (.inRight .word value) store ∧ ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
   obtain ⟨result', value, related, applied', evaluated, valid⟩ :=
-    initialized_success observations profile leftRep rightRep snapshotSelected rightSelected store invalid
+    initialized_success observations profile (DataPlaceModifier.assignment_divisor applied) leftRep rightRep
+      snapshotSelected rightSelected store invalid
   have same := DataPlaceModifier.assignment_functional applied' applied
   subst result'
   exact ⟨value, related, evaluated, valid⟩
+
+/-- The native modifier always gives a leaf. The source either applies the
+operation, or panics on a zero divisor once the latest root is traversed. -/
+theorem initialized_outcome
+    (observations : FunctionObservations checked.catalog functions identities)
+    {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
+    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
+    {environment : Environment} {snapshot rhs : Expr}
+    (snapshotSelected : Selects environment snapshot (.inRight .unit leftCore))
+    (rightSelected : Selects environment rhs rightCore) (store : Store) (invalid : Word) :
+    ∃ result value, ValueRep checked registry functions mapping world sourceType result value type ∧
+      Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
+        (.inRight .word value) store ∧
+      ((Dynamic.AssignmentValueApplies operator (some left) right result ∧
+          ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right) ∨
+        (∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧
+          rightCore = .word Word.zero ∧
+          Dynamic.AssignmentOperandsPanic operator (some left) right SourceCorePanics.divisionByZero)) := by
+  by_cases zero : operator.mayPanic = true ∧ right = .word Word.zero
+  · obtain ⟨panics, rfl⟩ := zero
+    have word : SourceCoreRawMetadata.runtimeType sourceType = .word := by
+      rcases profile with same | word | ⟨_, notWordOnly⟩
+      · subst same; simp [Syntax.ValueAssignOp.mayPanic] at panics
+      · exact word
+      · cases operator <;> simp_all [Syntax.ValueAssignOp.mayPanic, Syntax.ValueAssignOp.wordOnly]
+    have projected : checked.catalog.project sourceType = .ok .word := by
+      rw [← checked.catalog.project_runtimeType sourceType, word]; rfl
+    have same := Except.ok.inj (leftRep.projection.symm.trans projected)
+    subst type
+    obtain ⟨left, rfl, rfl⟩ := word_fields observations leftRep
+    obtain ⟨zero, sameZero, rfl⟩ := word_fields observations rightRep
+    cases sameZero
+    cases operator <;> simp [Syntax.ValueAssignOp.mayPanic] at panics
+    · exact ⟨_, _, .compatible (actual := .word) word (.word (left.udiv Word.zero)),
+        .caseRight (snapshotSelected.evaluates store)
+          (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
+        .inr ⟨.wordDiv, rfl, rfl, .compound .uncheckedDivide (.wordUncheckedDivide left)⟩⟩
+    · exact ⟨_, _, .compatible (actual := .word) word (.word (left.umod Word.zero)),
+        .caseRight (snapshotSelected.evaluates store)
+          (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
+        .inr ⟨.wordMod, rfl, rfl, .compound .uncheckedModulo (.wordUncheckedModulo left)⟩⟩
+  · have divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero := by
+      by_cases panics : operator.mayPanic = true
+      · exact .inr fun same => zero ⟨panics, same⟩
+      · exact .inl (by simpa using panics)
+    obtain ⟨result, value, related, applied, evaluated, valid⟩ :=
+      initialized_success observations profile divisor leftRep rightRep snapshotSelected rightSelected store invalid
+    exact ⟨result, value, related, evaluated, .inl ⟨applied, valid⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
 end
@@ -900,7 +956,7 @@ open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDat
 
 /-- The exact subtree after the packed keys binder in `execute`. -/
 def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType : Ty)
-    (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) : Expr :=
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) : Expr :=
   LanguageResult.bind outputType
     (.apply (getter prepared keyType) (.pair (.loadCell (.var 1)) (.var 0)))
     (LanguageResult.bind outputType (shift 3 rhs)
@@ -908,10 +964,11 @@ def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType
         (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid)
         (LanguageResult.bind outputType
           (.apply (setter prepared keyType) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-          (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))))
+          (Frontend.SourceCoreDataPlaces.guard outputType operator
+            (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))))
 
 theorem execute_eq (prepared : Prepared) (reference : Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) :
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) :
     execute prepared reference keys rhs next outputType operator bitNot invalid =
       .letE reference (LanguageResult.bind outputType (shift 1 keys.expression)
         (remainder prepared keys.type rhs next outputType operator bitNot invalid)) := rfl
@@ -923,7 +980,7 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping) (index : Nat)
-    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word)
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
     (result : Value) (finalStore : Store) : Prop where
   | fault {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -964,7 +1021,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalid) result finalStore) :
     Result checked registry functions program context evidence source faults prepared codes sourceTypes place environment

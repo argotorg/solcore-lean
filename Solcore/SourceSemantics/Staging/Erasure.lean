@@ -735,6 +735,8 @@ local macro "erase_recursive_plain" : tactic =>
       exact value_occurrence occurrence (.binaryEvaluateRight (owned := []) rfl a continues b (.primitive applies))
     case binaryInvalid occurrence first continues second invalid a b =>
       exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.primitive invalid))
+    case binaryPanic occurrence first continues second panics a b =>
+      exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.panic panics))
     case unaryMethod occurrence dispatch method operand rootsEq selected parameters allocate body resultRule operandIH bodyIH =>
       rename_i outcome result
       have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
@@ -936,6 +938,9 @@ local macro "erase_recursive_plain" : tactic =>
     case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid childIH =>
       exact StatementsPlain.head_fault (.assignValue contains form
         (.operands (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead invalid))
+    case assignBarePanic contains form snapshot child currentRead rootType initialValue pathRead panics childIH =>
+      exact StatementsPlain.head_fault (.assignValue contains form
+        (.panic (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead panics))
     case assignBareUnbound contains form _bare missing =>
       exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
     case assignBareDangling contains form _bare lookup missing =>
@@ -1091,6 +1096,9 @@ local macro "erase_recursive_plain" : tactic =>
     case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid childIH =>
       exact .head (.assignValue
         (.operands (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead invalid))
+    case assignmentPanic snapshot child currentRead rootType initialValue pathRead panics childIH =>
+      exact .head (.assignValue
+        (.panic (snapshot.resolves _ _ _ _) childIH currentRead rootType initialValue pathRead panics))
     case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
     case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
     case testFault test testIH =>
@@ -1670,6 +1678,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
     exact StatementsPlain.head_fault (.assignValue contains form
       (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
+  case assignBarePanic contains form snapshot child currentRead rootType initialValue pathRead panics _childIH =>
+    exact StatementsPlain.head_fault (.assignValue contains form
+      (.panic (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead panics))
   case assignBareUnbound contains form _bare missing =>
     exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
   case assignBareDangling contains form _bare lookup missing =>
@@ -1832,6 +1843,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
     exact .head (.assignValue
       (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
+  case assignmentPanic snapshot child currentRead rootType initialValue pathRead panics _childIH =>
+    exact .head (.assignValue
+      (.panic (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead panics))
   case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
   case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
   case testFault test _testIH =>
@@ -2000,6 +2014,9 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
   case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid _childIH =>
     exact .head (.assignValue
       (.operands (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead invalid))
+  case assignmentPanic snapshot child currentRead rootType initialValue pathRead panics _childIH =>
+    exact .head (.assignValue
+      (.panic (snapshot.resolves _ _ _ _) child.value_plain currentRead rootType initialValue pathRead panics))
   case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
   case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
 

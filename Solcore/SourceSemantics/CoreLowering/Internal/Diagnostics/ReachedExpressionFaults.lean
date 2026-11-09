@@ -99,11 +99,25 @@ structure IndexLeaf where
   fault : Dynamic.ExpressionFaults program context evidence source environment before id
     (.missingMappingDefault rawValue) heap
 
+/-- An actual Source panic, which fails with its code's own reason. -/
+structure PanicLeaf where
+  program : Program
+  context : SourceSemantics.Context
+  evidence : Dynamic.EvidenceEnvironment
+  source : TypedSource
+  environment : Dynamic.Environment
+  before : Dynamic.Heap
+  heap : Dynamic.Heap
+  id : ExpressionId
+  code : UInt8
+  fault : Dynamic.ExpressionFaults program context evidence source environment before id (.panic code) heap
+
 /-- No arbitrary predicate branch stands in for an actual primitive origin. -/
 inductive PrimitiveOrigin : Dynamic.Heap → Dynamic.SemanticFault → Word → Type where
   | read (leaf : ReadLeaf) : PrimitiveOrigin leaf.heap (.uninitializedLocation leaf.location) leaf.reason
   | index (leaf : IndexLeaf) : PrimitiveOrigin leaf.heap (.missingMappingDefault leaf.rawValue)
       (leaf.reason.add leaf.tag)
+  | panic (leaf : PanicLeaf) : PrimitiveOrigin leaf.heap (.panic leaf.code) (SourceCorePanics.reason leaf.code)
 
 /- The leaf packet is an index. Each join keeps its exact final Source heap.
 Only the first sequence/composition seam is represented here; later original
@@ -115,6 +129,8 @@ mutual
     | read (leaf : ReadLeaf) : ExpressionPath (.read leaf) leaf.program leaf.context leaf.evidence
         leaf.source leaf.environment leaf.heap leaf.id
     | index (leaf : IndexLeaf) : ExpressionPath (.index leaf) leaf.program leaf.context leaf.evidence
+        leaf.source leaf.environment leaf.before leaf.id
+    | panic (leaf : PanicLeaf) : ExpressionPath (.panic leaf) leaf.program leaf.context leaf.evidence
         leaf.source leaf.environment leaf.before leaf.id
     | expression {heap : Dynamic.Heap} {reason : Dynamic.SemanticFault} {token : Word}
         {origin : PrimitiveOrigin heap reason token} {program : Program} {context : SourceSemantics.Context}
@@ -159,6 +175,7 @@ def NativeTransport {heap : Dynamic.Heap} {reason : Dynamic.SemanticFault} {toke
   | .read leaf => SourceCoreRawMetadata.Extends leaf.values.registry registry
   | .index leaf => SourceCoreRawMetadata.Extends leaf.registry registry ∧
       LocationMap.Extends leaf.mapping mapping ∧ WorldExtends leaf.world world
+  | .panic _ => True
 
 /-- The final Source heap is the very heap indexing the selected leaf. The
 actual native Store belongs to the original full result tuple and is not equated
@@ -207,6 +224,9 @@ theorem composition_joins (registry : SourceCoreRawMetadata.Registry)
     intro environment before id ids reason after token mapping world store link _failed post
     obtain ⟨origin, path, native⟩ := post
     exact ⟨origin, .expressions link path, native⟩
+  panic := by
+    intro environment before id code after mapping world store failed
+    exact ⟨.panic ⟨program, context, evidence, source, environment, before, after, id, code, failed⟩, .panic _, trivial⟩
 
 end Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
 end
@@ -364,6 +384,7 @@ def ModelAssociation (checked : SourceCoreCompatibleCatalog.Checked)
   match origin with
   | .read leaf => leaf.values.checked = checked
   | .index leaf => leaf.checked = checked ∧ HEq leaf.ambient ambient ∧ HEq leaf.functions functions
+  | .panic _ => True
 
 /-- Model association belongs to this SAME existential origin and path. -/
 def model_expressionPost (checked : SourceCoreCompatibleCatalog.Checked)
@@ -441,6 +462,10 @@ theorem model_composition_joins (checked : SourceCoreCompatibleCatalog.Checked)
     intro environment before id ids reason after token mapping world store link _failed post
     obtain ⟨origin, path, native, associated⟩ := post
     exact ⟨origin, .expressions link path, native, associated⟩
+  panic := by
+    intro environment before id code after mapping world store failed
+    exact ⟨.panic ⟨program, context, evidence, source, environment, before, after, id, code, failed⟩, .panic _,
+      trivial, trivial⟩
 
 private theorem original_result {catalog : SourceCoreDataCatalog.Catalog}
     {projects : GenericHeap.Projection} {definitions : DataEnvironment}
@@ -947,6 +972,10 @@ theorem composition_joins (checked : SourceCoreCompatibleCatalog.Checked)
     intro environment before id ids reason after token mapping world store link _failed post
     obtain ⟨origin, path, native, associated⟩ := post
     exact ⟨origin, .expressions link path, native, associated⟩
+  panic := by
+    intro environment before id code after mapping world store failed
+    exact ⟨.panic ⟨program, context, evidence, source, environment, before, after, id, code, failed⟩,
+      .prior (.panic _), trivial, trivial⟩
 
 theorem index_base {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
     {id base key : ExpressionId} {node baseNode keyNode : ExpressionNode} {layout : Core.OrderedMapping.Layout}

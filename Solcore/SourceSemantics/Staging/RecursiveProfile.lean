@@ -272,6 +272,13 @@ inductive WriteFault (operator : Syntax.ValueAssignOp) (target : ResolvedPlace)
       (pathRead : ProjectionsRead initial target.projections currentSelected)
       (invalid : AssignmentOperandsInvalid operator target.selected right) :
       WriteFault operator target right heap (.invalidAssignmentOperands operator)
+  | panic {currentCell initial currentSelected code}
+      (currentRead : Heap.Reads heap target.location currentCell)
+      (rootType : currentCell.type = target.rootType)
+      (initialValue : RootInitialValue currentCell initial)
+      (pathRead : ProjectionsRead initial target.projections currentSelected)
+      (panics : AssignmentOperandsPanic operator target.selected right code) :
+      WriteFault operator target right heap (.panic code)
   | structural {currentCell initial reason}
       (currentRead : Heap.Reads heap target.location currentCell)
       (rootType : currentCell.type = target.rootType)
@@ -360,6 +367,7 @@ theorem WriteFault.source {program : Program} {context : Context}
     SourcePlaceAssignmentFaults program context evidence source environment before place operator rhs reason rhsHeap := by
   cases failed with
   | operands read root initial path invalid => exact .operands resolved evaluated read root initial path invalid
+  | panic read root initial path panics => exact .panic resolved evaluated read root initial path panics
   | structural read root initial fault => exact .structuralUpdate resolved evaluated read root initial fault
 
 end Solcore.SourceSemantics.Staging.Recursive.ProjectedTarget
@@ -596,6 +604,13 @@ mutual
         (invalid : BinaryPrimitiveOperandsInvalid operator a b) :
         Expression program registry scope context environment before id
           (.fault (.semantic (.invalidBinaryOperands operator))) after
+    | binaryPanic {scope context environment before middle after id left operator right a b code}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value a) middle)
+        (continues : EvaluatesRightOperand operator a)
+        (second : Expression program registry scope context environment middle right (.value b) after)
+        (panics : BinaryPrimitivePanics operator a b code) :
+        Expression program registry scope context environment before id (.fault (.semantic (.panic code))) after
     | unaryMethod {scope context environment before argumentsHeap bound after id operator operand input
           requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result}
         (occurrence : Occurrence scope id (.unary operator operand) requirements)
@@ -1042,6 +1057,19 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         StatementsIn program registry mode scope context environment before (id :: rest) context
           (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | assignBarePanic {mode scope context environment before after id rest node assignment operator rhs
+          target right currentCell initial currentSelected code}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context
+          (.fault (.semantic (.panic code))) after
     | assignBareUnbound {mode scope context environment heap id rest node assignment operator rhs}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -1314,6 +1342,17 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | assignmentPanic {scope context environment before after assignment operator rhs target right
+          currentCell initial currentSelected rest code}
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context
+          (.fault (.semantic (.panic code))) after
     | unbound {scope context environment heap assignment operator rhs rest}
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
@@ -1467,7 +1506,7 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
-  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBarePanic assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements

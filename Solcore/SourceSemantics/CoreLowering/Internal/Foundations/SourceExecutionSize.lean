@@ -2813,6 +2813,11 @@ mutual
         (invalid : BinaryPrimitiveOperandsInvalid operator left right) :
         BinaryOperationFaults program (stepSize []) context evidence heap operator [] left right
           (.invalidBinaryOperands operator) heap
+    | panic
+        {context evidence heap operator left right code}
+        (panics : BinaryPrimitivePanics operator left right code) :
+        BinaryOperationFaults program (stepSize []) context evidence heap operator [] left right
+          (.panic code) heap
     | requirement
         {context evidence heap operator requirements left right failed}
         (fault : RequirementListFaults context evidence requirements failed) :
@@ -3418,6 +3423,21 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         SourcePlaceAssignmentFaults program (stepSize [size_resolve, size_evaluate]) context evidence source environment
           before place operator rhs (.invalidAssignmentOperands operator) rhsHeap
+    | panic
+        {size_resolve size_evaluate : Nat}
+        {context evidence source environment before targetHeap rhsHeap place operator
+          rhs target right currentCell initial currentSelected code}
+        (resolve : SourcePlaceResolves program size_resolve context evidence source environment
+          before place target targetHeap)
+        (evaluate : ExpressionEvaluates program size_evaluate context evidence source environment
+          targetHeap rhs right rhsHeap)
+        (current_read : Heap.Reads rhsHeap target.location currentCell)
+        (root_type_eq : currentCell.type = target.rootType)
+        (initial_value : RootInitialValue currentCell initial)
+        (path_read : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        SourcePlaceAssignmentFaults program (stepSize [size_resolve, size_evaluate]) context evidence source environment
+          before place operator rhs (.panic code) rhsHeap
     | structuralUpdate
         {size_resolve size_evaluate : Nat}
         {context evidence source environment before targetHeap rhsHeap place operator
@@ -3790,6 +3810,8 @@ theorem BinaryOperationFaults.sound {program : Program} {size : Nat} {a0 : Conte
   match trace with
   | .primitive invalid =>
     exact .primitive invalid
+  | .panic panics =>
+    exact .panic panics
   | .requirement fault =>
     exact .requirement fault
   | .method dispatch selected fault =>
@@ -3954,6 +3976,8 @@ theorem SourcePlaceAssignmentFaults.sound {program : Program} {size : Nat} {a0 :
     exact .rhs (SourcePlaceResolves.sound resolve) (ExpressionFaults.sound fault)
   | .operands resolve evaluate current_read root_type_eq initial_value path_read invalid =>
     exact .operands (SourcePlaceResolves.sound resolve) (ExpressionEvaluates.sound evaluate) current_read root_type_eq initial_value path_read invalid
+  | .panic resolve evaluate current_read root_type_eq initial_value path_read panics =>
+    exact .panic (SourcePlaceResolves.sound resolve) (ExpressionEvaluates.sound evaluate) current_read root_type_eq initial_value path_read panics
   | .structuralUpdate resolve evaluate current_read root_type_eq initial_value fault =>
     exact .structuralUpdate (SourcePlaceResolves.sound resolve) (ExpressionEvaluates.sound evaluate) current_read root_type_eq initial_value fault
 termination_by structural trace
@@ -4212,6 +4236,8 @@ theorem BinaryOperationFaults.has_size {program : Program} {a0 : Context} {a1 : 
   match trace with
   | .primitive invalid =>
     exact ⟨_, .primitive invalid⟩
+  | .panic panics =>
+    exact ⟨_, .panic panics⟩
   | .requirement fault =>
     exact ⟨_, .requirement fault⟩
   | .method dispatch selected fault =>
@@ -4429,6 +4455,10 @@ theorem SourcePlaceAssignmentFaults.has_size {program : Program} {a0 : Context} 
     obtain ⟨size_resolve, resolve⟩ := SourcePlaceResolves.has_size resolve
     obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
     exact ⟨_, .operands resolve evaluate current_read root_type_eq initial_value path_read invalid⟩
+  | .panic resolve evaluate current_read root_type_eq initial_value path_read panics =>
+    obtain ⟨size_resolve, resolve⟩ := SourcePlaceResolves.has_size resolve
+    obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
+    exact ⟨_, .panic resolve evaluate current_read root_type_eq initial_value path_read panics⟩
   | .structuralUpdate resolve evaluate current_read root_type_eq initial_value fault =>
     obtain ⟨size_resolve, resolve⟩ := SourcePlaceResolves.has_size resolve
     obtain ⟨size_evaluate, evaluate⟩ := ExpressionEvaluates.has_size evaluate
@@ -4708,6 +4738,8 @@ theorem BinaryOperationFaults.children_below {program : Program} {size : Nat} {a
   cases trace with
   | @primitive _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
+  | @panic _ _ _ _ _ _ _ _ =>
+    exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @requirement _ _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @method size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
@@ -4951,6 +4983,8 @@ theorem SourcePlaceAssignmentFaults.children_below {program : Program} {size : N
   | @rhs size_resolve size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_resolve, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
   | @operands size_resolve size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_resolve, size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @panic size_resolve size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_resolve, size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
   | @structuralUpdate size_resolve size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_resolve, size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩

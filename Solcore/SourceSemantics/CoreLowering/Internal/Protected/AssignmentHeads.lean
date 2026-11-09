@@ -57,7 +57,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {checked : Checked} {regis
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     ProtectedStatePlaceAssignmentContracts.KeyResultAt protocol size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
@@ -127,7 +127,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     ProtectedStatePlaceAssignmentContracts.KeyResultAt protocol size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
@@ -178,7 +178,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     RecursiveNamedPlaceAssignmentContracts.KeyResultAt size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
@@ -209,7 +209,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
     Result checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
@@ -278,7 +278,7 @@ theorem reflects_bounded_with_sequence_with_diagnostics (budget : Nat) {compilat
         (payloadModel compilation.checked registry functions) initialState budget)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     ProtectedStatePlaceAssignmentContracts.PrefixResultAt protocol size compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -413,7 +413,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {compilation : SourceCoreC
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -435,7 +435,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {compilation : SourceCoreC
         (payloadModel compilation.checked registry functions) initialState budget)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     ProtectedStatePlaceAssignmentContracts.PrefixResultAt protocol size compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -465,7 +465,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -476,7 +476,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     ProtectedStatePlaceAssignmentContracts.PrefixResultAt protocol size compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -529,7 +529,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -540,7 +540,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (installed : entry scope mapping world before store canonical)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     RecursiveNamedPlaceAssignmentContracts.PrefixResultAt size compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -566,7 +566,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -577,7 +577,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (installed : entry scope mapping world before store canonical)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
@@ -762,7 +762,7 @@ theorem reflects_bounded_with_producers_with_diagnostics (budget : Nat) {compila
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {certificate : Certificate} {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
@@ -851,7 +851,7 @@ theorem reflects_bounded_with_producers (budget : Nat) {compilation : SourceCore
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -903,7 +903,7 @@ theorem reflects_bounded_with_diagnostics (budget : Nat) {compilation : SourceCo
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {certificate : Certificate} {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
@@ -998,7 +998,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -1049,7 +1049,7 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -1097,7 +1097,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -1196,7 +1196,7 @@ theorem ShapeErrors.of_uniform {values : SourceCoreCompatibleValues.Context} {re
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs}
     {initialIndex : ProtectedStateTransition.Index} {initial : protocol.State initialIndex} {faults : FunctionCalls.FaultRep}
-    (errors : head.ReachableErrors registry faults) :
+    [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults) :
     ShapeErrors values registry functions protocol source context certificate scope administrative environment
       assignment.target head.prepared operator head.invalid initial faults head.shape := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
@@ -1266,7 +1266,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, post, continuation⟩
 
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
-theorem preserves_fault_bounded_with_diagnostics (budget : Nat)
+theorem preserves_fault_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (errors : ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
       scope administrative environment assignment.target head.prepared operator head.invalid initialState faults head.shape)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
@@ -1297,7 +1297,7 @@ theorem preserves_fault_bounded_with_diagnostics (budget : Nat)
 
 
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
-theorem preserves_fault_reachable_bounded (budget : Nat)
+theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
@@ -1315,7 +1315,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     budget boundedMeaning (ProtectedPlaceReachedDiagnostics.ShapeErrors.of_uniform errors) trace bounded next output
 
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
-theorem reflects_bounded_with_diagnostics (budget : Nat)
+theorem reflects_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions) (errors : ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
       scope administrative environment assignment.target head.prepared operator head.invalid initialState faults head.shape)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
@@ -1350,7 +1350,7 @@ theorem reflects_bounded_with_diagnostics (budget : Nat)
 
 
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
-theorem reflects_reachable_bounded (budget : Nat)
+theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
@@ -1433,7 +1433,7 @@ theorem preserves_prefix_bare_bounded (budget : Nat)
 
 include observations extension environments heaps locals agrees actualTyped initial bare in
 theorem preserves_fault_reachable_bare_bounded (budget : Nat)
-    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
     (next : Expr) (output : Ty) :
@@ -1457,7 +1457,7 @@ theorem preserves_fault_reachable_bare_bounded (budget : Nat)
 
 include observations transport extension environments heaps locals agrees actualTyped initial bare in
 theorem reflects_reachable_bare_bounded (budget : Nat)
-    (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
+    (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
@@ -1549,7 +1549,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
 
 include projected transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -1570,7 +1570,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
       transport.extend installed maps worlds frame metadata⟩
 
 include projected transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
+theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,

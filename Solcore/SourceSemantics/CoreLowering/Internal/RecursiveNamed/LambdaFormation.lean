@@ -1027,7 +1027,7 @@ theorem call_reflects_at (authenticated : Bool)
         _ authorized budget size within childrenMeaning bodies head found
 
 include complete alignments callerAligned extension unique owners uninitialized missing in
-theorem preserves_at (authenticated : Bool)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -1052,7 +1052,7 @@ theorem preserves_at (authenticated : Bool)
     (fun smaller strict => children smaller (Nat.le_of_lt strict)) bodies
 
 include complete alignments callerAligned extension uninitialized missing in
-theorem reflects_at (authenticated : Bool)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)

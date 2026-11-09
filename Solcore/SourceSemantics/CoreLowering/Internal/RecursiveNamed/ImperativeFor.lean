@@ -792,7 +792,7 @@ theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (uniqu
       ⟨returnTo.restore loopState, protocol.trans headerRelated (protocol.trans loopRelated (returnTo.related loopState))⟩⟩
 
 include definitions registered producer acquire stateTransport stateBindings assignments assignmentFaults meaning extend solved in
-theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_at_with [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -1364,14 +1364,14 @@ theorem assignment_prefix_uniform : ∀ context, validity context → ProtectedF
     exact ProtectedAssignmentHeads.Stateful.Head.preserves_prefix_bounded functions extension program evidence protocol stateTransport faithful observations
       head environments heaps locals agrees typed state budget (fun child smaller => meaningMost context valid child (Nat.le_of_lt smaller)) assigned within
 include extension stateTransport meaningMost faithful observations in
-theorem assignment_fault_uniform : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentFaultPreservesAt protocol functions (registry := registry)
+theorem assignment_fault_uniform [FunctionCalls.FaultTokens faults] : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentFaultPreservesAt protocol functions (registry := registry)
       program evidence source (certificates context) context administrative faults budget := by
     intro context valid scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
       environments heaps locals agrees typed state errors reason after child failed within next output
     exact ProtectedAssignmentHeads.Stateful.Head.preserves_fault_reachable_bounded functions extension program evidence protocol stateTransport faithful observations
       head environments heaps locals agrees typed state budget (fun child smaller => meaningMost context valid child (Nat.le_of_lt smaller)) errors failed within next output
 include definitions registered extension stateTransport stateBindings producer acquire meaningMost faithful observations extend runtimeOf solved in
-theorem preserving_heads_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source) :
+theorem preserving_heads_trivial [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source) :
     PreservingHeads protocol (Readiness.trivial protocol) conditionGate (fun _ _ _ => True) functions program evidence validity budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError)
       (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative)
@@ -1426,7 +1426,7 @@ theorem preserving_heads_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy)
       contextValid
 
 include definitions registered extension stateTransport stateBindings producer acquire meaningMost faithful observations extend solved in
-theorem preserving_loops_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source) :
+theorem preserving_loops_trivial [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source) :
     PreservingLoops protocol (Readiness.trivial protocol) conditionGate (fun _ _ _ _ _ => True) functions program evidence validity budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError)
       (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative)
@@ -1505,7 +1505,7 @@ variable (meaningMost : ∀ context, validity context →
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults size))
 include definitions registered extension stateTransport stateBindings producer acquire meaningMost faithful observations extend runtimeOf in
-theorem preservesAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_match_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -1646,7 +1646,7 @@ theorem legacyAssignmentPrefix (context : SourceSemantics.Context) (budget : Nat
     ⟨⟨installed⟩, trivial⟩, agreement⟩
 
 include extension faithful observations transport in
-theorem legacyAssignmentFault (context : SourceSemantics.Context) (budget : Nat)
+theorem legacyAssignmentFault [FunctionCalls.FaultTokens faults] (context : SourceSemantics.Context) (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) :
     ProtectedForHeader.Stateful.AssignmentFaultPreservesAt (ProtectedStateTransition.Lexical.legacyProtocol entry) functions (registry := registry)
@@ -1660,7 +1660,7 @@ theorem legacyAssignmentFault (context : SourceSemantics.Context) (budget : Nat)
     ⟨⟨installed⟩, trivial⟩⟩
 
 include extension faithful observations transport in
-theorem legacyAssignmentReflection (context : SourceSemantics.Context) (budget : Nat)
+theorem legacyAssignmentReflection [FunctionCalls.FaultTokens faults] (context : SourceSemantics.Context) (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry))
     (functionTypes : FunctionRuntimeViews functions) :
@@ -1755,7 +1755,7 @@ abbrev ReflectsAtWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context :
 
 include definitions registered extension transport bindings meaning faithful observations extend solved in
 set_option linter.unusedSectionVars false in
-theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+theorem header_preserves_at_with [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeaderWith (validity := validity) (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -1789,7 +1789,7 @@ theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (uniqu
 
 include extension meaning transport bindings definitions registered faithful observations extend solved in
 set_option linter.unusedSectionVars false in
-theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_at_with [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -1834,7 +1834,7 @@ variable (meaningMost : ∀ context, validity context →
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults entry))
 include definitions registered extension transport bindings meaningMost faithful observations extend runtimeOf in
-theorem preservesAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_match_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -1871,7 +1871,7 @@ theorem preservesAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (
         CatalogCompatibility.loop_preserves functions program evidence (actual child within))⟩
 
 include definitions registered extension transport bindings meaningMost faithful observations extend runtimeOf in
-theorem preservesAt_for_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_for_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -1888,7 +1888,7 @@ include definitions registered extension transport bindings meaning faithful obs
 /-- A caller with only strictly smaller expression laws can use the same main
 induction at each actual statement size. The empty header remains inclusive
 inside that invocation. -/
-theorem preserves_below_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preserves_below_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -1983,7 +1983,7 @@ abbrev ReflectsAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : 
       context scope items condition post statements expected type code
 
 include definitions registered extension transport bindings meaning faithful observations in
-theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+theorem header_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -1998,7 +1998,7 @@ theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : N
 
 
 include extension meaning transport bindings definitions registered faithful observations in
-theorem loop_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -2024,7 +2024,7 @@ variable (meaningMost : ∀ context, CompatibleExpressionLiterals.ContextValid s
     program context evidence source (certificates context) faults entry))
 
 include definitions registered extension transport bindings meaningMost faithful observations in
-theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_match [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -2041,7 +2041,7 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
 
 
 include definitions registered extension transport bindings meaningMost faithful observations in
-theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -2061,7 +2061,7 @@ include definitions registered extension transport bindings meaning faithful obs
 /-- A caller with only strictly smaller expression laws can use the same main
 induction at each actual statement size. The empty header remains inclusive
 inside that invocation. -/
-theorem preserves_below (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preserves_below [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -2940,14 +2940,14 @@ variable (reflection : ∀ context, validity context →
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults size))
 include extension stateTransport reflection faithful observations in
-theorem assignment_reflection_uniform (functionTypes : FunctionRuntimeViews functions) : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentReflectsAt protocol functions (registry := registry)
+theorem assignment_reflection_uniform [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentReflectsAt protocol functions (registry := registry)
       program evidence source (certificates context) context administrative faults budget := by
     intro context valid scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
       environments heaps locals agrees typed state errors next output value finalStore child evaluated within
     exact ProtectedAssignmentHeads.Stateful.Head.reflects_reachable_bounded functions extension program evidence protocol stateTransport faithful observations
       head environments heaps locals agrees typed state budget (reflection context valid) functionTypes errors evaluated within
 include definitions registered extension stateTransport stateBindings producer acquire reflection faithful observations extend runtimeOf solved in
-theorem reflecting_heads_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source) :
+theorem reflecting_heads_trivial [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source) :
     ReflectingHeads protocol (Readiness.trivial protocol) conditionGate (fun _ _ _ => True) functions program evidence validity budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError)
       (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative)
@@ -2998,7 +2998,7 @@ theorem reflecting_heads_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy)
       contextValid
 
 include definitions registered extension stateTransport stateBindings producer acquire reflection faithful observations extend solved in
-theorem reflecting_loops_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source) :
+theorem reflecting_loops_trivial [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source) :
     ReflectingLoops protocol (Readiness.trivial protocol) conditionGate (fun _ _ _ _ _ => True) functions program evidence validity budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError)
       (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative)
@@ -3073,7 +3073,7 @@ variable (reflection : ∀ context, validity context →
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults size))
 include definitions registered extension stateTransport stateBindings producer acquire reflection faithful observations extend runtimeOf in
-theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_match_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3174,7 +3174,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
 
 include definitions registered extension transport bindings reflection faithful observations extend solved in
 set_option linter.unusedSectionVars false in
-theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
+theorem header_reflects_at_with [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeaderWith (validity := validity) (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -3207,7 +3207,7 @@ theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functi
 
 include extension reflection transport bindings definitions registered faithful observations extend solved in
 set_option linter.unusedSectionVars false in
-theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects_at_with [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -3250,7 +3250,7 @@ theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget) (function
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, reached.down⟩
 
 include definitions registered extension transport bindings reflection faithful observations extend runtimeOf in
-theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_match_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3287,7 +3287,7 @@ theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (f
         CatalogCompatibility.loop_reflects functions program evidence (actual child within))⟩
 
 include definitions registered extension transport bindings reflection faithful observations extend runtimeOf in
-theorem reflectsAt_for_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_for_with [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3334,7 +3334,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension transport bindings reflection faithful observations in
-theorem header_reflects_at (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
+theorem header_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -3349,7 +3349,7 @@ theorem header_reflects_at (size : Nat) (bounded : size ≤ budget) (functionTyp
 
 
 include extension reflection transport bindings definitions registered faithful observations in
-theorem loop_reflects_at (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -3373,7 +3373,7 @@ theorem loop_reflects_at (size : Nat) (bounded : size ≤ budget) (functionTypes
 
 
 include definitions registered extension transport bindings reflection faithful observations in
-theorem reflectsAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_match [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3390,7 +3390,7 @@ theorem reflectsAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (functi
 
 
 include definitions registered extension transport bindings reflection faithful observations in
-theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative

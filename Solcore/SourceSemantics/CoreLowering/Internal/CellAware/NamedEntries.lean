@@ -732,7 +732,7 @@ private theorem product_values : CallableIndexedOwnedPreparedStagedPairBounds.Pr
 
 include positive bridge profile receiver stagePrepared authority selectedBodies runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem preserves_tree_selected
+theorem preserves_tree_selected [FunctionCalls.FaultTokens readFaults]
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
@@ -740,6 +740,8 @@ theorem preserves_tree_selected
     (tree : Tree generation rootFuel invocation.source context reasonAt scope id lowered)
     (size : Nat) :
     PreservesAt bridge context valueModel named stages invocation (Point scope id lowered) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction tree generalizing size with
   | plain receipt =>
     intro current child code point
@@ -850,7 +852,7 @@ theorem preserves_tree_selected
 
 include positive bridge profile receiver stagePrepared authority selectedBodies runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem reflects_tree_selected
+theorem reflects_tree_selected [FunctionCalls.FaultTokens readFaults]
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
@@ -858,6 +860,8 @@ theorem reflects_tree_selected
     (tree : Tree generation rootFuel invocation.source context reasonAt scope id lowered)
     (size : Nat) :
     ReflectsAt bridge context valueModel named stages invocation (Point scope id lowered) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction tree generalizing size with
   | plain receipt =>
     intro current child code point
@@ -967,7 +971,7 @@ theorem reflects_tree_selected
 /- Compatibility adapters for callers with a whole-program receipt. -/
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem preserves_tree
+theorem preserves_tree [FunctionCalls.FaultTokens readFaults]
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.PreservesAt bridge context valueModel named stages invocation callFaults size)
@@ -979,7 +983,7 @@ theorem preserves_tree
 
 include positive bridge profile receiver stagePrepared authority wellFormed runtime covers unique
   extension sameLedger runtimeLedger faithful functionLeaves functionTypes indices uninitialized semantic in
-theorem reflects_tree
+theorem reflects_tree [FunctionCalls.FaultTokens readFaults]
     (builtins : (CallableIndexedBuiltinValues.model compiled.indexed profile).Includes functionModel)
     (generalized : ∀ size, CellAwareScopeGeneralizedReadBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
     (applications : ∀ size, CellAwareScopeApplicationBounds.ReflectsAt bridge context valueModel named stages invocation callFaults size)
@@ -1186,6 +1190,8 @@ include receiver extension runtime selectedBodies in
 public result, with no new runtime or body assumptions. -/
 theorem preserves_selected (size : Nat) :
     CellAwareScopeApplicationBounds.PreservesAt bridge context model named stages invocation receivedFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   intro scope mapping world environment canonical before store function native bindings parameter result sources values
     association raw frame arguments heaps initial admitted _authority _physical owner _ownerFrame atFrame outcome after trace
   cases association with
@@ -1205,6 +1211,8 @@ include receiver extension runtime selectedBodies in
 original Source call, retaining exactly the same returned caller. -/
 theorem reflects_selected (size : Nat) :
     CellAwareScopeApplicationBounds.ReflectsAt bridge context model named stages invocation receivedFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   intro scope mapping world environment canonical before store function native bindings parameter result sources values
     association raw frame arguments heaps initial admitted _authority _physical owner _ownerFrame atFrame value finalStore completed
   cases association with
@@ -1282,6 +1290,8 @@ original Source execution, including reached mixed cells and public failures. -/
 theorem preserves_selected (size : Nat) :
     CellAwareScopeExpressionBounds.PreservesAt bridge context model named stages invocation
       (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   intro scope id lowered certificate node
   obtain ⟨rootFuel, tree⟩ := certificate
   rw [← sourceEq] at tree
@@ -1307,6 +1317,8 @@ same returned state through the actual accepted compiler tree. -/
 theorem reflects_selected (size : Nat) :
     CellAwareScopeExpressionBounds.ReflectsAt bridge context model named stages invocation
       (CellAwareNamedBodyProducer.Certificate generation context) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   intro scope id lowered certificate node
   obtain ⟨rootFuel, tree⟩ := certificate
   rw [← sourceEq] at tree

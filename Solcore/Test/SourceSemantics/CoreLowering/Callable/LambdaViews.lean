@@ -2448,13 +2448,16 @@ private theorem faithful : DataEquality.IdentityFaithful identities := ⟨fun im
 private theorem functionLeaves (ambient : AmbientDefinitions checked.catalog.definitions) : CompatibleEquality.FunctionObservations checked.catalog (functions ambient) identities := fun impossible => False.elim impossible
 private theorem functionTypes (ambient : AmbientDefinitions checked.catalog.definitions) : FunctionRuntimeViews (functions ambient) := fun impossible => False.elim impossible
 private def faults : FunctionCalls.FaultRep := fun reason token =>
-  (∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)
+  ((∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)) ∨
+  ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id) :=
-  fun _ location => .inl ⟨location, rfl, rfl⟩
+  fun _ location => .inl (.inl ⟨location, rfl, rfl⟩)
 private theorem missing : ∀ id key value tag, MetadataRep values.registry (.mapping key value) tag →
   faults (.missingMappingDefault value) ((reasonAt id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures]

@@ -81,7 +81,7 @@ code. This also applies to the real bitNot branch: the raw RHS may have an
 arbitrary result there, so no declared leaf type is asserted. -/
 theorem execute_children {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
-    {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {definitions : DataEnvironment} {context : Core.Context}
     (typed : HasType context
       (execute prepared reference keys rhs next output operator bitNot invalid) result definitions) :
@@ -103,8 +103,8 @@ theorem execute_children {prepared : Prepared} {reference rhs next : Expr}
                   exact ⟨rawRight, rawKeys⟩
 
 private theorem modifier_slot {definitions : DataEnvironment} {context : Core.Context}
-    {leaf payload failure : Ty} {operator : Option BinaryOp} {snapshot : Expr} {invalid : Word}
-    (ordinary : ∀ op, operator = some op → op.rightType = op.resultType)
+    {leaf payload failure : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {snapshot : Expr} {invalid : Word}
+    (ordinary : ∀ op, operator = some op → op.operation.rightType = op.operation.resultType)
     (typed : HasType (payload :: context)
       (modified leaf operator false snapshot (.var 0) invalid) (.sum failure leaf) definitions) :
     payload = leaf := by
@@ -127,15 +127,16 @@ private theorem modifier_slot {definitions : DataEnvironment} {context : Core.Co
               | binary left right =>
                   cases right with
                   | var found =>
-                      have slot : payload = op.rightType := by
+                      have slot : payload = op.operation.rightType := by
                         simpa only [List.getElem?_cons_succ, List.getElem?_cons_zero,
                           Option.some.injEq] using found
                       exact slot.trans (ordinary op rfl)
 
 private theorem assignment_operator_types (integer : Bool) (operator : Syntax.ValueAssignOp)
-    {op : BinaryOp} (selected : binaryOperator integer operator = some op) :
-    op.rightType = op.resultType := by
-  cases integer <;> cases operator <;> simp only [binaryOperator, ↓reduceIte] at selected
+    {op : Frontend.SourceCoreDataPlaces.Modifier} (selected : binaryOperator integer operator = some op) :
+    op.operation.rightType = op.operation.resultType := by
+  cases integer <;> cases operator <;>
+    simp only [binaryOperator, Frontend.SourceCoreDataPlaces.Modifier.total, ↓reduceIte] at selected
   all_goals cases selected
   all_goals rfl
 

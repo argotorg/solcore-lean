@@ -536,7 +536,7 @@ private theorem acquire (location : Location) (native : NativeFrame)
 include wellFormed sameLayout extension faithful observations in
 /-- The existing measured closer proves the exact computed entry, including
 ReachedExit. Only impossible static expression leaves are discharged. -/
-theorem parameter_preserves (size : Nat) :
+theorem parameter_preserves [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.PreservesAt (registry := registry) (faults := faults)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       functions program (receipt.admitted_entry wellFormed).original size := by
@@ -555,7 +555,7 @@ theorem parameter_preserves (size : Nat) :
 include wellFormed sameLayout extension faithful observations functionTypes in
 /-- The original native completion retains its own size and returns an
 independently measured Source body at the same actual parameter entry. -/
-theorem parameter_reflects (size : Nat) :
+theorem parameter_reflects [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyEntryContracts.ReflectsAt (registry := registry) (faults := faults)
       (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       functions program (receipt.admitted_entry wellFormed).original size := by
@@ -574,7 +574,7 @@ theorem parameter_reflects (size : Nat) :
 include wellFormed sameLayout extension faithful observations in
 /-- Every callback is derived at its actual receipt; the original continuation
 agreement remains part of the production interface. -/
-theorem source_bodies (budget : Nat) :
+theorem source_bodies [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.SourceBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := fun _ => noExpressions)
@@ -586,7 +586,7 @@ theorem source_bodies (budget : Nat) :
 include wellFormed sameLayout extension faithful observations functionTypes in
 /-- The real measured prefix and saved caller write select the same exact
 native callback; no comparison to its reflected Source grade is used. -/
-theorem native_bodies (budget : Nat) :
+theorem native_bodies [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedAdmittedNamedExpressionHeads.NativeBodiesFor
       (headers := headers) (keys := keys) (owner := owner) (functions := functions)
       (registry := registry) (faults := faults) (certificates := fun _ => noExpressions)
@@ -675,7 +675,7 @@ abbrev RuntimeTree : GenericExpressionMeaning.Certificate :=
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles in
-private theorem preserves_with_literals {literals : GenericExpressionMeaning.Certificate}
+private theorem preserves_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (size : Nat) :
@@ -711,7 +711,7 @@ private theorem preserves_with_literals {literals : GenericExpressionMeaning.Cer
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles in
-private theorem reflects_with_literals {literals : GenericExpressionMeaning.Certificate}
+private theorem reflects_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults) (size : Nat) :
@@ -749,7 +749,7 @@ include extension faithful observations functionTypes wellFormed sourceRuntime c
   uninitialized missing sameLayouts escaped profiles in
 /-- Genuine ordinary literal and callee-profile receipts close the whole
 original Tree internally at every source size and actual admitted input. -/
-theorem preserves_at (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (size : Nat) :
+theorem preserves_at [FunctionCalls.FaultTokens faults] (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (compilation := compilation) owner))
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -764,7 +764,7 @@ include extension faithful observations functionTypes wellFormed sourceRuntime c
   uninitialized missing sameLayouts escaped profiles in
 /-- Native completion returns its independent Source size and the same actual
 reached caller with successful admission; no Source trace is assumed. -/
-theorem reflects_at (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (size : Nat) :
+theorem reflects_at [FunctionCalls.FaultTokens faults] (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (compilation := compilation) owner))
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -778,7 +778,7 @@ theorem reflects_at (valid : CompatibleExpressionLiterals.ContextValid solved co
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles in
 /-- Runtime numeric leaves use their exact original selected ledger rows. -/
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (compilation := compilation) owner))
@@ -792,7 +792,7 @@ include extension faithful observations functionTypes wellFormed sourceRuntime c
   uninitialized missing sameLayouts escaped profiles in
 /-- Runtime reflection retains independent Source and native grades and every
 original ledger row beside its actual returned pool. -/
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (size : Nat) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (compilation := compilation) owner))
@@ -1093,7 +1093,7 @@ variable (functions : FunctionModel compiled.compatible.checked.catalog (Callabl
 include transport extension faithful observations functionTypes valid reads missing unique wellFormed runtime covers in
 /-- The genuine builtin producer supplies the closed child packet at every
 actual admitted entry. The finite conversion supplies no separate origin law. -/
-theorem preserves_builtin (size : Nat) :
+theorem preserves_builtin [FunctionCalls.FaultTokens faults] (size : Nat) :
     PreservesAt bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       context evidence source (CompatibleExpressionBuiltins.Tree fuel (.initial compiled.compatible.checked)
         source context solved reasonAt) faults
@@ -1107,7 +1107,7 @@ theorem preserves_builtin (size : Nat) :
 include transport extension faithful observations functionTypes valid reads missing unique wellFormed runtime covers in
 /-- The actual measured builtin child retains its independent Source grade
 and the same token/path used by the ordered sequence join. -/
-theorem reflects_builtin (size : Nat) :
+theorem reflects_builtin [FunctionCalls.FaultTokens faults] (size : Nat) :
     ReflectsAt bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       context evidence source (CompatibleExpressionBuiltins.Tree fuel (.initial compiled.compatible.checked)
         source context solved reasonAt) faults

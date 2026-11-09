@@ -245,7 +245,7 @@ include callerBridge receiver functions wellFormed runtime covers unique
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves_reached_with_functions
+theorem preserves_reached_with_functions [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -257,6 +257,8 @@ theorem preserves_reached_with_functions
     PreservesIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -632,7 +634,7 @@ include callerBridge receiver functions wellFormed runtime covers unique
   observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects_reached_with_functions
+theorem reflects_reached_with_functions [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
@@ -645,6 +647,8 @@ theorem reflects_reached_with_functions
     ReflectsIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -1084,7 +1088,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include callerBridge receiver profile wellFormed runtime covers unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
-theorem preserves_reached
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -1102,7 +1106,7 @@ theorem preserves_reached
 
 include callerBridge receiver profile wellFormed runtime covers unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
-theorem reflects_reached
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
@@ -1307,7 +1311,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
 include support globals selected semantic assignmentInterpretation in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
-theorem preserves
+theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -1404,7 +1408,7 @@ theorem preserves
 include support globals selected semantic assignmentInterpretation in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
-theorem reflects
+theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -1880,7 +1884,7 @@ include owner callerBridge receiver stagePrepared profile wellFormed runtime cov
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves_reached
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     (bodyChildren : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
@@ -1941,7 +1945,7 @@ include owner callerBridge receiver stagePrepared profile wellFormed runtime cov
   sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (bodyChildren : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
@@ -2013,7 +2017,7 @@ include owner callerBridge receiver stagePrepared profile wellFormed runtime cov
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     (bodyChildren : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
@@ -2048,7 +2052,7 @@ include owner callerBridge receiver stagePrepared profile wellFormed runtime cov
   sameLedger runtimeLedger uninitialized in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (bodyChildren : ∀ childSize, childSize < budget →
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt

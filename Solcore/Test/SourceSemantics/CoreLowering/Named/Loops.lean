@@ -79,7 +79,7 @@ variable {checked : Checked} {base : Base checked}
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -123,7 +123,7 @@ theorem actual_compiler_body_preserves
     environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -166,7 +166,7 @@ theorem actual_compiler_body_reflects
     contextValid unique owners escapedFault uninitialized missing bodyUninitialized bodyMissing faithful functionLeaves functionTypes
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem actual_compiler_body_finite_iff
+theorem actual_compiler_body_finite_iff [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -347,7 +347,7 @@ variable {checked : Checked} {base : Base checked}
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -390,7 +390,7 @@ theorem actual_compiler_body_preserves
     environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -2074,6 +2074,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.word firstInput, .word firstValue, .bool true, .bool false] (.value (.word firstValue)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -2167,6 +2169,8 @@ theorem RetainedState.update {fixture : CompiledFixture} {observed : ObservedFac
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.actual.header invocation state.heap [.word input, .word value, .bool flag, .bool false]
         (.value (.word (if flag then value else input))) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -2284,6 +2288,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedFactory 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.word firstInput, .word firstValue, .bool true, .bool false] (.value (.word firstValue)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -2392,6 +2398,8 @@ theorem forward_update {fixture : CompiledFixture} {observed : ObservedFactory f
     (trace : SourceCall support support.actual.header invocation state.heap
       [.word input, .word value, .bool flag, .bool false] (.value (.word (if flag then value else input))) after) :
     ForwardAt support call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -3453,6 +3461,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.bool true, .word firstValue, .bool false] (.value (.word firstValue)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -3550,6 +3560,8 @@ theorem RetainedState.choose {fixture : CompiledFixture} {observed : ObservedFac
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.actual.header invocation state.heap [.bool flag, .word value, .bool false]
         (.value (.word value)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -3667,6 +3679,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedFactory 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.bool true, .word firstValue, .bool false] (.value (.word firstValue)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -3779,6 +3793,8 @@ theorem forward_choose {fixture : CompiledFixture} {observed : ObservedFactory f
     (trace : SourceCall support support.actual.header invocation state.heap
       [.bool flag, .word value, .bool false] (.value (.word value)) after) :
     ForwardAt support call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

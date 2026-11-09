@@ -128,6 +128,9 @@ inductive SemanticFault where
   | unsatisfiedRequirement (id : RequirementId)
   | stagingViolation
   | controlEscapedFunction
+  /-- Solidity's `Panic(code)`, such as `0x12` for unchecked division by
+  zero. Upstream reverts with the code as data. -/
+  | panic (code : UInt8)
   deriving Repr, DecidableEq
 
 /-- Terminal result of one expression evaluation.  Heap evolution is kept as

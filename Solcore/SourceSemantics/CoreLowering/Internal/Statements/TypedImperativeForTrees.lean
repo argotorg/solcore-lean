@@ -1304,7 +1304,7 @@ abbrev ReflectsAt (context : SourceSemantics.Context) (scope : Scope) (position 
       context scope items condition post statements expected type code
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
+theorem Tree.preservesAt [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
@@ -1469,7 +1469,7 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem Tree.reflectsAt [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
@@ -1657,7 +1657,7 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1690,7 +1690,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
     contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)

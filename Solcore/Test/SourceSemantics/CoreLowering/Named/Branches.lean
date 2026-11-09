@@ -1498,6 +1498,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.word firstInput, .word firstValue] (.value (.word firstValue)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -1592,6 +1594,8 @@ theorem RetainedState.update {fixture : CompiledFixture} {observed : ObservedFac
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.actual.header invocation state.heap [.word previous, .word value]
         (.value (.word value)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -1706,6 +1710,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedFactory 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.word firstInput, .word firstValue] (.value (.word firstValue)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -1815,6 +1821,8 @@ theorem forward_update {fixture : CompiledFixture} {observed : ObservedFactory f
     (trace : SourceCall support support.actual.header invocation state.heap
       [.word previous, .word value] (.value (.word value)) after) :
     ForwardAt support call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -2841,6 +2849,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.bool true, .word firstValue] (.value (.word firstValue)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -2935,6 +2945,8 @@ theorem RetainedState.choose {fixture : CompiledFixture} {observed : ObservedFac
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.actual.header invocation state.heap [.bool flag, .word value]
         (.value (.word value)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -3049,6 +3061,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedFactory 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.bool true, .word firstValue] (.value (.word firstValue)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -3158,6 +3172,8 @@ theorem forward_choose {fixture : CompiledFixture} {observed : ObservedFactory f
     (trace : SourceCall support support.actual.header invocation state.heap
       [.bool flag, .word value] (.value (.word value)) after) :
     ForwardAt support call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -4607,6 +4623,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.word firstInput, .word firstValue] (.value (.word firstValue)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -4701,6 +4719,8 @@ theorem RetainedState.update {fixture : CompiledFixture} {observed : ObservedFac
     ∃ after : RetainedState support call.completion.session [],
       SourceCall support support.actual.header invocation state.heap [.word previous, .word value]
         (.value (.word value)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -4815,6 +4835,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedFactory 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.word firstInput, .word firstValue] (.value (.word firstValue)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -4924,6 +4946,8 @@ theorem forward_update {fixture : CompiledFixture} {observed : ObservedFactory f
     (trace : SourceCall support support.actual.header invocation state.heap
       [.word previous, .word value] (.value (.word value)) after) :
     ForwardAt support call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

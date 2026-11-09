@@ -42,7 +42,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {certificate : GenericExpressionMeaning.Certificate} {faults : GenericExpressionMeaning.FaultRep}
 
 /-- Only actual operand slots receive Source typing and child admission. -/
-theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context source) (covers : evidence.Covers context)
     (meaning : ∀ childSize, childSize ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -68,7 +68,7 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
 
 /-- The real reflected Source trace keeps its independent grade and certifies
 post admission at the exact reached native witness. -/
-theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context source) (covers : evidence.Covers context)
     (meaning : ∀ childSize, childSize ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -367,7 +367,7 @@ theorem header_preserves_with_receipt
       ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
-theorem header_preserves
+theorem header_preserves [FunctionCalls.FaultTokens faults]
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -439,7 +439,7 @@ theorem header_reflects_with_receipt
 
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem header_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -563,7 +563,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (transport : AdministrativeTransport callerProtocol)
 
 include transport in
-theorem preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+theorem preserves_bounded_for [FunctionCalls.FaultTokens faults] (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaning : Below budget (fun size => CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
       (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       context evidence source certificate faults size))
@@ -983,7 +983,7 @@ abbrev ReflectingGoalWithReceipt (R : HeaderReceiptFamily) := ProtectedStateImpe
   (administrative := administrative) (registry := registry) (faults := faults)
 
 include stateTransport unique in
-theorem preserving_loops_with_receipts
+theorem preserving_loops_with_receipts [FunctionCalls.FaultTokens faults]
     (R : HeaderReceiptFamily)
     (HP : GenericImperativeMatch.Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative))
     (postSuccess : CallableIndexedOwnedPostReceiptOperations.PrefixAt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (certificates := certificates) (administrative := administrative) (registry := registry) bridge functions evidence guard validity budget HP)
@@ -1020,7 +1020,7 @@ theorem preserving_loops_with_receipts
         valid postTyped agrees reference state read guarded ready continued trace (Nat.le_of_lt smaller)
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
-theorem preserving_loops
+theorem preserving_loops [FunctionCalls.FaultTokens faults]
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1081,7 +1081,7 @@ theorem reflecting_loops_with_receipts
         valid postTyped agrees reference state read guarded ready continued evaluated (Nat.le_of_lt smaller)
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
-theorem reflecting_loops (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_loops [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1107,7 +1107,7 @@ theorem reflecting_loops (functionTypes : FunctionRuntimeViews functions)
       (.mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child) loopFacts
 
 include definitions registered extension producer acquire stateTransport stateBindings unique extend runtimeOf in
-theorem preserving_heads_with_receipts
+theorem preserving_heads_with_receipts [FunctionCalls.FaultTokens faults]
     (R : HeaderReceiptFamily)
     (headerPrefix : CallableIndexedOwnedHeaderReceiptOperations.PrefixAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) bridge functions evidence guard validity budget R)
     (headerFault : CallableIndexedOwnedHeaderReceiptOperations.FaultAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget R)
@@ -1182,7 +1182,7 @@ theorem preserving_heads_with_receipts
           ⟨match_child_syntax parentFacts found form scrutineeFound selectedContext, ⟨control, staticFinal, facts, bodyTyped⟩⟩ environments heaps locals agrees typed reference read unmapped state gated ready trace
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend runtimeOf in
-theorem preserving_heads
+theorem preserving_heads [FunctionCalls.FaultTokens faults]
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1276,7 +1276,7 @@ theorem reflecting_heads_with_receipts
           ⟨match_child_syntax parentFacts found form scrutineeFound selectedContext, ⟨control, staticFinal, facts, bodyTyped⟩⟩ environments heaps locals agrees typed reference read unmapped state gated ready trace
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend runtimeOf in
-theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_heads [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)

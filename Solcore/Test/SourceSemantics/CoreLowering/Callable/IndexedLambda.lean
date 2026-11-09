@@ -50,7 +50,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem completed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Core.Value} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -70,7 +70,7 @@ theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence
     | value called => exact ⟨_, after, finalMap, finalWorld, called, payload, finalHeap, caller.read⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem failed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem failed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {token : Word} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -904,7 +904,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include inputs sourceFrame readFuel policy callback edited avoids unique valid projection syntaxTree emitted tree represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem completed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Core.Value} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaSemanticCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -925,7 +925,7 @@ theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence
     | value called => exact ⟨_, after, finalMap, finalWorld, called, payload, finalHeap, caller.read⟩
 
 include inputs sourceFrame readFuel policy callback edited avoids unique valid projection syntaxTree emitted tree represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem failed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem failed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {token : Word} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaSemanticCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -947,7 +947,7 @@ theorem failed_call {callerContext : SourceSemantics.Context} {callerEvidence : 
 Every body semantic input is constructed from static evidence at the compiler
 view and its actual callback equation. -/
 include inputs sourceFrame readFuel policy callback edited avoids unique valid projection syntaxTree emitted tree represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem source_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem source_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,
@@ -1178,7 +1178,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem completed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Core.Value} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaViewCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -1198,7 +1198,7 @@ theorem completed_call {callerContext : SourceSemantics.Context} {callerEvidence
     | value called => exact ⟨_, after, finalMap, finalWorld, called, payload, finalHeap, caller.read⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem failed_call {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem failed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {token : Word} {finalStore : Store} {fuel : Nat}
     (completed : runStateful fuel (.initial CallableIndexedLambdaViewCalls.applyPayload
       [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments] store)
@@ -2082,7 +2082,7 @@ include body functions functionObservations functionViews extension uninitialize
 the copies of the captures and every administrative slot past the scope keeps
 its index and value. The same source copies, allocation and caller restoration
 follow from the concrete runtime body. -/
-theorem empty_arguments {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem empty_arguments [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store} (empty : nativeArguments = [])
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -2601,7 +2601,7 @@ variable {function : Dynamic.Closure} {outerScope : SourceCoreLocalCell.Scope} {
 local notation "F" => model headers locations registry faults profile
 local notation "P" => CallableIndexedLambdaNestedFormationEntries.protectedEntry caller headers locations 0 1
 include body complete globals slots extension family uninitialized missing escaped owners in
-theorem closed_body_preserves (budget size : Nat) (within : size ≤ budget)
+theorem closed_body_preserves [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -2635,7 +2635,7 @@ theorem closed_body_preserves (budget size : Nat) (within : size ≤ budget)
   CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.preserves_sized code body profile complete globals slots extension family owners uninitialized missing escaped budget size within environments heaps locals agrees typed reference read unmapped installed trace
 
 include body complete globals slots extension family uninitialized missing escaped in
-theorem closed_body_reflects (budget size : Nat) (within : size ≤ budget)
+theorem closed_body_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -2994,7 +2994,7 @@ include body profile extension uninitialized missing escaped initial sameFrame r
 the copies of the captures and every administrative slot past the scope keeps
 its index and value. The same source copies, allocation and caller restoration
 follow from the concrete runtime body. -/
-theorem empty_arguments {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem empty_arguments [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {size : Nat} {result : Value} {finalStore : Store} (empty : nativeArguments = [])
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -3082,7 +3082,7 @@ variable {headers : RecursiveNamedCatalog.Inventory prepared.ancestry values pre
   (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
 
 include body extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
-theorem source_value_completes {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem source_value_completes [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {payload : Dynamic.Value} {after : Dynamic.Heap}
     (executed : Dynamic.CallableApplies program callerContext callerEvidence function.evidence before
       (.closure function) arguments payload after) :
@@ -3103,7 +3103,7 @@ theorem source_value_completes {callerContext : SourceSemantics.Context} {caller
   | value related => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, related, rest⟩
 
 include body extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
-theorem source_fault_completes {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem source_fault_completes [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (executed : Dynamic.CallableFaults program callerContext callerEvidence function.evidence before
       (.closure function) arguments reason after) :

@@ -943,7 +943,14 @@ theorem item_fault
         before rhs right after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsInvalid operator target.selected right) := by
+      Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ child right currentCell initial currentSelected code, child < size ∧
+      reason = .panic code ∧
+      SourceExecutionSize.ExpressionEvaluates program child context invocation.evidence invocation.source environment
+        before rhs right after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) := by
   cases trace with
   | assignValue failed =>
     cases failed with
@@ -954,7 +961,11 @@ theorem item_fault
       simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
     | operands resolved evaluated currentRead rootType initialValue pathRead invalid =>
       obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
-      refine .inr ⟨_, _, _, _, _, ?_, rfl, evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩
+      refine .inr (.inl ⟨_, _, _, _, _, ?_, rfl, evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
+    | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+      obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
+      refine .inr (.inr ⟨_, _, _, _, _, _, ?_, rfl, evaluated, currentRead, rootType, initialValue, pathRead, panics⟩)
       simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
     | structuralUpdate resolved _ _ _ _ failed =>
       obtain ⟨rfl, rfl⟩ := resolve_same snapshot resolved
@@ -975,6 +986,13 @@ theorem child_and_tail {rest : List ForItemForm}
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ child right currentCell initial currentSelected code, child < size ∧ finalContext = context ∧
+      outcome = .fault (.panic code) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
@@ -986,26 +1004,32 @@ theorem child_and_tail {rest : List ForItemForm}
     cases trace with
     | cons head tail =>
       obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ := item_value snapshot head
-      exact .inr (.inr ⟨child, _, value, middle, updated, _,
+      exact .inr (.inr (.inr ⟨child, _, value, middle, updated, _,
         Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)),
-        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .done tail⟩)
+        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .done tail⟩))
   | fault trace =>
     cases trace with
     | head failed =>
       rcases item_fault snapshot failed with
         ⟨child, strict, failed⟩ |
         ⟨child, right, currentCell, initial, currentSelected, strict, reasonEq, evaluated,
-          currentRead, rootType, initialValue, pathRead, invalid⟩
+          currentRead, rootType, initialValue, pathRead, invalid⟩ |
+        ⟨child, right, currentCell, initial, currentSelected, code, strict, reasonEq, evaluated,
+          currentRead, rootType, initialValue, pathRead, panics⟩
       · exact .inl ⟨child, _, Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl, .fault failed⟩
       · cases reasonEq
         exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected,
           Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl,
           .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
+      · cases reasonEq
+        exact .inr (.inr (.inl ⟨child, right, currentCell, initial, currentSelected, code,
+          Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)), rfl, rfl,
+          .value evaluated, currentRead, rootType, initialValue, pathRead, panics⟩))
     | tail head failed =>
       obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ := item_value snapshot head
-      exact .inr (.inr ⟨child, _, value, middle, updated, _,
+      exact .inr (.inr (.inr ⟨child, _, value, middle, updated, _,
         Nat.lt_trans strict (SourceExecutionSize.child_lt_stepSize (by simp)),
-        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .fault failed⟩)
+        SourceExecutionSize.child_lt_stepSize (by simp), .value evaluated, written, .fault failed⟩))
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentInversion
 end
@@ -1203,6 +1227,13 @@ theorem assign {assignment : AssignmentResolution} {operator : Syntax.ValueAssig
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
       Dynamic.AssignmentOperandsInvalid operator target.selected right) ∨
+    (∃ child right currentCell initial currentSelected code, child < size ∧
+      outcome = .fault (.panic code) ∧
+      RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
+        environment before rhs (.value right) after ∧
+      Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
+      Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
+      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
@@ -1214,17 +1245,22 @@ theorem assign {assignment : AssignmentResolution} {operator : Syntax.ValueAssig
   · rcases SelectedCompilationStageForItemsAssignmentInversion.item_fault snapshot failed with
       ⟨child, childStrict, failed⟩ |
       ⟨child, right, currentCell, initial, currentSelected, childStrict, reasonEq, evaluated,
-        currentRead, rootType, initialValue, pathRead, invalid⟩
+        currentRead, rootType, initialValue, pathRead, invalid⟩ |
+      ⟨child, right, currentCell, initial, currentSelected, code, childStrict, reasonEq, evaluated,
+        currentRead, rootType, initialValue, pathRead, panics⟩
     · exact .inl ⟨child, reason, Nat.lt_trans childStrict strict, same, .fault failed⟩
     · subst reason
       exact .inr (.inl ⟨child, right, currentCell, initial, currentSelected, Nat.lt_trans childStrict strict,
         same, .value evaluated, currentRead, rootType, initialValue, pathRead, invalid⟩)
+    · subst reason
+      exact .inr (.inr (.inl ⟨child, right, currentCell, initial, currentSelected, code, Nat.lt_trans childStrict strict,
+        same, .value evaluated, currentRead, rootType, initialValue, pathRead, panics⟩))
   · obtain ⟨child, value, middle, updated, strict, rfl, rfl, evaluated, written⟩ :=
       SelectedCompilationStageForItemsAssignmentInversion.item_value snapshot executed
     rw [restored tail] at same
     subst outcome
-    exact .inr (.inr ⟨child, _, value, middle, updated, _, Nat.lt_trans strict childStrict, tailStrict,
-      .value evaluated, written, tail⟩)
+    exact .inr (.inr (.inr ⟨child, _, value, middle, updated, _, Nat.lt_trans strict childStrict, tailStrict,
+      .value evaluated, written, tail⟩))
 
 theorem bitNot {assignment : AssignmentResolution}
     (bare : assignment.target.projections = [])

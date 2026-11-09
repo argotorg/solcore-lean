@@ -45,6 +45,8 @@ inductive UnsupportedExpression where
   | member
   | proxy
   | index
+  /-- Unchecked `/` and `%`, which panic; this bridge has no failures. -/
+  | panickingOperator
   deriving Repr, BEq, DecidableEq
 
 /-- Statement forms outside the tail-normal executable profile. -/
@@ -535,6 +537,8 @@ private def directBinary (operator : Syntax.BinaryOp)
   | .uncheckedAdd => .binary .wordAdd left right
   | .uncheckedSubtract => .binary .wordSub left right
   | .uncheckedMultiply => .binary .wordMul left right
+  | .uncheckedDivide => .binary .wordDiv left right
+  | .uncheckedModulo => .binary .wordMod left right
   | .bitAnd => .binary .wordAnd left right
   | .bitXor => .binary .wordXor left right
   | .bitOr => .binary .wordOr left right
@@ -1669,7 +1673,9 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
                 plan.consumedRequirements
             }
   | .binary left operator right =>
-      if node.requirements.isEmpty then
+      if operator.mayPanic then
+        failWith lift (.occurrence id.occurrence) (.unsupportedExpression .panickingOperator)
+      else if node.requirements.isEmpty then
         match lowerType (.occurrence id.occurrence) node.type with
         | .error error => .error (lift error)
         | .ok _ => do
@@ -2624,6 +2630,8 @@ private def stagedCoreBinary? : Syntax.BinaryOp → Option Core.BinaryOp
   | .uncheckedAdd
   | .uncheckedSubtract
   | .uncheckedMultiply
+  | .uncheckedDivide
+  | .uncheckedModulo
   | .less
   | .lessEqual
   | .greaterEqual

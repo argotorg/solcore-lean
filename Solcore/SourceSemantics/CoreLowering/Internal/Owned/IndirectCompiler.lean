@@ -1054,7 +1054,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
 /-- Each real argument post obtains a closed Source continuation at its exact
 parameter Entry and body. The authentic selected owner and full captured
 canonical prefix are preserved through the actual argument effects. -/
-theorem source_continuations (budget : Nat) :
+theorem source_continuations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     SourceContinuations (source := source) (context := context) (evidence := evidence)
       (environment := environment) (ids := ids) profile closure bodyEscaped bridge initial budget := by
   subst owner
@@ -1076,7 +1076,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
   uninitialized missing escaped profiles sameOwner prefixOne principalGlobals bodyUninitialized bodyMissing in
 /-- Native continuation reflection consumes the actual Prefix and reached
 body pool, keeping independent Source grades and exact final restoration. -/
-theorem native_continuations (budget : Nat) :
+theorem native_continuations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     NativeContinuations (source := source) (context := context) (evidence := evidence)
       (environment := environment) (ids := ids) profile closure bodyEscaped bridge initial budget := by
   subst owner

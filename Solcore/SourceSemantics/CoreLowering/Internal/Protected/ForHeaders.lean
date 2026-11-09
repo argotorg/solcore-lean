@@ -233,7 +233,7 @@ theorem preserves_prefix_bounded {updated : Dynamic.Value} {after : Dynamic.Heap
     rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
     simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment,
       rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
-      commit.prefix_agreement resolution coreLookup (next.rename ξ) output
+      commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatements.Head
 end
@@ -1189,7 +1189,7 @@ private theorem legacyAssignmentPrefix (context : SourceSemantics.Context) (budg
     ⟨⟨installed⟩, trivial⟩, agreement⟩
 
 include extension faithful observations transport in
-private theorem legacyAssignmentFault (context : SourceSemantics.Context) (budget : Nat)
+private theorem legacyAssignmentFault [FunctionCalls.FaultTokens faults] (context : SourceSemantics.Context) (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) :
     Stateful.AssignmentFaultPreservesAt (ProtectedStateTransition.Lexical.legacyProtocol entry) functions (registry := registry)
@@ -1203,7 +1203,7 @@ private theorem legacyAssignmentFault (context : SourceSemantics.Context) (budge
     ⟨⟨installed⟩, trivial⟩⟩
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves_fault_reachable_bounded_for
+theorem Tree.preserves_fault_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
       validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
@@ -1250,7 +1250,7 @@ theorem Tree.preserves_fault_reachable_bounded_for
   exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
+theorem Tree.preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {context finalContext : SourceSemantics.Context} {scope : Scope}
@@ -1283,7 +1283,7 @@ theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
   all_goals assumption
 
 include definitions registered extension meaning faithful observations transport bindings in
-theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault_reachable [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -1314,7 +1314,7 @@ theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.C
 
 include definitions registered extension meaning faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -1705,7 +1705,7 @@ theorem Tree.reflects_reachable_bounded_for
 end Stateful
 
 include extension faithful observations transport in
-private theorem legacyAssignmentReflection (context : SourceSemantics.Context) (budget : Nat)
+private theorem legacyAssignmentReflection [FunctionCalls.FaultTokens faults] (context : SourceSemantics.Context) (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry))
     (functionTypes : FunctionRuntimeViews functions) :
@@ -1722,7 +1722,7 @@ private theorem legacyAssignmentReflection (context : SourceSemantics.Context) (
     exact .success trace finalHeaps maps worlds preservation metadata count typed ⟨⟨installed⟩, trivial⟩ smaller remaining
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.reflects_reachable_bounded_for
+theorem Tree.reflects_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
       validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
@@ -1765,7 +1765,7 @@ theorem Tree.reflects_reachable_bounded_for
   exact result.toLegacy
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.reflects_reachable_bounded (budget : Nat)
+theorem Tree.reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
@@ -1796,7 +1796,7 @@ theorem Tree.reflects_reachable_bounded (budget : Nat)
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
-theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -1826,7 +1826,7 @@ theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -2002,7 +2002,7 @@ theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {sc
     valid environments heaps locals agrees actualTyped reference read unmapped installed sized (Nat.le_refl size)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.reflects_post_reachable_bounded_for
+theorem Tree.reflects_post_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
       validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
@@ -2058,7 +2058,7 @@ theorem Tree.reflects_post_reachable_bounded_for
     exact .inr ⟨_, _, _, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, preservation, metadata, transport.extend installed maps worlds preservation metadata⟩
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.reflects_post_reachable_bounded (budget : Nat)
+theorem Tree.reflects_post_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
@@ -2106,7 +2106,7 @@ theorem Tree.reflects_post_reachable_bounded (budget : Nat)
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
-theorem Tree.reflects_post_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_post_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -2157,7 +2157,7 @@ theorem Tree.reflects_post_reachable (functionTypes : FunctionRuntimeViews funct
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects_post (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_post [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -2307,7 +2307,7 @@ theorem post_preserves {items : List ForItemForm} {finalContext : SourceSemantic
     tree valid agrees reference state continued sized (Nat.le_refl size)
 
 include definitions registered extension faithful observations transport bindings in
-theorem post_fault_reachable_bounded_for
+theorem post_fault_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
       validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
@@ -2338,7 +2338,7 @@ theorem post_fault_reachable_bounded_for
     matched, heaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension faithful observations transport bindings in
-theorem post_fault_reachable_bounded (budget : Nat)
+theorem post_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
@@ -2362,7 +2362,7 @@ theorem post_fault_reachable_bounded (budget : Nat)
   all_goals assumption
 
 include definitions registered extension meaning faithful observations transport bindings in
-theorem post_fault_reachable {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+theorem post_fault_reachable [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (tree : Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -2384,7 +2384,7 @@ theorem post_fault_reachable {items : List ForItemForm} {finalContext : SourceSe
 
 include definitions registered extension meaning faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+theorem post_fault [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (tree : Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -2403,7 +2403,7 @@ theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Co
   all_goals assumption
 
 include definitions registered extension faithful observations transport bindings solved in
-theorem post_reflects_reachable_bounded_for
+theorem post_reflects_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
       validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
@@ -2444,7 +2444,7 @@ theorem post_reflects_reachable_bounded_for
       heaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension faithful observations transport bindings in
-theorem post_reflects_reachable_bounded (budget : Nat)
+theorem post_reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
@@ -2473,7 +2473,7 @@ theorem post_reflects_reachable_bounded (budget : Nat)
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
-theorem post_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem post_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {items : List ForItemForm} {value : Value} {finalStore : Store}
     (tree : Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
@@ -2505,7 +2505,7 @@ theorem post_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem post_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem post_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {items : List ForItemForm} {value : Value} {finalStore : Store}
     (tree : Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
@@ -2700,7 +2700,7 @@ private theorem sequence_stopped_preserves (unique : NodeOccurrencesUnique sourc
 
 
 include definitions registered extension transport bindings meaning faithful observations in
-theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
+theorem header_preserves_reachable [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -2746,7 +2746,7 @@ theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
 
 include definitions registered extension transport bindings meaning faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem header_preserves (unique : NodeOccurrencesUnique source)
+theorem header_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -2759,7 +2759,7 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
   all_goals assumption
 
 include extension meaning transport bindings definitions registered faithful observations in
-theorem loop_preserves_reachable (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_reachable [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -2840,7 +2840,7 @@ abbrev ReflectsAt (context : SourceSemantics.Context) (scope : Scope) (position 
 
 include extension meaning transport bindings definitions registered faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -2859,7 +2859,7 @@ theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : Expr
   all_goals assumption
 
 include definitions registered extension transport bindings meaning faithful observations in
-theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3089,7 +3089,7 @@ theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique 
 
 include definitions registered extension transport bindings meaning faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem preservesAt (unique : NodeOccurrencesUnique source)
+theorem preservesAt [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3192,7 +3192,7 @@ private theorem sequence_stopped_reflects (_unique : NodeOccurrencesUnique sourc
 
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
-theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+theorem header_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -3223,7 +3223,7 @@ theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews function
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+theorem header_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
@@ -3236,7 +3236,7 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_uniqu
   all_goals assumption
 
 include extension meaning reflection transport bindings definitions registered faithful observations in
-theorem loop_reflects_reachable (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects_reachable [FunctionCalls.FaultTokens faults] (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -3267,7 +3267,7 @@ theorem loop_reflects_reachable (_unique : NodeOccurrencesUnique source) (functi
 
 include extension meaning reflection transport bindings definitions registered faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem loop_reflects (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects [FunctionCalls.FaultTokens faults] (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -3289,7 +3289,7 @@ theorem loop_reflects (_unique : NodeOccurrencesUnique source) (functionTypes : 
   all_goals assumption
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
-theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -3514,7 +3514,7 @@ theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (function
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative

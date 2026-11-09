@@ -219,7 +219,7 @@ variable {callerSource : TypedSource} {callerContext : SourceSemantics.Context}
   {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
 
 include transport extension uninitialized missing faithful functionLeaves functionTypes children nativeTypes packedType in
-theorem call_preserves
+theorem call_preserves [FunctionCalls.FaultTokens faults]
     (argumentMeaning : ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program callerContext callerEvidence callerSource certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
@@ -279,7 +279,7 @@ theorem call_preserves
 
 
 include transport extension uninitialized missing faithful functionLeaves functionTypes children nativeTypes packedType in
-theorem call_reflects
+theorem call_reflects [FunctionCalls.FaultTokens faults]
     (argumentMeaning : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program callerContext callerEvidence callerSource certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
@@ -366,7 +366,7 @@ include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Source expression outcomes dispatch to the exact retained body, with
 ordered arguments and concrete builtin body semantics. The global/frame entry
 is obtained from actual protected observations rather than payload typing. -/
-theorem Head.preserves
+theorem Head.preserves [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (meaning : ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -404,7 +404,7 @@ theorem Head.preserves
 include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Whole native completion constructs the independent ordinary named-call
 expression, including first argument faults and the real source body dispatch. -/
-theorem Head.reflects
+theorem Head.reflects [FunctionCalls.FaultTokens faults]
     (meaning : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context caller source certificate faults (Entry functions registry bodies compilation.administrativePrefix)) :
     ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)

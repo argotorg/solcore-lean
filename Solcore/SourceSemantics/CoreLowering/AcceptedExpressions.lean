@@ -427,7 +427,7 @@ private theorem product_values :
 include extension sameLedger uninitialized selectedBodies runtime covers in
 /-- Every receipt tree preserves its original staged Source execution at every
 Source grade, including failures and the reached mixed-cell heap. -/
-theorem preserves_tree {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+theorem preserves_tree [RecursiveStageMeaning.FaultTokens faults] {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr} (tree : trees scope id lowered) (size : Nat) :
     PreservesAt (attachment := attachment) bridge context valueModel index registry invocation
       (Point scope id lowered) faults size := by
@@ -508,7 +508,7 @@ theorem preserves_tree {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
 include extension sameLedger uninitialized selectedBodies runtime covers in
 /-- Every completed native run of a receipt tree reconstructs an independent
 Source grade, the same outcome and the reached heap. -/
-theorem reflects_tree {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+theorem reflects_tree [RecursiveStageMeaning.FaultTokens faults] {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr} (tree : trees scope id lowered) (size : Nat) :
     ReflectsAt (attachment := attachment) bridge context valueModel index registry invocation
       (Point scope id lowered) faults size := by
@@ -716,7 +716,7 @@ private theorem reads_lowered {fuel : Nat} {context : SourceSemantics.Context}
 /-- Every accepted subset expression of a named-row body preserves its staged
 Source execution at every grade. The receipt tree is extracted from the
 compiler's own acceptance at the reached scope and Source context. -/
-theorem preserves (fuel : Nat) {context : SourceSemantics.Context}
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (fuel : Nat) {context : SourceSemantics.Context}
     (sourceEq : invocation.source = index.source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -756,7 +756,7 @@ theorem preserves (fuel : Nat) {context : SourceSemantics.Context}
 
 /-- Every completed native run of an accepted subset expression of a named-row
 body reconstructs an independent Source grade, outcome and reached heap. -/
-theorem reflects (fuel : Nat) {context : SourceSemantics.Context}
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (fuel : Nat) {context : SourceSemantics.Context}
     (sourceEq : invocation.source = index.source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -813,7 +813,7 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
 
 /-- A body whose accepted expressions all lie in the closed subset discharges
 the accepted-expression input of the statement closure at every budget. -/
-theorem expressions (closed : Closed index) (budget : Nat)
+theorem expressions [RecursiveStageMeaning.FaultTokens faults] (closed : Closed index) (budget : Nat)
     (sourceEq : invocation.source = index.source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -861,7 +861,7 @@ include bindings transport registered in
 /-- The complete accepted body of an actual invocation whose accepted
 expressions all lie in the closed subset: `body_preserves` without the
 accepted-expression premise. -/
-theorem body_preserves (budget : Nat) (closed : Closed index) (reads : Reads index faults)
+theorem body_preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat) (closed : Closed index) (reads : Reads index faults)
     (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
       (protocol := protocol) index invocation faults)
@@ -929,7 +929,7 @@ include bindings transport registered in
 /-- Native completion of the same complete accepted body reconstructs an
 original Source execution: `body_reflects` without the accepted-expression
 premise. -/
-theorem body_reflects (budget : Nat) (closed : Closed index) (reads : Reads index faults)
+theorem body_reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat) (closed : Closed index) (reads : Reads index faults)
     (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
       (protocol := protocol) index invocation faults)
@@ -1487,6 +1487,8 @@ theorem preserves_selected
       CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
         namedFunctions accepted owner caller header capture payloads header.context
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   have certified := support.certified header
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
@@ -1605,6 +1607,8 @@ theorem reflects_selected
       CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
         namedFunctions accepted owner caller header capture payloads header.context
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   have certified := support.certified header
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,

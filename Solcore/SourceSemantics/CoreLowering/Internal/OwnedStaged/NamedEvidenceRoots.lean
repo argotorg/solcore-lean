@@ -179,6 +179,8 @@ theorem of_accepted
     (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
     Nonempty (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.RootAt compiled context invocation
       scope id lowered (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   obtain ⟨predecessor, ⟨root⟩⟩ := policy_receipt prepared aligned (by simpa only [sameSource] using accepted)
   have unique : NodeOccurrencesUnique invocation.source := sameSource ▸ header.unique
   have profile := CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles.recipe_policy_for
@@ -1465,6 +1467,8 @@ theorem of_policy_sites
       invocation.source scope id header.reasonAt = .ok lowered) :
     ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
       context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   have sameSource := (stages).source selected
   have unique : NodeOccurrencesUnique invocation.source := sameSource ▸ header.unique
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.recipe_policy_for_native
@@ -1818,6 +1822,8 @@ def at_scope_sites {fuel : Nat}
       terminal.expression terminal.receipt.child faults //
       support.rawType = header.function.resultType ∧ support.reasonAt = header.reasonAt ∧
       support.compilation.administrativePrefix = 1 } := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   have sourceEq := stages.source selected
   have unique : NodeOccurrencesUnique child.source := sourceEq ▸ header.unique
   have declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
@@ -2014,6 +2020,8 @@ theorem of_policy_sites
       invocation.source scope id header.reasonAt = .ok lowered) :
     ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
       context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   have sameSource := (stages).source selected
   have unique : NodeOccurrencesUnique invocation.source := sameSource ▸ header.unique
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerEvidenceProfiles.recipe_policy_for
@@ -2220,7 +2228,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
     (fun reason token => faults (.semantic reason) token))
 
 include static wellFormed selected semantic assignmentInterpretation in
-theorem Support.preserves
+theorem Support.preserves [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -2265,7 +2273,7 @@ theorem Support.preserves
         static aligned.globals profile selected extension layouts children canonicalChildren
 
 include static wellFormed selected semantic assignmentInterpretation in
-theorem Support.reflects
+theorem Support.reflects [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -2361,6 +2369,8 @@ theorem of_accepted
     (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
     Nonempty (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.RootAt compiled context invocation
       scope id lowered (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt prepared aligned (by simpa only [sameSource] using accepted)
   have unique : NodeOccurrencesUnique invocation.source := sameSource ▸ header.unique
   have profile := CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles.recipe_policy_for_native

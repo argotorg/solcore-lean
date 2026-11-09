@@ -48,6 +48,12 @@ theorem of_semantic {table : SourceCoreFaultSites.Table}
   | semantic reason => exact represented
   | stage invocation call reason => exact False.elim represented
 
+/-- A table without reasons in the panic range keeps the panic law for staged
+failures. -/
+theorem tokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
+    RecursiveStageMeaning.FaultTokens (faults table) :=
+  ⟨fun code => (CallableIndexedOwnedPublicDecodedCallFaults.tokens free).panic code⟩
+
 /-- A scoped first-gate producer retains the failing invocation and call. -/
 theorem of_first_gate {table : SourceCoreFaultSites.Table}
     {failure : Staging.Recursive.Failure} {token : Word}
@@ -2009,7 +2015,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (unaryIncluded : ∀ reason token, EmittedDiagnosticTokenPlan.UnaryRep receipt.original.prepared.compilation.own.assignments reason token → faults reason token)
 
 include ambientDefinitions extension faithful observations producer acquire stateTransport stateBindings wellFormed diagnosticsFound rebuilt operandIncluded unaryIncluded in
-theorem preserves_fault_coupled_bounded_for
+theorem preserves_fault_coupled_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
     (covers : ∀ context, validity context → header.function.evidence.Covers context)
@@ -2086,7 +2092,7 @@ theorem preserves_fault_coupled_bounded_for
       tree coupled tokens valid ⟨staticFinal, itemTyping⟩ environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
 
 include ambientDefinitions extension faithful observations producer acquire stateTransport stateBindings wellFormed diagnosticsFound rebuilt operandIncluded unaryIncluded in
-theorem reflects_coupled_bounded_for
+theorem reflects_coupled_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
     (covers : ∀ context, validity context → header.function.evidence.Covers context)

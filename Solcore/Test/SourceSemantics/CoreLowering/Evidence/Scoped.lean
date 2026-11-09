@@ -3237,6 +3237,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
       SourceCall support support.wordHeader.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.wordHeader.header.function)
         ⟨[]⟩ [.word seed, .bool true, .bool true] (.value (.word seed)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := fixture.actual_start first.opened first.started
   have ready : first.bootstrap.ReadyAt 100000 first.session := .single first.ready
@@ -3361,6 +3363,8 @@ theorem RetainedState.finished_call {fixture : CompiledFixture} {observed : Obse
     ∃ after : RetainedState support call.completion.session entries,
       SourceCall support request.header invocation state.heap arguments
         (.value scalar.source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have registry := request.started.simple_registry state.registry simple
   have metadata : SourceCoreRawMetadata.Extends request.encodedValues.registry state.receiving.result.context.registry := by
     rw [registry]; exact .refl _
@@ -3449,6 +3453,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support support.wordHeader.header invocation ⟨[]⟩ [.word seed, .bool true, .bool true] (.value (.word seed)) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := fixture.actual_start first.opened first.started
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -3722,6 +3728,8 @@ theorem forward_call {fixture : CompiledFixture} {observed : ObservedProgram fix
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceCall support request.header invocation state.heap arguments (.value scalar.source) after) :
     ForwardAt (entries := entries) support scalar call after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →

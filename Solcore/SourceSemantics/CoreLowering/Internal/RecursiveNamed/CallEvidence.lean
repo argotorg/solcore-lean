@@ -1761,7 +1761,7 @@ theorem reflects_at_with_state {Records : Type v}
 include extension faithful functionLeaves functionTypes unique missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
 only an actual named callee consumes the strictly smaller body contract. -/
-theorem head_preserves_at_with_calls (P : ProtectedExpressionMeaning.Entry)
+theorem head_preserves_at_with_calls [FunctionCalls.FaultTokens faults] (P : ProtectedExpressionMeaning.Entry)
     (transport : ProtectedExpressionMeaning.Transport P)
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
@@ -1804,7 +1804,7 @@ theorem head_preserves_at_with_calls (P : ProtectedExpressionMeaning.Entry)
 include extension faithful functionLeaves functionTypes unique owners missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
 only an actual named callee consumes the strictly smaller body contract. -/
-theorem head_preserves_at_with_for (P : ProtectedExpressionMeaning.Entry)
+theorem head_preserves_at_with_for [FunctionCalls.FaultTokens faults] (P : ProtectedExpressionMeaning.Entry)
     (transport : ProtectedExpressionMeaning.Transport P)
     (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
       protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
@@ -1837,7 +1837,7 @@ theorem head_preserves_at_with_for (P : ProtectedExpressionMeaning.Entry)
           (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head)
 
 include extension faithful functionLeaves functionTypes unique owners missing in
-theorem head_preserves_at_with (authenticated : Bool)
+theorem head_preserves_at_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (idsUnique : authenticated = true → RequirementIdsUnique context)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
@@ -1860,7 +1860,7 @@ theorem head_preserves_at_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes unique owners missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
 only an actual named callee consumes the strictly smaller body contract. -/
-theorem head_preserves_at (budget size : Nat) (within : size ≤ budget)
+theorem head_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix))
@@ -1876,7 +1876,7 @@ theorem head_preserves_at (budget size : Nat) (within : size ≤ budget)
 include extension faithful functionLeaves functionTypes missing in
 /-- Original native children select their own pointwise obligations. Reflection
 constructs a separately measured source trace. -/
-theorem head_reflects_at_with_calls (P : ProtectedExpressionMeaning.Entry)
+theorem head_reflects_at_with_calls [FunctionCalls.FaultTokens faults] (P : ProtectedExpressionMeaning.Entry)
     (transport : ProtectedExpressionMeaning.Transport P)
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
@@ -1919,7 +1919,7 @@ theorem head_reflects_at_with_calls (P : ProtectedExpressionMeaning.Entry)
 include extension faithful functionLeaves functionTypes missing in
 /-- Original native children select their own pointwise obligations. Reflection
 constructs a separately measured source trace. -/
-theorem head_reflects_at_with_for (P : ProtectedExpressionMeaning.Entry)
+theorem head_reflects_at_with_for [FunctionCalls.FaultTokens faults] (P : ProtectedExpressionMeaning.Entry)
     (transport : ProtectedExpressionMeaning.Transport P)
     (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
       protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
@@ -1951,7 +1951,7 @@ theorem head_reflects_at_with_for (P : ProtectedExpressionMeaning.Entry)
           (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head)
 
 include extension faithful functionLeaves functionTypes missing in
-theorem head_reflects_at_with (authenticated : Bool)
+theorem head_reflects_at_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
@@ -1973,7 +1973,7 @@ theorem head_reflects_at_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes missing in
 /-- Original native children select their own pointwise obligations. Reflection
 constructs a separately measured source trace. -/
-theorem head_reflects_at (budget size : Nat) (within : size ≤ budget)
+theorem head_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix))
@@ -1989,7 +1989,7 @@ theorem head_reflects_at (budget size : Nat) (within : size ≤ budget)
 include extension faithful functionLeaves functionTypes unique uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
-theorem preserves_at_with_literals_with_for (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+theorem preserves_at_with_literals_with_for [FunctionCalls.FaultTokens faults] (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (P : ProtectedExpressionMeaning.Entry)
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
@@ -2021,7 +2021,7 @@ theorem preserves_at_with_literals_with_for (calls : GenericExpressionMeaning.Ce
   · exact heads
 
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
-theorem preserves_at_with_literals_with (authenticated : Bool)
+theorem preserves_at_with_literals_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (idsUnique : authenticated = true → RequirementIdsUnique context)
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
@@ -2040,7 +2040,7 @@ theorem preserves_at_with_literals_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
-theorem preserves_at_with_literals
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
     (budget size : Nat) (within : size ≤ budget)
@@ -2056,7 +2056,7 @@ theorem preserves_at_with_literals
 include extension faithful functionLeaves functionTypes valid unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
-theorem preserves_at (budget size : Nat) (within : size ≤ budget)
+theorem preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -2072,7 +2072,7 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
-theorem preserves_at_runtime_with (authenticated : Bool)
+theorem preserves_at_runtime_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -2090,7 +2090,7 @@ theorem preserves_at_runtime_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
-theorem preserves_at_runtime
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -2107,7 +2107,7 @@ theorem preserves_at_runtime
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
-theorem reflects_at_with_literals_with_for (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+theorem reflects_at_with_literals_with_for [FunctionCalls.FaultTokens faults] (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (P : ProtectedExpressionMeaning.Entry)
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
@@ -2139,7 +2139,7 @@ theorem reflects_at_with_literals_with_for (calls : GenericExpressionMeaning.Cer
   · exact heads
 
 include extension faithful functionLeaves functionTypes uninitialized missing in
-theorem reflects_at_with_literals_with (authenticated : Bool)
+theorem reflects_at_with_literals_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
     (budget size : Nat) (within : size ≤ budget)
@@ -2157,7 +2157,7 @@ theorem reflects_at_with_literals_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
-theorem reflects_at_with_literals
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
     (budget size : Nat) (within : size ≤ budget)
@@ -2173,7 +2173,7 @@ theorem reflects_at_with_literals
 include extension faithful functionLeaves functionTypes valid uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
-theorem reflects_at (budget size : Nat) (within : size ≤ budget)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -2189,7 +2189,7 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
-theorem reflects_at_runtime_with (authenticated : Bool)
+theorem reflects_at_runtime_with [FunctionCalls.FaultTokens faults] (authenticated : Bool)
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -2207,7 +2207,7 @@ theorem reflects_at_runtime_with (authenticated : Bool)
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
-theorem reflects_at_runtime
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)

@@ -1077,7 +1077,7 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
   | constructorFault occurrence _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
-  | binaryRightFault occurrence _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binaryRightFault occurrence _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -1127,7 +1127,7 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
-  | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
+  | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
   | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
@@ -1194,7 +1194,7 @@ theorem ActualHeader.failed_heap
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
-  | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
+  | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
   | letGeneralized contains otherForm _ _ _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
@@ -2468,6 +2468,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
         SourceCall support support.failedHeader.header
           (RecursiveStageRegistry.scope stages.sidecar [] support.failedHeader.header.function)
           ⟨[]⟩ [] (.fault failure) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   have startupRegistry := first.metadata_at_start opened sessionAt started
@@ -2682,6 +2684,8 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
       ∃ checkpoint : SourceCoreExecution.Checkpoint publicArtifact,
         publicSession.startHandlePacked handle .unit failureOptions.inputValidationFuel = .ok checkpoint ∧
         ForwardFailureAt support checkpoint entries failure next.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have invoked : publicSession.InvokeAt entry.handle .unit failureOptions (.ok (.failed call.reason call.returned)) := by
     rw [entryHandle]
     exact call.executed
@@ -2793,6 +2797,8 @@ theorem RetainedState.identity {fixture : CompiledFixture} {observed : ObservedP
     ∃ after : RetainedState support call.completion.session entries,
       SourceCall support support.identityHeader.header invocation state.heap [.word seed]
         (.value (.word seed)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.failedInput, support.identityInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

@@ -958,7 +958,7 @@ theorem Certificate.scoped_completed {fuel : Nat} {context : ValuesContext} {sou
     (heapTyped : Dynamic.HeapWellTyped sourceContext heap)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
     {value : Value} {finalStore : Store} (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ outcome after,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
@@ -1097,7 +1097,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel checked rawRegistry
 local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel model instances
 
 include extension ordinaryCells uninitialized semantic unique selectedBodies runtime covers in
-theorem completes {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+theorem completes [FunctionCalls.FaultTokens semanticFaults] {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (certificate : Certificate readFuel (.initial checked) invocation.source context solved reasonAt scope id lowered)
     {node : ExpressionNode} (found : invocation.source.lookupExpression? id = some node)
     (typed : ExpressionHasType invocation.source context id node.type)
@@ -2164,7 +2164,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
 
 include extension ordinaryCells certificate found unique typed wellFormed runtime covers environments heaps heapTyped locals agrees uninitialized semantic in
-theorem completes :
+theorem completes [FunctionCalls.FaultTokens semanticFaults] :
     ∃ size sourceOutcome after value finalStore,
       Staging.Recursive.Size.Statements program registry size invocation context environment before statements context
         (control (Staging.Recursive.Lifting.embed sourceOutcome)) after ∧
@@ -2206,7 +2206,7 @@ theorem completes :
   · simpa only [receipt.sameType] using resultRep
 
 include extension ordinaryCells certificate found unique typed wellFormed runtime covers environments heaps heapTyped locals agrees uninitialized semantic in
-theorem reflects {value : Value} {finalStore : Store}
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (body.rename embedding) value finalStore) :
     ∃ size sourceOutcome after,
       Staging.Recursive.Size.Statements program registry size invocation context environment before statements context
@@ -2225,7 +2225,7 @@ theorem reflects {value : Value} {finalStore : Store}
   exact ⟨size, sourceOutcome, after, trace, represented, finalHeaps, frame, metadata, effect⟩
 
 include extension ordinaryCells certificate found unique typed wellFormed runtime covers environments heaps heapTyped locals agrees uninitialized semantic in
-theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {finalContext : SourceSemantics.Context}
     {bodyOutcome : Staging.Recursive.BodyOutcome} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements program registry size invocation context environment before
       statements finalContext bodyOutcome after)
@@ -2299,7 +2299,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked}
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
 
 include extension ordinaryCells read found unique environments heaps heapTyped locals agrees uninitialized semantic in
-theorem completes :
+theorem completes [FunctionCalls.FaultTokens semanticFaults] :
     ∃ sourceOutcome after value finalStore,
       Dynamic.ExpressionEvaluatesOutcome program context invocation.evidence invocation.source environment before
         expression sourceOutcome after ∧
@@ -2352,7 +2352,7 @@ theorem completes :
 include extension ordinaryCells read found unique environments heaps heapTyped locals agrees uninitialized semantic in
 /-- Native completion reflects to the independently constructed original body
 and exactly the same result, store and retained generalized rows. -/
-theorem reflects {value : Value} {finalStore : Store}
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (body.rename embedding) value finalStore) :
     ∃ sourceOutcome : Dynamic.ExpressionOutcome, ∃ after,
       Staging.Recursive.Size.Statements program registry (Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize []])
@@ -2375,7 +2375,7 @@ theorem reflects {value : Value} {finalStore : Store}
 include extension ordinaryCells read found unique environments heaps heapTyped locals agrees uninitialized semantic in
 /-- An independent original terminal trace selects that same complete native
 execution. Read uniqueness fixes both the Source result and reached heap. -/
-theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {finalContext : SourceSemantics.Context}
     {bodyOutcome : Staging.Recursive.BodyOutcome} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements program registry size invocation context environment before
       statements finalContext bodyOutcome after)

@@ -209,7 +209,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} (evidence : 
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts prefixMatches calleeUninitialized calleeMissing escaped profiles syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -228,7 +228,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts prefixMatches calleeUninitialized calleeMissing escaped profiles syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -841,7 +841,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 
 include conditional nativeType source rows extension faithful observations functionTypes valid reads branchReads missing unique wellFormed in
 /-- Source inversion supplies the real condition and chosen return child. -/
-theorem source_body_with_post (size : Nat) :
+theorem source_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry) (faults := faults) entry reached size := by
   intro outcome after bodyTrace
   obtain ⟨finalContext, control, flowTrace, exit⟩ := RecursiveNamedFunctionFinishBounds.trace_flow bodyTrace
@@ -923,7 +923,7 @@ theorem source_body_with_post (size : Nat) :
 include conditional nativeType source rows extension faithful observations functionTypes valid reads branchReads missing unique wellFormed in
 /-- Native finish, sequence and conditional inversion retain the actual selected
 branch. Source sizes are reconstructed independently from its true children. -/
-theorem native_body_with_post (size : Nat) :
+theorem native_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry) (faults := faults) entry reached size := by
   intro value finalStore bodyCompletion
   have nativeFinish : EvaluationSize size entry.actualBody entry.store
@@ -1003,7 +1003,7 @@ theorem native_body_with_post (size : Nat) :
 
 include conditional nativeType source rows extension faithful observations functionTypes valid reads branchReads missing unique wellFormed in
 /-- Every strict Source body member comes from the same concrete conditional producer. -/
-theorem source_below (budget : Nat) :
+theorem source_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry) (faults := faults) entry reached) := by
   intro child _strict
@@ -1012,7 +1012,7 @@ theorem source_below (budget : Nat) :
 
 include conditional nativeType source rows extension faithful observations functionTypes valid reads branchReads missing unique wellFormed in
 /-- The native strict member consumes its own whole body completion. -/
-theorem native_below (budget : Nat) :
+theorem native_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (model_bodyPost compiled.compatible.checked functions registry) (faults := faults) entry reached) := by
   intro child _strict
@@ -1166,7 +1166,7 @@ variable {functions}
 
 include source rows extension faithful observations functionTypes wellFormed in
 /-- The strict Source child is derived from the concrete conditional producer. -/
-theorem ConditionalInputs.source_below
+theorem ConditionalInputs.source_below [FunctionCalls.FaultTokens faults]
     (inputs : ConditionalInputs (program := program) (registry := registry) (faults := faults) functions header)
     (budget : Nat) : RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (FaultPost functions (registry := registry)) (faults := faults) entry reached) :=
@@ -1176,7 +1176,7 @@ theorem ConditionalInputs.source_below
 
 include source rows extension faithful observations functionTypes wellFormed in
 /-- The strict native child is derived from the same concrete conditional producer. -/
-theorem ConditionalInputs.native_below
+theorem ConditionalInputs.native_below [FunctionCalls.FaultTokens faults]
     (inputs : ConditionalInputs (program := program) (registry := registry) (faults := faults) functions header)
     (budget : Nat) : RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (FaultPost functions (registry := registry)) (faults := faults) entry reached) :=
@@ -1215,7 +1215,7 @@ variable {functions}
 include admitted wellFormed sourceRuntime covers locals argumentTypes application inputs extension faithful observations functionTypes in
 /-- The original successful arguments supply the exact parameter receipt;
 only the concrete strict body producer is invoked. -/
-theorem source_invocations (budget : Nat) :
+theorem source_invocations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedExpressionHeads.SourceInvocationsForWithPost (post := FaultPost functions (registry := registry)) (source := source) (context := context)
       (evidence := evidence) (faults := faults) functions owner
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (keys := keys) functions registry header) bridge initial
@@ -1242,7 +1242,7 @@ theorem source_invocations (budget : Nat) :
 include admitted wellFormed sourceRuntime covers locals argumentTypes application inputs extension faithful observations functionTypes in
 /-- The original successful arguments supply the exact parameter receipt;
 only the concrete strict body producer is invoked. -/
-theorem native_invocations (budget : Nat) :
+theorem native_invocations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedExpressionHeads.NativeInvocationsForWithPost (post := FaultPost functions (registry := registry)) (source := source) (context := context)
       (evidence := evidence) (faults := faults) functions owner
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (keys := keys) functions registry header) bridge initial
@@ -1358,7 +1358,7 @@ def ReflectsHeadAtWithPost (size : Nat) : Prop :=
 include wellFormed sourceRuntime covers unique sameLayouts extension faithful observations functionTypes owners idsUnique in
 /-- Strict actual argument children and a genuine selected static body domain
 derive both providers internally, then retain the original reached admission. -/
-theorem preserves_head_with_body_post (budget size : Nat) (within : size ≤ budget)
+theorem preserves_head_with_body_post [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : RecursiveNamedBoundedContracts.Below budget
       (CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
         (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)
@@ -1398,7 +1398,7 @@ theorem preserves_head_with_body_post (budget size : Nat) (within : size ≤ bud
 include wellFormed sourceRuntime covers unique sameLayouts extension faithful observations functionTypes in
 /-- Strict actual argument children and a genuine selected static body domain
 derive both providers internally, then retain the original reached admission. -/
-theorem reflects_head_with_body_post (budget size : Nat) (within : size ≤ budget)
+theorem reflects_head_with_body_post [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : RecursiveNamedBoundedContracts.Below budget
       (CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
         (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)

@@ -237,6 +237,12 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
   | uncheckedMultiply {left right result : Value}
       (applies : BinaryPrimitiveApplies .uncheckedMultiply left right result) :
       AssignmentValueApplies .uncheckedMultiply (some left) right result
+  | uncheckedDivide {left right result : Value}
+      (applies : BinaryPrimitiveApplies .uncheckedDivide left right result) :
+      AssignmentValueApplies .uncheckedDivide (some left) right result
+  | uncheckedModulo {left right result : Value}
+      (applies : BinaryPrimitiveApplies .uncheckedModulo left right result) :
+      AssignmentValueApplies .uncheckedModulo (some left) right result
 
 /-- Bit-not assignment operates on the leaf snapshot captured by place
 resolution. -/

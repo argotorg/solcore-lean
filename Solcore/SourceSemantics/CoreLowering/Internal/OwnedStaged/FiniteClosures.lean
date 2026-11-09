@@ -102,7 +102,7 @@ variable
 include extension uninitialized semantic wellFormed in
 /-- Every smaller Source child meaning is constructed by the actual finite
 tree. The exact selected child is the sole singleton certificate member. -/
-theorem child_preserves (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+theorem child_preserves [FunctionCalls.FaultTokens semanticFaults] (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (budget : Nat) :
     PreservesBelow
       (CallableIndexedOwnedBodyRestorationAdmission.bridge (compiled := compiled)
@@ -146,7 +146,7 @@ theorem child_preserves (child : Staging.Recursive.Scope) (selected : stages.Clo
 include extension uninitialized semantic wellFormed in
 /-- Native reflection follows the original finite sites at each strict
 budget and returns an independent Source grade with the full reached post. -/
-theorem child_reflects (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+theorem child_reflects [FunctionCalls.FaultTokens semanticFaults] (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
     (budget : Nat) :
     ReflectsBelow
       (CallableIndexedOwnedBodyRestorationAdmission.bridge (compiled := compiled)
@@ -248,7 +248,7 @@ variable (represented : CallableIndexedParameterMeaning.Arguments
 include stable beforeTyped argumentsTyped extension uninitialized semantic wellFormed expression shape reader represented heaps locals reference currentCarried allowed callerRuntime in
 /-- The strict body port is manufactured at the genuine parameter entry.
 The Source application and both native prefixes run once. -/
-theorem application_preserves (child : Staging.Recursive.Scope)
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] (child : Staging.Recursive.Scope)
     (selected : stages.Closure function child) (budget : Nat)
     {invocation : Staging.Recursive.Scope} {callContext : SourceSemantics.Context} {size : Nat}
     {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
@@ -274,7 +274,7 @@ theorem application_preserves (child : Staging.Recursive.Scope)
 include stable beforeTyped argumentsTyped extension uninitialized semantic wellFormed expression shape reader represented heaps locals reference currentCarried allowed callerRuntime in
 /-- Reflection selects the authentic strict native body child and constructs
 its independently graded Source body from the expression hypothesis. -/
-theorem application_reflects (child : Staging.Recursive.Scope)
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults] (child : Staging.Recursive.Scope)
     (selected : stages.Closure function child) (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     (budget : Nat)
     {invocation : Staging.Recursive.Scope} {callContext : SourceSemantics.Context} {size : Nat}
@@ -560,7 +560,7 @@ variable (association : Association headers keys bodyRegistry semanticFaults map
 include association packet raw represented heaps stable runtime extension semantic wellFormed in
 /-- The actual Source application selects its own scope. Its finite body
 constructs that child meaning internally at the retained parameter context. -/
-theorem application_preserves (budget : Nat)
+theorem application_preserves [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     {invocation : Staging.Recursive.Scope} {size : Nat}
     {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages size
@@ -624,7 +624,7 @@ theorem application_preserves (budget : Nat)
 include association packet raw represented heaps stable runtime extension semantic wellFormed in
 /-- The contextual branch exposes its exact Code, captures and owner before
 running the finite terminal application producer once. -/
-theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
+theorem application_reflects [FunctionCalls.FaultTokens semanticFaults] (valid : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     (budget : Nat)
     {invocation : Staging.Recursive.Scope} {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size [native, DataPatternValues.packValues values] store
@@ -756,7 +756,7 @@ include bridge profile compiler prepared sourceParent occurrence related admitte
   actualFunctionType calleeRelated represented bundle originalResult extension semantic in
 /-- The concrete selected closure suffix constructs the original applied
 parent. Both numeric grades and every transient reached effect are retained. -/
-theorem reflects_suffix
+theorem reflects_suffix [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
         bindings parameterCore resultCore),
@@ -840,7 +840,7 @@ include bridge profile compiler prepared sourceParent occurrence related admitte
   actualFunctionType calleeRelated represented bundle originalResult extension semantic in
 /-- The genuine argument endpoint feeds the actual closure application once.
 Its native suffix and original three binds complete the whole parent. -/
-theorem preserves_parent
+theorem preserves_parent [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults argumentMap argumentWorld function carrier
         bindings parameterCore resultCore),
@@ -1016,7 +1016,7 @@ include sourceParent occurrence preparedStages receiver wellFormed runtime cover
 /-- User classification and physical arity happen inside the actual retained
 prefix. The closure branch constructs full parent meaning; only the literal
 global application remains for the separate named producer. -/
-theorem reflects_closure_or_global
+theorem reflects_closure_or_global [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
         bindings parameterCore resultCore),
@@ -1196,7 +1196,7 @@ include sourceParent occurrence preparedStages receiver wellFormed runtime cover
 /-- Authentic Source application and prefix witnesses construct the original
 closure parent. Physical count rejection keeps the reached argument heap and
 literal receiving arity word; success preserves the actual selected body once. -/
-theorem preserves_closure_or_global
+theorem preserves_closure_or_global [FunctionCalls.FaultTokens semanticFaults]
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
         bindings parameterCore resultCore),
@@ -1368,7 +1368,7 @@ theorem of_tree {compiled : SourceCoreUnifiedCompilation.Compiled}
     (reader : policy.readStatement =
       SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
-    (uninitialized : ∀ current id lowered,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id lowered,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         function.source inputs.context code.reasonAt current id lowered →

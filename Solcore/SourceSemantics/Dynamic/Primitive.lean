@@ -285,6 +285,13 @@ theorem IntegerStrictBinaryOperator.toStrict {operator : Syntax.BinaryOp}
     StrictBinaryOperator operator := by
   cases classification <;> constructor
 
+/-- Operators that evaluate both operands and then may panic instead of
+giving a result: unchecked `/` and `%`, which panic with `0x12` on a zero
+divisor. -/
+inductive PanickingBinaryOperator : Syntax.BinaryOp → Prop where
+  | uncheckedDivide : PanickingBinaryOperator .uncheckedDivide
+  | uncheckedModulo : PanickingBinaryOperator .uncheckedModulo
+
 /-- A left value which decides a lazy Boolean binary expression without
 evaluating the right occurrence. -/
 inductive ShortCircuits : Syntax.BinaryOp → Value → Value → Prop where
@@ -295,6 +302,9 @@ inductive ShortCircuits : Syntax.BinaryOp → Value → Value → Prop where
 inductive EvaluatesRightOperand : Syntax.BinaryOp → Value → Prop where
   | strict {operator : Syntax.BinaryOp} {left : Value}
       (classification : StrictBinaryOperator operator) :
+      EvaluatesRightOperand operator left
+  | panicking {operator : Syntax.BinaryOp} {left : Value}
+      (classification : PanickingBinaryOperator operator) :
       EvaluatesRightOperand operator left
   | andTrue : EvaluatesRightOperand .logicalAnd (.bool true)
   | orFalse : EvaluatesRightOperand .logicalOr (.bool false)
@@ -315,9 +325,11 @@ theorem excludes_right_operand
   | andFalse =>
       cases evaluates with
       | strict classification => cases classification
+      | panicking classification => cases classification
   | orTrue =>
       cases evaluates with
       | strict classification => cases classification
+      | panicking classification => cases classification
 
 end ShortCircuits
 
@@ -354,6 +366,12 @@ inductive BinaryPrimitiveApplies :
   | wordUncheckedMultiply (left right : Core.Word) :
       BinaryPrimitiveApplies .uncheckedMultiply (.word left) (.word right)
         (.word (left.mul right))
+  | wordUncheckedDivide (left right : Core.Word) (nonzero : right ≠ Core.Word.zero) :
+      BinaryPrimitiveApplies .uncheckedDivide (.word left) (.word right)
+        (.word (left.udiv right))
+  | wordUncheckedModulo (left right : Core.Word) (nonzero : right ≠ Core.Word.zero) :
+      BinaryPrimitiveApplies .uncheckedModulo (.word left) (.word right)
+        (.word (left.umod right))
   | wordBitAnd (left right : Core.Word) :
       BinaryPrimitiveApplies .bitAnd (.word left) (.word right)
         (.word (left.bitAnd right))
@@ -433,6 +451,25 @@ inductive BinaryPrimitiveApplies :
   | logicalOr (left right : Bool) :
       BinaryPrimitiveApplies .logicalOr (.bool left) (.bool right)
         (.bool (left || right))
+
+/-- A primitive application that panics instead of giving a result. -/
+inductive BinaryPrimitivePanics : Syntax.BinaryOp → Value → Value → UInt8 → Prop where
+  | wordUncheckedDivide (left : Core.Word) :
+      BinaryPrimitivePanics .uncheckedDivide (.word left) (.word Core.Word.zero) 0x12
+  | wordUncheckedModulo (left : Core.Word) :
+      BinaryPrimitivePanics .uncheckedModulo (.word left) (.word Core.Word.zero) 0x12
+
+theorem BinaryPrimitivePanics.excludes_application {operator : Syntax.BinaryOp}
+    {left right result : Value} {code : UInt8}
+    (panics : BinaryPrimitivePanics operator left right code)
+    (applies : BinaryPrimitiveApplies operator left right result) : False := by
+  cases panics <;> cases applies <;> rename_i nonzero <;> exact nonzero rfl
+
+theorem BinaryPrimitivePanics.functional {operator : Syntax.BinaryOp}
+    {left right : Value} {first second : UInt8}
+    (firstPanic : BinaryPrimitivePanics operator left right first)
+    (secondPanic : BinaryPrimitivePanics operator left right second) : first = second := by
+  cases firstPanic <;> cases secondPanic <;> rfl
 
 namespace BinaryPrimitiveApplies
 

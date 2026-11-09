@@ -258,7 +258,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) sized (Nat.le_refl size)
 
 include transport extension faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_fault_reachable_bounded (budget : Nat)
+theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
@@ -277,7 +277,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
   exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, reached.down⟩
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -294,7 +294,7 @@ theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -308,7 +308,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
     environments heaps locals agrees actualTyped installed errors.reachable trace next output
 
 include transport extension faithful observations environments heaps locals agrees actualTyped installed in
-theorem reflects_reachable_bounded (budget : Nat)
+theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
@@ -327,7 +327,7 @@ theorem reflects_reachable_bounded (budget : Nat)
     exact .success trace finalHeaps maps worlds frame metadata count typed reached.down strict remaining
 
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
-theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
+theorem reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -355,7 +355,7 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (err
 
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
+theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -428,7 +428,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
@@ -446,7 +446,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -464,7 +464,7 @@ theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -479,7 +479,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem reflects_reachable (errors : head.ReachableErrors registry faults)
+theorem reflects_reachable [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -508,7 +508,7 @@ theorem reflects_reachable (errors : head.ReachableErrors registry faults)
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
-theorem reflects (errors : head.Errors registry faults)
+theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -1072,7 +1072,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (bindings : ProtectedExpressionMeaning.Binds entry)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves
+theorem Tree.preserves [FunctionCalls.FaultTokens faults]
     (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
@@ -1273,7 +1273,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (bindings : ProtectedExpressionMeaning.Binds entry)
 
 include definitions registered extension faithful observations transport bindings runtimeViews in
-theorem Tree.reflects
+theorem Tree.reflects [FunctionCalls.FaultTokens faults]
     (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry)

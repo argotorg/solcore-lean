@@ -510,7 +510,7 @@ abbrev Certificate (context : SourceSemantics.Context) (scope : SourceCoreLocalC
   StaticCertificate checked invocation.source reasonAt context scope id lowered
 
 include extension uninitialized semantic selectedBodies in
-theorem expression {context scope id lowered node}
+theorem expression [FunctionCalls.FaultTokens semanticFaults] {context scope id lowered node}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (certificate : Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt) context scope id lowered)
     (found : invocation.source.lookupExpression? id = some node) :
@@ -645,7 +645,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 include extension uninitialized semantic selectedBodies in
-theorem terminal {context scope mode statements expression lowered node expected}
+theorem terminal [FunctionCalls.FaultTokens semanticFaults] {context scope mode statements expression lowered node expected}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (head : Terminal invocation.source expression mode statements)
     (found : invocation.source.lookupExpression? expression = some node) (valueType : node.type = expected)
@@ -834,7 +834,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 include definitions registered extension uninitialized semantic selectedBodies in
-theorem completes {context nextContext scope mode id node binder initializer initializerNode rest expected type body lowered}
+theorem completes [FunctionCalls.FaultTokens semanticFaults] {context nextContext scope mode id node binder initializer initializerNode rest expected type body lowered}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .letDecl binder (some initializer))
     (mono : binder.scheme.quantified = []) (extended : BinderExtends invocation.source.owner context binder nextContext)
@@ -1124,7 +1124,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 include extension uninitialized semantic selectedBodies in
-theorem completes {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body}
+theorem completes [FunctionCalls.FaultTokens semanticFaults] {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : invocation.source.lookupExpression? condition = some conditionNode)
@@ -1300,7 +1300,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 include extension uninitialized semantic selectedBodies in
-theorem completes {context scope mode id node expression expressionNode semicolon rest expected type body lowered}
+theorem completes [FunctionCalls.FaultTokens semanticFaults] {context scope mode id node expression expressionNode semicolon rest expected type body lowered}
     (entry : Entry functions rawRegistry instances program invocation frame globals context scope)
     (found : invocation.source.lookupStatement? id = some node) (form : node.form = .expression expression semicolon)
     (continuing : semicolon = true ∨ mode = false)
@@ -1409,7 +1409,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
 
 include definitions registered extension uninitialized semantic selectedBodies in
-theorem completes {context scope mode statements expected type code}
+theorem completes [FunctionCalls.FaultTokens semanticFaults] {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
       context scope mode statements expected type code) :
@@ -1458,7 +1458,7 @@ theorem completes {context scope mode statements expected type code}
       entry found form conditionFound conditionType conditionTree thenIH elseIH (.inr ⟨thenStops,elseStops⟩)
 
 include definitions registered extension uninitialized semantic selectedBodies in
-theorem reflects {context scope mode statements expected type code}
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
       context scope mode statements expected type code)
@@ -1472,7 +1472,7 @@ theorem reflects {context scope mode statements expected type code}
   exact ⟨result,same⟩
 
 include definitions registered extension uninitialized semantic selectedBodies in
-theorem preserves {context scope mode statements expected type code}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {context scope mode statements expected type code}
     (tree : CellAwareOrdinaryBodyTree.Tree layouts owner active frame globals onError (.initial checked) invocation.source
       (CellAwareLexicalBodyExpressions.Certificate (checked := checked) (invocation := invocation) (reasonAt := reasonAt))
       context scope mode statements expected type code)

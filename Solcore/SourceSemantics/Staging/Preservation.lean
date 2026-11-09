@@ -289,6 +289,16 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_secondTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
             runtime covers (locals.mono firstExtends) middleTyped rightTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @binaryPanic firstSize secondSize scope context environment before middle after id left operator right a b code
+      occurrence first _continues second _panics =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | binary leftTyped rightTyped _ =>
+          obtain ⟨_firstTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
+            runtime covers locals heap leftTyped first
+          obtain ⟨_secondTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
+            runtime covers (locals.mono firstExtends) middleTyped rightTyped second
+          exact ⟨afterTyped, firstExtends.trans secondExtends⟩
   | @unaryMethod operandSize bodySize scope context environment before argumentsHeap bound after id operator operand input
       requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
       occurrence dispatch method operandTrace rootsEq selected parameters allocate body resultRule =>

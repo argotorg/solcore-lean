@@ -270,7 +270,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 
 include transport extension faithful functionLeaves functionTypes unique missing wellFormed runtime covers
 
-theorem preserves_at_with_calls
+theorem preserves_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -314,7 +314,7 @@ theorem preserves_at_with_calls
   · intro branch parentFound parentTyped actualAdmission childTrace
     exact callMeaning branch parentFound parentTyped environments heaps locals agrees typed initial actualAdmission childTrace
 
-theorem reflects_at_with_calls
+theorem reflects_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -1560,7 +1560,7 @@ variable (bridge functions evidence)
 include extension faithful observations functionTypes valid reads missing unique wellFormed runtime covers transport in
 /-- One builtin producer returns its complete semantic tuple and primitive path.
 The actual Source trace supplies admission at the same protected transition. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (tree : CompatibleExpressionBuiltins.Tree fuel (.initial compiled.compatible.checked) source context solved reasonAt scope id lowered)
     (found : source.lookupExpression? id = some node) (sourceTyped : ExpressionHasType source context id node.type)
@@ -1601,7 +1601,7 @@ theorem preserves
 include extension faithful observations functionTypes valid reads missing unique wellFormed runtime covers transport in
 /-- Native completion retains the same fault packet and reached state. Its
 Source grade is reconstructed from the genuine returned Source trace. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (tree : CompatibleExpressionBuiltins.Tree fuel (.initial compiled.compatible.checked) source context solved reasonAt scope id lowered)
     (found : source.lookupExpression? id = some node) (sourceTyped : ExpressionHasType source context id node.type)

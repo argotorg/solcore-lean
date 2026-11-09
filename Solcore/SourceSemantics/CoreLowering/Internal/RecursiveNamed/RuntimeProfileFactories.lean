@@ -1827,7 +1827,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem emitted_call_has_sufficient_fuel_with_evidence
+theorem emitted_call_has_sufficient_fuel_with_evidence [FunctionCalls.FaultTokens faults]
     {actual : Environment} {ξ : Renaming} (agrees : EnvironmentsAgree ξ canonical actual)
     {argumentCode : Expr} {reason : Word}
     (argumentsEvaluated : Evaluates actual store argumentCode
@@ -1861,7 +1861,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_call_reflects_program_with_evidence
+theorem completed_call_reflects_program_with_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -1940,7 +1940,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem emitted_call_has_sufficient_fuel_with
+theorem emitted_call_has_sufficient_fuel_with [FunctionCalls.FaultTokens faults]
     {actual : Environment} {ξ : Renaming} (agrees : EnvironmentsAgree ξ canonical actual)
     {argumentCode : Expr} {reason : Word}
     (argumentsEvaluated : Evaluates actual store argumentCode
@@ -1963,7 +1963,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_call_reflects_program_with
+theorem completed_call_reflects_program_with [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -2032,7 +2032,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem emitted_call_has_sufficient_fuel_match
+theorem emitted_call_has_sufficient_fuel_match [FunctionCalls.FaultTokens faults]
     {actual : Environment} {ξ : Renaming} (agrees : EnvironmentsAgree ξ canonical actual)
     {argumentCode : Expr} {reason : Word}
     (argumentsEvaluated : Evaluates actual store argumentCode
@@ -2056,7 +2056,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_call_reflects_program_match
+theorem completed_call_reflects_program_match [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -2126,7 +2126,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- The real global reference and capture supply the emitted call's read.
 Source execution supplies the body; original native completeness supplies a
 budget for the complete call, including argument packing and dispatch. -/
-theorem emitted_call_has_sufficient_fuel
+theorem emitted_call_has_sufficient_fuel [FunctionCalls.FaultTokens faults]
     {actual : Environment} {ξ : Renaming} (agrees : EnvironmentsAgree ξ canonical actual)
     {argumentCode : Expr} {reason : Word}
     (argumentsEvaluated : Evaluates actual store argumentCode
@@ -2151,7 +2151,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- An original completed call exposes the same smaller body derivation.
 Reflection uses the independent source entry conditions and never a source
 execution or body-preservation law as an input. -/
-theorem completed_call_reflects_program
+theorem completed_call_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)

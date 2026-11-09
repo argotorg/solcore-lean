@@ -868,7 +868,7 @@ def Body.toKernel : CallableRuntimeBodyKernel.BodyFor layouts owner active frame
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault in
 /-- The original source grade feeds the single imperative proof. The returned
 heap and reached lexical exit belong to this exact emitted body. -/
-theorem Body.preserves_sized (size : Nat)
+theorem Body.preserves_sized [FunctionCalls.FaultTokens faults] (size : Nat)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -911,7 +911,7 @@ theorem Body.preserves_sized (size : Nat)
 
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault in
 /-- Source-only sizing is confined to preservation. -/
-theorem Body.preserves
+theorem Body.preserves [FunctionCalls.FaultTokens faults]
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -942,7 +942,7 @@ theorem Body.preserves
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault in
 /-- Reflection consumes the actual measured body completion. The finish proof
 passes its original strict flow child to the same bounded statement proof. -/
-theorem Body.reflects_sized (budget size : Nat) (within : size ≤ budget)
+theorem Body.reflects_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -1130,7 +1130,7 @@ include parameters inputs extended acceptedPrefix definitions registered represe
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook actualTyped
   extension uninitialized missing faithful functionLeaves functionTypes profile escapedFault in
 /-- The concrete runtime body closes the shared native hook continuation. -/
-theorem hook_preserves {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+theorem hook_preserves [FunctionCalls.FaultTokens faults] {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function context environment bound outcome after) :
     ∃ origin index metadata value finalStore finalMap finalWorld,
@@ -1165,7 +1165,7 @@ include parameters inputs extended acceptedPrefix definitions registered represe
   extension uninitialized missing faithful functionLeaves functionTypes profile escapedFault in
 /-- Reflection uses the original strict hook child and its actual allocation
 prefix; source execution receives its own independent grade. -/
-theorem hook_reflects_sized {size : Nat} {value : Value} {finalStore : Store}
+theorem hook_reflects_sized [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (evaluation : EvaluationSize size actual store (code.rename ξ) value finalStore) :
     ∃ origin index metadata environment bound outcome after finalMap finalWorld,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
@@ -1213,7 +1213,7 @@ include profile parameters inputs extended acceptedPrefix definitions registered
   uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame escapedFault in
 /-- Independent method body execution drives the actual marked parameters,
 frame install, concrete body and restoration. The selected evidence is fixed. -/
-theorem preserves {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem preserves [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : BodyOutcome program sourceBody function.evidence before arguments outcome after) :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
@@ -1247,7 +1247,7 @@ include profile parameters inputs extended acceptedPrefix definitions registered
   uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame escapedFault in
 /-- A completed real hook supplies source allocation and a concrete body
 trace. Source method invocation follows without ordinary global instantiation. -/
-theorem reflects_sized {size : Nat} {value : Value} {finalStore : Store}
+theorem reflects_sized [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (code.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
       BodyOutcome program sourceBody function.evidence before arguments outcome after ∧
@@ -1398,7 +1398,7 @@ private theorem actual_parameters : SourceCoreSourceCells.bindParameters
   rw [profile.sameSource]; exact compiled.parametersCompiled
 
 include profile extension faithful observations functionTypes uninitialized missing escaped in
-theorem Profile.preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem Profile.preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {outcome : Dynamic.ExpressionOutcome}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -1435,7 +1435,7 @@ theorem Profile.preserves {mapping : LocationMap} {world : StoreTyping} {before 
     (snapshots := installed.snapshots) (sourceFrame := profile.sourceFrame) trace
 
 include profile extension faithful observations functionTypes uninitialized missing escaped in
-theorem Profile.reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem Profile.reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {size : Nat} {value : Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)
@@ -1551,7 +1551,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes packedType profile in
 /-- The first failing argument skips the installed body; successful ordered
 arguments enter the same concrete method profile at their actual final heap. -/
-theorem call_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem call_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {outcome : Dynamic.ExpressionOutcome}
@@ -1633,7 +1633,7 @@ include extension faithful observations functionTypes uninitialized missing esca
   children nativeTypes packedType profile in
 /-- Original call children supply the argument completion and strict method
 body witness. The source trace is reconstructed independently at each step. -/
-theorem call_reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem call_reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {reason : Word} {value : Value} {size : Nat}
@@ -1747,9 +1747,11 @@ theorem OperatorSource.of_accepted
     exact ⟨⟨⟨traitName, methodName, methodIds, 1,
       Option.some.inj (rawRequirements.symm.trans owned), certificate⟩, by simpa only [form] using binary_dispatch dispatch⟩⟩
 
-private theorem binary_strict {operator : Syntax.BinaryOp} {traitName methodName : String}
-    (dispatch : BinaryTraitDispatch operator traitName methodName) : Dynamic.StrictBinaryOperator operator := by
-  cases dispatch <;> constructor
+/-- A trait-dispatched operator evaluates its right operand, strict or
+panicking alike. -/
+private theorem binary_continues {operator : Syntax.BinaryOp} {traitName methodName : String} {left : Dynamic.Value}
+    (dispatch : BinaryTraitDispatch operator traitName methodName) : Dynamic.EvaluatesRightOperand operator left := by
+  cases dispatch <;> first | exact .strict (by constructor) | exact .panicking (by constructor)
 
 variable
   {receipt : Operator checkedProgram project caller compilation child fuel source scope id reasonAt policy node output}
@@ -1821,7 +1823,7 @@ theorem OperatorSource.raw {environment : Dynamic.Environment} {before after : D
         | head fault =>
           dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
           rw [form]
-          exact .binaryRight layout leftEvaluated (.strict (binary_strict dispatch)) fault
+          exact .binaryRight layout leftEvaluated (binary_continues dispatch) fault
         | tail _ fault => cases fault
     | apply evaluated body =>
       cases evaluated with
@@ -1834,12 +1836,12 @@ theorem OperatorSource.raw {environment : Dynamic.Environment} {before after : D
             dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
             rw [form]
             exact .binaryEvaluateRight layout leftEvaluated
-              (.strict (binary_strict dispatch)) rightEvaluated (.method dispatch selection invoked)
+              (binary_continues dispatch) rightEvaluated (.method dispatch selection invoked)
           | fault failed =>
             dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
             rw [form]
             exact .binaryApply layout leftEvaluated
-              (.strict (binary_strict dispatch)) rightEvaluated (.method dispatch selection failed)
+              (binary_continues dispatch) rightEvaluated (.method dispatch selection failed)
 
 include selected selection in
 /-- The old whole-expression entry adds the empty coercion path to the same
@@ -1936,7 +1938,7 @@ theorem OperatorAlignment.emitted (coercions : node.coercions = []) (ξ : Renami
 
 include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
   children nativeTypes profile alignment selected selection in
-theorem operator_preserves {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
+theorem operator_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap}
     {store : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -1978,7 +1980,7 @@ theorem operator_preserves {mapping : LocationMap} {world : StoreTyping} {before
 
 include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
   children nativeTypes profile alignment selected selection in
-theorem operator_reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem operator_reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment canonical : Environment}
     {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
     {ξ : Renaming} {value : Value} {size : Nat}
@@ -2378,7 +2380,7 @@ include initial sameFrame length spine owned history sourceFrame sameSource kern
 bound is supplied by that hook, even for an empty parameter list. The source
 trace, reached method entry, full heap and restored caller catalog are returned
 from one kernel invocation and the existing restore proof. -/
-theorem reflects_prefix_sized (budget : Nat) (strict : reached.childSize < budget)
+theorem reflects_prefix_sized [FunctionCalls.FaultTokens faults] (budget : Nat) (strict : reached.childSize < budget)
     (expressions : ∀ context, validity context → RecursiveNamedBoundedContracts.Below budget
       (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context function.evidence function.source
@@ -2512,7 +2514,7 @@ include parameters inputs extended acceptedPrefix definitions registered represe
   faithful functionLeaves functionTypes escapedFault extend runtimeOf sourceFrame sameSource initial sameFrame in
 /-- The body child is extracted from the original completed hook exactly once.
 Its independent source trace is lifted through the actual method frame. -/
-theorem reflects_hook_sized {size : Nat} {value : Value} {finalStore : Store}
+theorem reflects_hook_sized [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (expressions : ∀ context, validity context → RecursiveNamedBoundedContracts.Below size
       (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context function.evidence function.source
@@ -2624,7 +2626,7 @@ variable {expressionSyntax : ExpressionId → Prop}
 include profile extension faithful observations functionTypes escaped extend runtimeOf in
 /-- Reflect this actual compiled hook. The bounded expression interface is
 internal to the enclosing mutual proof; it is not a whole-program premise. -/
-theorem ProfileFor.reflects_sized {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
+theorem ProfileFor.reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap}
     {store finalStore : Store} {callerEnvironment : Environment} {arguments : List Dynamic.Value} {payloads : List Value}
     {size : Nat} {value : Value}
     (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative) functions mapping world before store callerEnvironment)

@@ -449,7 +449,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource} {conte
 include extension contextValid unique uninitialized in
 /-- The entire finite source sequence determines a native execution. No child
 execution or universal child meaning is a certificate premise. -/
-theorem Tree.preserves {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -528,7 +528,7 @@ theorem Tree.preserves {scope : Scope} {statements : List StatementId} {expected
 include extension contextValid uninitialized in
 /-- Every completed generated flow constructs its independent source trace.
 The returned expression trace is derived from the actual native subtree. -/
-theorem Tree.reflects {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -687,7 +687,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 
 include extension contextValid unique uninitialized in
 /-- Finite preservation for the complete production function wrapper. -/
-theorem Tree.body_preserves {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type flow)
     (fellThrough escaped : Word)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
@@ -714,7 +714,7 @@ theorem Tree.body_preserves {scope : Scope} {statements : List StatementId} {exp
 include extension contextValid uninitialized in
 /-- Completed full-body execution reflects into the independent source function
 sequence, with the same final heap and all administrative-frame obligations. -/
-theorem Tree.body_reflects {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {flow : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope statements expected type flow)
     (fellThrough escaped : Word)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
@@ -1129,7 +1129,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 include definitions registered extension contextValid uninitialized in
 /-- Every independent finite source trace through the binding prefix and its
 concrete body is preserved under the real full native definition table. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source finalContext solved reasonAt
       context scope statements expected type code)
@@ -1170,7 +1170,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {stat
 include definitions registered extension contextValid uninitialized in
 /-- Reflection constructs the independent source allocations from a completed
 native run; no prior source trace or child expression execution is supplied. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source finalContext solved reasonAt
       context scope statements expected type code)
@@ -1242,7 +1242,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 include definitions registered extension contextValid uninitialized in
 /-- Every independent finite source trace through the binding prefix and its
 concrete body is preserved under the real full native definition table. -/
-theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source finalContext solved reasonAt
       context scope statements expected type code)
@@ -1277,7 +1277,7 @@ theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} 
 include definitions registered extension contextValid uninitialized in
 /-- Reflection constructs the independent source allocations from a completed
 native run; no prior source trace or child expression execution is supplied. -/
-theorem Tree.body_reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source finalContext solved reasonAt
       context scope statements expected type code)
@@ -1702,7 +1702,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 include definitions registered extension initialValid finalValid uninitialized in
 /-- Initialization failure preserves its exact old-context effects. Success
 allocates only afterward, then uses the concrete remaining binding tree. -/
-theorem Tree.preserves {scope : Scope} {id : StatementId} {rest : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source context nextContext finalContext solved reasonAt
       scope id rest expected type code) (unique : NodeOccurrencesUnique source)
@@ -1758,7 +1758,7 @@ theorem Tree.preserves {scope : Scope} {id : StatementId} {rest : List Statement
 include definitions registered extension initialValid finalValid uninitialized in
 /-- Every completed generated expression determines whether initialization
 failed in the old scope or the allocated binding's tail ran in the new scope. -/
-theorem Tree.reflects {scope : Scope} {id : StatementId} {rest : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source context nextContext finalContext solved reasonAt
       scope id rest expected type code)
@@ -1849,7 +1849,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 include definitions registered extension initialValid finalValid uninitialized in
 /-- Initialization failure preserves its exact old-context effects. Success
 allocates only afterward, then uses the concrete remaining binding tree. -/
-theorem Tree.body_preserves {scope : Scope} {id : StatementId} {rest : List StatementId}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source context nextContext finalContext solved reasonAt
       scope id rest expected type code) (fellThrough escaped : Word) (unique : NodeOccurrencesUnique source)
@@ -1883,7 +1883,7 @@ theorem Tree.body_preserves {scope : Scope} {id : StatementId} {rest : List Stat
 include definitions registered extension initialValid finalValid uninitialized in
 /-- Every completed generated expression determines whether initialization
 failed in the old scope or the allocated binding's tail ran in the new scope. -/
-theorem Tree.body_reflects {scope : Scope} {id : StatementId} {rest : List StatementId}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source context nextContext finalContext solved reasonAt
       scope id rest expected type code) (fellThrough escaped : Word)
@@ -2518,7 +2518,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 include definitions registered extension uninitialized in
 /-- Every independent finite source trace through the binding prefix and its
 concrete body is preserved under the real full native definition table. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -2596,7 +2596,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {stat
 include definitions registered extension uninitialized in
 /-- Reflection constructs the independent source allocations from a completed
 native run; no prior source trace or child expression execution is supplied. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -2710,7 +2710,7 @@ private theorem finish_input {environment : Environment} {before after : Store} 
 include definitions registered extension uninitialized in
 /-- Initialization failure preserves its exact old-context effects. Success
 allocates only afterward, then uses the concrete remaining binding tree. -/
-theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -2747,7 +2747,7 @@ theorem Tree.body_preserves {context : SourceSemantics.Context} {scope : Scope} 
 include definitions registered extension uninitialized in
 /-- Every completed generated expression determines whether initialization
 failed in the old scope or the allocated binding's tail ran in the new scope. -/
-theorem Tree.body_reflects {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
+theorem Tree.body_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope statements expected type code)
@@ -3171,7 +3171,7 @@ variable {readFuel : Nat} {values : SourceCoreCompatibleValues.Context}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include extension contextValid unique uninitialized in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
@@ -3199,7 +3199,7 @@ theorem Certificate.preserves
     finalHeaps, maps, worlds, frame, metadata⟩
 
 include extension contextValid unique uninitialized in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate readFuel values function.source context solved reasonAt scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
@@ -3294,7 +3294,7 @@ variable {checked : Checked} {base : Base checked}
 include extension contextValid unique uninitialized in
 /-- At the certified body context, finite source execution determines the
 accepted named hook's native result and restores its caller's frame. -/
-theorem preserves (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
+theorem preserves [FunctionCalls.FaultTokens faults] (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
     {named : SourceCoreGeneralFunctions.Function} {code : Expr} {ξ : Renaming}
     (accepted : SourceCoreCallableIndexedAncestry.namedBody prepared named (body.rename ξ) = .ok code)
     (certificate : CompatibleNamedBody.Certificate readFuel values sourceFunction.source context solved reasonAt scope
@@ -3341,7 +3341,7 @@ theorem preserves (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
 include extension contextValid unique uninitialized in
 /-- Completed execution of the actual named hook constructs the independent
 source trace. The body correspondence is derived from its static receipt. -/
-theorem reflects (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
+theorem reflects [FunctionCalls.FaultTokens faults] (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
     {named : SourceCoreGeneralFunctions.Function} {code : Expr} {ξ : Renaming}
     (accepted : SourceCoreCallableIndexedAncestry.namedBody prepared named (body.rename ξ) = .ok code)
     (certificate : CompatibleNamedBody.Certificate readFuel values sourceFunction.source context solved reasonAt scope
@@ -3740,7 +3740,7 @@ variable {readFuel : Nat} {values : SourceCoreCompatibleValues.Context}
 include extension contextValid unique uninitialized in
 /-- Finite source body execution completes the actual parameter prefix. The
 source allocation is the one retained by the constructed entry. -/
-theorem Entry.preserves
+theorem Entry.preserves [FunctionCalls.FaultTokens faults]
     (entry : Entry values functions registry function context bindings arguments before store mapping world
       administrative actual ξ parameterCode body)
     (certificate : CompatibleNamedBody.Certificate readFuel values function.source context solved reasonAt
@@ -3764,7 +3764,7 @@ theorem Entry.preserves
 include extension contextValid unique uninitialized in
 /-- Completed native prefix execution constructs the independent source trace
 at the installed call context, without a universal body reflection premise. -/
-theorem Entry.reflects
+theorem Entry.reflects [FunctionCalls.FaultTokens faults]
     (entry : Entry values functions registry function context bindings arguments before store mapping world
       administrative actual ξ parameterCode body)
     (certificate : CompatibleNamedBody.Certificate readFuel values function.source context solved reasonAt
@@ -3871,7 +3871,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized in
 /-- A source allocation and its finite body trace execute the real full named
 hook. Parameters are compared with the independently constructed allocation. -/
-theorem preserves {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+theorem preserves [FunctionCalls.FaultTokens faults] {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
     (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
     (trace : FunctionCallBody.Trace program function context environment bound outcome after) :
     ∃ origin index metadata value finalStore finalMap finalWorld,
@@ -3908,7 +3908,7 @@ include certificate parameters inputs extended acceptedPrefix definitions regist
   contextValid unique uninitialized in
 /-- Completed actual native execution constructs both source parameter
 allocation and the independent body trace at the fixed call context. -/
-theorem reflects {value : Value} {finalStore : Store}
+theorem reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (evaluation : Evaluates actual store code value finalStore) :
     ∃ origin index metadata environment bound outcome after finalMap finalWorld,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧

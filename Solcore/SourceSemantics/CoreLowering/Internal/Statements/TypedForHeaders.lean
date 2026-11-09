@@ -386,7 +386,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_prefix [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code)
@@ -503,7 +503,7 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : Tree.Errors registry faults tree)
@@ -727,7 +727,7 @@ theorem Result.prepend {context middleContext : SourceSemantics.Context}
       (preservation.trans lastFrame) (metadata.trans lastMetadata)
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : Tree.Errors registry faults tree)
@@ -920,7 +920,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_post [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code)
@@ -954,7 +954,7 @@ theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {sc
     environments.extend maps worlds, locals.mono metadata, actualTyped.weaken worlds⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.reflects_post (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_post [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : Tree.Errors registry faults tree)

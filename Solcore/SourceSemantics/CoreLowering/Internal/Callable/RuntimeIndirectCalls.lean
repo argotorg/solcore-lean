@@ -1652,7 +1652,7 @@ variable (runtime : Bool) {checked : Checked} {base : Base checked}
 
 include extension faithful observations escaped producers acquire stateTransport stateBindings profileProvider gateOf in
 /-- Source traces keep their original grade and exact reached pool. No body meaning is an external premise. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ header, header ∈ headers → ∀ context,
       RecursiveNamedCatalogMutualMeaning.ContextFor runtime header.solved context header.function.evidence →
       ∀ budget child, child ≤ budget →
@@ -1699,7 +1699,7 @@ theorem preserves_at
 
 include extension faithful observations escaped producers acquire stateTransport stateBindings profileProvider gateOf functionTypes in
 /-- Native completions return independent source grades and the actual body post. No body meaning is an external premise. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ header, header ∈ headers → ∀ context,
       RecursiveNamedCatalogMutualMeaning.ContextFor runtime header.solved context header.function.evidence →
       ∀ budget child, child ≤ budget →

@@ -485,6 +485,8 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply success
+      | uncheckedDivide => exact finishNonEqual .uncheckedDivide success
+      | uncheckedModulo => exact finishNonEqual .uncheckedModulo success
 
 /-- Once the actual place and RHS are typed in the completed statement
 source, executable assignment inference supplies every remaining premise of
@@ -1213,6 +1215,8 @@ theorem inferAssignedValueFuel_success_place_state_provenance
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success
+      | uncheckedDivide => exact finishNonEqual success
+      | uncheckedModulo => exact finishNonEqual success
 
 /-- In an indexed place, the recursive base traversal is an anchored prefix
 of the whole place traversal.  In particular, a selected call used as the new
@@ -1522,6 +1526,8 @@ theorem inferAssignedValueFuel_success_value_provenance
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success
+      | uncheckedDivide => exact finishNonEqual success
+      | uncheckedModulo => exact finishNonEqual success
 
 /-- The assignment's final type refinement changes no place projection
 edges.  Every indexed key of the actual inferred place is still a direct

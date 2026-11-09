@@ -329,6 +329,8 @@ theorem lifts_packed {invocation : Staging.Recursive.Scope}
       (Staging.Recursive.callableEvidence function) before function sources plain after) :
     Staging.Recursive.Lifting.ApplicationLift (Program.ofChecked compiled.sourceProgram) callStages
       invocation context before function sources plain after := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   classical
   obtain ⟨size, measured⟩ := RecursiveNamedCallBounds.CallOutcome.has_size called
   cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
@@ -549,10 +551,13 @@ compiler packet and checker-derived typing at the actual public registry. -/
 theorem named_bodies (support : Support compiled (headers rows) (keys compiled) initial) :
     NamedBodies support := by
   intro receiving issued extension header member budget child selected
-  exact SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
-    support.profile (support.certificates header member) (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected
-    (fun size _ => SelectedCompilationStageActualLifting.lifts_roots support issued extension size)
-    (fun size => SelectedCompilationStageLiftBounds.preserves_roots support issued extension size)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled issued)
+    SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
+      support.profile (support.certificates header member) (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected
+      (fun size _ => SelectedCompilationStageActualLifting.lifts_roots support issued extension size)
+      (fun size => SelectedCompilationStageLiftBounds.preserves_roots support issued extension size)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStagePublicProgramLifting
 end

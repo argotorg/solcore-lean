@@ -645,6 +645,8 @@ inductive WordBinaryOperator : Syntax.BinaryOp → Prop where
   | uncheckedAdd : WordBinaryOperator .uncheckedAdd
   | uncheckedSubtract : WordBinaryOperator .uncheckedSubtract
   | uncheckedMultiply : WordBinaryOperator .uncheckedMultiply
+  | uncheckedDivide : WordBinaryOperator .uncheckedDivide
+  | uncheckedModulo : WordBinaryOperator .uncheckedModulo
 
 inductive LogicalBinaryOperator : Syntax.BinaryOp → Prop where
   | logicalAnd : LogicalBinaryOperator .logicalAnd
@@ -704,6 +706,8 @@ inductive AssignmentOperatorBinary :
   | uncheckedAdd : AssignmentOperatorBinary .uncheckedAdd .uncheckedAdd
   | uncheckedSubtract : AssignmentOperatorBinary .uncheckedSubtract .uncheckedSubtract
   | uncheckedMultiply : AssignmentOperatorBinary .uncheckedMultiply .uncheckedMultiply
+  | uncheckedDivide : AssignmentOperatorBinary .uncheckedDivide .uncheckedDivide
+  | uncheckedModulo : AssignmentOperatorBinary .uncheckedModulo .uncheckedModulo
 
 inductive AssignmentOperandsInvalid :
     Syntax.ValueAssignOp → Option Value → Value → Prop where
@@ -717,6 +721,16 @@ inductive AssignmentOperandsInvalid :
       (corresponds : AssignmentOperatorBinary operator binary)
       (invalid : BinaryPrimitiveOperandsInvalid binary left right) :
       AssignmentOperandsInvalid operator (some left) right
+
+/-- A compound assignment whose operation panics on its operands. -/
+inductive AssignmentOperandsPanic :
+    Syntax.ValueAssignOp → Option Value → Value → UInt8 → Prop where
+  | compound
+      {operator : Syntax.ValueAssignOp} {binary : Syntax.BinaryOp}
+      {left right : Value} {code : UInt8}
+      (corresponds : AssignmentOperatorBinary operator binary)
+      (panics : BinaryPrimitivePanics binary left right code) :
+      AssignmentOperandsPanic operator (some left) right code
 
 /-- Known primitive coercions reject only a wrong-shaped source value. -/
 inductive PrimitiveCoercionInputInvalid : CoercionStep → Value → Prop where
@@ -938,6 +952,16 @@ theorem excludes_application
       cases operator_class <;> cases applies <;> simp_all [WordPair]
   | logical operator_class invalid_pair =>
       cases operator_class <;> cases applies <;> simp_all [BooleanPair]
+
+/-- A panicking pair is well shaped, so it is not an invalid one. -/
+theorem excludes_panic
+    {operator : Syntax.BinaryOp} {left right : Value} {code : UInt8}
+    (invalid : BinaryPrimitiveOperandsInvalid operator left right)
+    (panics : BinaryPrimitivePanics operator left right code) : False := by
+  cases panics <;> cases invalid with
+  | numeric operator_class => cases operator_class
+  | word _ invalid_pair => exact invalid_pair trivial
+  | logical operator_class => cases operator_class
 
 end BinaryPrimitiveOperandsInvalid
 
@@ -1517,6 +1541,11 @@ mutual
         (invalid : BinaryPrimitiveOperandsInvalid operator left right) :
         BinaryOperationFaults program context evidence heap operator [] left right
           (.invalidBinaryOperands operator) heap
+    | panic
+        {context evidence heap operator left right code}
+        (panics : BinaryPrimitivePanics operator left right code) :
+        BinaryOperationFaults program context evidence heap operator [] left right
+          (.panic code) heap
     | requirement
         {context evidence heap operator requirements left right failed}
         (fault : RequirementListFaults context evidence requirements failed) :
@@ -2094,6 +2123,21 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         SourcePlaceAssignmentFaults program context evidence source environment
           before place operator rhs (.invalidAssignmentOperands operator) rhsHeap
+    /-- A compound operation that panics, after the latest root is traversed. -/
+    | panic
+        {context evidence source environment before targetHeap rhsHeap place operator
+          rhs target right currentCell initial currentSelected code}
+        (resolve : SourcePlaceResolves program context evidence source environment
+          before place target targetHeap)
+        (evaluate : ExpressionEvaluates program context evidence source environment
+          targetHeap rhs right rhsHeap)
+        (current_read : Heap.Reads rhsHeap target.location currentCell)
+        (root_type_eq : currentCell.type = target.rootType)
+        (initial_value : RootInitialValue currentCell initial)
+        (path_read : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        SourcePlaceAssignmentFaults program context evidence source environment
+          before place operator rhs (.panic code) rhsHeap
 
     /-- Structural traversal precedes the leaf modifier, so this fault wins
     even if the old snapshot would make a compound operation fail. -/

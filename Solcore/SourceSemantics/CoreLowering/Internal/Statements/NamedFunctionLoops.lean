@@ -67,7 +67,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.preserves_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -89,7 +89,7 @@ theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Sc
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -106,7 +106,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -144,7 +144,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -733,7 +733,7 @@ variable {checked : Checked} {base : Base checked}
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem CertificateFor.preserves {diagnosticPolicy : AssignmentDiagnosticPolicy}
+theorem CertificateFor.preserves [FunctionCalls.FaultTokens faults] {diagnosticPolicy : AssignmentDiagnosticPolicy}
     (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -780,7 +780,7 @@ theorem CertificateFor.preserves {diagnosticPolicy : AssignmentDiagnosticPolicy}
     NamedImperativeForStatements.retained functions installed maps worlds frame metadata⟩
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem CertificateFor.reflects {diagnosticPolicy : AssignmentDiagnosticPolicy}
+theorem CertificateFor.reflects [FunctionCalls.FaultTokens faults] {diagnosticPolicy : AssignmentDiagnosticPolicy}
     (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -859,7 +859,7 @@ include definitions registered escapedFault extension faithful functionLeaves fu
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
-theorem CertificateFor.finite_iff {diagnosticPolicy : AssignmentDiagnosticPolicy}
+theorem CertificateFor.finite_iff [FunctionCalls.FaultTokens faults] {diagnosticPolicy : AssignmentDiagnosticPolicy}
     (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -900,7 +900,7 @@ theorem CertificateFor.finite_iff {diagnosticPolicy : AssignmentDiagnosticPolicy
       Core.evaluation_runStateful_complete_with_sufficient_fuel evaluated
     exact ⟨runtimeFuel, value, finalStore, completed runtimeFuel (Nat.le_refl _)⟩
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -935,7 +935,7 @@ theorem Certificate.preserves
     environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -973,7 +973,7 @@ include definitions registered escapedFault extension faithful functionLeaves fu
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
-theorem Certificate.finite_iff
+theorem Certificate.finite_iff [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -1061,7 +1061,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1083,7 +1083,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
       context scope mode statements expected type code) :
@@ -1232,7 +1232,7 @@ variable {checked : Checked} {base : Base checked}
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -1279,7 +1279,7 @@ theorem Certificate.preserves
     NamedLoopStatements.retained functions installed maps worlds frame metadata⟩
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
@@ -1358,7 +1358,7 @@ include definitions registered escapedFault extension faithful functionLeaves fu
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
-theorem Certificate.finite_iff
+theorem Certificate.finite_iff [FunctionCalls.FaultTokens faults]
     (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}

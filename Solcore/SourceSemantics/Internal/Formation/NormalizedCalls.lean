@@ -2118,6 +2118,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       | uncheckedAdd => exact finishNonEqual (valueIH place) success
       | uncheckedSubtract => exact finishNonEqual (valueIH place) success
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success
+      | uncheckedDivide => exact finishNonEqual (valueIH place) success
+      | uncheckedModulo => exact finishNonEqual (valueIH place) success
 
   case case14 =>
     intros context expression expected initial fuel id allocated allocationEq

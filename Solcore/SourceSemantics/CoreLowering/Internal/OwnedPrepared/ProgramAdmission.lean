@@ -668,11 +668,14 @@ theorem preserves_bodies (header) (member : header ∈ headers)
       (headers := headers) (keys := keys) header
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving.result.context.registry (functions support))
       (stages compiled) child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts.preserves_with_methods
-    issued (stagePrepared compiled) support.profile support.wellFormed (observations support)
-    (static_extension support extension) (semantic_extension support issued extension)
-    support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
-    header member selected budget
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
+    CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts.preserves_with_methods
+      issued (stagePrepared compiled) support.profile support.wellFormed (observations support)
+      (static_extension support extension) (semantic_extension support issued extension)
+      support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
+      header member selected budget
 
 include support issued extension in
 theorem reflects_bodies (header) (member : header ∈ headers)
@@ -681,11 +684,14 @@ theorem reflects_bodies (header) (member : header ∈ headers)
       (headers := headers) (keys := keys) header
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving.result.context.registry (functions support))
       (stages compiled) child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
-  exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts.reflects_with_methods
-    issued (stagePrepared compiled) support.profile support.wellFormed (observations support)
-    (static_extension support extension) (semantic_extension support issued extension)
-    support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
-    rfl header member selected budget
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
+    CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts.reflects_with_methods
+      issued (stagePrepared compiled) support.profile support.wellFormed (observations support)
+      (static_extension support extension) (semantic_extension support issued extension)
+      support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
+      rfl header member selected budget
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalProgramSupport
 end

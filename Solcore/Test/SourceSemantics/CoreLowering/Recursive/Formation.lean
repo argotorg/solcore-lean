@@ -2476,6 +2476,8 @@ theorem invoke_word {fixture : CompiledFixture} {observed : ObservedProgram fixt
     ∃ (sources : List Dynamic.Value) (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value (.word word)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -2540,6 +2542,8 @@ theorem invoke_success {fixture : CompiledFixture} {observed : ObservedProgram f
       (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -2612,6 +2616,8 @@ theorem RetainedState.make_pair
       ∃ after : RetainedState support call.completion.session (entries ++ [firstEntry, secondEntry]),
         SourceCall support support.makeHeader.header invocation state.heap [.word word]
           (.value (.product firstEntry.source secondEntry.source)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.makeInput, support.relayInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -2730,6 +2736,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
         SourceCall support support.makeHeader.header
           (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
           ⟨[]⟩ [.word seed] (.value (.product firstEntry.source secondEntry.source)) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ :=
     fixture.actual_start first.opened first.started
@@ -2999,6 +3007,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap} {source : Dynamic.Value}
     (trace : SourceCall support support.makeHeader.header invocation ⟨[]⟩ [.word seed] (.value source) after) :
     InitialForwardAt support first source after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := fixture.actual_start first.opened first.started
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -3130,6 +3140,8 @@ theorem forward_word {fixture : CompiledFixture} {observed : ObservedProgram fix
     (packing : Dynamic.ValuesPack arguments .unit)
     (trace : SourceInvocation support invocation state.heap entry.source arguments (.value (.word word)) after) :
     ForwardWordAt support publicSession entries handle word after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have unitInput : RecursiveNamedPublicFunctionHistoryInputs.Input entries
       support.makeHeader.header.function.context .unit .unit .unit :=
     .data ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
@@ -3275,6 +3287,8 @@ theorem forward_make {fixture : CompiledFixture} {observed : ObservedProgram fix
     (trace : SourceCall support support.makeHeader.header invocation state.heap
       [.word value] (.value source) after) :
     ForwardAt (entries := entries) support call source after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.makeInput, support.relayInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

@@ -256,6 +256,8 @@ theorem preserves_selected {budget : Nat}
       ∃ reached : protocol.State ⟨CellAwareImperativeBodyProducer.scope named, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission bridge context expected
           (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) reached := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   intro size within mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime covers sameLedger typed initial admitted lexical physical owner sameLocation ready
     finalContext outcome after trace
@@ -326,6 +328,8 @@ theorem reflects_selected {budget : Nat}
       ∃ reached : protocol.State ⟨CellAwareImperativeBodyProducer.scope named, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission bridge context expected
           (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) reached := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   intro size within mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime covers sameLedger typed initial admitted lexical physical owner sameLocation ready
     value finalStore completed
@@ -1063,6 +1067,8 @@ theorem lifts_selected
     CellAwareSourceFlowLiftBounds.Lifts (named := named) (administrative := administrative)
       (registry := stages) (invocation := invocation) bridge producer context
       (CellAwareImperativeBodyProducer.scope named) true compiled.statements := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   intro size mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime
   exact CellAwareImperativeSourceTreeLifting.lifts bridge bindings transport functions extension compiled record producer registered

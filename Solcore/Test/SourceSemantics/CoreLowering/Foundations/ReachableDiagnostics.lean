@@ -1294,7 +1294,7 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
-theorem concrete_named_preserves {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
+theorem concrete_named_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -1311,7 +1311,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
+theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
@@ -1328,7 +1328,7 @@ theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Typ
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Initializers and the nested body inhabit the same recursive grammar. The
 head is followed by its concrete tail with no runtime endpoint premise. -/
-theorem concrete_for_preserves {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
+theorem concrete_for_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {items post : List ForItemForm}
     {condition : ExpressionId} {statements rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {initialCode body : Expr} {administrative : Core.Context}
@@ -1351,7 +1351,7 @@ theorem concrete_for_preserves {context : SourceSemantics.Context} {scope : Type
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Completed initializers, finite iterations and post are inverted before the
 tail. Break/return skip post and continue/fallthrough run it in source order. -/
-theorem concrete_for_reflects {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
+theorem concrete_for_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool}
     {id : StatementId} {node : StatementNode} {items post : List ForItemForm}
     {condition : ExpressionId} {statements rest : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {initialCode body : Expr} {administrative : Core.Context}
@@ -1397,7 +1397,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem concrete_builtin_preserves {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool} {statements : List StatementId}
+theorem concrete_builtin_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : BuiltinImperativeFor.Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1430,7 +1430,7 @@ theorem concrete_builtin_preserves {context : SourceSemantics.Context} {scope : 
   all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem concrete_builtin_reflects {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool} {statements : List StatementId}
+theorem concrete_builtin_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : BuiltinImperativeFor.Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1480,7 +1480,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 include missing uninitialized in
 /-- Equal introduces no operand-token law at a statement position. -/
-theorem equal_statement_receipt {id : StatementId} {node : StatementNode} {mode : Bool}
+theorem equal_statement_receipt [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
     (tail : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
@@ -1492,7 +1492,7 @@ theorem equal_statement_receipt {id : StatementId} {node : StatementNode} {mode 
 
 include missing uninitialized in
 /-- The initializer position uses exactly the same policy and static Tree. -/
-theorem equal_initializer_receipt {items post : List ForItemForm} {condition : ExpressionId}
+theorem equal_initializer_receipt [FunctionCalls.FaultTokens faults] {items post : List ForItemForm} {condition : ExpressionId}
     {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
     (tail : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
       context scope (.initializers items condition post statements) expected type code)
@@ -1893,7 +1893,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -1934,7 +1934,7 @@ theorem actual_compiler_body_preserves
     (extracted.ready interpreted contextValid signatures) environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -1993,7 +1993,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 include missing uninitialized in
 /-- Equal introduces no operand-token law at a statement position. -/
-theorem equal_statement_receipt {id : StatementId} {node : StatementNode} {mode : Bool}
+theorem equal_statement_receipt [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
     (tail : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
@@ -2005,7 +2005,7 @@ theorem equal_statement_receipt {id : StatementId} {node : StatementNode} {mode 
 
 include missing uninitialized in
 /-- The initializer position uses exactly the same policy and static Tree. -/
-theorem equal_initializer_receipt {items post : List ForItemForm} {condition : ExpressionId}
+theorem equal_initializer_receipt [FunctionCalls.FaultTokens faults] {items post : List ForItemForm} {condition : ExpressionId}
     {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
     (tail : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
       context scope (.initializers items condition post statements) expected type code)
@@ -2022,7 +2022,7 @@ theorem equal_strict_impossible (noOperand : ∀ token, ¬ faults (.invalidAssig
 
 
 include missing uninitialized in
-theorem equal_assignment_extraction
+theorem equal_assignment_extraction [FunctionCalls.FaultTokens faults]
     {id : StatementId} {node : StatementNode} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
     {solved : List SolvedRequirement}
@@ -2290,7 +2290,7 @@ variable {checked : Checked} {base : Base checked}
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem extracted_named_finite_iff
+theorem extracted_named_finite_iff [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -2833,7 +2833,7 @@ variable {checked : Checked} {base : Base checked}
 
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_preserves (budget : Nat)
+theorem concrete_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -2854,7 +2854,7 @@ theorem concrete_preserves (budget : Nat)
     valid unique owners uninitialized missing budget child within
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_reflects (budget : Nat)
+theorem concrete_reflects [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -2877,7 +2877,7 @@ theorem concrete_reflects (budget : Nat)
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The inclusive endpoint used by a source-body strong induction. No N+1
 budget and no callee law at N is supplied by this consumer. -/
-theorem concrete_preserves_at_top (size : Nat)
+theorem concrete_preserves_at_top [FunctionCalls.FaultTokens faults] (size : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -2896,7 +2896,7 @@ theorem concrete_preserves_at_top (size : Nat)
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
 /-- A completed native body gives its own source size, without relating source
 cost to the original native budget. -/
-theorem concrete_native_only (budget size : Nat) (smaller : size < budget)
+theorem concrete_native_only [FunctionCalls.FaultTokens faults] (budget size : Nat) (smaller : size < budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -2912,7 +2912,7 @@ theorem concrete_native_only (budget size : Nat) (smaller : size < budget)
   concrete_reflects functions definitions registered extension faithful observations runtimeViews evidence unique
     uninitialized missing bodyUninitialized bodyMissing budget tree errors size smaller
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_block_preserves_at (size : Nat)
+theorem terminal_block_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -2934,7 +2934,7 @@ theorem terminal_block_preserves_at (size : Nat)
     (.terminalBlock exactUnique found form inner stops issued) (.terminalBlock (unique := exactUnique) (found := found) (form := form) (stops := stops) (issued := issued) innerErrors)
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_block_reflects_at (budget size : Nat) (smaller : size < budget)
+theorem terminal_block_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (smaller : size < budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -2956,7 +2956,7 @@ theorem terminal_block_reflects_at (budget size : Nat) (smaller : size < budget)
     (.terminalBlock exactUnique found form inner stops issued) (.terminalBlock (unique := exactUnique) (found := found) (form := form) (stops := stops) (issued := issued) innerErrors)
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_if_preserves_at (size : Nat)
+theorem terminal_if_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -2989,7 +2989,7 @@ theorem terminal_if_preserves_at (size : Nat)
     (.terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued) (.terminalIf (unique := exactUnique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenErrors elseErrors)
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_if_reflects_at (budget size : Nat) (smaller : size < budget)
+theorem terminal_if_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (smaller : size < budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -3471,7 +3471,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -3511,7 +3511,7 @@ theorem actual_compiler_body_preserves
     errors environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -3851,7 +3851,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem concrete_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -3873,7 +3873,7 @@ theorem concrete_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     valid unique owners uninitialized missing budget child within
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -3894,7 +3894,7 @@ theorem concrete_reflects_at (budget size : Nat) (bounded : size ≤ budget)
     functions extension body bodyUninitialized bodyMissing faithful observations runtimeViews
     valid uninitialized missing budget child within
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem terminal_block_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {statements rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {innerCode suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -3914,7 +3914,7 @@ theorem terminal_block_preserves_at (budget size : Nat) (bounded : size ≤ budg
     (.terminalBlock exactUnique found form inner stops issued)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_block_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem terminal_block_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {statements rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {innerCode suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -3934,7 +3934,7 @@ theorem terminal_block_reflects_at (budget size : Nat) (bounded : size ≤ budge
     (.terminalBlock exactUnique found form inner stops issued)
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_if_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem terminal_if_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody elseBody rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -3962,7 +3962,7 @@ theorem terminal_if_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (.terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
-theorem terminal_if_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem terminal_if_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody elseBody rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode suffix : Expr}
     (exactUnique : NodeOccurrencesUnique source)
@@ -4967,7 +4967,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -5007,7 +5007,7 @@ theorem actual_compiler_body_preserves
     errors environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)

@@ -1242,7 +1242,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (bindings : ProtectedExpressionMeaning.Binds entry)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves
+theorem Tree.preserves [FunctionCalls.FaultTokens faults]
     (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
@@ -1464,7 +1464,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (bindings : ProtectedExpressionMeaning.Binds entry)
 
 include definitions registered extension faithful observations transport bindings runtimeViews in
-theorem Tree.reflects
+theorem Tree.reflects [FunctionCalls.FaultTokens faults]
     (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry)

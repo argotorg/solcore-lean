@@ -407,7 +407,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
 include support profile certified extension selected semantic assignmentInterpretation in
-theorem preserves {budget : Nat}
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.PreservesRootsAt
         (headers := headers) (keys := keys) model stages semanticFaults faults size) :
@@ -428,7 +428,7 @@ theorem preserves {budget : Nat}
       (CallableIndexedOwnedPreparedPhysicalCellOrigins.observations profile) selected extension body.layouts children
 
 include support profile certified extension selected semantic assignmentInterpretation in
-theorem reflects {budget : Nat}
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ size, size < budget →
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
         (headers := headers) (keys := keys) model stages semanticFaults faults size) :
@@ -812,8 +812,10 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include closurePackets closureSupport owners stagePrepared receiver profile bodyTyping certificates observations extension semantic bodies bodySupport mixedMethodSupport in
 /-- Every ordinary and method body uses only strictly smaller Source grades. -/
-theorem preserves_with_methods (size : Nat) :
+theorem preserves_with_methods [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction size using Nat.strongRecOn with
   | ind budget ih =>
     intro context invocation scope expression lowered root owner keyPhysical
@@ -912,8 +914,10 @@ theorem preserves_with_methods (size : Nat) :
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport mixedMethodSupport in
 /-- Every ordinary and method body uses only strictly smaller native grades. -/
-theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_with_methods [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   subst stages
   induction size using Nat.strongRecOn with
   | ind budget ih =>
@@ -1017,21 +1021,21 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport methodSupport in
 /-- The existing named-body API embeds its terminal method packets. -/
-theorem preserves_with_bodies (size : Nat) :
+theorem preserves_with_bodies [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   preserves_with_methods receiver stagePrepared profile bodyTyping certificates observations extension semantic
     bodies bodySupport closurePackets closureSupport owners methodSupport.toMixed size
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport methodSupport in
 /-- The existing named-body API embeds its terminal method packets. -/
-theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_with_bodies [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   reflects_with_methods receiver stagePrepared profile bodyTyping certificates observations extension semantic
     bodies bodySupport closurePackets closureSupport owners methodSupport.toMixed stageEq size
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic terminals namedSupport methodSupport in
 /-- Existing terminal families delegate to the same body-generic induction. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   preserves_with_bodies receiver stagePrepared profile bodyTyping certificates observations extension semantic
     (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
@@ -1041,7 +1045,7 @@ theorem preserves (size : Nat) :
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic terminals namedSupport methodSupport in
 /-- Existing terminal reflection retains its original arguments and conclusion. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   reflects_with_bodies receiver stagePrepared profile bodyTyping certificates observations extension semantic
     (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
@@ -1115,64 +1119,76 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport mixedMethodSupport in
-theorem preserves_with_methods
+theorem preserves_with_methods [FunctionCalls.FaultTokens semanticFaults]
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
-        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
-    (bodySupport header member) profile (certificates header member) extension selected
-    (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
-      receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
-      closurePackets closureSupport owners mixedMethodSupport size)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
+    SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+      (bodySupport header member) profile (certificates header member) extension selected
+      (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_methods
+        receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
+        closurePackets closureSupport owners mixedMethodSupport size)
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport mixedMethodSupport in
-theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects_with_methods [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
-        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
-    (bodySupport header member) profile (certificates header member) extension selected
-    (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_methods
-      receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
-      closurePackets closureSupport owners mixedMethodSupport stageEq size)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
+    SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+      (bodySupport header member) profile (certificates header member) extension selected
+      (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_methods
+        receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
+        closurePackets closureSupport owners mixedMethodSupport stageEq size)
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport methodSupport in
-theorem preserves_with_bodies
+theorem preserves_with_bodies [FunctionCalls.FaultTokens semanticFaults]
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
-        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
-    (bodySupport header member) profile (certificates header member) extension selected
-    (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_bodies
-      receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
-      closurePackets closureSupport owners methodSupport size)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
+    SelectedCompilationPhysicalNamedBodySupport.preserves (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+      (bodySupport header member) profile (certificates header member) extension selected
+      (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.preserves_with_bodies
+        receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
+        closurePackets closureSupport owners methodSupport size)
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport methodSupport in
-theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects_with_bodies [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  exact SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
-        (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
-    (bodySupport header member) profile (certificates header member) extension selected
-    (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_bodies
-      receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
-      closurePackets closureSupport owners methodSupport stageEq size)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
+    SelectedCompilationPhysicalNamedBodySupport.reflects (semantic := semantic)
+          (assignmentInterpretation := PreparedAssignmentDiagnosticAuthority.interprets receiver)
+      (bodySupport header member) profile (certificates header member) extension selected
+      (fun size _ => SelectedCompilationPhysicalMixedCallerFamily.reflects_with_bodies
+        receiver stagePrepared profile bodyTyping certificates observations extension semantic bodies bodySupport
+        closurePackets closureSupport owners methodSupport stageEq size)
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic terminals namedSupport methodSupport in
 /-- The previous terminal family keeps its original public body-port API. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
@@ -1186,7 +1202,7 @@ theorem preserves
 
 include closurePackets closureSupport owners receiver stagePrepared profile bodyTyping certificates observations extension semantic terminals namedSupport methodSupport in
 /-- The previous terminal family keeps its original public body-port API. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :

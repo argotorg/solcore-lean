@@ -177,7 +177,7 @@ private def memberRhs : Expr := .letE
   (.storeCell (.var 0) (.inRight .unit (.construct tag (.pair (.integer 100) (.integer 22)))))
   (LanguageResult.success (.integer 5))
 private def memberCode : Expr := execute memberPrepared (.var 0) (SourceCoreCalls.packArguments []) memberRhs
-  (LanguageResult.success .unit) .unit (some .integerAdd) false Word.zero
+  (LanguageResult.success .unit) .unit (some (.total .integerAdd)) false Word.zero
 example : infer? [.cell (.sum .unit (.namedData ⟨0⟩))] memberCode [⟨[.product .integer .integer]⟩] =
     some (LanguageResult.resultType .unit) := by cbv
 example : runStateful 200 (.initial memberCode [.cellRef (.sum .unit (.namedData ⟨0⟩)) 0]
@@ -255,6 +255,8 @@ private def code : SourceCoreBasic.LoweredExpr := ⟨.bool, LanguageResult.succe
 private inductive Child : Certificate where
   | literal (scope : Scope) : Child scope id code
 private def faults : FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 private theorem found : source.lookupExpression? id = some node := by cbv
 private theorem literal : Literals.Tree source id (.bool true) 1 :=
   .bool (lookupExpression?_sound found) rfl rfl rfl rfl
@@ -390,7 +392,10 @@ private def faults : FaultRep := fun reason token => match reason with
   | .invalidAssignmentOperands .add => token = invalid
   | .uninitializedLocation _ => token = Word.zero
   | .missingMappingDefault _ => token = Word.zero
+  | .panic code => token = Solcore.Frontend.SourceCorePanics.reason code
   | _ => False
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => rfl⟩
 private theorem found : source.lookupExpression? id = some node := by cbv
 private theorem literal : Literals.Tree source id (.word five) 1 :=
   .word (lookupExpression?_sound found) rfl rfl rfl rfl (interpretWordLiteral?_sound (by decide))
@@ -432,7 +437,7 @@ private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures
     exact ⟨0, .nil rfl⟩
 private def next : Expr := LanguageResult.success (.storeCell (.var 0) (.inRight .unit (.word five)))
 private def expression : Expr := execute prepared (.var 0) (SourceCoreCalls.packArguments []) code.expression
-  next .unit (some .wordAdd) false invalid
+  next .unit (some (.total .wordAdd)) false invalid
 example : lower checked signatures (fun fuel source scope id reasonAt =>
     SourceCoreBasic.lowerExpression fuel source scope id (reasonAt id)) 3 source scope (.occurrence id.occurrence)
     ⟨place, []⟩ .add (some id) .unit next (fun _ => Word.zero)
@@ -445,7 +450,7 @@ example : lower checked signatures (fun fuel source scope id reasonAt =>
     bind, Except.bind, pure, Pure.pure, Except.pure]
   change (do
     let _ ← SourceCoreBasic.ensureType (.occurrence id.occurrence) Ty.word Ty.word
-    pure (execute prepared (.var 0) (SourceCoreCalls.packArguments []) code.expression next .unit (some .wordAdd) false invalid)) = .ok expression
+    pure (execute prepared (.var 0) (SourceCoreCalls.packArguments []) code.expression next .unit (some (.total .wordAdd)) false invalid)) = .ok expression
   rfl
 
 example : infer? (SourceCoreLocalCell.coreContext scope) expression catalog.definitions =
@@ -1138,7 +1143,7 @@ private theorem profile : DataPlaceRouteCertificates.Profile signatures source o
 
 private def body : Expr := execute prepared (.var 0)
   (SourceCoreCalls.packArguments [loweredKey, loweredKey]) (LanguageResult.success (.integer 3))
-  (LanguageResult.success .unit) .unit (some .integerAdd) false Word.zero
+  (LanguageResult.success .unit) .unit (some (.total .integerAdd)) false Word.zero
 
 private theorem bodyChecked : infer? (SourceCoreLocalCell.coreContext scope) body catalog.definitions =
     some (LanguageResult.resultType .unit) := by cbv
@@ -1159,7 +1164,7 @@ example (functions : GenericHeap.PayloadModel catalog) :
       prepared [loweredKey, loweredKey] types (SourceCoreLocalCell.coreContext scope) := by
   apply DataPlaceLayoutCertificates.of_describe_prepare (route := route) (expression := expression)
     (reference := .var 0) (rhs := LanguageResult.success (.integer 3))
-    (next := LanguageResult.success .unit) (outputType := .unit) (operator := some .integerAdd)
+    (next := LanguageResult.success .unit) (outputType := .unit) (operator := some (.total .integerAdd))
     (bitNot := false) (invalidOperand := Word.zero) ?_ described preparedBy generated ?_ (infer_sound bodyChecked)
   · intro actual accepted
     have same := Except.ok.inj (rootBinding.symm.trans accepted)
@@ -1245,18 +1250,20 @@ private def functions : GenericHeap.PayloadModel catalog where
   runtime_hasType := False.elim
   extend := fun impossible _ _ => False.elim impossible
 
-/-- Each source operator has a total initialized primitive result at Word, and
-each but the shifts at Integer. This covers Word wrapping, division/modulo by
-zero and every Integer sign without a runtime evaluation premise. The store can
-include arbitrary closure/cell cycles. -/
-example (operator : Syntax.ValueAssignOp) (left right : Word) (store : Store) :
+/-- Each source operator has an initialized primitive result at Word, given a
+nonzero divisor for unchecked `/` and `%`, and each Integer operator does. This
+covers Word wrapping, checked division/modulo by zero and every Integer sign
+without a runtime evaluation premise. The store can include arbitrary
+closure/cell cycles. -/
+example (operator : Syntax.ValueAssignOp) (left right : Word) (store : Store)
+    (divisor : operator.mayPanic = false ∨ Dynamic.Value.word right ≠ .word Word.zero) :
     ∃ result value, ValueRep catalog signatures functions [] [] .word result value .word ∧
       Dynamic.AssignmentValueApplies operator (some (.word left)) (.word right) result ∧
       Evaluates [.inRight .unit (.word left), .word right] store
         (modified .word (binaryOperator false operator) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) :=
-  initialized_success (.inl rfl) (.word left) (.word right) (.var rfl) (.var rfl) store Word.zero
+  initialized_success (.inl rfl) divisor (.word left) (.word right) (.var rfl) (.var rfl) store Word.zero
 
 example (operator : Syntax.ValueAssignOp) (notWordOnly : operator.wordOnly = false) (left right : Int) (store : Store) :
     ∃ result value, ValueRep catalog signatures functions [] [] .integer result value .integer ∧
@@ -1265,7 +1272,8 @@ example (operator : Syntax.ValueAssignOp) (notWordOnly : operator.wordOnly = fal
         (modified .integer (binaryOperator true operator) false (.var 0) (.var 1) Word.zero)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.integer left)) (.integer right) :=
-  initialized_success (.inr ⟨rfl, notWordOnly⟩) (.integer left) (.integer right) (.var rfl) (.var rfl) store Word.zero
+  initialized_success (.inr ⟨rfl, notWordOnly⟩) (.inr (fun same => by cases same)) (.integer left) (.integer right)
+    (.var rfl) (.var rfl) store Word.zero
 
 example (left : Int) (store : Store) :
     ∃ value, ValueRep catalog signatures functions [] [] .integer (.integer 0) value .integer ∧
@@ -1326,7 +1334,8 @@ section
 -- leanmerge: from Solcore.Test.SourceCoreDataPlaceModifierReflection
 /-! Modifier reflection distinguishes an absent compound-assignment snapshot
 from ordinary initialization, and constructs the source primitive result for
-any completed typed Word operation without assuming its source application. -/
+any completed typed Word operation without assuming its source application,
+given a nonzero divisor for unchecked `/` and `%`. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreDataPlaceModifierReflection
 open Solcore Solcore.Core Solcore.Frontend Solcore.Frontend.SourceInference
@@ -1342,6 +1351,7 @@ private def functions : GenericHeap.PayloadModel catalog where
   extend := fun impossible _ _ => False.elim impossible
 
 example (operator : Syntax.ValueAssignOp) (left right : Word) (before after : Store) (result : Value)
+    (divisor : operator.mayPanic = false ∨ right ≠ Word.zero)
     (completed : Evaluates [.inRight .unit (.word left), .word right] before
       (modified .word (binaryOperator false operator) false (.var 0) (.var 1) Word.zero) result after) :
     after = before ∧ ∃ source value,
@@ -1353,6 +1363,10 @@ example (operator : Syntax.ValueAssignOp) (left right : Word) (before after : St
   cases related with
   | applied applied value => exact ⟨_, _, applied, value, rfl⟩
   | uninitialized absent => cases absent
+  | panicking zero selected _ _ =>
+    rcases divisor with total | nonzero
+    · rw [DataPlaceModifier.binaryOperator_panics selected] at total; cases total
+    · cases zero; exact (nonzero rfl).elim
 
 private def token : Word := ⟨17, by decide⟩
 private def absentAdd : Expr := modified .integer (binaryOperator true .add) false (.var 0) (.var 1) token
@@ -1376,6 +1390,7 @@ example : ∃ source, Dynamic.AssignmentValueApplies .equal none (.bool true) so
     (.var rfl) (.var (index := 1) rfl) (runStateful_evaluation_sound initializeRan)
   cases result.2 with
   | applied applied related => exact ⟨_, applied, related⟩
+  | panicking _ selected _ _ => cases selected
 
 end Tests.SourceCoreDataPlaceModifierReflection
 end
@@ -1464,6 +1479,8 @@ private def sourceContext := (SourceSemantics.Context.ofSignatures signatures).w
 private def place : PlaceResolution := ⟨binder.id, projections, .bool⟩
 private def Child : GenericExpressionMeaning.Certificate := fun _ _ _ => False
 private def faults : GenericExpressionMeaning.FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 private theorem meaning (program : SourceSemantics.Program) :
     GenericExpressionMeaning.Reflects model program sourceContext [] source Child faults := by
   intro scope id lowered impossible
@@ -1689,7 +1706,7 @@ private def expression : ExpressionLowerer := fun _ _ _ id _ =>
   if id = rhsId then .ok ⟨.integer, rhsExpression⟩ else .error (.missingExpression id)
 private def next : Core.Expr := Core.OptionalCell.read (.namedData ⟨0⟩) (.var 0) (Core.Word.zero)
 private def lowered : Core.Expr := execute prepared (.var 0) (SourceCoreCalls.packArguments []) rhsExpression next
-  (.namedData ⟨0⟩) (some .integerAdd) false (Core.Word.zero)
+  (.namedData ⟨0⟩) (some (.total .integerAdd)) false (Core.Word.zero)
 private theorem accepted : lower checked signatures expression 20 source scope site assignment .add (some rhsId)
     (.namedData ⟨0⟩) next (fun _ => Core.Word.zero) (Core.Word.zero) (Core.Word.zero)
     (fun _ => Core.Word.zero) = .ok lowered := by cbv
@@ -2540,7 +2557,7 @@ def run : IO Unit := do
   let rhs := .letE (.storeCell (.var 0) (.inRight .unit (outerExpression 22 777))) ((event 3 5).weakenAt 0)
   let next := LanguageResult.success (.pair (.loadCell (.var 0)) (.loadCell (.var 1)))
   let outputType := .product (.sum .unit outerLayout.type) .integer
-  let expression := execute prepared (.var 0) keyCode rhs next outputType (some .integerAdd) false Word.zero
+  let expression := execute prepared (.var 0) keyCode rhs next outputType (some (.total .integerAdd)) false Word.zero
   let initial : Store := [.inRight .unit (outerValue 11), .integer 0]
   let finalPrefix : Store := [.inRight .unit (latestValue 16 777), .integer 123]
   checkRun expression [.cellRef (.sum .unit outerLayout.type) 0, .cellRef .integer 1]
@@ -2589,6 +2606,8 @@ private def code : SourceCoreBasic.LoweredExpr := ⟨.bool, LanguageResult.succe
 private inductive Child : Certificate where
   | literal (scope : Scope) : Child scope id code
 private def faults : FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 private theorem found : source.lookupExpression? id = some node := by cbv
 private theorem literal : Literals.Tree source id (.bool true) 1 :=
   .bool (lookupExpression?_sound found) rfl rfl rfl rfl

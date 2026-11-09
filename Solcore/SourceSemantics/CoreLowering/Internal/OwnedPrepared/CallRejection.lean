@@ -723,6 +723,8 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
     (high : native.diagnostics.unknown.val ≤ token.val)
     (decoded : native.diagnostics.rootTable.diagnostic? token = some diagnostic) :
     completion.result.diagnostics.diagnostic? token = some diagnostic := by
+  have receiverFree :=
+    CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver
   obtain ⟨issued, present, callablePresent, allocated⟩ :=
     CallableIndexedOwnedPublicCallableDiagnostics.of_compiled compiled stages.present
   have allocatedReceipt := CallableFaultDiagnosticPreparation.prepare_receipt allocated
@@ -733,38 +735,52 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
     CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled present
   obtain ⟨actual, rebuilt, sameReceiver⟩ := receiver
   rw [present] at rebuilt
-  have absent : actual.diagnostic? token = none := by
-    cases found : actual.diagnostic? token with
-    | none => rfl
-    | some original =>
-        have below := CallableIndexedOwnedReceivingPreparedShapeInterpretations.decoded_token_below
-          accepted rebuilt found
-        omega
+  rw [sameReceiver] at receiverFree
   obtain ⟨extra, _expanded, sameBase, _origins⟩ := issued.tableForRegistry_receipt rebuilt
   have sameEscaped : actual.escapedReason = native.diagnostics.rootTable.escapedReason := by
     rw [sameBase, allocatedReceipt.table]
   have sameReads : actual.reads = native.diagnostics.rootTable.reads := by
     rw [sameBase, allocatedReceipt.table]
-  have nonzero : token ≠ Word.zero := by
-    intro zero
-    simp [zero, SourceCoreFaultSites.Table.diagnostic?] at absent
-  have notEscaped : token ≠ actual.escapedReason := by
-    intro escaped
-    have escapedNonzero : actual.escapedReason ≠ Word.zero := by
-      rw [← escaped]
-      exact nonzero
-    simp [SourceCoreFaultSites.Table.diagnostic?, escaped, escapedNonzero] at absent
-  have additionalAbsent : actual.additional.find? (fun item => decide (item.1 = token)) = none := by
-    cases found : actual.additional.find? (fun item => decide (item.1 = token)) with
-    | none => rfl
-    | some pair =>
-        simp [SourceCoreFaultSites.Table.diagnostic?, nonzero, notEscaped, found] at absent
+  have sameOwner : actual.owner = native.diagnostics.rootTable.owner := by
+    rw [sameBase, allocatedReceipt.table]
+  -- Below the panic range the table decodes nothing at a high callable token;
+  -- in it, every row of the table lies below the token.
+  have lookups : token ≠ Word.zero ∧ token ≠ actual.escapedReason ∧
+      actual.additional.find? (fun item => decide (item.1 = token)) = none := by
+    by_cases panic : SourceCorePanics.base ≤ token.val
+    · obtain ⟨nonzero, notEscaped, additionalAbsent, _⟩ :=
+        CallableIndexedOwnedReceivingPreparedShapeInterpretations.panicFree_misses
+          (CallableIndexedOwnedReceivingPreparedShapeInterpretations.appendCallable_panicFree receiverFree) panic
+      exact ⟨nonzero, notEscaped, additionalAbsent⟩
+    · have absent : actual.diagnostic? token = none := by
+        cases found : actual.diagnostic? token with
+        | none => rfl
+        | some original =>
+            have below := CallableIndexedOwnedReceivingPreparedShapeInterpretations.decoded_token_below
+              accepted rebuilt found (SourceCorePanics.code?_eq_none (Nat.lt_of_not_le panic))
+            omega
+      have nonzero : token ≠ Word.zero := by
+        intro zero
+        simp [zero, SourceCoreFaultSites.Table.diagnostic?] at absent
+      have notEscaped : token ≠ actual.escapedReason := by
+        intro escaped
+        have escapedNonzero : actual.escapedReason ≠ Word.zero := by
+          rw [← escaped]
+          exact nonzero
+        simp [SourceCoreFaultSites.Table.diagnostic?, escaped, escapedNonzero] at absent
+      have additionalAbsent : actual.additional.find? (fun item => decide (item.1 = token)) = none := by
+        cases found : actual.additional.find? (fun item => decide (item.1 = token)) with
+        | none => rfl
+        | some pair =>
+            simp [SourceCoreFaultSites.Table.diagnostic?, nonzero, notEscaped, found] at absent
+      exact ⟨nonzero, notEscaped, additionalAbsent⟩
+  obtain ⟨nonzero, notEscaped, additionalAbsent⟩ := lookups
   have originalNotEscaped : token ≠ native.diagnostics.rootTable.escapedReason := by
     rwa [sameEscaped] at notEscaped
   rw [sameReceiver, appendCallable, callablePresent]
   simp only [SourceCoreFaultSites.Table.diagnostic?, nonzero, notEscaped,
     originalNotEscaped, if_false, List.find?_append, additionalAbsent,
-    Option.none_or, filtered_find high, sameReads] at decoded ⊢
+    Option.none_or, filtered_find high, sameReads, sameOwner] at decoded ⊢
   exact decoded
 
 private theorem issued_reason {table : SourceCoreStageCodebook.Table}

@@ -100,6 +100,8 @@ private theorem functionLeaves : CompatibleEquality.FunctionObservations checked
 private theorem functionTypes : FunctionRuntimeViews functions := fun impossible => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures]
@@ -249,7 +251,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag → faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension valid unique declarations signatures closed residual coercions uninitialized missing in
-theorem accepted_sufficient_fuel {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
+theorem accepted_sufficient_fuel [FunctionCalls.FaultTokens faults] {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
     (inputs : ∀ id, id ∈ ids → ∃ node, source.lookupExpression? id = some node ∧
       CompatibleExpressionIndices.Syntax source id ∧ ExpressionHasType source context id node.type)
     (accepted : ids.mapM (fun id => compile (values := values) (readFuel := readFuel) (fuel := fuel)
@@ -277,7 +279,7 @@ theorem accepted_sufficient_fuel {ids : List ExpressionId} {codes : List SourceC
   exact ⟨types, value, finalStore, finalMap, finalWorld, required, result⟩
 
 include extension valid unique declarations signatures closed residual coercions uninitialized missing in
-theorem accepted_reflects_done {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
+theorem accepted_reflects_done [FunctionCalls.FaultTokens faults] {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
     (inputs : ∀ id, id ∈ ids → ∃ node, source.lookupExpression? id = some node ∧
       CompatibleExpressionIndices.Syntax source id ∧ ExpressionHasType source context id node.type)
     (accepted : ids.mapM (fun id => compile (values := values) (readFuel := readFuel) (fuel := fuel)
@@ -839,7 +841,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_post_restores :
+theorem compiled_post_restores [FunctionCalls.FaultTokens faults] :
     ∃ tail : Tail registry functions source solved [] administrative frame globals location native (Fallthrough .bool) context environment after,
       Evaluates actual store (code.rename ξ) (LocalLoop.fallthroughValue .bool) tail.store ∧
       CompatibleHeap.HeapRepresents values.checked registry functions tail.mapping tail.world after tail.store ∧
@@ -854,7 +856,7 @@ theorem compiled_post_restores :
   exact ⟨tail, evaluated, tail.heaps, outer, restored, actualTyped⟩
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_post_reflects (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_post_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     Result registry functions program source solved [] administrative frame globals location native .bool faults (Fallthrough .bool)
       context environment before items mapping world store value finalStore := by
@@ -864,7 +866,7 @@ theorem compiled_post_reflects (runtimeViews : FunctionRuntimeViews functions) {
     errors valid unique environments heaps locals agrees typed reference read unmapped completed
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_post_shape (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_post_shape [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     value = LocalLoop.fallthroughValue .bool ∨ ∃ token, value = .inLeft (LocalLoop.controlType .bool) (.word token) := by
   subst definitions
@@ -1102,7 +1104,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedLexicalWhile.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .bool .bool (.returned (.bool true)) value ∧
@@ -1116,7 +1118,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before statements finalContext outcome sourceHeap ∧
@@ -1356,7 +1358,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedLexicalWhile.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .bool .bool (.returned (.bool true)) value ∧
@@ -1370,7 +1372,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include matched binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before statements finalContext outcome sourceHeap ∧
@@ -1609,7 +1611,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matched unary binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedLexicalWhile.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .bool .bool (.returned (.bool true)) value ∧
@@ -1623,7 +1625,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include matched unary binderPolicy allocationPolicy sourceSignatures declarations expressions nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before statements finalContext outcome sourceHeap ∧
@@ -1950,13 +1952,16 @@ private theorem sourceFailure (mode : Bool) : Executes mode program initial [] s
   exact TypedScopedStatements.head_fault mode [] (.block (lookupStatement?_sound (node := scopedBlock) rfl) rfl innerFailure)
 
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 
 private theorem failureContext_ne_full : context3 ≠ context4 := by
   intro same
@@ -2485,6 +2490,8 @@ private theorem sourceTrace (heap : Dynamic.Heap) : TypedScopedStatements.Execut
       (.returnUnit (lookupStatement?_sound (node := returnNode) rfl) rfl)
 
 private def faults : FunctionCalls.FaultRep := fun _ _ => True
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun _ => trivial⟩
 
 /-- Actual compiled while flow preserves an independent trace, with arbitrary
 actual captures/renaming and a genuine live indexed context cell. -/
@@ -3285,13 +3292,16 @@ private def functions : FunctionModel checked.catalog ambient where
   extend := fun impossible _ _ _ => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by
@@ -3575,13 +3585,16 @@ private def functions : FunctionModel checked.catalog ambient where
   extend := fun impossible _ _ _ => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by
@@ -3960,13 +3973,16 @@ private theorem sourceFailure : Dynamic.FunctionStatementsExecuteOutcome program
       (by rintro ⟨key, value, impossible⟩; cases impossible)
 
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 
 private theorem failureContext_ne_full : context3 ≠ context4 := by
   intro same
@@ -4218,13 +4234,16 @@ private def functions : FunctionModel checked.catalog ambient where
   extend := fun impossible _ _ _ => False.elim impossible
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by

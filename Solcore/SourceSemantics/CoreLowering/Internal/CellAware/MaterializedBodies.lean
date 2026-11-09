@@ -121,6 +121,8 @@ theorem preserves {invocation : Staging.Recursive.Scope} {tail : Environment}
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions cells caller context result resultCore
         outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   obtain ⟨decoded, values, decodedPacking, decodedArity, nativeEq, represented, raw, frame⟩ :=
     arguments functions profile runtime heapTyped member calleeTyped packedTyped packedRelated
   have same : decoded = sources := decodedPacking.injective_of_length_eq packing (decodedArity.trans arity.symm)
@@ -156,6 +158,8 @@ theorem reflects {invocation : Staging.Recursive.Scope} {tail : Environment}
           before (.closure function) sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions cells caller context result resultCore
           outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   obtain ⟨sources, values, packing, arity, nativeEq, represented, raw, frame⟩ :=
     arguments functions profile runtime heapTyped member calleeTyped packedTyped packedRelated
   have resultEq := calleeTyped.closure_function_inv.2.1

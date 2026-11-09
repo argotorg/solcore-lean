@@ -583,7 +583,7 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -650,7 +650,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -708,7 +708,7 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
-  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
+  | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible

@@ -133,14 +133,17 @@ private theorem faithful : DataEquality.IdentityFaithful identities := ⟨fun im
 private theorem functionLeaves (ambient : AmbientDefinitions checked.catalog.definitions) : CompatibleEquality.FunctionObservations checked.catalog (functions ambient) identities := fun impossible => False.elim impossible
 private theorem functionTypes (ambient : AmbientDefinitions checked.catalog.definitions) : FunctionRuntimeViews (functions ambient) := fun impossible => False.elim impossible
 private def faults : FunctionCalls.FaultRep := fun reason token =>
-  (∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag) ∨
-  (reason = .invalidAssignmentOperands .equal ∧ token = Word.zero)
+  ((∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag) ∨
+   (reason = .invalidAssignmentOperands .equal ∧ token = Word.zero)) ∨
+  ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id) :=
-  fun _ location => .inl ⟨location, rfl, rfl⟩
+  fun _ location => .inl (.inl ⟨location, rfl, rfl⟩)
 private theorem missing : ∀ id key value tag, MetadataRep values.registry (.mapping key value) tag →
   faults (.missingMappingDefault value) ((reasonAt id).add tag) :=
-  fun _ key value tag owned => .inr (.inl ⟨key, value, tag, owned, rfl, rfl⟩)
+  fun _ key value tag owned => .inl (.inr (.inl ⟨key, value, tag, owned, rfl, rfl⟩))
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures, Context.withLocal]
@@ -2624,6 +2627,8 @@ theorem invoke_word {fixture : CompiledFixture} {observed : ObservedProgram fixt
     ∃ (sources : List Dynamic.Value) (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value (.word word)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -2688,6 +2693,8 @@ theorem invoke_success {fixture : CompiledFixture} {observed : ObservedProgram f
       (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -2759,6 +2766,8 @@ theorem RetainedState.relay_typed_handle
       ∃ after : RetainedState support call.completion.session (entries ++ [entry]),
         SourceCall support support.relayHeader.header invocation state.heap [.word word]
           (.value entry.source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.makeInput, support.relayInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -2886,6 +2895,8 @@ theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : Obser
         SourceCall support support.relayHeader.header
           (RecursiveStageRegistry.scope relayStages.sidecar [] support.relayHeader.header.function)
           ⟨[]⟩ [.word seed] (.value entry.source) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ :=
     fixture.actual_start first.opened first.started
@@ -3134,6 +3145,8 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap} {source : Dynamic.Value}
     (trace : SourceCall support support.relayHeader.header invocation ⟨[]⟩ [.word seed] (.value source) after) :
     InitialForwardAt support first source after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := fixture.actual_start first.opened first.started
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -3254,6 +3267,8 @@ theorem forward_relay {fixture : CompiledFixture} {observed : ObservedProgram fi
     (trace : SourceCall support support.relayHeader.header invocation state.heap
       [.word value] (.value source) after) :
     ForwardAt (entries := entries) support call source after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.identityInput, support.makeInput, support.relayInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -3487,14 +3502,17 @@ private theorem faithful : DataEquality.IdentityFaithful identities := ⟨fun im
 private theorem functionLeaves (ambient : AmbientDefinitions checked.catalog.definitions) : CompatibleEquality.FunctionObservations checked.catalog (functions ambient) identities := fun impossible => False.elim impossible
 private theorem functionTypes (ambient : AmbientDefinitions checked.catalog.definitions) : FunctionRuntimeViews (functions ambient) := fun impossible => False.elim impossible
 private def faults : FunctionCalls.FaultRep := fun reason token =>
-  (∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag) ∨
-  (reason = .invalidAssignmentOperands .equal ∧ token = Word.zero)
+  ((∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag) ∨
+   (reason = .invalidAssignmentOperands .equal ∧ token = Word.zero)) ∨
+  ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id) :=
-  fun _ location => .inl ⟨location, rfl, rfl⟩
+  fun _ location => .inl (.inl ⟨location, rfl, rfl⟩)
 private theorem missing : ∀ id key value tag, MetadataRep values.registry (.mapping key value) tag →
   faults (.missingMappingDefault value) ((reasonAt id).add tag) :=
-  fun _ key value tag owned => .inr (.inl ⟨key, value, tag, owned, rfl, rfl⟩)
+  fun _ key value tag owned => .inl (.inr (.inl ⟨key, value, tag, owned, rfl, rfl⟩))
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures, Context.withLocal]
@@ -3966,7 +3984,7 @@ variable {ambient : AmbientDefinitions checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedLexicalWhile.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .bool .bool (.returned (.bool true)) value ∧
@@ -3980,7 +3998,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations runtimeViews errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before statements finalContext outcome sourceHeap ∧
@@ -4284,7 +4302,7 @@ variable {ambient : AmbientDefinitions checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matchPolicy matchValues matchDefinitions matchAllocator expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedLexicalWhile.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .unit .unit (.fallthrough environment) value ∧
@@ -4298,7 +4316,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations runtimeViews errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include matchPolicy matchValues matchDefinitions matchAllocator expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before [site] finalContext outcome sourceHeap ∧
@@ -4406,7 +4424,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_preserves
+theorem actual_compiler_body_preserves [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -4446,7 +4464,7 @@ theorem actual_compiler_body_preserves
     errors environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem actual_compiler_body_reflects
+theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope
       function.body type reasonAt fellThrough escaped = .ok code)
     (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -4654,13 +4672,16 @@ private theorem faithful : DataEquality.IdentityFaithful identities := ⟨fun im
 private theorem functionLeaves (ambient : AmbientDefinitions checked.catalog.definitions) : CompatibleEquality.FunctionObservations checked.catalog (functions ambient) identities := fun impossible => False.elim impossible
 private theorem functionTypes (ambient : AmbientDefinitions checked.catalog.definitions) : FunctionRuntimeViews (functions ambient) := fun impossible => False.elim impossible
 private def faults : FunctionCalls.FaultRep := fun reason token =>
-  (∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)
+  ((∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)) ∨
+  ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id) :=
-  fun _ location => .inl ⟨location, rfl, rfl⟩
+  fun _ location => .inl (.inl ⟨location, rfl, rfl⟩)
 private theorem missing : ∀ id key value tag, MetadataRep values.registry (.mapping key value) tag →
   faults (.missingMappingDefault value) ((reasonAt id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures]
@@ -4945,13 +4966,16 @@ private theorem faithful : DataEquality.IdentityFaithful identities := ⟨fun im
 private theorem functionLeaves (ambient : AmbientDefinitions checked.catalog.definitions) : CompatibleEquality.FunctionObservations checked.catalog (functions ambient) identities := fun impossible => False.elim impossible
 private theorem functionTypes (ambient : AmbientDefinitions checked.catalog.definitions) : FunctionRuntimeViews (functions ambient) := fun impossible => False.elim impossible
 private def faults : FunctionCalls.FaultRep := fun reason token =>
-  (∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)
+  ((∃ location, reason = .uninitializedLocation location ∧ token = Word.zero) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ reason = .missingMappingDefault value ∧ token = Word.zero.add tag)) ∨
+  ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id) :=
-  fun _ location => .inl ⟨location, rfl, rfl⟩
+  fun _ location => .inl (.inl ⟨location, rfl, rfl⟩)
 private theorem missing : ∀ id key value tag, MetadataRep values.registry (.mapping key value) tag →
   faults (.missingMappingDefault value) ((reasonAt id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private theorem valid : CompatibleExpressionLiterals.ContextValid [] context [] := by
   refine ⟨rfl, ⟨?_, ?_⟩, ?_⟩
   · simp [RequirementIdsUnique, context, Context.ofSignatures]

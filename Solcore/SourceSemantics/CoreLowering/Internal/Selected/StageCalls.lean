@@ -321,7 +321,7 @@ include support globals selected semantic faithful observations assignmentInterp
 /-- The original named body starts at its genuine parameter entry. Completed
 bodies retain the exact Source context and heap; stage rejection retains the
 actual earlier prefix and skips the remaining effects. -/
-theorem lifts
+theorem lifts [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget → LiftsRootsAt
@@ -459,7 +459,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
     (fun reason token => faults (.semantic reason) token))
 
 include support profile certified extension selected semantic assignmentInterpretation in
-theorem lifts {budget : Nat}
+theorem lifts [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ size, size < budget →
       LiftsRootsAt
         (headers := headers) (keys := keys) model stages semanticFaults size)
@@ -516,10 +516,13 @@ theorem named_bodies {budget : Nat}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram)) (member : header ∈ headers)
     {child : Staging.Recursive.Scope} (selected : (stages compiled).Closure header.function child) :
     NamedLiftsBelow (headers := headers) (keys := keys) header model (stages compiled) child budget := by
-  exact SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
-    support.profile (support.certificates header member)
-    (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
-    (preserves_roots support issued extension)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled issued)
+    SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
+      support.profile (support.certificates header member)
+      (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
+      (preserves_roots support issued extension)
 
 private theorem named_descriptor (header : Header compiled (Program.ofChecked compiled.sourceProgram)) :
     Nonempty (SourceCoreCallableContracts.Descriptor compiled.indexed.ancestry.graph.inputs.callable.table
@@ -586,6 +589,10 @@ theorem indirect {budget : Nat}
     (children : ∀ size, size < budget → LiftsRootsAt (headers := headers) (keys := keys)
       model (stages compiled) semanticFaults size) :
     SelectedCompilationStageCallerHeadHandlers.Indirect bridge model (stages compiled) faults budget root.certificate := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled issued)
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
   intro fuel current id callee ids metadata code types compiler path sequence
   obtain ⟨port⟩ := root.callsReady compiler path
   have calleeCertified : RecursiveStageTupleMeaning.Entries current compiler.entries
@@ -1260,7 +1267,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
 
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
 /-- Actual parameter allocation supplies the entire Source body entry. -/
-theorem source_continuation
+theorem source_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)
@@ -1509,7 +1516,7 @@ variable (semantic : ∀ reason token, semanticFaults reason token → faults (.
     (fun reason token => faults (.semantic reason) token))
 
 include support certified selected keyPhysical beforeTyped argumentsTyped stable semantic faithful observations assignmentInterpretation in
-theorem source_continuation
+theorem source_continuation [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
     (budget : Nat)
@@ -1573,6 +1580,8 @@ include issued extension in
 theorem method {budget : Nat}
     (children : ∀ size, size < budget → LiftsRootsAt (headers := headers) (keys := keys) model (stages compiled) semanticFaults size) :
     SelectedCompilationStageCallerHeadHandlers.Method (callerBridge).forgetSlots model (stages compiled) faults budget root.certificate := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled issued)
   intro fuel current id code types compiler path sequence
   obtain ⟨⟨port, selection⟩⟩ := root.methodReady compiler path
   obtain ⟨packet, sourceAtEq, static⟩ := support.methods compiler port selection
@@ -1719,7 +1728,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include callerBridge receiver functions runtime unique
   observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
-private theorem preserves {budget rootScope rootId rootCode}
+private theorem preserves [FunctionCalls.FaultTokens semanticFaults] {budget rootScope rootId rootCode}
     (root : Certificate policy body compilation readFuel
       (.initial compiled.compatible.checked) invocation.source context reasonAt rootScope rootId rootCode)
     (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId))
@@ -1746,7 +1755,7 @@ include callerBridge receiver functions runtime unique
   observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Finite compiler structure supplies every ordered child lift. Call heads
 are indexed by their actual compiler receipt and path in this same tree. -/
-theorem laws (budget : Nat) {rootScope rootId rootCode}
+theorem laws [FunctionCalls.FaultTokens semanticFaults] (budget : Nat) {rootScope rootId rootCode}
     (root : Certificate policy body compilation readFuel
       (.initial compiled.compatible.checked) invocation.source context reasonAt rootScope rootId rootCode)
     (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
@@ -2157,7 +2166,7 @@ include callerBridge receiver functions runtime unique
   observations functionTypes indexObservations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Projection consumed by the ordinary-trace induction. All child laws are
 constructed by the finite certificate recursion above. -/
-theorem lifts_reached_with_functions (budget : Nat) {rootScope rootId rootCode}
+theorem lifts_reached_with_functions [FunctionCalls.FaultTokens semanticFaults] (budget : Nat) {rootScope rootId rootCode}
     (root : Certificate policy body compilation readFuel
       (.initial compiled.compatible.checked) invocation.source context reasonAt rootScope rootId rootCode)
     (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId))
@@ -2212,6 +2221,8 @@ theorem lifts (budget : Nat)
     LiftsAt (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys)
       compilation.administrativePrefix).forgetSlots context model (stages compiled) invocation
       (CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point scope expression lowered) budget := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
   let callerBridge := CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner compilation.administrativePrefix keyPhysical.locations
   intro current id code point
   exact SelectedCompilationStageSharedCallerLifting.lifts_reached_with_functions
@@ -2698,10 +2709,13 @@ private theorem named_bodies {budget : Nat}
     (header : Header compiled (Program.ofChecked compiled.sourceProgram)) (member : header ∈ headers)
     {child : Staging.Recursive.Scope} (selected : (stages compiled).Closure header.function child) :
     NamedLiftsBelow (headers := headers) (keys := keys) header model (stages compiled) child budget := by
-  exact SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
-    support.profile (support.certificates header member)
-    (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
-    (preserves_roots support issued extension)
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled issued)
+    SelectedCompilationStageNamedBodyLifting.lifts (assignmentInterpretation := SelectedCompilationPhysicalProgramSupport.assignment_interpretation (compiled := compiled) issued) (semantic := SelectedCompilationPhysicalProgramSupport.semantic_extension support issued extension) (support.bodySupport header member)
+      support.profile (support.certificates header member)
+      (SelectedCompilationPhysicalProgramSupport.static_extension support extension) selected children
+      (preserves_roots support issued extension)
 
 private theorem named_descriptor (header : Header compiled (Program.ofChecked compiled.sourceProgram)) :
     Nonempty (SourceCoreCallableContracts.Descriptor compiled.indexed.ancestry.graph.inputs.callable.table

@@ -112,7 +112,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -164,7 +164,7 @@ theorem preserves_with_literals_and_post
       ScalarExpressionFaultPostContracts.tuple_outcome ordinaryJoins metadata form sourceTrace packed retained⟩
     simpa only [sourceType] using payload
 
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -216,7 +216,7 @@ theorem reflects_with_literals_and_post
 include extension unique uninitialized in
 /-- Every independent completed source execution is preserved for the entire
 certified tree. There is no external child semantic hypothesis. -/
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -235,7 +235,7 @@ theorem preserves_with_literals
           exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension valid unique uninitialized in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -246,7 +246,7 @@ theorem preserves :
 include extension uninitialized in
 /-- Every native completion reconstructs the independent source execution of
 the whole tree, including a fault after an effectful successful left prefix. -/
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -265,7 +265,7 @@ theorem reflects_with_literals
           exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension valid uninitialized in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -408,6 +408,9 @@ inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty �
       BinaryProfile operator .word (scalarSource (SourceCorePrimitive.binaryResultType operator)) .word
   | integer {operator} (strict : Dynamic.IntegerStrictBinaryOperator operator) :
       BinaryProfile operator .integer (scalarSource (SourceCoreInteger.binaryResultType operator)) .integer
+  /-- Unchecked `/` and `%` on Words, which panic on a zero divisor. -/
+  | panicking {operator} (panicking : Dynamic.PanickingBinaryOperator operator) :
+      BinaryProfile operator .word .word .word
   | logicalAnd : BinaryProfile .logicalAnd .bool .bool .word
   | logicalOr : BinaryProfile .logicalOr .bool .bool .word
 
@@ -418,7 +421,8 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   | wordArithmetic kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordComparison kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordShift kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
-  | wordUnchecked kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
+  | wordUnchecked kind =>
+    cases kind <;> first | exact ⟨_, .word (by constructor)⟩ | exact ⟨_, .panicking (by constructor)⟩
   | integerArithmetic kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | integerComparison kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | booleanAnd => exact ⟨_, .logicalAnd⟩
@@ -757,8 +761,34 @@ theorem binary_fault_excluded {operator : Syntax.BinaryOp} {left right output : 
     (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) : False := by
   cases fault with
   | primitive invalid => exact invalid.excludes_application ⟨output, applied⟩
+  | panic panics => exact panics.excludes_application applied
   | requirement failed => cases failed
   | method _ selected _ => cases selected
+
+/-- A fault of an operation that panics is that panic. -/
+theorem binary_fault_panic {operator : Syntax.BinaryOp} {left right : Dynamic.Value} {code : UInt8}
+    {reason : Dynamic.SemanticFault}
+    (panics : Dynamic.BinaryPrimitivePanics operator left right code)
+    (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) :
+    reason = .panic code ∧ after = before := by
+  cases fault with
+  | primitive invalid => exact (invalid.excludes_panic panics).elim
+  | panic other => exact ⟨by rw [panics.functional other], rfl⟩
+  | requirement failed => cases failed
+  | method _ selected _ => cases selected
+
+/-- A primitive panic of a binary node, as its source fault. -/
+theorem binary_panic_fault {operator : Syntax.BinaryOp} {left right : ExpressionId}
+    (metadata : Metadata checked source id node type) (form : node.form = .binary left operator right)
+    {a b : Dynamic.Value} {middle operated : Dynamic.Heap} {code : UInt8}
+    (first : Dynamic.ExpressionEvaluates program context evidence source environment before left a middle)
+    (continues : Dynamic.EvaluatesRightOperand operator a)
+    (second : Dynamic.ExpressionEvaluates program context evidence source environment middle right b operated)
+    (panics : Dynamic.BinaryPrimitivePanics operator a b code) :
+    Dynamic.ExpressionFaults program context evidence source environment before id (.panic code) operated := by
+  apply Dynamic.ExpressionFaults.form (lookupExpression?_sound metadata.found)
+  rw [form, metadata.requirements, metadata.coercions]
+  exact .binaryApply (owned := []) rfl first continues second (.panic panics)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitives
 end
@@ -1266,25 +1296,32 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitives
 open Core Frontend SourceInference GeneralHeap CompatiblePayload
 
+/-- The step after both operands: the body, or for unchecked `/` and `%` on
+Words, the divisor check before it. -/
+def Mode.continuation (mode : Mode) (operator : Syntax.BinaryOp) : Expr :=
+  match mode, operator with
+  | .word, .uncheckedDivide | .word, .uncheckedModulo => SourceCorePrimitive.panickingBody operator
+  | _, _ => LanguageResult.success (mode.body operator)
+
 def Mode.tail (mode : Mode) (operator : Syntax.BinaryOp) (right : Expr) : Expr :=
   match operator with
   | .logicalAnd => .ifE (.var 0) (right.weakenAt 0) (LanguageResult.success (.bool false))
   | .logicalOr => .ifE (.var 0) (LanguageResult.success (.bool true)) (right.weakenAt 0)
-  | _ => LanguageResult.bind (mode.resultType operator) (right.weakenAt 0)
-      (LanguageResult.success (mode.body operator))
+  | _ => LanguageResult.bind (mode.resultType operator) (right.weakenAt 0) (mode.continuation operator)
 
 theorem Mode.binary_eq (mode : Mode) (operator : Syntax.BinaryOp) (left right : Expr) :
     mode.binary operator left right = .caseE left
       (.inLeft (mode.resultType operator) (.var 0)) (mode.tail operator right) := by
-  cases mode <;> cases operator <;> simp [Mode.binary, Mode.tail, Mode.resultType, Mode.body, SourceCorePrimitive.binaryResultType, SourceCoreInteger.binaryResultType, SourceCorePrimitive.binary, SourceCoreInteger.binary, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr, LocalPrimitiveResults.binaryWith, LocalControl.choose, LanguageResult.bind, LanguageResult.success, Expr.weakenAt]
+  cases mode <;> cases operator <;> simp [Mode.binary, Mode.tail, Mode.continuation, Mode.resultType, Mode.body, SourceCorePrimitive.binaryResultType, SourceCoreInteger.binaryResultType, SourceCorePrimitive.binary, SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr, LocalPrimitiveResults.binaryWith, LocalControl.choose, LanguageResult.bind, LanguageResult.success, Expr.weakenAt]
 
 theorem Mode.binary_rename (mode : Mode) (operator : Syntax.BinaryOp) (left right : Expr) (ξ : Renaming) :
     (mode.binary operator left right).rename ξ = mode.binary operator (left.rename ξ) (right.rename ξ) := by
   cases mode <;> cases operator <;>
-    simp [Mode.binary, SourceCorePrimitive.binary, SourceCoreInteger.binary,
+    simp [Mode.binary, SourceCorePrimitive.binary, SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary,
       LocalPrimitiveResults.binaryWith, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr,
-      LocalControl.choose, LanguageResult.bind, LanguageResult.success, Expr.rename,
-      Expr.weakenAt, SourceCorePrimitive.strictBinaryBody, SourceCoreInteger.strictBinaryBody, Renaming.lift]
+      LocalControl.choose, LanguageResult.bind, LanguageResult.success, LanguageResult.failure, Expr.rename,
+      Expr.weakenAt, SourceCorePrimitive.strictBinaryBody, SourceCorePrimitive.panickingBody,
+      SourceCoreInteger.strictBinaryBody, Renaming.lift]
 
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
@@ -1298,6 +1335,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
   cases profile with
   | word strict => exact .inr (.strict strict)
   | integer strict => exact .inr (.strict strict.toStrict)
+  | panicking panicking => exact .inr (.panicking panicking)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -1316,6 +1354,7 @@ theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand resul
   cases profile with
   | word strict => cases invalid <;> cases strict
   | integer strict => cases invalid <;> cases strict
+  | panicking panicking => cases invalid <;> cases panicking
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases invalid with | logicalAnd invalid => exact invalid trivial
@@ -1331,6 +1370,7 @@ theorem Mode.left_failure {environment : Environment} {before after : Store} {le
     | exact LocalPrimitiveResults.logicalAnd_failure evaluated
     | exact LocalPrimitiveResults.logicalOr_failure evaluated
     | exact LocalPrimitiveResults.binaryWith_left_failure evaluated
+    | exact SourceCorePrimitive.binaryPanicking_left_failure evaluated
 
 theorem BinaryProfile.short {environment : Environment} {before after : Store} {left right : Expr} {output : Dynamic.Value}
     (profile : BinaryProfile operator operand result mode)
@@ -1342,6 +1382,7 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
   cases profile with
   | word strict => cases circuit <;> cases strict
   | integer strict => cases circuit <;> cases strict
+  | panicking panicking => cases circuit <;> cases panicking
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -1362,29 +1403,53 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
   cases profile with
   | word strict => rw [Mode.binary_strict _ strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | integer strict => rw [Mode.binary_strict _ strict.toStrict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | panicking panicking =>
+    cases panicking <;> exact SourceCorePrimitive.binaryPanicking_right_failure first second
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue => exact LocalPrimitiveResults.logicalAnd_right first second
   | logicalOr =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse => exact LocalPrimitiveResults.logicalOr_right first second
 
-theorem BinaryProfile.right_success {environment : Environment} {before middle after : Store} {left right : Expr}
+/-- After both operands, the operation either applies or, for unchecked `/`
+and `%` with a zero divisor, panics. -/
+theorem BinaryProfile.right_outcome {environment : Environment} {before middle after : Store} {left right : Expr}
     (profile : BinaryProfile operator operand result mode)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after) :
-    ∃ sourceResult coreResult, Dynamic.BinaryPrimitiveApplies operator a b sourceResult ∧
+    (∃ sourceResult coreResult, Dynamic.BinaryPrimitiveApplies operator a b sourceResult ∧
       ValueRep checked registry functions mapping world result sourceResult coreResult (mode.resultType operator) ∧
-      Evaluates environment before (mode.binary operator left right) (.inRight .word coreResult) after := by
+      Evaluates environment before (mode.binary operator left right) (.inRight .word coreResult) after) ∨
+    (∃ code, Dynamic.BinaryPrimitivePanics operator a b code ∧
+      Evaluates environment before (mode.binary operator left right)
+        (.inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code))) after) := by
   cases profile with
+  | panicking panicking =>
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by cases panicking <;> exact leftRep)
+    obtain ⟨b, rfl, rfl⟩ := word_fields (by cases panicking <;> exact rightRep)
+    cases panicking with
+    | uncheckedDivide =>
+      by_cases zero : b = Word.zero
+      · subst zero
+        exact .inr ⟨_, .wordUncheckedDivide a, SourceCorePrimitive.binaryPanicking_panic first second⟩
+      · exact .inl ⟨_, _, .wordUncheckedDivide a b zero, .word _,
+          SourceCorePrimitive.binaryPanicking_success first second zero fun _ => .binary (.var rfl) (.var rfl) rfl⟩
+    | uncheckedModulo =>
+      by_cases zero : b = Word.zero
+      · subst zero
+        exact .inr ⟨_, .wordUncheckedModulo a, SourceCorePrimitive.binaryPanicking_panic first second⟩
+      · exact .inl ⟨_, _, .wordUncheckedModulo a b zero, .word _,
+          SourceCorePrimitive.binaryPanicking_success first second zero fun _ => .binary (.var rfl) (.var rfl) rfl⟩
   | word strict =>
+    refine .inl ?_
     have operandEq := PrimitiveExpressions.strict_operand_word strict
     obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
     obtain ⟨b, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
@@ -1394,6 +1459,7 @@ theorem BinaryProfile.right_success {environment : Environment} {before middle a
       rw [Mode.binary_strict _ strict]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
   | integer strict =>
+    refine .inl ?_
     have operandEq : SourceCoreInteger.binaryOperandType operator = .integer := by cases strict <;> rfl
     obtain ⟨a, rfl, rfl⟩ := integer_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
     obtain ⟨b, rfl, rfl⟩ := integer_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
@@ -1403,17 +1469,52 @@ theorem BinaryProfile.right_success {environment : Environment} {before middle a
       rw [Mode.binary_strict _ strict.toStrict]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
   | logicalAnd =>
+    refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep
     obtain ⟨b, rfl, rfl⟩ := bool_fields rightRep
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue => exact ⟨_, _, .logicalAnd true b, .bool b, LocalPrimitiveResults.logicalAnd_right first second⟩
   | logicalOr =>
+    refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep
     obtain ⟨b, rfl, rfl⟩ := bool_fields rightRep
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse => exact ⟨_, _, .logicalOr false b, .bool b, LocalPrimitiveResults.logicalOr_right first second⟩
+
+/-- An operation that the source applies also completes in Core. -/
+theorem BinaryProfile.right_success {environment : Environment} {before middle after : Store} {left right : Expr}
+    {output : Dynamic.Value}
+    (profile : BinaryProfile operator operand result mode)
+    (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (continues : Dynamic.EvaluatesRightOperand operator a)
+    (first : Evaluates environment before left (.inRight .word x) middle)
+    (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
+    (applies : Dynamic.BinaryPrimitiveApplies operator a b output) :
+    ∃ sourceResult coreResult, Dynamic.BinaryPrimitiveApplies operator a b sourceResult ∧
+      ValueRep checked registry functions mapping world result sourceResult coreResult (mode.resultType operator) ∧
+      Evaluates environment before (mode.binary operator left right) (.inRight .word coreResult) after := by
+  rcases profile.right_outcome leftRep rightRep continues first second with success | ⟨_, panics, _⟩
+  · exact success
+  · exact (panics.excludes_application applies).elim
+
+/-- A source panic is the same Core panic. -/
+theorem BinaryProfile.right_panic {environment : Environment} {before middle after : Store} {left right : Expr}
+    {code : UInt8}
+    (profile : BinaryProfile operator operand result mode)
+    (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (continues : Dynamic.EvaluatesRightOperand operator a)
+    (first : Evaluates environment before left (.inRight .word x) middle)
+    (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
+    (panics : Dynamic.BinaryPrimitivePanics operator a b code) :
+    Evaluates environment before (mode.binary operator left right)
+      (.inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code))) after := by
+  rcases profile.right_outcome leftRep rightRep continues first second with ⟨_, _, applies, _⟩ | ⟨other, panicked, ran⟩
+  · exact (panics.excludes_application applies).elim
+  · rwa [panics.functional panicked]
 
 
 /-- In a branch selected by the independent left-value rule, native completion
@@ -1427,10 +1528,11 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   cases profile with
   | word strict => cases strict <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | integer strict => cases strict <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | panicking panicking => cases panicking <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue =>
       cases evaluated with
       | ifTrue condition right =>
@@ -1442,7 +1544,7 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   | logicalOr =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse =>
       cases evaluated with
       | ifFalse condition right =>
@@ -1578,7 +1680,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -1723,19 +1825,20 @@ theorem preserves_with_literals_and_post
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ :=
+            profile.right_success leftPayload rightPayload continues first second applied
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
             .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
             firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
     | invalid firstTrace continues secondTrace failed =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata, _⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _⟩ :=
         leftIH leftFound environments heaps locals agrees (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, _, _, _, second, represented, _, maps, worlds, _⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, _⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue) (.value secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
@@ -1743,11 +1846,18 @@ theorem preserves_with_literals_and_post
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨_, _, applied, _, _⟩ := profile.right_success leftPayload rightPayload continues first second
-          exact False.elim (binary_fault_excluded applied failed)
+          rcases profile.right_outcome leftPayload rightPayload continues first second with
+            ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
+          · exact False.elim (binary_fault_excluded applied failed)
+          · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
+            exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
+              .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+              firstFrame.trans frame, firstMetadata.trans heapMetadata,
+              ExpressionFailurePostContracts.OutcomePost.panic ordinaryJoins
+                (binary_panic_fault metadata form firstTrace continues secondTrace panics)⟩
 
 
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -1878,18 +1988,27 @@ theorem reflects_with_literals_and_post
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              obtain ⟨sourceResult, result, applied, resultRep, combined⟩ :=
-                profile.right_success leftPayload rightPayload continues leftEvaluation rightEvaluation
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
-              cases trace with
-              | value secondTrace =>
-                exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
-                  .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation with
+                ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
+                    .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld,
+                    binary_intro metadata form (.invalid firstTrace continues secondTrace (.panic panics)),
+                    .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata,
+                    ExpressionFailurePostContracts.OutcomePost.panic ordinaryJoins
+                      (binary_panic_fault metadata form firstTrace continues secondTrace panics)⟩
 
 
 include extension unique uninitialized in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1908,7 +2027,7 @@ theorem preserves_with_literals
           exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension valid unique uninitialized in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -1917,7 +2036,7 @@ theorem preserves :
 
 
 include extension uninitialized in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1936,7 +2055,7 @@ theorem reflects_with_literals
           exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension valid uninitialized in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree

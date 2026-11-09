@@ -1590,7 +1590,7 @@ variable {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets member in
 /-- The original named preservation producer is invoked once with child
 meaning derived from the shared E induction at this selected packet. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressions : CallableIndexedOwnedPreparedEligiblePairedExpressionFamilies.ExpressionsPreserves
       (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
     RecursiveNamedHeaderContracts.AtMost budget
@@ -1602,7 +1602,7 @@ theorem preserves_flow (budget : Nat)
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets member in
 /-- Reflection invokes the same original producer once, retaining its strict
 native budget and independent Source grade. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (expressions : CallableIndexedOwnedPreparedEligiblePairedExpressionFamilies.ExpressionsReflects
       (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions budget) :
     Below budget
@@ -1871,7 +1871,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 include faithful observations wellFormed receiving in
 /-- Paired E through n constructs the same selected closure F through n. -/
-theorem preserves_at_most (budget : Nat)
+theorem preserves_at_most [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressions : ExpressionsPreserves (headers := headers) (keys := keys)
       (registry := registry) (faults := faults) functions budget) :
     ∀ {mapping world function native bindings parameter result}
@@ -1886,7 +1886,7 @@ theorem preserves_at_most (budget : Nat)
 
 include faithful observations wellFormed receiving in
 /-- The dispatcher receives only strict F from smaller shared E budgets. -/
-theorem preserves_below (budget : Nat)
+theorem preserves_below [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressions : ∀ child, child < budget → ExpressionsPreserves
       (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions child) :
     ClosurePreservesBelow (qualification := facet headers) (headers := headers)
@@ -1898,7 +1898,7 @@ theorem preserves_below (budget : Nat)
 
 include faithful observations wellFormed receiving in
 /-- Strict native E constructs strict F with its own recovered Source grade. -/
-theorem reflects_below (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_below [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (expressions : ExpressionsReflects (headers := headers) (keys := keys)
       (registry := registry) (faults := faults) functions budget) :
     ClosureReflectsBelow (qualification := facet headers) (headers := headers)

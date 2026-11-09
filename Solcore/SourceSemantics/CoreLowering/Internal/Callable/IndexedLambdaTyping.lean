@@ -1987,7 +1987,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 include definitions registered extension contextValid unique uninitialized missing faithful functionLeaves functionTypes in
 /-- Finite source body execution completes the actual parameter prefix. The
 source allocation is the one retained by the constructed entry. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     (entry : CallableIndexedLambdaPrefix.Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : BuiltinNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -2014,7 +2014,7 @@ theorem preserves
 include definitions registered extension contextValid unique uninitialized missing faithful functionLeaves functionTypes in
 /-- Completed native prefix execution constructs the independent source trace
 at the installed call context, without a universal body reflection premise. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (entry : CallableIndexedLambdaPrefix.Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body)
     (certificate : BuiltinNamedBody.Certificate layouts owner active layout globals onError readFuel values function.source context solved reasonAt
@@ -2347,7 +2347,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include extension uninitialized missing in
-theorem Entry.preserves
+theorem Entry.preserves [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {copies environment : Dynamic.Environment} {copied bound after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
@@ -2380,7 +2380,7 @@ theorem Entry.preserves
   exact ⟨result, _, finalMap, finalWorld, callEval, related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include extension uninitialized missing in
-theorem Entry.reflects
+theorem Entry.reflects [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -2424,7 +2424,7 @@ theorem Entry.reflects
       related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
       store applyPayload result finalStore) :
@@ -2442,7 +2442,7 @@ theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dyn
   exact ⟨outcome, after, finalMap, finalWorld, trace.call body.frame body.extended copy allocated, rest⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem preserves [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,

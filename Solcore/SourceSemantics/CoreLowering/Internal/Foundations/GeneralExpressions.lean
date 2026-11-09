@@ -722,6 +722,9 @@ private theorem binary_readOnly {left right : Core.Expr} (operator : Syntax.Bina
     | exact choose_readOnly _ leftRestricted (.inRight .bool) rightRestricted
     | exact bind_readOnly _ leftRestricted
         (bind_readOnly _ (rightRestricted.weakenAt 0) (success_readOnly (strictBody_readOnly _)))
+    | exact bind_readOnly _ leftRestricted
+        (bind_readOnly _ (rightRestricted.weakenAt 0)
+          (.ifE (.binary .var .word) (.inLeft .word) (success_readOnly (strictBody_readOnly _))))
 
 theorem readOnly {compilation : SourceCorePrimitive.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
     {reasonAt : ExpressionId → Core.Word} {id : ExpressionId} {type : Core.Ty} {code : Core.Expr} {depth : Nat}
@@ -730,7 +733,7 @@ theorem readOnly {compilation : SourceCorePrimitive.Context} {source : TypedSour
   | control tree => exact Control.readOnly tree
   | integerLiteral => exact .inRight .word
   | unary _ _ _ _ operand => exact bind_readOnly _ operand (.inRight (.unary .var))
-  | binary operator _ _ _ _ left right => exact binary_readOnly operator left right
+  | binary operator _ _ _ _ _ left right => exact binary_readOnly operator left right
   | group _ _ _ ih => exact ih
   | pair _ _ _ _ left right => exact pair_readOnly _ _ left right
   | conditional _ _ _ _ _ condition thenBranch elseBranch => exact choose_readOnly _ condition thenBranch elseBranch
@@ -837,7 +840,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
               · rw [form, metadata.requirements, metadata.coercions]
                 exact .unary (owned := []) rfl sourceEvaluation (.primitive sourceApplied)
               · rw [metadata.coercions]; exact .nil
-  | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form
+  | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form total
       leftTree rightTree leftIH rightIH =>
       obtain ⟨leftOutcome, leftValue, leftSource, leftRelated, leftCore⟩ := leftIH
       cases leftRelated with
@@ -868,7 +871,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
                           .value result resultTyped, ?_⟩
                         rw [binary_strict strict]
                         exact Core.LocalPrimitiveResults.binaryWith_success leftCore shifted (bodyEvaluation _ _)
-              · rcases binary_nonstrict strict with isAnd | isOr
+              · rcases binary_nonstrict strict total with isAnd | isOr
                 · subst operator
                   obtain ⟨leftBoolean, rfl⟩ := bool_of_type leftValue leftTyped
                   cases leftBoolean with

@@ -215,6 +215,10 @@ theorem composition_joins (checked : SourceCoreCompatibleCatalog.Checked)
     intro environment before id ids reason after token mapping world store link _failed post
     obtain ⟨origin, path, native, associated⟩ := post
     exact ⟨origin, .expressions link path, native, associated⟩
+  panic := by
+    intro environment before id code after mapping world store failed
+    exact ⟨.panic ⟨program, context, evidence, source, environment, before, after, id, code, failed⟩,
+      .prior (.prior (.panic _)), trivial, trivial⟩
 
 theorem constructor_joins (values : SourceCoreCompatibleValues.Context)
     {ambient : AmbientDefinitions values.checked.catalog.definitions}
@@ -448,6 +452,10 @@ theorem composition_joins (checked : SourceCoreCompatibleCatalog.Checked)
     intro environment before id ids reason after token mapping world store link _failed post
     obtain ⟨origin, path, native, associated⟩ := post
     exact ⟨origin, .expressions link path, native, associated⟩
+  panic := by
+    intro environment before id code after mapping world store failed
+    exact ⟨.panic ⟨program, context, evidence, source, environment, before, after, id, code, failed⟩,
+      .prior (.prior (.prior (.panic _))), trivial, trivial⟩
 
 theorem constructor_joins (values : SourceCoreCompatibleValues.Context)
     {ambient : AmbientDefinitions values.checked.catalog.definitions}
@@ -729,7 +737,7 @@ theorem read_reflects
     finalHeaps, maps, worlds, frame, metadata, ReachedScalarExpressionFaultPaths.prior_outcomePost retained⟩
 
 include extension in
-theorem members_preserves
+theorem members_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (policies : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source) :
@@ -746,7 +754,7 @@ theorem members_preserves
     (read_preserves functions extension program evidence policies unique) ⟨tree, tree.literalSites⟩
 
 include extension in
-theorem members_reflects
+theorem members_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (policies : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source) :
@@ -779,7 +787,7 @@ theorem scalar_terminal
     worlds, frame, functional, trace, ReachedScalarExpressionFaultPaths.prior_outcomePost retained⟩
 
 include extension in
-theorem scalar_preserves
+theorem scalar_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)
@@ -796,7 +804,7 @@ theorem scalar_preserves
     (ReachedScalarExpressionFaultPaths.index_joins values functions registry program context evidence source)
 
 include extension in
-theorem scalar_reflects
+theorem scalar_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)
@@ -832,7 +840,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
   (program : Program) (evidence : Dynamic.EvidenceEnvironment) {faults : FunctionCalls.FaultRep}
 
 include extension in
-theorem recursive_preserves
+theorem recursive_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (policies : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source) :
@@ -850,7 +858,7 @@ theorem recursive_preserves
     ⟨tree, tree.literalSites⟩
 
 include extension in
-theorem recursive_reflects
+theorem recursive_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (policies : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source) :
@@ -947,7 +955,7 @@ theorem general_terminal
     worlds, frame, functional, trace, ReachedScalarExpressionFaultPaths.prior_outcomePost retained⟩
 
 include extension faithful functionLeaves functionTypes in
-theorem general_preserves
+theorem general_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)
@@ -970,7 +978,7 @@ theorem general_preserves
     ⟨tree, tree.literalSites⟩
 
 include extension faithful functionLeaves functionTypes in
-theorem general_reflects
+theorem general_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)
@@ -1065,7 +1073,7 @@ theorem general_terminal
     worlds, frame, functional, trace, ReachedBuiltinExpressionFaultPaths.prior_outcomePost retained⟩
 
 include extension faithful functionLeaves functionTypes in
-theorem builtin_preserves
+theorem builtin_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)
@@ -1089,7 +1097,7 @@ theorem builtin_preserves
     ⟨tree, tree.literalSites⟩
 
 include extension faithful functionLeaves functionTypes in
-theorem builtin_reflects
+theorem builtin_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (reads : ReachedLoweredReadOutcomePorts.ReadPolicies fuel values source context reasonAt faults)
     (unique : NodeOccurrencesUnique source)

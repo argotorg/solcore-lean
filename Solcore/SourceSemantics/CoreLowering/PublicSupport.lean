@@ -611,11 +611,14 @@ theorem preserves_bodies (header) (member : header ∈ headers)
       (headers := headers) (keys := keys) header
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving.result.context.registry (functions support))
       (stages compiled) child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
-  exact SelectedCompilationPhysicalMixedNamedFamilyPorts.preserves_with_methods
-    issued (stagePrepared compiled) support.profile support.bodyTyping support.certificates (observations support)
-    (static_extension support extension) (semantic_extension support issued extension)
-    support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
-    header member selected budget
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
+    SelectedCompilationPhysicalMixedNamedFamilyPorts.preserves_with_methods
+      issued (stagePrepared compiled) support.profile support.bodyTyping support.certificates (observations support)
+      (static_extension support extension) (semantic_extension support issued extension)
+      support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
+      header member selected budget
 
 include support issued extension in
 theorem reflects_bodies (header) (member : header ∈ headers)
@@ -624,11 +627,14 @@ theorem reflects_bodies (header) (member : header ∈ headers)
       (headers := headers) (keys := keys) header
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving.result.context.registry (functions support))
       (stages compiled) child (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) budget := by
-  exact SelectedCompilationPhysicalMixedNamedFamilyPorts.reflects_with_methods
-    issued (stagePrepared compiled) support.profile support.bodyTyping support.certificates (observations support)
-    (static_extension support extension) (semantic_extension support issued extension)
-    support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
-    rfl header member selected budget
+  exact
+    haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
+    SelectedCompilationPhysicalMixedNamedFamilyPorts.reflects_with_methods
+      issued (stagePrepared compiled) support.profile support.bodyTyping support.certificates (observations support)
+      (static_extension support extension) (semantic_extension support issued extension)
+      support.bodies support.bodySupport support.closurePackets support.closureSupport support.owners support.methods
+      rfl header member selected budget
 
 include issued in
 /-- The actual issued receiver interprets each retained assignment origin. -/

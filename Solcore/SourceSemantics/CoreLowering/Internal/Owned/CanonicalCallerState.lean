@@ -2362,7 +2362,7 @@ theorem reflects_with_globals {callerPrefix size}
 
 include extension faithful functionLeaves functionTypes unique missing in
 /-- Compositional heads consume the actual ordered child states. -/
-theorem head_preserves_at_with_calls
+theorem head_preserves_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (callerPrefix budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → ProtectedStateTransition.PreservesAt
@@ -2384,7 +2384,7 @@ theorem head_preserves_at_with_calls
 
 include extension faithful functionLeaves functionTypes missing in
 /-- Reflection uses the same actual child posts at their native grades. -/
-theorem head_reflects_at_with_calls
+theorem head_reflects_at_with_calls [FunctionCalls.FaultTokens faults]
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (callerPrefix budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → ProtectedStateTransition.ReflectsAt
@@ -2418,7 +2418,7 @@ variable
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing sameLayouts authorized in
 /-- The unchanged static Tree fold closes every expression child. Actual call
 bodies remain only at genuine strict Source child grades. -/
-theorem preserves_at_with_literals
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults]
     (idsUnique : RequirementIdsUnique context)
     (literalMeaning : GenericExpressionMeaning.Preserves
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -2467,7 +2467,7 @@ theorem preserves_at_with_literals
 include extension faithful functionLeaves functionTypes uninitialized missing sameLayouts authorized in
 /-- Core children and named hook bodies supply their independent strict grades;
 the existing fold returns the separately measured Source trace and real pool. -/
-theorem reflects_at_with_literals
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source literals faults)
@@ -2514,7 +2514,7 @@ theorem reflects_at_with_literals
 
 include extension faithful functionLeaves functionTypes valid unique owners uninitialized missing sameLayouts authorized in
 /-- The original compiler Tree supplies its complete literal receipts. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (idsUnique : RequirementIdsUnique context)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -2539,7 +2539,7 @@ theorem preserves_at
 
 include extension faithful functionLeaves functionTypes valid uninitialized missing sameLayouts authorized in
 /-- The original compiler Tree supplies its complete literal receipts. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
@@ -2563,7 +2563,7 @@ theorem reflects_at
 
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing sameLayouts authorized in
 /-- Genuine runtime ledger receipts supply every literal leaf of the same Tree. -/
-theorem preserves_at_runtime
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -2589,7 +2589,7 @@ theorem preserves_at_runtime
 
 include extension faithful functionLeaves functionTypes uninitialized missing sameLayouts authorized in
 /-- Genuine runtime ledger receipts supply every literal leaf of the same Tree. -/
-theorem reflects_at_runtime
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults]
     (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     (budget size : Nat) (within : size ≤ budget)
@@ -2741,7 +2741,7 @@ private theorem acquire {header : CallableIndexedOwnedFunctionValues.Header comp
 include extension faithful observations sameLayouts escaped profileProvider in
 /-- The shared actual body fold closes callee meanings internally. Original
 parameter globals authorize the canonical proof wrapper at each callee input. -/
-theorem preserves_at_with_family
+theorem preserves_at_with_family [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ header, header ∈ headers → ∀ context,
       RecursiveNamedCatalogMutualMeaning.ContextFor runtime header.solved context header.function.evidence →
       ∀ budget child, child ≤ budget →
@@ -2784,7 +2784,7 @@ theorem preserves_at_with_family
 include extension faithful observations sameLayouts escaped profileProvider functionTypes in
 /-- The shared actual body fold closes callee meanings internally. Original
 parameter globals authorize the canonical proof wrapper at each callee input. -/
-theorem reflects_at_with_family
+theorem reflects_at_with_family [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ header, header ∈ headers → ∀ context,
       RecursiveNamedCatalogMutualMeaning.ContextFor runtime header.solved context header.function.evidence →
       ∀ budget child, child ≤ budget →
@@ -2869,7 +2869,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} {evidence : 
 include extension faithful observations functionTypes unique owners uninitialized missing sameLayouts in
 /-- Ordinary static call heads are included pointwise in the full evidence
 head. The original Tree fold receives actual children and callee witnesses. -/
-private theorem ordinary_preserves
+private theorem ordinary_preserves [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -2935,7 +2935,7 @@ private theorem ordinary_preserves
 include extension faithful observations functionTypes uninitialized missing sameLayouts in
 /-- Native ordinary heads use the same full evidence adapter pointwise, with
 independently measured Source children and the exact reached actual pool. -/
-private theorem ordinary_reflects
+private theorem ordinary_reflects [FunctionCalls.FaultTokens faults]
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -2999,7 +2999,7 @@ private theorem ordinary_reflects
   exact meaning ⟨tree, tree.literalSites⟩
 
 include extension faithful observations functionTypes unique owners uninitialized missing sameLayouts in
-private theorem expressions_preserve (runtime : Bool)
+private theorem expressions_preserve [FunctionCalls.FaultTokens faults] (runtime : Bool)
     (valid : RecursiveNamedCatalogMutualMeaning.ContextFor runtime solved context evidence)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -3024,7 +3024,7 @@ private theorem expressions_preserve (runtime : Bool)
       valid.ledger valid.runtime budget size within bodies
 
 include extension faithful observations functionTypes uninitialized missing sameLayouts in
-private theorem expressions_reflect (runtime : Bool)
+private theorem expressions_reflect [FunctionCalls.FaultTokens faults] (runtime : Bool)
     (valid : RecursiveNamedCatalogMutualMeaning.ContextFor runtime solved context evidence)
     (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
@@ -3078,7 +3078,7 @@ variable (runtime : Bool)
 include extension faithful observations functionTypes sameLayouts owners uninitialized missing escaped prefixMatches profiles in
 /-- Authentic static profiles and actual parameter entries close all named
 callee bodies through the existing measured mutual family. -/
-theorem preserves_at (size : Nat) : ∀ header, header ∈ headers →
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3102,7 +3102,7 @@ theorem preserves_at (size : Nat) : ∀ header, header ∈ headers →
 include extension faithful observations functionTypes sameLayouts uninitialized missing escaped prefixMatches profiles in
 /-- Original native grades choose the strict callees; the Source grade and
 actual body post are returned by the same shared family. -/
-theorem reflects_at (size : Nat) : ∀ header, header ∈ headers →
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3138,7 +3138,7 @@ include extension faithful observations functionTypes sameLayouts owners uniniti
   valid sourceUnique callerUninitialized callerMissing in
 /-- The whole caller Tree may call any member, including itself or a mutual
 callee. The shared body family closes every strictly smaller call internally. -/
-theorem expression_preserves_at (size : Nat) :
+theorem expression_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ProtectedStateTransition.PreservesAt (argumentProtocol (headers := headers) owner callerCompilation.administrativePrefix)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source
@@ -3156,7 +3156,7 @@ include extension faithful observations functionTypes sameLayouts uninitialized 
   valid callerUninitialized callerMissing in
 /-- Completed native callers obtain independently graded Source traces and
 actual restored pools from the same closed named body and expression families. -/
-theorem expression_reflects_at (size : Nat) :
+theorem expression_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ProtectedStateTransition.ReflectsAt (argumentProtocol (headers := headers) owner callerCompilation.administrativePrefix)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source

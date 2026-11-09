@@ -471,7 +471,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
 include extension faithful functionLeaves functionTypes sameLedger runtime unique uninitialized missing in
 /-- Every independent source outcome is preserved using the complete runtime
 ledger and actual selected rows at this tree's numeric leaves. -/
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificate fuel values source context solved reasonAt) faults :=
   CompatibleExpressionGeneral.preserves_with_literals functions extension faithful functionLeaves functionTypes
@@ -481,7 +481,7 @@ theorem preserves :
 include extension faithful functionLeaves functionTypes sameLedger runtime uninitialized missing in
 /-- Original native completion reconstructs an independent source outcome.
 No source execution or preservation law is an input. -/
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificate fuel values source context solved reasonAt) faults :=
   CompatibleExpressionGeneral.reflects_with_literals functions extension faithful functionLeaves functionTypes
@@ -584,7 +584,7 @@ variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : Ty
 include extension faithful functionLeaves functionTypes sameLedger runtime unique uninitialized missing in
 /-- Every independent source outcome is preserved using the complete runtime
 ledger and actual selected rows at this tree's numeric leaves. -/
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificate fuel values source context solved reasonAt) faults :=
   CompatibleExpressionBuiltins.preserves_with_literals functions extension faithful functionLeaves functionTypes
@@ -594,7 +594,7 @@ theorem preserves :
 include extension faithful functionLeaves functionTypes sameLedger runtime uninitialized missing in
 /-- Original native completion reconstructs an independent source outcome.
 No source execution or preservation law is an input. -/
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificate fuel values source context solved reasonAt) faults :=
   CompatibleExpressionBuiltins.reflects_with_literals functions extension faithful functionLeaves functionTypes

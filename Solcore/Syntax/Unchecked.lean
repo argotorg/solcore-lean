@@ -13,10 +13,7 @@ A block reaches every expression and statement written in it, including
 nested blocks, conditions, loop headers and match arms, but no lambda body:
 a lambda body starts outside any block and may hold its own. Patterns are not
 marked. A block written in another block is rejected, as upstream rejects it
-(`SC0001`), and so is a recorded `{` that starts no block statement.
-
-`/`, `%`, `/=` and `%=` in a block are rejected for now: upstream's unchecked
-division and remainder panic on a zero divisor, and Lean has no panics yet. -/
+(`SC0001`), and so is a recorded `{` that starts no block statement. -/
 
 set_option autoImplicit false
 
@@ -27,8 +24,6 @@ inductive Error where
   | nested (span : SourceSpan)
   /-- `unchecked {` whose `{` starts no block statement, at that `{`. -/
   | notStatement (startByte : Nat)
-  /-- `/`, `%`, `/=` or `%=` in a block, at the operator. -/
-  | division (span : SourceSpan)
   /-- The traversal bound, four times the file's byte size, was reached. -/
   | depthExhausted
   /-- Replacing ASCII bytes with spaces broke UTF-8, which cannot happen. -/
@@ -73,12 +68,16 @@ def BinaryOp.unchecked : BinaryOp → BinaryOp
   | .add => .uncheckedAdd
   | .subtract => .uncheckedSubtract
   | .multiply => .uncheckedMultiply
+  | .divide => .uncheckedDivide
+  | .modulo => .uncheckedModulo
   | operator => operator
 
 def ValueAssignOp.unchecked : ValueAssignOp → ValueAssignOp
   | .add => .uncheckedAdd
   | .subtract => .uncheckedSubtract
   | .multiply => .uncheckedMultiply
+  | .divide => .uncheckedDivide
+  | .modulo => .uncheckedModulo
   | operator => operator
 
 /-- The recorded `{` starts not yet met. -/
@@ -94,22 +93,12 @@ def claim (startByte : Nat) : M Bool := do
     pure false
 
 /-- A compound arithmetic assignment in a block becomes unchecked. -/
-def assignOperator (inside : Bool) (operator : Located ValueAssignOp) : M (Located ValueAssignOp) :=
-  if inside then
-    match operator.value with
-    | .divide | .modulo => throw (.division operator.span)
-    | value => pure { operator with value := ValueAssignOp.unchecked value }
-  else
-    pure operator
+def assignOperator (inside : Bool) (operator : Located ValueAssignOp) : Located ValueAssignOp :=
+  if inside then { operator with value := ValueAssignOp.unchecked operator.value } else operator
 
 /-- A binary arithmetic operator in a block becomes unchecked. -/
-def binaryOperator (inside : Bool) (operator : Located BinaryOp) : M (Located BinaryOp) :=
-  if inside then
-    match operator.value with
-    | .divide | .modulo => throw (.division operator.span)
-    | value => pure { operator with value := BinaryOp.unchecked value }
-  else
-    pure operator
+def binaryOperator (inside : Bool) (operator : Located BinaryOp) : Located BinaryOp :=
+  if inside then { operator with value := BinaryOp.unchecked operator.value } else operator
 
 mutual
 
@@ -123,7 +112,7 @@ def expression : Nat → Bool → Located ExprValue → M (Located ExprValue)
             pure (.lambda keyword parameters returnType (← block fuel false body))
         | .unary operator operand => pure (.unary operator (← expression fuel inside operand))
         | .binary left operator right =>
-            pure (.binary (← expression fuel inside left) (← binaryOperator inside operator)
+            pure (.binary (← expression fuel inside left) (binaryOperator inside operator)
               (← expression fuel inside right))
         | .index base brackets index =>
             pure (.index (← expression fuel inside base) brackets (← expression fuel inside index))
@@ -168,7 +157,7 @@ def forItems : Nat → Bool → List (Located ForItemValue) → M (List (Located
         | .letDecl name type initializer => pure (.letDecl name type (← optional fuel inside initializer))
         | .expression written => pure (.expression (← expression fuel inside written))
         | .assignValue target operator value =>
-            pure (.assignValue (← expression fuel inside target) (← assignOperator inside operator)
+            pure (.assignValue (← expression fuel inside target) (assignOperator inside operator)
               (← expression fuel inside value))
         | .assignBitNot target operator => pure (.assignBitNot (← expression fuel inside target) operator)
       return { item with value } :: (← forItems fuel inside rest)
@@ -195,7 +184,7 @@ def statement : Nat → Bool → Located StatementValue → M (Located Statement
         | .expression value trailingSemicolon =>
             pure (.expression (← expression fuel inside value) trailingSemicolon)
         | .assignValue target operator value =>
-            pure (.assignValue (← expression fuel inside target) (← assignOperator inside operator)
+            pure (.assignValue (← expression fuel inside target) (assignOperator inside operator)
               (← expression fuel inside value))
         | .assignBitNot target operator => pure (.assignBitNot (← expression fuel inside target) operator)
         | .matchWith scrutinees arms =>

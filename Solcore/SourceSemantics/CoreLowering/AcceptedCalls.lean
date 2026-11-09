@@ -693,7 +693,7 @@ include callerBridge keyPhysical cache extension sameLedger uninitialized select
 /-- Every extended receipt tree preserves its staged Source execution at
 every grade, given the application of every admitted callee header below the
 grade. -/
-theorem preserves_call_tree {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+theorem preserves_call_tree [RecursiveStageMeaning.FaultTokens faults] {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr}
     (tree : CallTree compiled headers called compilation readFuel solved invocation.source context reasonAt scope id
       lowered) (size : Nat)
@@ -740,7 +740,7 @@ include callerBridge keyPhysical cache extension sameLedger uninitialized select
 /-- Native completion of every extended receipt tree reconstructs its staged
 Source execution, given the native application of every admitted callee header
 below the grade. -/
-theorem reflects_call_tree {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+theorem reflects_call_tree [RecursiveStageMeaning.FaultTokens faults] {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
     {lowered : SourceCoreBasic.LoweredExpr}
     (tree : CallTree compiled headers called compilation readFuel solved invocation.source context reasonAt scope id
       lowered) (size : Nat)
@@ -867,7 +867,7 @@ private theorem reads_lowered {fuel : Nat} {context : SourceSemantics.Context}
 /-- Every accepted extended root of the named row preserves its staged Source
 execution at every grade, given the call authority and the application of
 every admitted callee header below the grade. -/
-theorem preserves (fuel : Nat) {context : SourceSemantics.Context}
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (fuel : Nat) {context : SourceSemantics.Context}
     (sourceEq : invocation.source = (rowIndex generation record).source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -914,7 +914,7 @@ theorem preserves (fuel : Nat) {context : SourceSemantics.Context}
 
 /-- Every completed native run of an accepted extended root reconstructs an
 independent Source grade, outcome and reached heap. -/
-theorem reflects (fuel : Nat) {context : SourceSemantics.Context}
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (fuel : Nat) {context : SourceSemantics.Context}
     (sourceEq : invocation.source = (rowIndex generation record).source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -963,7 +963,7 @@ theorem reflects (fuel : Nat) {context : SourceSemantics.Context}
 the accepted-expression input of the statement closure on the slot-retaining
 protocol at a budget, given the call authority and the application of every
 admitted callee header below the budget. -/
-theorem expressions (closed : ClosedCalls generation record called) (budget : Nat)
+theorem expressions [RecursiveStageMeaning.FaultTokens faults] (closed : ClosedCalls generation record called) (budget : Nat)
     (sourceEq : invocation.source = (rowIndex generation record).source)
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
@@ -1793,6 +1793,8 @@ theorem preserves (size : Nat)
         (rowIndex generation record) stages child faults size) :
     CellAwareInvocationAcceptedDirectCalls.PreservesAt (attachment := fun _ _ _ => True) (headers := headers)
       (keys := keys) model stages faults header size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   intro scope mapping world before store canonical owner caller capture cache _member stable context arguments
     payloads _supports heapTyped argumentsTyped represented heaps rawD function sourceAt invocation outcome after trace
@@ -1930,6 +1932,8 @@ theorem reflects (size : Nat) {bodyScope : Staging.Recursive.Scope}
         (rowIndex generation record) stages child faults size) :
     CellAwareInvocationAcceptedDirectCalls.ReflectsAt (attachment := fun _ _ _ => True) (headers := headers)
       (keys := keys) model stages faults header size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   intro scope mapping world before store canonical owner caller capture cache _member stable context arguments
     payloads _supports heapTyped argumentsTyped represented heaps rawD function sourceAt invocation value finalStore
@@ -2069,6 +2073,8 @@ theorem expressions_closed
         (receiving := completion.result.context.registry) (functions := rootFunctions)
         (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
         (rowIndex generation record) stages child faults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   intro owner keyPhysical child selected
   obtain ⟨_facts, certificate⟩ := support.certified header
@@ -2264,6 +2270,8 @@ theorem preserves_selected {scope : SourceCoreLocalCell.Scope} {mapping : Locati
         rootFunctions accepted owner caller header capture.named payloads header.context
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result bodyOutcome) after value finalStore finalMap finalWorld
         faults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   subst sameNamed
   have certified := support.certified header
   obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
@@ -2495,6 +2503,8 @@ theorem expressions (size : Nat) :
         (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
         (rowIndex (rows header member admitted).generation (rows header member admitted).record) stages child faults
         size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   induction size using Nat.strongRecOn with
   | ind size ih =>
     intro header member admitted owner keyPhysical child selected

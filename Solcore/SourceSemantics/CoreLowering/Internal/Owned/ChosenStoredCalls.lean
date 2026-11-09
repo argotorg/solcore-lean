@@ -524,7 +524,7 @@ include profile receiving members functionTypes member scopedInputs calleeTrace 
   actualFunctionType accepted owners idsUnique in
 /-- The parent core supplies its actual argument state. This finite leaf
 constructs raw arguments and the chosen continuation internally at that state. -/
-theorem ForModel.application_preserves_on (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.application_preserves_on [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
@@ -584,7 +584,7 @@ include profile receiving members functionTypes member genericInputs calleeTrace
   actualFunctionType accepted owners idsUnique in
 /-- The parent core supplies its actual argument state. This finite leaf
 constructs raw arguments and the chosen continuation internally at that state. -/
-theorem ForModel.application_preserves_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.application_preserves_for_model [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
@@ -613,7 +613,7 @@ include member inputs calleeTrace post sameNative parentTyped tree unique runtim
   actualFunctionType accepted owners idsUnique in
 /-- The parent core supplies its actual argument state. This finite leaf
 constructs raw arguments and the chosen continuation internally at that state. -/
-theorem application_preserves (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem application_preserves [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner index))
     {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
@@ -647,7 +647,7 @@ include profile receiving members functionTypes member scopedInputs calleeTrace 
   actualFunctionType selected accepted owners idsUnique environments agrees typed in
 /-- Ordered arguments and the whole Source parent use the original core once;
 the chosen application leaf is constructed internally rather than supplied. -/
-theorem ForModel.preserves_accepted_on (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.preserves_accepted_on [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -703,7 +703,7 @@ include profile receiving members functionTypes member genericInputs calleeTrace
   actualFunctionType selected accepted owners idsUnique environments agrees typed in
 /-- Ordered arguments and the whole Source parent use the original core once;
 the chosen application leaf is constructed internally rather than supplied. -/
-theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.preserves_accepted_for_model [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -737,7 +737,7 @@ include member inputs calleeTrace post sameNative parentTyped tree unique parent
   actualFunctionType selected accepted owners idsUnique environments agrees typed in
 /-- Ordered arguments and the whole Source parent use the original core once;
 the chosen application leaf is constructed internally rather than supplied. -/
-theorem preserves_accepted (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem preserves_accepted [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner index))
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -804,7 +804,7 @@ include profile receiving members functionTypes member scopedInputs calleeTrace 
   actualFunctionType accepted in
 /-- Reflection consumes the authentic whole fourth bind at its own argument
 store, then the same chosen application and finite caller-pool lift once. -/
-theorem ForModel.reflects_accepted_on (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.reflects_accepted_on [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {value : Value} {finalStore : Store}
@@ -918,7 +918,7 @@ include profile receiving members functionTypes member genericInputs calleeTrace
   actualFunctionType accepted in
 /-- Reflection consumes the authentic whole fourth bind at its own argument
 store, then the same chosen application and finite caller-pool lift once. -/
-theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.reflects_accepted_for_model [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {value : Value} {finalStore : Store}
@@ -956,7 +956,7 @@ include member inputs calleeTrace post sameNative parentTyped tree unique parent
   actualFunctionType accepted in
 /-- Reflection consumes the authentic whole fourth bind at its own argument
 store, then the same chosen application and finite caller-pool lift once. -/
-theorem reflects_accepted (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem reflects_accepted [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner index))
     {value : Value} {finalStore : Store}
@@ -1140,7 +1140,7 @@ include certified found sourceTyped parentTyped runtime covers environments heap
 /-- Construct the callee post once from the actual strict child. Its complete
 selection keeps prior alternatives. The positive accepted continuation derives
 its own body and ordered argument producer through the existing parent core. -/
-theorem preserves_closure_parent_on (outer budget : Nat) (within : budget ≤ outer)
+theorem preserves_closure_parent_on [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       bridge model context evidence source certificate faults size)
     (trace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
@@ -1190,7 +1190,7 @@ include certified found sourceTyped parentTyped runtime covers environments heap
 /-- Construct the callee post once from the actual strict child. Its complete
 selection keeps prior alternatives. The positive accepted continuation derives
 its own body and ordered argument producer through the existing parent core. -/
-theorem preserves_closure_parent (outer budget : Nat) (within : budget ≤ outer)
+theorem preserves_closure_parent [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       bridge model context evidence source certificate faults size)
     (trace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
@@ -1340,7 +1340,7 @@ include certified found sourceTyped parentTyped wellFormed runtime covers enviro
 /-- The original native parent prefix invokes the strict callee child once.
 Its actual value retains all alternatives; only a genuine positive receipt at
 that same tuple can enter the accepted body resolver. -/
-theorem reflects_parent_on (outer budget : Nat) (within : budget ≤ outer)
+theorem reflects_parent_on [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       bridge model context evidence source certificate faults size)
     {size : Nat} {result : Value} {finalStore : Store}
@@ -1422,7 +1422,7 @@ include certified found sourceTyped parentTyped wellFormed runtime covers enviro
 /-- The original native parent prefix invokes the strict callee child once.
 Its actual value retains all alternatives; only a genuine positive receipt at
 that same tuple can enter the accepted body resolver. -/
-theorem reflects_parent (outer budget : Nat) (within : budget ≤ outer)
+theorem reflects_parent [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       bridge model context evidence source certificate faults size)
     {size : Nat} {result : Value} {finalStore : Store}

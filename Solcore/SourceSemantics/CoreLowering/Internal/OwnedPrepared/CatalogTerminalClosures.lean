@@ -1429,7 +1429,7 @@ private theorem source_runtime : Dynamic.SourceRuntimeValid (Program.ofChecked c
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Preservation uses E at sizes at most n at the exact visited contexts. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity header context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt (bridge (headers := headers) owner header)
@@ -1466,7 +1466,7 @@ theorem preserves_flow (budget : Nat)
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Reflection consumes strict native E grades and retains its independent
 Source grade through the same original prepared producer. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (meaning : ∀ context, Validity header context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt (bridge (headers := headers) owner header)

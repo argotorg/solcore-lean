@@ -285,6 +285,23 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
               exact ⟨_, _, _, .assignProjectedRhsFault (lookupStatement?_sound found) form projected keys snapshot lifted, .rejected origin call reason _ reached⟩
           | completed =>
               exact ⟨_, _, _, .assignProjectedWriteFault (lookupStatement?_sound found) form projected keys snapshot lifted (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · exact ⟨_, _, _, .assignProjectedKeysFault (lookupStatement?_sound found) form projected ready keys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := childLift _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (authority.transport resolution.effect)
+              (physical.transport resolution.effect resolution.frame) owner sameLocation (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              exact ⟨_, _, _, .assignProjectedRhsFault (lookupStatement?_sound found) form projected keys snapshot lifted, .rejected origin call reason _ reached⟩
+          | completed =>
+              exact ⟨_, _, _, .assignProjectedWriteFault (lookupStatement?_sound found) form projected keys snapshot lifted (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -915,6 +932,28 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
               obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
               obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
               exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_write_fault projected measuredKeys snapshot measuredRhs (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+          exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_keys_fault projected ready measuredKeys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := childLift _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (authority.transport resolution.effect)
+              (physical.transport resolution.effect resolution.frame) owner sameLocation (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+              obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+              exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_rhs_fault projected measuredKeys snapshot measuredRhs, .rejected origin call reason _ reached⟩
+          | completed =>
+              obtain ⟨keyGrade, measuredKeys⟩ := Staging.Recursive.Size.Expressions.of_trace keys
+              obtain ⟨rhsGrade, measuredRhs⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+              exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_write_fault projected measuredKeys snapshot measuredRhs (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -1370,6 +1409,8 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     ⟨childSize, reason, _strict, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, _strict, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, _strict, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, _strict, _tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children runtime covers sameLedger childSize head.right head.found typed
@@ -1388,6 +1429,15 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     cases adapted with
     | completed => exact ⟨_, _, _, assignment_operands snapshot measuredChild
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, assignment_fault snapshot measuredChild, .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children runtime covers sameLedger childSize head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation evaluated
+    obtain ⟨measuredSize, measuredChild⟩ := Staging.Recursive.Size.Expression.of_trace lifted
+    cases adapted with
+    | completed => exact ⟨_, _, _, assignment_panic snapshot measuredChild
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       exact ⟨_, _, _, assignment_fault snapshot measuredChild, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
@@ -2163,6 +2213,23 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
               exact ⟨_, _, _, .projectedAssignmentRhsFault projected keys snapshot lifted, .rejected origin call reason _ reached⟩
           | completed =>
               exact ⟨_, _, _, .projectedAssignmentWriteFault projected keys snapshot lifted (.operands currentRead rootType initialValue pathRead invalid), .completed (.fault (.invalidAssignmentOperands operator))⟩
+      | panic resolved evaluated currentRead rootType initialValue pathRead panics =>
+        rcases liftResolved resolved
+          (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
+          ⟨origin, call, reason, reached, ready, keys⟩ |
+          ⟨sources, keys, snapshot, _keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
+        · exact ⟨_, _, _, .projectedAssignmentKeysFault projected ready keys, .rejected origin call reason _ reached⟩
+        · obtain ⟨staged, reached, lifted, adapted⟩ := childLift _
+            (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega)
+            head.right head.found typed (environments.extend resolution.maps resolution.worlds)
+            resolution.heaps (locals.mono resolution.metadata) agrees (actualTyped.weaken resolution.worlds)
+            getterState getterAdmission (authority.transport resolution.effect)
+              (physical.transport resolution.effect resolution.frame) owner sameLocation (.value evaluated)
+          cases adapted with
+          | rejected origin call reason reached =>
+              exact ⟨_, _, _, .projectedAssignmentRhsFault projected keys snapshot lifted, .rejected origin call reason _ reached⟩
+          | completed =>
+              exact ⟨_, _, _, .projectedAssignmentWriteFault projected keys snapshot lifted (.panic currentRead rootType initialValue pathRead panics), .completed (.fault (.panic _))⟩
       | structuralUpdate resolved evaluated currentRead rootType initialValue pathFault =>
         rcases liftResolved resolved
           (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -2572,6 +2639,8 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     ⟨childSize, reason, _strict, rfl, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, _strict, rfl, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, _strict, rfl, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, _strict, _tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children runtime covers sameLedger childSize head.right head.found typed
@@ -2588,6 +2657,14 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     cases adapted with
     | completed => exact ⟨_, _, _, .assignmentOperands snapshot lifted
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, .assignmentFailure snapshot lifted, .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children runtime covers sameLedger childSize head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation evaluated
+    cases adapted with
+    | completed => exact ⟨_, _, _, .assignmentPanic snapshot lifted
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       exact ⟨_, _, _, .assignmentFailure snapshot lifted, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
@@ -2938,6 +3015,8 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     ⟨childSize, reason, _strict, rfl, rfl, evaluated⟩ |
     ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, _strict, rfl, rfl, evaluated,
       currentRead, rootType, rootInitial, pathRead, invalid⟩ |
+    ⟨childSize, sourceValue, currentCell, initialValue, currentSelected, code, _strict, rfl, rfl, evaluated,
+      currentRead, rootType, rootInitial, pathRead, panics⟩ |
     ⟨childSize, tailSize, sourceValue, middle, updated, written, _strict, _tailStrict, evaluated, write, tail⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=
       children runtime covers sameLedger childSize head.right head.found typed
@@ -2954,6 +3033,14 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
     cases adapted with
     | completed => exact ⟨_, _, _, .assignBareOperands (lookupStatement?_sound found) form snapshot lifted
         currentRead rootType rootInitial pathRead invalid, .completed (.fault (.invalidAssignmentOperands operator))⟩
+    | rejected origin call reason reached =>
+      exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted, .rejected origin call reason _ reached⟩
+  · obtain ⟨staged, reached, lifted, adapted⟩ :=
+      children runtime covers sameLedger childSize head.right head.found typed
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation evaluated
+    cases adapted with
+    | completed => exact ⟨_, _, _, .assignBarePanic (lookupStatement?_sound found) form snapshot lifted
+        currentRead rootType rootInitial pathRead panics, .completed (.fault (.panic _))⟩
     | rejected origin call reason reached =>
       exact ⟨_, _, _, .assignBareFault (lookupStatement?_sound found) form snapshot lifted, .rejected origin call reason _ reached⟩
   · obtain ⟨staged, reached, lifted, adapted⟩ :=

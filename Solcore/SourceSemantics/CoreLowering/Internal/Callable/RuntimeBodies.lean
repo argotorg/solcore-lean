@@ -72,7 +72,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 include body definitions registered extension faithful observations escapedFault transport binders extend runtimeOf in
 /-- Preserve at the original source body grade, retaining the actual entry. -/
-theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
+theorem BodyFor.preserves_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (expressions : ∀ context, validity context → RecursiveNamedHeaderContracts.AtMost budget (fun child =>
       RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context function.evidence function.source (certificates context) faults entry))
@@ -112,7 +112,7 @@ theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
 
 include body definitions registered extension faithful observations functionTypes escapedFault transport binders extend runtimeOf in
 /-- Reflect the original native finish and return an independent source grade. -/
-theorem BodyFor.reflects_sized (budget size : Nat) (within : size ≤ budget)
+theorem BodyFor.reflects_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (expressions : ∀ context, validity context → RecursiveNamedBoundedContracts.Below budget (fun child =>
       RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context function.evidence function.source (certificates context) faults entry))
@@ -328,7 +328,7 @@ end WithReady
 
 include body definitions registered extension faithful observations escapedFault producer acquire stateTransport stateBindings extend runtimeOf in
 /-- Preserve at the original source body grade, retaining the actual reached state. -/
-theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
+theorem BodyFor.preserves_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (expressions : ∀ context, validity context → RecursiveNamedHeaderContracts.AtMost budget (fun child =>
       ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context function.evidence function.source (certificates context) faults child))
@@ -410,7 +410,7 @@ theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
 
 include body definitions registered extension faithful observations functionTypes escapedFault producer acquire stateTransport stateBindings extend runtimeOf in
 /-- Reflect the original native finish and return an independent source grade. -/
-theorem BodyFor.reflects_sized (budget size : Nat) (within : size ≤ budget)
+theorem BodyFor.reflects_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (expressions : ∀ context, validity context → RecursiveNamedBoundedContracts.Below budget (fun child =>
       ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context function.evidence function.source (certificates context) faults child))
@@ -962,7 +962,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 
 include extension faithful observations producer acquire stateTransport in
 /-- Compatibility kits delegate the original finite producers. -/
-theorem PreservingKits.trivial
+theorem PreservingKits.trivial [FunctionCalls.FaultTokens faults]
     (expressions : ∀ context, origin.validity context → RecursiveNamedHeaderContracts.AtMost budget (fun child =>
       ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context origin.function.evidence origin.function.source (origin.certificates context) faults child)) :
@@ -1000,7 +1000,7 @@ theorem PreservingKits.trivial
 
 include extension faithful observations functionTypes producer acquire stateTransport in
 /-- Compatibility kits delegate the original finite producers. -/
-theorem ReflectingKits.trivial
+theorem ReflectingKits.trivial [FunctionCalls.FaultTokens faults]
     (expressions : ∀ context, origin.validity context → RecursiveNamedBoundedContracts.Below budget (fun child =>
       ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context origin.function.evidence origin.function.source (origin.certificates context) faults child)) :
@@ -1099,7 +1099,7 @@ variable {values : SourceCoreCompatibleValues.Context}
 
 include extension faithful observations in
 /-- Source children may use the current budget; callee bodies are strict. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget (PreservesAt functions program (origins callee))) →
       RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1124,7 +1124,7 @@ theorem preserves_at
 include extension faithful observations functionTypes in
 /-- Native finish inversion selects original strict children. Reflection
 returns the source grade without a preservation or source-trace premise. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget (ReflectsAt functions program (origins callee))) →
       RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -1291,7 +1291,7 @@ variable {values : SourceCoreCompatibleValues.Context}
 include extension faithful observations producers acquire stateTransport stateBindings in
 /-- Each genuine origin uses its own state protocol and record observation.
 The same measured fold supplies only strictly smaller actual callee meanings. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget
         (CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocols callee) (conditionGate callee) functions program (origins callee))) →
@@ -1328,7 +1328,7 @@ theorem preserves_at
 include extension faithful observations functionTypes producers acquire stateTransport stateBindings in
 /-- Original native completions choose strict callees at their own protocols.
 The same measured closer returns independent source grades and actual posts. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget
         (CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocols callee) (conditionGate callee) functions program (origins callee))) →
@@ -1392,7 +1392,7 @@ variable {values : SourceCoreCompatibleValues.Context}
 include extension faithful observations producers acquire stateTransport stateBindings in
 /-- The actual source family closes through the shared measured fold. Its
 expression interface receives only strictly smaller actual callee meanings. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget
         (CallableRuntimeBodyOrigins.Stateful.PreservesAt protocol (conditionGate callee) functions program (origins callee))) →
@@ -1408,7 +1408,7 @@ theorem preserves_at
 include extension faithful observations functionTypes producers acquire stateTransport stateBindings in
 /-- The actual native family consumes original completions and returns
 independently graded source traces through the same measured closer. -/
-theorem reflects_at
+theorem reflects_at [FunctionCalls.FaultTokens faults]
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
       (∀ callee, RecursiveNamedBoundedContracts.Below budget
         (CallableRuntimeBodyOrigins.Stateful.ReflectsAt protocol (conditionGate callee) functions program (origins callee))) →

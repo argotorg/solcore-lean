@@ -324,7 +324,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves_reached
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     (closureChildren : ∀ size, size ≤ budget →
       ∀ {mapping world function native bindings parameterCore resultCore}
@@ -345,6 +345,8 @@ theorem preserves_reached
     NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -626,7 +628,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (closureChildren : ∀ size, size ≤ budget →
       ∀ {mapping world function native bindings parameterCore resultCore}
@@ -648,6 +650,8 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
     NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   revert reached
   induction root with
   | proxy receipt =>
@@ -930,7 +934,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (budget : Nat)
     (closureChildren : ∀ size, size ≤ budget →
       ∀ {mapping world function native bindings parameterCore resultCore}
@@ -962,7 +966,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   sameLedger runtimeLedger uninitialized in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (budget : Nat)
     (closureChildren : ∀ size, size ≤ budget →
       ∀ {mapping world function native bindings parameterCore resultCore}

@@ -234,11 +234,13 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
   completion.result.diagnostics
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem preserves_both (size : Nat) :
+theorem preserves_both [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size ∧
     CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
       (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction size using Nat.strongRecOn with
   | ind size ih =>
     constructor
@@ -276,23 +278,25 @@ theorem preserves_both (size : Nat) :
         root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size :=
   (preserves_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic size).1
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem preserves_canonical (size : Nat) :
+theorem preserves_canonical [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
       (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   (preserves_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic size).2
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_both [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size ∧
     CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
       (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   induction size using Nat.strongRecOn with
   | ind size ih =>
     constructor
@@ -330,13 +334,13 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
         root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size :=
   (reflects_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic stageEq size).1
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-theorem reflects_canonical (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_canonical [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
       (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
   (reflects_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic stageEq size).2
@@ -431,7 +435,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals namedSupport
   sameLedger runtimeLedger uninitialized in
 /-- The accepted compiler action issues the actual tree used for Source preservation. -/
-theorem preserves_compiled
+theorem preserves_compiled [FunctionCalls.FaultTokens semanticFaults]
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)
     (policyFor : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor policy
@@ -452,6 +456,8 @@ theorem preserves_compiled
     (size : Nat) :
     PreservesAt bridge context model stages invocation
       (Point rootScope rootId rootCode) callFaults size := by
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
     let root := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_functions
       unique declarations policyFor coercions syntaxTree found typed accepted
     have bodies : ∀ childSize,
@@ -493,7 +499,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals namedSupport
   sameLedger runtimeLedger uninitialized in
 /-- The same issued tree reflects native completion to its independent Source grade. -/
-theorem reflects_compiled
+theorem reflects_compiled [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)
@@ -515,6 +521,8 @@ theorem reflects_compiled
     (size : Nat) :
     ReflectsAt bridge context model stages invocation
       (Point rootScope rootId rootCode) callFaults size := by
+    haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+      (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
     let root := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_functions
       unique declarations policyFor coercions syntaxTree found typed accepted
     have bodies : ∀ childSize,
@@ -639,7 +647,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closureCoverage namedTerminals namedSupport
   sameLedger runtimeLedger uninitialized in
 /-- Static Association coverage suffices for the same accepted caller preservation theorem. -/
-theorem preserves_compiled
+theorem preserves_compiled [FunctionCalls.FaultTokens semanticFaults]
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)
     (policyFor : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor policy
@@ -689,7 +697,7 @@ include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closureCoverage namedTerminals namedSupport
   sameLedger runtimeLedger uninitialized in
 /-- The same local dependent choice retains the independent Source reflection grade. -/
-theorem reflects_compiled
+theorem reflects_compiled [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {rootScope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source rootScope context)
@@ -1038,7 +1046,7 @@ include bridge receiver profile observations extension semantic family namedTerm
   selected conditions syntaxTree found typed accepted in
 /-- The accepted ordinary caller and prepared ordinary sequence bodies feed
 numeric preservation, with the original principal and named static support. -/
-theorem preserves_compiled (size : Nat) :
+theorem preserves_compiled [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context model (RecursiveNamedPreparedStageScopes.registry stagePrepared) invocation (Point rootScope rootId rootCode) callFaults size := by
   have sourceEq : invocation.source = function.source := ((RecursiveNamedPreparedStageScopes.registry stagePrepared)).source selected
   have metadataAt : CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles.MetadataFor
@@ -1070,7 +1078,7 @@ include bridge receiver profile observations extension semantic family namedTerm
   selected conditions syntaxTree found typed accepted in
 /-- The same actual caller and ordinary sequence producer feed numeric
 reflection, retaining the original principal and named static support. -/
-theorem reflects_compiled (size : Nat) :
+theorem reflects_compiled [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context model (RecursiveNamedPreparedStageScopes.registry stagePrepared) invocation (Point rootScope rootId rootCode) callFaults size := by
   have sourceEq : invocation.source = function.source := ((RecursiveNamedPreparedStageScopes.registry stagePrepared)).source selected
   have metadataAt : CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles.MetadataFor
@@ -1162,7 +1170,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 packets come from preparation, and the selected named packet supplies its own
 static roots. The exact optional-cell read, parameter entry, body, restoration
 and root argument packing are all executed by the existing producers. -/
-theorem preserves_root
+theorem preserves_root [FunctionCalls.FaultTokens semanticFaults]
     {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) size invocation context before
@@ -1177,6 +1185,8 @@ theorem preserves_root
           (registry := completion.result.context.registry) (payloads := payloads)
           (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
           rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   classical
   let chosen : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
@@ -1243,7 +1253,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 /-- A completed original root exposes its exact cached named body. Numeric
 reflection supplies the staged application and actual returned pool; a staged
 rejection remains a staged rejection rather than an ordinary Dynamic fault. -/
-theorem reflects_root
+theorem reflects_root [FunctionCalls.FaultTokens semanticFaults]
     (descriptor : SourceCoreCallableContracts.Descriptor compiled.indexed.ancestry.graph.inputs.callable.table
       (.named header.named.signature.key))
     {fuel : Nat} {value : Value} {finalStore : Store}
@@ -1260,6 +1270,8 @@ theorem reflects_root
           (registry := completion.result.context.registry) (payloads := payloads)
           (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
           rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   classical
   let chosen : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
@@ -1329,7 +1341,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 /-- An actual public success reaches the same cached named body and staged
 Source application. Export metadata and the body model's receiving metadata
 retain their own actual receipts; no registry equality is invented. -/
-theorem public_run_succeeded_reflects
+theorem public_run_succeeded_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
@@ -1379,7 +1391,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   sameCompiled started in
 /-- Public failure retains the actual staged failure relation. In particular,
 a nested stage rejection is not relabeled as a Dynamic semantic fault. -/
-theorem public_run_failed_reflects
+theorem public_run_failed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
@@ -1427,7 +1439,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 /-- A staged Source Word result is preserved by the same public checkpoint
 at sufficient native fuel. The actual export budget remains independent of
 the input budget and the staged trace is retained unchanged. -/
-theorem public_word_preserved
+theorem public_word_preserved [FunctionCalls.FaultTokens semanticFaults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
     (atCheckpoint : publicCheckpoint.IndexedAt nativeCheckpoint)
@@ -1631,7 +1643,7 @@ include closurePackets closureSupport namedTerminals namedSupport receiver stage
 /-- Closed strict child preservation supplies the literal body evaluation once.
 The original trace retains its ordinary exit or exact stage rejection alongside
 the full reached PostAdmission. -/
-theorem preserves_body_with_exit {size : Nat}
+theorem preserves_body_with_exit [FunctionCalls.FaultTokens semanticFaults] {size : Nat}
     {finalContext : SourceSemantics.Context} {bodyOutcome : Staging.Recursive.BodyOutcome}
     {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
@@ -1679,7 +1691,7 @@ include closurePackets closureSupport namedTerminals namedSupport receiver stage
   observations extension semantic stageEq support selected environments heaps locals agrees actualTyped admitted in
 /-- Closed strict child reflection supplies the body trace once; every result
 retains its nested fault representation and reached PostAdmission. -/
-theorem reflects_body_with_exit {size : Nat} {value : Value} {finalStore : Store}
+theorem reflects_body_with_exit [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (code.receipt.body.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
       Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram) stages sourceSize

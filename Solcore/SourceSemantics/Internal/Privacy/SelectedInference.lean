@@ -2596,6 +2596,8 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       | uncheckedAdd => exact finishNonEqual (valueIH place) success
       | uncheckedSubtract => exact finishNonEqual (valueIH place) success
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success
+      | uncheckedDivide => exact finishNonEqual (valueIH place) success
+      | uncheckedModulo => exact finishNonEqual (valueIH place) success
   case case46 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition body statementEq conditionInduction bodyInduction

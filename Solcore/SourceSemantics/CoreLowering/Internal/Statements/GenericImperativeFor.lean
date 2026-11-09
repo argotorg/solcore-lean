@@ -92,7 +92,7 @@ theorem post_preserves {items : List ForItemForm} {finalContext : SourceSemantic
     tail.heaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension meaning faithful observations in
-theorem post_fault_reachable {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+theorem post_fault_reachable [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -118,7 +118,7 @@ theorem post_fault_reachable {items : List ForItemForm} {finalContext : SourceSe
 
 include definitions registered extension meaning faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+theorem post_fault [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -137,7 +137,7 @@ theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Co
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations in
-theorem post_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem post_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {items : List ForItemForm} {value : Value} {finalStore : Store}
     (tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
@@ -173,7 +173,7 @@ theorem post_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension meaning reflection faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem post_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem post_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {items : List ForItemForm} {value : Value} {finalStore : Store}
     (tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
@@ -472,7 +472,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -496,7 +496,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -515,7 +515,7 @@ theorem iterations_success
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore) ?_ ?_ ?_ ?_ ?_ trace
   · intro context evidence source environment before after condition statements conditionEvaluation
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -528,7 +528,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap bodyHeap after condition statements bodyFinalContext bodyEnvironment outcome
       conditionEvaluation bodyEvaluation next nextIH
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -550,7 +550,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap bodyHeap after condition statements bodyFinalContext bodyEnvironment outcome
       conditionEvaluation bodyEvaluation next nextIH
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -572,7 +572,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap after condition statements bodyFinalContext bodyEnvironment
       conditionEvaluation bodyEvaluation
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -589,7 +589,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap after condition statements bodyFinalContext returned
       conditionEvaluation bodyEvaluation
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -616,7 +616,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -640,7 +640,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -659,7 +659,7 @@ theorem iterations_fault
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore) ?_ ?_ ?_ ?_ ?_ trace
   · intro context evidence source environment before after condition statements reason conditionFault
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.fault conditionFault)
@@ -667,7 +667,7 @@ theorem iterations_fault
     | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, .conditionFault evaluated, .fault matched, progress⟩
   · intro context evidence source environment before after condition statements value actualType conditionEvaluation notBoolean runtimeType
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -677,7 +677,7 @@ theorem iterations_fault
       exact False.elim (notBoolean trivial)
   · intro context evidence source environment before conditionHeap after condition statements bodyContext reason conditionEvaluation bodyFault
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -693,7 +693,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap after condition statements bodyFinalContext bodyEnvironment reason
       conditionEvaluation bodyEvaluation next nextIH
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -715,7 +715,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap after condition statements bodyFinalContext bodyEnvironment reason
       conditionEvaluation bodyEvaluation next nextIH
       certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code selfReason mapping world store node faults _
       meaning conditionTree found valid unique agrees reference correct state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions program evidence meaning conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -869,7 +869,7 @@ theorem iterations_reflect {condition : ExpressionId} {node : ExpressionNode}
 /- The generated prelude installs its self closure before the first condition;
 source heap and scope stay unchanged during this administrative step. -/
 include meaning in
-theorem while_preserves {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem while_preserves [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -1040,7 +1040,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -1064,7 +1064,7 @@ theorem iterations_success
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning conditionTree found valid unique agrees reference correct postCorrect state
   exact ProtectedFor.Body.iterations_success trace
     (ProtectedExpressionMeaning.preserves_of_typed ProtectedFor.Body.trivialEntry meaning)
@@ -1082,7 +1082,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source certificate faults →
       certificate scope condition ⟨.bool, conditionCode⟩ →
@@ -1111,7 +1111,7 @@ theorem iterations_fault
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
   intro certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+    contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
     meaning conditionTree found valid unique agrees reference correct postCorrect postFailed state
   exact ProtectedFor.Body.iterations_fault trace
     (ProtectedExpressionMeaning.preserves_of_typed ProtectedFor.Body.trivialEntry meaning)
@@ -1222,7 +1222,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 
 include extension meaning unique definitions registered faithful observations in
-theorem loop_preserves_reachable {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_reachable [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -1259,7 +1259,7 @@ theorem loop_preserves_reachable {condition : ExpressionId} {conditionNode : Exp
 
 include extension meaning unique definitions registered faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -1278,7 +1278,7 @@ theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNod
   all_goals assumption
 
 include extension meaning reflection unique definitions registered faithful observations in
-theorem loop_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -1314,7 +1314,7 @@ theorem loop_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
 
 include extension meaning reflection unique definitions registered faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -1411,7 +1411,7 @@ abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : TypedLexica
     GenericForHeader.Tree.Errors registry faults tree
 
 include definitions registered extension meaning faithful observations in
-theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
+theorem header_preserves_reachable [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
@@ -1457,7 +1457,7 @@ theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
 
 include definitions registered extension meaning faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem header_preserves (unique : NodeOccurrencesUnique source)
+theorem header_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
@@ -1470,7 +1470,7 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
   all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations in
-theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+theorem header_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
@@ -1501,7 +1501,7 @@ theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews function
 
 include definitions registered extension meaning reflection faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+theorem header_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
@@ -1545,7 +1545,7 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   (observations : FunctionObservations values.checked.catalog functions identities)
 
 include extension meaning faithful observations in
-theorem assignment_preserves_reachable {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem assignment_preserves_reachable [FunctionCalls.FaultTokens faults] {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
@@ -1599,7 +1599,7 @@ theorem assignment_preserves_reachable {mode : Bool} {id : StatementId} {node : 
 
 include extension meaning faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem assignment_preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
@@ -1612,7 +1612,7 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
   all_goals assumption
 
 include extension meaning reflection faithful observations in
-theorem assignment_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+theorem assignment_reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
@@ -1642,7 +1642,7 @@ theorem assignment_reflects_reachable (functionTypes : FunctionRuntimeViews func
 
 include extension meaning reflection faithful observations in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem assignment_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem assignment_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}

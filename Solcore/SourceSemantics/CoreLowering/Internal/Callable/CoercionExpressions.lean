@@ -641,7 +641,7 @@ variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
 include checkedAccepted extension definitions registered faithful observations runtimeViews uninitialized missing ledger emitted steps chain entry in
 /-- Preserve an independent whole source outcome with its original raw form and
 ordered coercions. The raw law is the remaining expression-grammar interface. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     (notLocal : ∀ name binder, node.form ≠ .reference name (.local binder))
     (rawMeaning : RawFormPreserves (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
@@ -672,7 +672,7 @@ theorem preserves
 include extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry in
 /-- Reflect only finite completion of the real emitted expression. The source
 form and path derivations retain their separate heaps and independent costs. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     (rawMeaning : RawFormReflects (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before caller mapping world store node ξ receipt.operand)
     {value : Value} {finalStore : Store}
@@ -1218,7 +1218,7 @@ variable {readFuel : Nat} {values : SourceCoreCompatibleValues.Context} {source 
   (actualTyped : RuntimeEnvironmentHasTypes world caller actualContext ambient.definitions)
 
 include extension faithful observations runtimeViews valid uninitialized missing child environments heaps locals agrees actualTyped in
-theorem raw_preserves (unique : NodeOccurrencesUnique source) :
+theorem raw_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) :
     RawFormPreserves (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before caller mapping world store node ξ operand := by
   intro outcome after trace
@@ -1230,7 +1230,7 @@ theorem raw_preserves (unique : NodeOccurrencesUnique source) :
     finalHeaps, maps, worlds, admin, metadata⟩
 
 include extension faithful observations runtimeViews valid uninitialized missing child environments heaps locals agrees actualTyped in
-theorem raw_reflects :
+theorem raw_reflects [FunctionCalls.FaultTokens faults] :
     RawFormReflects (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before caller mapping world store node ξ operand := by
   intro value finalStore evaluated
@@ -1291,7 +1291,7 @@ variable {readFuel : Nat} {inner : ExpressionId} {solved : List SolvedRequiremen
   (actualTyped : RuntimeEnvironmentHasTypes world caller actualContext ambient.definitions)
 
 include checkedAccepted extension definitions registered faithful observations runtimeViews uninitialized missing ledger emitted steps chain entry childTree valid rawUninitialized rawMissing environments heaps locals agrees actualTyped in
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     (unique : NodeOccurrencesUnique source)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
@@ -1309,7 +1309,7 @@ theorem preserves
       environments heaps locals agrees actualTyped unique) trace
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry childTree valid rawUninitialized rawMissing environments heaps locals agrees actualTyped in
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates caller store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,

@@ -189,6 +189,14 @@ mutual
         (invalid : BinaryPrimitiveOperandsInvalid operator a b) :
         Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id
           (.fault (.semantic (.invalidBinaryOperands operator))) after
+    | binaryPanic {firstSize secondSize : Nat} {scope context environment before middle after id left operator right a b code}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry firstSize scope context environment before left (.value a) middle)
+        (continues : EvaluatesRightOperand operator a)
+        (second : Expression program registry secondSize scope context environment middle right (.value b) after)
+        (panics : BinaryPrimitivePanics operator a b code) :
+        Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id
+          (.fault (.semantic (.panic code))) after
     | unaryMethod {operandSize bodySize : Nat} {scope context environment before argumentsHeap bound after id operator operand input
           requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result}
         (occurrence : Occurrence scope id (.unary operator operand) requirements)
@@ -635,6 +643,19 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context
           (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | assignBarePanic {childSize : Nat} {mode scope context environment before after id rest node assignment operator rhs
+          target right currentCell initial currentSelected code}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context
+          (.fault (.semantic (.panic code))) after
     | assignBareUnbound {mode scope context environment heap id rest node assignment operator rhs}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -905,6 +926,17 @@ mutual
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         ForItems program registry (stepSize [childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.invalidAssignmentOperands operator))) after
+    | assignmentPanic {childSize : Nat} {scope context environment before after assignment operator rhs target right
+          currentCell initial currentSelected rest code}
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.value right) after)
+        (currentRead : Heap.Reads after target.location currentCell)
+        (rootType : currentCell.type = target.rootType)
+        (initialValue : RootInitialValue currentCell initial)
+        (pathRead : ProjectionsRead initial target.projections currentSelected)
+        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        ForItems program registry (stepSize [childSize]) scope context environment before (.assignValue assignment operator rhs :: rest) context
+          (.fault (.semantic (.panic code))) after
     | unbound {scope context environment heap assignment operator rhs rest}
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
@@ -1057,7 +1089,7 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
-  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBarePanic assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements
@@ -1118,6 +1150,7 @@ local macro "erase_stage_grade" : tactic =>
     case binaryRightFault => apply Recursive.Expression.binaryRightFault <;> assumption
     case binary => apply Recursive.Expression.binary <;> assumption
     case binaryInvalid => apply Recursive.Expression.binaryInvalid <;> assumption
+    case binaryPanic => apply Recursive.Expression.binaryPanic <;> assumption
     case unaryMethod => apply Recursive.Expression.unaryMethod <;> assumption
     case binaryMethod => apply Recursive.Expression.binaryMethod <;> assumption
     case conditional => apply Recursive.Expression.conditional <;> assumption
@@ -1182,6 +1215,7 @@ local macro "erase_stage_grade" : tactic =>
     case assignBare => apply Recursive.StatementsIn.assignBare <;> assumption
     case assignBareFault => apply Recursive.StatementsIn.assignBareFault <;> assumption
     case assignBareOperands => apply Recursive.StatementsIn.assignBareOperands <;> assumption
+    case assignBarePanic => apply Recursive.StatementsIn.assignBarePanic <;> assumption
     case assignBareUnbound => apply Recursive.StatementsIn.assignBareUnbound <;> assumption
     case assignBareDangling => apply Recursive.StatementsIn.assignBareDangling <;> assumption
     case letUninitialized => apply Recursive.StatementsIn.letUninitialized <;> assumption
@@ -1219,6 +1253,7 @@ local macro "erase_stage_grade" : tactic =>
     case assignment => apply Recursive.ForItems.assignment <;> assumption
     case assignmentFailure => apply Recursive.ForItems.assignmentFailure <;> assumption
     case assignmentOperands => apply Recursive.ForItems.assignmentOperands <;> assumption
+    case assignmentPanic => apply Recursive.ForItems.assignmentPanic <;> assumption
     case unbound => apply Recursive.ForItems.unbound <;> assumption
     case dangling => apply Recursive.ForItems.dangling <;> assumption
     case testFault => apply Recursive.ForLoop.testFault <;> assumption
@@ -1397,6 +1432,10 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨firstSize, graded_first⟩ := ih_first
       obtain ⟨secondSize, graded_second⟩ := ih_second
       exact ⟨_, .binaryInvalid occurrence graded_first continues graded_second invalid⟩
+    case binaryPanic occurrence first continues second panics ih_first ih_second =>
+      obtain ⟨firstSize, graded_first⟩ := ih_first
+      obtain ⟨secondSize, graded_second⟩ := ih_second
+      exact ⟨_, .binaryPanic occurrence graded_first continues graded_second panics⟩
     case unaryMethod occurrence dispatch method operand rootsEq selected parameters allocate body resultRule operandIH bodyIH =>
       obtain ⟨operandSize, gradedOperand⟩ := operandIH
       obtain ⟨bodySize, gradedBody⟩ := bodyIH
@@ -1570,6 +1609,9 @@ local macro "construct_stage_grade" : tactic =>
     case assignBareOperands contains form snapshot child currentRead rootType initialValue pathRead invalid childIH =>
       obtain ⟨childSize, childGraded⟩ := childIH
       exact ⟨_, .assignBareOperands contains form snapshot childGraded currentRead rootType initialValue pathRead invalid⟩
+    case assignBarePanic contains form snapshot child currentRead rootType initialValue pathRead panics childIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignBarePanic contains form snapshot childGraded currentRead rootType initialValue pathRead panics⟩
     case assignBareUnbound contains form bare missing =>
       exact ⟨_, .assignBareUnbound contains form bare missing⟩
     case assignBareDangling contains form bare lookup missing =>
@@ -1719,6 +1761,9 @@ local macro "construct_stage_grade" : tactic =>
     case assignmentOperands snapshot child currentRead rootType initialValue pathRead invalid childIH =>
       obtain ⟨childSize, childGraded⟩ := childIH
       exact ⟨_, .assignmentOperands snapshot childGraded currentRead rootType initialValue pathRead invalid⟩
+    case assignmentPanic snapshot child currentRead rootType initialValue pathRead panics childIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignmentPanic snapshot childGraded currentRead rootType initialValue pathRead panics⟩
     case unbound bare missing =>
       exact ⟨_, .unbound bare missing⟩
     case dangling bare lookup missing =>
@@ -2281,6 +2326,8 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | assignBareOperands actual same _ _ _ _ _ _ _ =>
       cases (shape actual).symm.trans same
+  | assignBarePanic actual same _ _ _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
   | assignBareUnbound actual same _ _ =>
       cases (shape actual).symm.trans same
   | assignBareDangling actual same _ _ _ =>
@@ -2401,6 +2448,8 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
   | assignBareFault actual same _ _ =>
       cases (shape actual).symm.trans same
   | assignBareOperands actual same _ _ _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
+  | assignBarePanic actual same _ _ _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBareUnbound actual same _ _ =>
       cases (shape actual).symm.trans same

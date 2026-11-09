@@ -2344,7 +2344,7 @@ variable
   {expressionSyntax : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram) → ExpressionId → Prop}
 
 include inclusion complete slots extension faithful observations functionTypes wellFormed runtime covers unique uninitialized missing in
-theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem preserves_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Preserves
       (model (registry := registry) functions)
       (Program.ofChecked compiled.sourceProgram) context principal.dictionary
@@ -2388,7 +2388,7 @@ theorem preserves_at_with_literals {literals : GenericExpressionMeaning.Certific
       (fun smaller strict => children smaller (Nat.le_of_lt strict)) below
 
 include inclusion complete slots extension faithful observations functionTypes wellFormed runtime covers unique uninitialized missing in
-theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certificate}
+theorem reflects_at_with_literals [FunctionCalls.FaultTokens faults] {literals : GenericExpressionMeaning.Certificate}
     (literalMeaning : GenericExpressionMeaning.Reflects
       (model (registry := registry) functions)
       (Program.ofChecked compiled.sourceProgram) context principal.dictionary
@@ -2434,7 +2434,7 @@ theorem reflects_at_with_literals {literals : GenericExpressionMeaning.Certifica
 include inclusion complete slots extension faithful observations functionTypes wellFormed runtime covers unique uninitialized missing in
 /-- The runtime literal producer and concrete heads discharge expression
 semantics internally through the original support fold. -/
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : PreservingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)
@@ -2455,7 +2455,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 include inclusion complete slots extension faithful observations functionTypes wellFormed runtime covers unique uninitialized missing in
 /-- The runtime literal producer and concrete heads discharge expression
 semantics internally through the original support fold. -/
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : ReflectingBelow (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax)

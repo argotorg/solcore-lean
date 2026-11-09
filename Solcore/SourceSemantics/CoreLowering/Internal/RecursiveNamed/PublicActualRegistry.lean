@@ -210,7 +210,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 encoded argument position. Structural input descriptions and metadata coverage
 are the only boundary conditions; the full execution meaning and next history
 are constructed by the existing caller theorem. -/
-theorem public_run_succeeded_retains
+theorem public_run_succeeded_retains [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion))) :
@@ -260,7 +260,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 /-- A function returned by the original public execution joins the history.
 The remembered entry uses the exact selected Source result type and the actual
 returned Source value and native payload. -/
-theorem public_run_succeeded_remembers
+theorem public_run_succeeded_remembers [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -315,7 +315,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
 /-- The original public start and successful product output supply every
 selected function entry. The selection describes output positions only; entry
 meaning and recursive validation fuel come from the execution and its codec. -/
-theorem public_run_succeeded_collects
+theorem public_run_succeeded_collects [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
@@ -370,7 +370,7 @@ include receiver observations extension semantic family namedTerminals namedSupp
   prepared complete history atRecipe atSession inputsFor metadataFor descriptors in
 /-- Actual public startup and a failed execution return a reusable history at
 the failure heap, preserving every earlier handle and its captured environment. -/
-theorem public_run_failed_retains
+theorem public_run_failed_retains [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned))) :
@@ -694,7 +694,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input in
 /-- A successful public resume reflects to Source at the actual extended
 registry, with the returned history ready for the next actual session. -/
-theorem public_resume_succeeded
+theorem public_resume_succeeded [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
@@ -756,7 +756,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
 /-- The original public invocation derives startup and the actual future
 registry. Arbitrarily nested metadata-bearing inputs use their real encoder;
 all previous function entries retain their captures at the reached heap. -/
-theorem public_invoke_succeeded
+theorem public_invoke_succeeded [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
@@ -883,7 +883,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input in
 /-- A failed public resume reflects to Source at its actual input registry.
 The exact after-heap, old captures and new receiver continue together. -/
-theorem public_resume_failed_at_arity
+theorem public_resume_failed_at_arity [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
@@ -939,7 +939,7 @@ theorem public_resume_failed_at_arity
 
 include receiver stagePrepared profile observations semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input in
-theorem public_resume_failed
+theorem public_resume_failed [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
@@ -984,7 +984,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input atRecipe in
 /-- The real public invocation supplies its own failed startup and receipt;
 metadata-bearing arguments need no separate receiving extension assumption. -/
-theorem public_invoke_failed
+theorem public_invoke_failed [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession returned : SourceCoreExecution.Session publicArtifact}
@@ -1355,7 +1355,7 @@ include receiver observations semantic family namedTerminals namedSupport wellFo
 /-- A following named call keeps all prior captures and ordered entries at its
 actual returned session. Both fuel bounds follow from the independent Source
 success; native completion and successful export are conclusions. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation anchor.function.context before
@@ -1471,7 +1471,7 @@ include receiver observations semantic family namedTerminals namedSupport wellFo
 /-- Independent Source failure of the actual ordered named call fixes the
 public token and reached heap for every sufficient execution budget. Output
 fuel may be zero; the failed session retains earlier captures and export authority. -/
-theorem public_resume_fault_has_sufficient_fuel
+theorem public_resume_fault_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {sourceSize : Nat} {failure : Staging.Recursive.Failure} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation anchor.function.context before
@@ -1809,7 +1809,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input in
 /-- Native success is reflected from the real export-error receipt. The
 Source result and all effects remain available through the returned session. -/
-theorem public_resume_export_error
+theorem public_resume_export_error [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     (exportsReady : session.ExportsReady)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
@@ -1884,7 +1884,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input atRecipe in
 /-- An actual public invocation supplies its own startup and export error.
 The earlier history continues at the exact successful Source after-heap. -/
-theorem public_invoke_export_error
+theorem public_invoke_export_error [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     (exportsReady : session.ExportsReady)
     {publicArtifact : SourceCoreExecution.Artifact}
@@ -2013,7 +2013,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
 failure and preserves prior handles. Output validation fuel is unrestricted.
 The Source argument count must match the callable: pack-equivalent argument
 rows with a different count can produce Source-only arity faults. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     (exportsReady : session.ExportsReady)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
@@ -2195,7 +2195,7 @@ include receiver observations semantic family namedTerminals namedSupport wellFo
   prepared complete history atRecipe atRegistry atSession exportsReady inputsFor descriptors in
 /-- A following named call that completes but cannot export its value retains
 all prior handles and the exact successful Source after-heap. -/
-theorem public_run_export_error_retains
+theorem public_run_export_error_retains [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {error : SourceCoreIndexedSession.Error}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.exportError error returned))) :
@@ -2377,7 +2377,7 @@ include receiver observations semantic family namedTerminals namedSupport wellFo
 /-- The actual named input encoder fixes the receiver, including metadata in
 ordered arguments. Successful public execution returns the exact Source trace
 and retained history without a caller-supplied receiving registry. -/
-theorem public_run_succeeded_retains
+theorem public_run_succeeded_retains [FunctionCalls.FaultTokens semanticFaults]
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion))) :
@@ -2447,7 +2447,7 @@ include receiver observations semantic family namedTerminals namedSupport wellFo
   prepared complete history atRecipe atRegistry atSession inputsFor descriptors in
 /-- A failed following named call retains all earlier handles at the actual
 Source after-heap and the same context used by the real input encoder. -/
-theorem public_run_failed_retains
+theorem public_run_failed_retains [FunctionCalls.FaultTokens semanticFaults]
     {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
     (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
     (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned))) :
@@ -2600,7 +2600,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
 /-- The real public invocation appends every selected output function in
 payload/row order, including repeated keys and repeated handles. The returned
 history uses the same current heap and actual metadata receiver. -/
-theorem public_invoke_succeeded_collects
+theorem public_invoke_succeeded_collects [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
@@ -2737,7 +2737,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
 /-- Every sufficiently funded actual public resume exports the Source result
 and retains all previous captures. Both fuel bounds precede the actual resume;
 no native completion or output success is a caller assumption. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     (exportsReady : session.ExportsReady)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
@@ -2913,7 +2913,7 @@ include receiver stagePrepared profile observations semantic family namedTermina
 /-- Both execution and output fuel bounds precede the actual resume. A structural
 selection over that returned public value retains its functions in payload/row
 order at the same Source after-heap, including repeated mapping entries. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     (atRegistry : session.RegistryAt completion.result.context.registry)
     (exportsReady : session.ExportsReady)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}

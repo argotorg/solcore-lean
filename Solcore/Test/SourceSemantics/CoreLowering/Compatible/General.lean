@@ -331,13 +331,16 @@ theorem mapping_keys_unmatched {key value : TypeSystem.Ty}
   cases comparable
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by
@@ -688,13 +691,16 @@ theorem mapping_keys_unmatched {key value : TypeSystem.Ty}
   cases comparable
 private def model := CompatibleAmbientHeap.payloadModel checked values.registry functions
 private def faults : FunctionCalls.FaultRep := fun error token =>
-  ((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
-  (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)
+  (((∃ location, error = .uninitializedLocation location) ∧ token = reason) ∨
+   (∃ key value tag, MetadataRep values.registry (.mapping key value) tag ∧ error = .missingMappingDefault value ∧ token = reason.add tag)) ∨
+  ∃ code, error = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem uninitialized : ∀ (id : ExpressionId) location, faults (.uninitializedLocation location) ((fun _ => reason) id) :=
-  fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩
+  fun _ location => .inl (.inl ⟨⟨location, rfl⟩, rfl⟩)
 private theorem missing : ∀ (id : ExpressionId) key value tag, MetadataRep values.registry (.mapping key value) tag →
     faults (.missingMappingDefault value) (((fun _ => reason) id).add tag) :=
-  fun _ key value tag owned => .inr ⟨key, value, tag, owned, rfl, rfl⟩
+  fun _ key value tag owned => .inl (.inr ⟨key, value, tag, owned, rfl, rfl⟩)
 private def administrativeType : Ty := .function .unit frameLayout.type
 private def administrativeValue : Value := .closure .unit frameLayout.type (.var 1) [SourceCoreCallableIndexedFrames.encode frameLayout .empty]
 private theorem frameRegistered : frameLayout.Registered ambient.definitions := by
@@ -919,7 +925,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 
 include extension faithful functionLeaves functionTypes sameLedger runtime uninitialized missing
 
-theorem accepted_pair_preserves (unique : NodeOccurrencesUnique source) :
+theorem accepted_pair_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (fun s i code => s = scope ∧ i = pairId ∧ code =
         ⟨.product lowered.type lowered.type, LocalSequence.pair lowered.type lowered.type lowered.expression lowered.expression⟩) faults := by
@@ -929,7 +935,7 @@ theorem accepted_pair_preserves (unique : NodeOccurrencesUnique source) :
   exact CompatibleExpressionGeneralRuntime.preserves functions extension faithful functionLeaves functionTypes
     program evidence sameLedger runtime unique uninitialized missing receipt
 
-theorem accepted_pair_reflects :
+theorem accepted_pair_reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (fun s i code => s = scope ∧ i = pairId ∧ code =
         ⟨.product lowered.type lowered.type, LocalSequence.pair lowered.type lowered.type lowered.expression lowered.expression⟩) faults := by
@@ -1102,7 +1108,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 
 include extension faithful functionLeaves functionTypes sameLedger runtime uninitialized missing
 
-theorem accepted_preserves :
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program sourceContext evidence source (fun s i code => s = scope ∧ i = id ∧ code = lowered) faults := by
   have receipt := accepted_support unique declarations signatures constructorValid policyFor coercions syntaxTree found typed accepted
@@ -1111,7 +1117,7 @@ theorem accepted_preserves :
   exact CompatibleExpressionGeneralRuntime.preserves functions extension faithful functionLeaves functionTypes
     program evidence sameLedger runtime unique uninitialized missing receipt
 
-theorem accepted_reflects :
+theorem accepted_reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program sourceContext evidence source (fun s i code => s = scope ∧ i = id ∧ code = lowered) faults := by
   have receipt := accepted_support unique declarations signatures constructorValid policyFor coercions syntaxTree found typed accepted
@@ -1509,7 +1515,13 @@ private theorem rootWritable : WritableLocal context binder.id rootType :=
 private def diagnostics (registry : SourceCoreRawMetadata.Registry) (prepared : Prepared) : GenericExpressionMeaning.FaultRep :=
   fun reason token =>
     (∃ root resolved count, FaultToken checked registry root prepared.steps resolved reason token count) ∨
-    ∃ location, reason = .uninitializedLocation location ∧ token = prepared.invalidProjection
+    (∃ location, reason = .uninitializedLocation location ∧ token = prepared.invalidProjection) ∨
+    ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+
+/-- Every panic fails with its code's reason. -/
+private instance (registry : SourceCoreRawMetadata.Registry) (prepared : Prepared) :
+    FunctionCalls.FaultTokens (diagnostics registry prepared) :=
+  ⟨fun code => .inr (.inr ⟨code, rfl, rfl⟩)⟩
 
 /-- A real completed emitted assignment reconstructs its source target prefix.
 There is no source key, source read or native helper execution premise. -/
@@ -1550,7 +1562,7 @@ theorem whole_reflection {route : Route} {prepared : Prepared}
   · intro root resolved reason token count receipt
     exact .inl ⟨root, resolved, count, receipt⟩
   · intro location
-    exact .inr ⟨location, rfl, rfl⟩
+    exact .inr (.inl ⟨location, rfl, rfl⟩)
 
 private def wholeExercise {route : Route} {prepared : Prepared}
     (described : describe compilation checked.signatures source site assignment = .ok route)
@@ -2199,6 +2211,8 @@ theorem actual_lower_reflects {code : Expr}
   have binding : ∀ actual, rootBinder source assignment.target.root = .ok actual → actual = binder := by
     intro actual found
     exact Except.ok.inj (found.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
+  -- The trivial relation relates every panic too.
+  haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
   have reflected := CompatiblePlaceLowerReflection.reflects (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _)) keyTyped
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment]) childReceipt accepted typed

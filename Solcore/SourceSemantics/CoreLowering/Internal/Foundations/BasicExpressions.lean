@@ -196,6 +196,11 @@ structure CompositionJoins (expressionPost : ExpressionFaultPost) (listPost : Ex
     Dynamic.ExpressionsFault program context evidence source environment before ids reason after →
     listPost program context evidence source environment before ids reason after token mapping world store →
     expressionPost program context evidence source environment before id reason after token mapping world store
+  /-- A panic is its own origin: its token is its code's reason at every site. -/
+  panic : ∀ {environment before id code after mapping world store},
+    Dynamic.ExpressionFaults program context evidence source environment before id (.panic code) after →
+    expressionPost program context evidence source environment before id (.panic code) after
+      (SourceCorePanics.reason code) mapping world store
 
 /-- The original untyped child contract with a fault-only post appended. -/
 def Preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
@@ -301,6 +306,7 @@ theorem trivial_composition_joins (program : Program) (context : SourceSemantics
     CompositionJoins TrivialExpressionPost TrivialExpressionsPost program context evidence source where
   expression := by intros; trivial
   expressions := by intros; trivial
+  panic := by intros; trivial
 
 variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
   {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
@@ -317,6 +323,17 @@ theorem OutcomePost.of_trivial {environment : Dynamic.Environment} {before after
   cases represented with
   | value _ => trivial
   | fault _ => exact ⟨_, rfl, trivial⟩
+
+/-- The post of a panic, from the joins' own panic origin. -/
+theorem OutcomePost.panic {listPost : ExpressionsFaultPost}
+    (joins : CompositionJoins post listPost program context evidence source)
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {id : ExpressionId} {type : Core.Ty} {code : UInt8}
+    {mapping : LocationMap} {world : StoreTyping} {store : Store}
+    (fault : Dynamic.ExpressionFaults program context evidence source environment before id (.panic code) after) :
+    OutcomePost post program context evidence source environment before id type
+      (.fault (.panic code)) after (.inLeft type (.word (SourceCorePanics.reason code))) mapping world store :=
+  ⟨_, rfl, joins.panic fault⟩
 
 theorem OutcomePost.fault {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {id : ExpressionId} {type : Core.Ty} {reason : Dynamic.SemanticFault} {token : Word}

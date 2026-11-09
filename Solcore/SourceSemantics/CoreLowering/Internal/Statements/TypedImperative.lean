@@ -34,7 +34,7 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   (observations : FunctionObservations values.checked.catalog functions identities)
 
 include extension uninitialized missing faithful observations in
-theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem assignment_preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
@@ -87,7 +87,7 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
     · exact go first (by cases mode <;> exact .fault tail)
 
 include extension uninitialized missing faithful observations in
-theorem assignment_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem assignment_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
@@ -608,7 +608,7 @@ variable {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope mode statements expected type code)
@@ -739,7 +739,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope mode statements expected type code)
@@ -903,9 +903,20 @@ namespace Solcore.SourceSemantics.CoreLowering.TypedImperative.Native
 open Core Frontend
 open TypedLexicalWhile.Native
 
+/-- The modifier's check has the type of its write. -/
+private theorem guard_typed {context : Core.Context} {outputType result : Ty}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {write : Expr} {definitions : DataEnvironment}
+    (typed : HasType context (Frontend.SourceCoreDataPlaces.guard outputType operator write) result definitions) :
+    HasType context write result definitions := by
+  rcases operator with _ | ⟨operation, _ | _⟩
+  · exact typed
+  · exact typed
+  · cases typed with
+    | ifE _ _ written => exact written
+
 theorem execute_continuation {prepared : SourceCoreCompatibleDataPlaces.Prepared}
     {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {output result : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {output result : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
     {definitions : DataEnvironment} {context : Core.Context}
     (typed : HasType context
       (SourceCoreCompatibleDataPlaces.execute prepared reference keys rhs next output operator bitNot invalid)
@@ -917,7 +928,7 @@ theorem execute_continuation {prepared : SourceCoreCompatibleDataPlaces.Prepared
         cases third with | caseE right failure fourth =>
           cases fourth with | caseE modified failure fifth =>
             cases fifth with | caseE updated failure last =>
-              cases last with | letE written body =>
+              cases guard_typed last with | letE written body =>
                 exact remove_front (remove_front (remove_front (remove_front
                   (remove_front (remove_front (remove_front body))))))
 end Solcore.SourceSemantics.CoreLowering.TypedImperative.Native

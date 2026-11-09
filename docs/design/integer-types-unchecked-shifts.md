@@ -232,7 +232,7 @@ blocks has no Lean counterpart.
 - **Blocks.** `StatementValue` gains `unchecked`, parsed when the contextual
   keyword `unchecked` is followed by `{`. (Implemented without the
   constructor: see [unchecked blocks as
-  implemented](#unchecked-blocks-as-implemented-without-division).)
+  implemented](#unchecked-blocks-as-implemented).)
 - **Desugaring.** A pass between parsing and inference removes every
   `unchecked` statement:
   - It replaces the block with a plain block.
@@ -414,7 +414,7 @@ the operator and panic plumbing first.
 - **Legacy fragments.** The older strict-`word` evaluators leave the shifts
   out.
 
-### Unchecked blocks as implemented, without division
+### Unchecked blocks as implemented
 
 - **No statement form.** Inference reads `Syntax.Statement` itself, and its
   functional-induction proofs name 514 numbered cases in 25 files, so a
@@ -430,18 +430,18 @@ the operator and panic plumbing first.
   A block written in another block, or a recorded `{` that starts no block
   statement, is a load error.
 - **Operators.** `BinaryOp` and `ValueAssignOp` gain `uncheckedAdd`,
-  `uncheckedSubtract` and `uncheckedMultiply`, which only the pass produces.
+  `uncheckedSubtract`, `uncheckedMultiply`, `uncheckedDivide` and
+  `uncheckedModulo`, which only the pass produces.
   - On `word` they type, run and lower as the checked operators.
-  - On a declared type they dispatch to `UncheckedAdd`, `UncheckedSub` and
-    `UncheckedMul`.
+  - On a declared type they dispatch to `UncheckedAdd`, `UncheckedSub`,
+    `UncheckedMul`, `UncheckedDiv` and `UncheckedMod`.
   - On `integer` inference rejects them, since upstream defines no unchecked
     instance for it.
   - A literal operand is a `word` at once rather than deferred: with `integer`
     excluded, `word` is the only literal target left.
-- **Division and remainder.** `/`, `%`, `/=` and `%=` written in a block are a
-  load error (`Syntax.Unchecked.Error.division`). Upstream's unchecked division
-  and remainder panic with `0x12` on a zero divisor, and Lean has no panics
-  yet, so no typing rule, semantic rule or lowering theorem mentions them.
+- **Division and remainder.** `/`, `%`, `/=` and `%=` in a block panic with
+  `0x12` on a zero divisor: see [panics as implemented](#panics-as-implemented).
+  Until panics existed they were a load error.
 - **Word-only compound assignment.** `ValueAssignOp.wordOnly` (the shifts and
   the unchecked arithmetic) replaces row 3's `isShift`. The data-place lowering
   refuses these operators at `integer` leaves, and the assignment profile its
@@ -455,6 +455,63 @@ the operator and panic plumbing first.
 - `pragma solcore;` (row 5);
 - reads of uninitialized locals, which Lean keeps faulting on by decision
   ([closure capture by value](../guide/source-semantics.md#closures-capture-by-value)).
+
+### Panics as implemented
+
+Unchecked `/` and `%` and their compound forms `/=` and `%=` panic with
+`Panic(0x12)` on a zero divisor, as upstream does. Row 2 is complete.
+
+**Frontend.**
+- `SourceCorePanics` gives panic code `c` the Core reason `2^256 − 2^8 + c`,
+  decodes a reason in that range back to its code (`code?`), and gives
+  upstream's revert data, `0x4e487b71` followed by the code as a 32-byte word
+  (`revertData`).
+- `RuntimeError.panic code` is the diagnostic. `Table.diagnostic?` tries the
+  table's rows first; a reason in the panic range then decodes to
+  `.panic code` at the function's declaration site.
+- Program preparation fails with `Error.panicRange` unless every reason that a
+  fault-site table issues lies below the panic range. `Compiled.panicFree`
+  records the check, and `Table.panic_diagnostic` proves that a checked table
+  decodes every panic.
+- A binary `/` or `%` in a block lowers to `panickingBody`: it compares the
+  right operand with zero and fails with the panic's reason, or applies Core's
+  `wordDiv` or `wordMod`. The legacy primitive lowerer, used only by tests,
+  rejects the two operators.
+- A compound `/=` or `%=` keeps Core's total modifier and checks the divisor in
+  `guard`, after the setter has rebuilt the latest root and before the write.
+  So a structural fault on the latest root still wins over the panic, as the
+  source rule requires. Bit-not assignments pass `.equal`, whose modifier never
+  checks.
+
+**Source semantics.**
+- `SemanticFault.panic code`. `BinaryPrimitivePanics` is the panicking case of
+  a primitive application, and `BinaryPrimitiveApplies` has no zero divisor for
+  the unchecked operators. `EvaluatesRightOperand.panicking` evaluates the right
+  operand of a panicking operator.
+- `AssignmentOperandsPanic` and `SourcePlaceAssignmentFaults.panic`: a compound
+  assignment panics only after the latest root has been traversed, beside the
+  `operands` rule.
+- The staged semantics gains `Expression.binaryPanic`,
+  `StatementsIn.assignBarePanic`, `ForItems.assignmentPanic` and
+  `WriteFault.panic`, with their sized forms, erasure and preservation.
+
+**Proofs.**
+- `FunctionCalls.FaultTokens faults` holds the panic law: `faults (.panic code)
+  (reason code)`. `RecursiveStageMeaning.FaultTokens` is its staged form.
+  Theorems that need it take it as an instance argument. The decoded relation
+  of an issued table has it through `issued_panicFree` and `tokens`, and a
+  staged law gives the law of its semantic failures (`semanticTokens`).
+- `CompositionJoins.panic` and the reached-fault paths give a panic its origin
+  (`PrimitiveOrigin.panic`, `ExpressionPath.panic`).
+- `DataPlaceGuard` relates `guard` to its write (`agreement`, `inv_sized`,
+  `panic_of_selected`), and each place pipeline's success, fault and
+  reflection theorems use it. The panic preservation theorems run the setter
+  on the readable latest root (`setter_preserves`) and then fail at the check.
+
+**Tests.** `Tests.SourceCoreUncheckedExecution` runs `/`, `%`, `/=` and `%=` in
+a block, also at a mapping element, with and without a zero divisor, and
+checks the panic's reason, its diagnostic and its revert data. Checked `/` and
+`%` still give 0.
 
 ## Consequences for existing programs
 
@@ -476,28 +533,21 @@ The unit is required. It was paused after row 3 and part of row 2 on
 
 **Done.**
 - Row 3, shifts: [shifts as implemented](#shifts-as-implemented).
-- Row 2 without division and remainder:
-  [unchecked blocks as implemented](#unchecked-blocks-as-implemented-without-division).
+- Row 2: [unchecked blocks as implemented](#unchecked-blocks-as-implemented),
+  with division and remainder through [panics as
+  implemented](#panics-as-implemented).
 
 The public-API tests are `Tests.SourceCoreShiftExecution` and
 `Tests.SourceCoreUncheckedExecution` in
 `Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean`.
 
-**Remaining, in order.**
+**Remaining.**
 
-1. **Panics**, designed once for every unit that needs them: unchecked `/` and
-   `%`, row 1's checked arithmetic, and row 4's array panics. They need:
-   - the fault reason `SemanticFault.panic code` and its fault rules;
-   - a Core failure reason per panic site, with a `RuntimeError.panic`
-     diagnostic;
-   - upstream's 36 bytes of revert data.
-
-   Then the load error on unchecked `/` and `%` is lifted: they become
-   `BinaryOp` and `ValueAssignOp` constructors with their typing, semantics and
-   lowering.
-2. **Row 1**: the twelve types, their literals and the `uint256` default,
-   unary minus, checked arithmetic, the integer types' shifts, unchecked and
-   bitwise operators and comparisons, and the API's canonical-argument check.
+- **Row 1**: the twelve types, their literals and the `uint256` default,
+  unary minus, checked arithmetic, the integer types' shifts, unchecked and
+  bitwise operators and comparisons, and the API's canonical-argument check.
+  Its checked `0x11` and `0x12` panics reuse the panic law, as row 4's array
+  panics will.
 
 **Measured costs.**
 

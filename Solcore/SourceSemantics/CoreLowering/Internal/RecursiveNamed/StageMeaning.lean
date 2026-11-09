@@ -191,7 +191,7 @@ variable (program : Program) (stages : Staging.Recursive.Registry) (invocation :
 include sameSource uninitialized in
 /-- The actual completed ordinary-cell read is inverted before a source rule
 is built. Full heap representation supplies the cell's ordinary metadata. -/
-theorem read_reflects :
+theorem read_reflects [FunctionCalls.FaultTokens faults] :
     Reflects functions (registry := registry) program stages invocation context
       (fun current id code => ReadSupported (fuel := fuel) (values := values) (source := source)
         (context := context) (reasonAt := reasonAt) (scope := current) id code) faults := by
@@ -417,7 +417,7 @@ private theorem pair_reflects {id left right : ExpressionId} {node leftNode righ
             finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
 
 include sameSource uninitialized in
-private theorem product_reflects (sameLedger : context.solvedRequirements = solved)
+private theorem product_reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtime : RuntimeRequirementLedgerValid context)
     {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : CompatibleExpressionProducts.Tree fuel values source context solved reasonAt scope id code}
@@ -476,6 +476,7 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   cases profile with
   | word strict => cases circuit <;> cases strict
   | integer strict => cases circuit <;> cases strict
+  | panicking panicking => cases circuit <;> cases panicking
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -502,10 +503,11 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   cases profile with
   | word strict => cases strict <;> exact bind_failed child evaluated
   | integer strict => cases strict <;> exact bind_failed child evaluated
+  | panicking panicking => cases panicking <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue =>
       cases evaluated with
       | ifFalse condition branch => cases condition with | var impossible => cases impossible
@@ -515,7 +517,7 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | logicalOr =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse =>
       cases evaluated with
       | ifTrue condition branch => cases condition with | var impossible => cases impossible
@@ -523,17 +525,37 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
         cases condition
         exact evaluation_deterministic branch child
 
-private theorem tail_value (profile : BinaryProfile operator operand result mode)
+private theorem tail_outcome (profile : BinaryProfile operator operand result mode)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (child : Evaluates (x :: environment) before (right.weakenAt 0) (.inRight .word y) middle)
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore) :
-    ∃ output native, Dynamic.BinaryPrimitiveApplies operator a b output ∧
+    (∃ output native, Dynamic.BinaryPrimitiveApplies operator a b output ∧
       ValueRep checked rawRegistry model mapping world result output native (mode.resultType operator) ∧
-      value = .inRight .word native ∧ finalStore = middle := by
+      value = .inRight .word native ∧ finalStore = middle) ∨
+    (∃ code, Dynamic.BinaryPrimitivePanics operator a b code ∧
+      value = .inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code)) ∧ finalStore = middle) := by
   cases profile with
+  | panicking panicking =>
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by cases panicking <;> exact leftRep)
+    obtain ⟨b, rfl, rfl⟩ := word_fields (by cases panicking <;> exact rightRep)
+    have body : Evaluates (.word b :: .word a :: environment) middle
+        (SourceCorePrimitive.panickingBody operator) value finalStore := by
+      cases panicking <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+    rcases SourceCorePrimitive.panickingBody_inv body with ⟨rfl, rfl, rfl⟩ | ⟨nonzero, ran⟩
+    · cases panicking
+      · exact .inr ⟨_, .wordUncheckedDivide a, rfl, rfl⟩
+      · exact .inr ⟨_, .wordUncheckedModulo a, rfl, rfl⟩
+    · cases ran with
+      | inRight actual =>
+        cases panicking
+        · obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (.binary (.var rfl) (.var rfl) rfl)
+          exact .inl ⟨_, _, .wordUncheckedDivide a b nonzero, .word _, rfl, rfl⟩
+        · obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (.binary (.var rfl) (.var rfl) rfl)
+          exact .inl ⟨_, _, .wordUncheckedModulo a b nonzero, .word _, rfl, rfl⟩
   | word strict =>
+    refine .inl ?_
     have operandEq := PrimitiveExpressions.strict_operand_word strict
     obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
     obtain ⟨b, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
@@ -547,6 +569,7 @@ private theorem tail_value (profile : BinaryProfile operator operand result mode
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
       exact ⟨_, _, applied, represented, rfl, rfl⟩
   | integer strict =>
+    refine .inl ?_
     have operandEq : SourceCoreInteger.binaryOperandType operator = .integer := by cases strict <;> rfl
     obtain ⟨a, rfl, rfl⟩ := integer_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
     obtain ⟨b, rfl, rfl⟩ := integer_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
@@ -560,10 +583,11 @@ private theorem tail_value (profile : BinaryProfile operator operand result mode
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
       exact ⟨_, _, applied, represented, rfl, rfl⟩
   | logicalAnd =>
+    refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep
     obtain ⟨b, rfl, rfl⟩ := bool_fields rightRep
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | andTrue =>
       cases evaluated with
       | ifFalse condition branch => cases condition with | var impossible => cases impossible
@@ -572,10 +596,11 @@ private theorem tail_value (profile : BinaryProfile operator operand result mode
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic branch child
         exact ⟨_, _, .logicalAnd true b, .bool b, rfl, rfl⟩
   | logicalOr =>
+    refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep
     obtain ⟨b, rfl, rfl⟩ := bool_fields rightRep
     cases continues with
-    | strict strict => cases strict
+    | strict strict | panicking strict => cases strict
     | orFalse =>
       cases evaluated with
       | ifTrue condition branch => cases condition with | var impossible => cases impossible
@@ -586,7 +611,7 @@ private theorem tail_value (profile : BinaryProfile operator operand result mode
 end Tail
 
 include sameSource uninitialized in
-theorem reflects (sameLedger : context.solvedRequirements = solved) (runtime : RuntimeRequirementLedgerValid context)
+theorem reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved) (runtime : RuntimeRequirementLedgerValid context)
     {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : Tree fuel values source context solved reasonAt scope id code} (supported : Supported tree) :
     ReflectsCode functions program stages invocation (context := context) (registry := registry) (faults := faults) scope id code := by
@@ -661,9 +686,13 @@ theorem reflects (sameLedger : context.solvedRequirements = solved) (runtime : R
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := payload.extend (.refl registry) maps worlds
-            obtain ⟨sourceResult, result, applied, resultRep, rfl, rfl⟩ := tail_value profile leftPayload rightPayload continues rightEvaluation branch
-            exact ⟨_, after, finalMap, finalWorld, .binary owned firstTrace continues secondTrace applied,
-              .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            rcases tail_outcome profile leftPayload rightPayload continues rightEvaluation branch with
+              ⟨sourceResult, result, applied, resultRep, rfl, rfl⟩ | ⟨code, panics, rfl, rfl⟩
+            · exact ⟨_, after, finalMap, finalWorld, .binary owned firstTrace continues secondTrace applied,
+                .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            · exact ⟨_, after, finalMap, finalWorld, .binaryPanic owned firstTrace continues secondTrace panics,
+                .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
 
 /-- A structural source fragment with no invocation edge. Atomic lambda creation
 is harmless here; the compiler support above still admits only actual literals
@@ -1144,7 +1173,7 @@ include sameSource unique uninitialized in
 /-- Preservation uses the established plain primitive proof once. The same
 static support first excludes a stage failure, so erasure cannot conceal a
 rejected nested invocation. Reflection above does not use this theorem. -/
-theorem preserves (extension : SourceCoreRawMetadata.Extends values.registry registry)
+theorem preserves [FunctionCalls.FaultTokens faults] (extension : SourceCoreRawMetadata.Extends values.registry registry)
     (sameLedger : context.solvedRequirements = solved) (runtime : RuntimeRequirementLedgerValid context)
     {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : Tree fuel values source context solved reasonAt scope id code} (supported : Supported tree)
@@ -1242,6 +1271,10 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 abbrev FaultRep (faults : FunctionCalls.FaultRep) : RecursiveStageMeaning.FaultRep
   | .semantic reason, token => faults reason token
   | .stage _ _ _, _ => False
+
+instance {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] :
+    RecursiveStageMeaning.FaultTokens (FaultRep faults) :=
+  ⟨fun code => FunctionCalls.FaultTokens.panic code⟩
 
 def Entries (scope : SourceCoreLocalCell.Scope) (entries : List (ExpressionId × SourceCoreBasic.LoweredExpr)) :
     GenericExpressionMeaning.Certificate := fun current id code => current = scope ∧ (id, code) ∈ entries
@@ -1425,6 +1458,9 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
   | binaryInvalid owned first continues second invalid =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible
+  | binaryPanic owned first continues second panics =>
+    have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
+    cases impossible
   | conditional owned test branch =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible
@@ -1585,7 +1621,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
 include sameSource sameLedger runtime uninitialized in
 /-- Each original native child is reflected by the same finite supported tree.
 No preceding source trace or preservation theorem enters this direction. -/
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Certificate fuel values source context solved reasonAt) (FaultRep faults) := by
   cases sameSource
@@ -1607,7 +1643,7 @@ theorem reflects :
 include sameSource sameLedger runtime uninitialized in
 /-- Preservation uses the sole ordered pack proof at each tuple node. The
 primitive theorem discharges its own stage-fault impossibility. -/
-theorem preserves (unique : NodeOccurrencesUnique source)
+theorem preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (extension : SourceCoreRawMetadata.Extends values.registry registry) :
     RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Certificate fuel values source context solved reasonAt) (FaultRep faults) := by
@@ -2001,7 +2037,7 @@ include sameSource extension in
 /-- Forward mapping-read preservation reuses the ordinary read proof and the
 independent staged erasure. A local reference cannot conceal a stage rejection. -/
 theorem preserves (unique : NodeOccurrencesUnique source)
-    (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
+    [FunctionCalls.FaultTokens faults] (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     (supported : Supported (fuel := fuel) (values := values) (source := source) (context := context) (reasonAt := reasonAt) scope id code)
     {node : ExpressionNode} (found : invocation.source.lookupExpression? id = some node)
@@ -2095,7 +2131,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include sameSource sameLedger extension runtime uninitialized in
-private theorem leaf_reflects :
+private theorem leaf_reflects [FunctionCalls.FaultTokens faults] :
     RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Leaves fuel values source context solved reasonAt)
       (RecursiveStageTupleMeaning.FaultRep faults) := by
@@ -2123,7 +2159,7 @@ private theorem leaf_reflects :
   | fault matched => exact .fault matched
 
 include sameSource sameLedger extension runtime uninitialized in
-private theorem leaf_preserves (unique : NodeOccurrencesUnique source) :
+private theorem leaf_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) :
     RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Leaves fuel values source context solved reasonAt)
       (RecursiveStageTupleMeaning.FaultRep faults) := by
@@ -2153,7 +2189,7 @@ private theorem leaf_preserves (unique : NodeOccurrencesUnique source) :
 include sameSource sameLedger extension runtime uninitialized in
 /-- Reflection starts with the original ordered Core pack. Each reached read
 retains its own raw type and initializes the same cell at the same position. -/
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Certificate fuel values source context solved reasonAt)
       (RecursiveStageTupleMeaning.FaultRep faults) := by
@@ -2164,7 +2200,7 @@ theorem reflects :
 include sameSource sameLedger extension runtime uninitialized in
 /-- Preservation closes the concrete leaf laws inside the common tuple proof.
 No external execution law or preceding native completion is an input. -/
-theorem preserves (unique : NodeOccurrencesUnique source) :
+theorem preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source) :
     RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program stages invocation context (Certificate fuel values source context solved reasonAt)
       (RecursiveStageTupleMeaning.FaultRep faults) := by

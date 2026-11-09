@@ -3932,7 +3932,7 @@ def evaluateLocalWordBinaryWithCost? (operator : Syntax.BinaryOp) (left right : 
   | .notEqual => some (.bool (!(left == right)), 5)
   | .lessEqual => some (.bool (!(decide (left > right))), 5)
   | .greaterEqual => some (.bool (!(decide (left < right))), 11)
-  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
+  | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo
   | .logicalAnd | .logicalOr => none
 
 /-- First-match actual lookup, strict primitives/right-associated tuples and selected-only control
@@ -4127,7 +4127,7 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
           · simp only [↓reduceIte, pure, Option.some.injEq, Prod.mk.injEq] at result
             obtain ⟨rfl, rfl⟩ := result
             exact .orTrue (evaluateLocalExpressionWithCost?_sound leftResult store)
-        case shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply =>
+        case shiftLeft | shiftRight | uncheckedAdd | uncheckedSubtract | uncheckedMultiply | uncheckedDivide | uncheckedModulo =>
           simp only [evaluateLocalExpressionWithCost?, bind, Option.bind_eq_some_iff] at accepted
           obtain ⟨⟨actualLeft, leftCost⟩, leftResult, result⟩ := accepted
           cases actualLeft <;> simp only [reduceCtorEq, Option.bind_eq_some_iff] at result

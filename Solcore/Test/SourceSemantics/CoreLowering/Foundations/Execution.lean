@@ -3785,10 +3785,10 @@ section
 as far as Lean implements them: `+`, `-` and `*` and their compound forms on
 Words, which wrap in a block as outside it, `unchecked` as an ordinary name,
 blocks in loops, lambdas written in a block, helpers called from one, and the
-rejected programs. Upstream's unchecked `/` and `%` panic on a zero divisor;
-Lean has no panics yet, so a block rejects them while the file loads.
-Every expected value is what the pinned Rust paths give (lane D's probe, in
-`docs/design/integer-types-unchecked-shifts.md`). -/
+rejected programs. Unchecked `/` and `%` and their compound forms panic with
+`Panic(0x12)` on a zero divisor, also at a mapping element, while checked `/`
+and `%` still give 0. Every expected value is what the pinned Rust paths give
+(lane D's probe, in `docs/design/integer-types-unchecked-shifts.md`). -/
 set_option autoImplicit false
 namespace Tests.SourceCoreUncheckedExecution
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -3817,12 +3817,19 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function helper(a: Word, b: Word) returns (Word) { return a / b; }",
   "function helperDivision(a: Word, b: Word) returns (Word) { unchecked { return helper(a, b); } }",
   "function lambdaBlock(x: Word) returns (Word) { unchecked { let next = lam(y: Word) -> Word { unchecked { return y + 1; } }; return next(x) * 2; } }",
-  "function shadowed(x: Word) returns (Word) { let r: Word = x; unchecked { let r: Word = 7; r = r + 1; } return r; }"
+  "function shadowed(x: Word) returns (Word) { let r: Word = x; unchecked { let r: Word = 7; r = r + 1; } return r; }",
+  "function divide(a: Word, b: Word) returns (Word) { unchecked { return a / b; } }",
+  "function remainder(a: Word, b: Word) returns (Word) { unchecked { return a % b; } }",
+  "function divideAssign(a: Word, b: Word) returns (Word) { let r: Word = a; unchecked { r /= b; } return r; }",
+  "function remainderAssign(a: Word, b: Word) returns (Word) { let r: Word = a; unchecked { r %= b; } return r; }",
+  "function tableDivide(a: Word, b: Word) returns (Word) { let table: mapping(Word => Word); table[7] = a; unchecked { table[7] /= b; } return table[7]; }",
+  "function tableRemainder(a: Word, b: Word) returns (Word) { let table: mapping(Word => Word); table[7] = a; unchecked { table[7] %= b; } return table[7]; }"
 ]
 
 private def names : List String :=
   ["wrapAdd", "wrapSub", "wrapMul", "compound", "named", "loop", "lambdaDivision",
-    "helperDivision", "lambdaBlock", "shadowed"]
+    "helperDivision", "lambdaBlock", "shadowed", "divide", "remainder", "divideAssign",
+    "remainderAssign", "tableDivide", "tableRemainder"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -3837,6 +3844,26 @@ private def execute {artifact : Artifact} (session : Session artifact) (key : Ke
   | .ok (.failed reason _) => throw (IO.userError s!"unchecked language failure: {reprStr reason}")
   | .ok (.outOfFuel _) => throw (IO.userError "unchecked execution exhausted")
   | .error error => throw (IO.userError s!"unchecked invocation: {reprStr error}")
+/-- A run that fails with `Panic(0x12)`: the reason is the panic's, the
+diagnostic decodes it, and the revert data is upstream's. -/
+private def panics {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
+    (label : String) : IO (Session artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.failed reason next) =>
+      let code := SourceCorePanics.divisionByZero
+      require (SourceCorePanics.code? reason == some code) s!"{label} failed with {reprStr reason}"
+      match session.diagnostic key reason with
+      | .ok (some diagnostic) =>
+          require (decide (diagnostic.error = .panic code)) s!"{label} decoded {reprStr diagnostic.error}"
+      | other => throw (IO.userError s!"{label} decoded {reprStr other}")
+      let data := ((SourceCorePanics.code? reason).map SourceCorePanics.revertData).map ByteArray.toList
+      require (data == some ([0x4e, 0x48, 0x7b, 0x71] ++ List.replicate 31 0 ++ [0x12]))
+        s!"{label} revert data {reprStr data}"
+      pure next
+  | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
+  | .ok _ => throw (IO.userError s!"{label} did not fail")
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def boot (artifact : Artifact) : IO (Session artifact) := do
   let fresh ← artifact.bootstrapWithReceipt
   match fresh.val.resume 300000 with
@@ -3849,7 +3876,7 @@ private def rejected (label : String) (lines : List String) : IO Unit :=
   | .ok _ => throw (IO.userError s!"{label} was accepted")
   | .error _ => pure ()
 
-/-- The block's own load error, so that a division is not rejected for an
+/-- The block's own load error, so that a program is not rejected for an
 unrelated reason. -/
 private def rejectedWhileLoading (label : String) (expected : Syntax.Unchecked.Error → Bool)
     (lines : List String) : IO Unit :=
@@ -3884,27 +3911,28 @@ def run : IO Unit := do
       (6, [7, 2], 3), (6, [7, 0], 0),
       (7, [9, 0], 0), (7, [9, 4], 2),
       (8, [maximum], 0), (8, [4], 10),
-      (9, [3], 3)]
+      (9, [3], 3),
+      (10, [7, 2], 3), (11, [7, 2], 1), (12, [9, 4], 2), (13, [9, 4], 1),
+      (14, [9, 4], 2), (15, [9, 4], 1)]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) (arguments.map word)
     require (completed.value == word expected)
       s!"unchecked case {names[index]?} {arguments} gave {reprStr completed.value}"
     session := completed.session
+  for (index, arguments) in [(10, [7, 0]), (11, [7, 0]), (12, [9, 0]), (13, [9, 0]), (14, [9, 0]), (15, [9, 0])] do
+    session ← panics session (← key index) (arguments.map word) s!"unchecked case {names[index]?} {arguments}"
+  -- The session survives a panic.
+  let completed ← execute session (← key 10) [word 8, word 2]
+  require (completed.value == word 4) "unchecked division after a panic"
   rejectedWhileLoading "a block in a block" (fun | .nested _ => true | _ => false)
     ["function bad() returns (Word) { unchecked { unchecked { return 1; } } }"]
-  rejectedWhileLoading "a division in a block" (fun | .division _ => true | _ => false)
-    ["function bad(a: Word, b: Word) returns (Word) { unchecked { return a / b; } }"]
-  rejectedWhileLoading "a remainder in a block" (fun | .division _ => true | _ => false)
-    ["function bad(a: Word, b: Word) returns (Word) { unchecked { return a % b; } }"]
-  rejectedWhileLoading "a compound remainder in a block" (fun | .division _ => true | _ => false)
-    ["function bad(a: Word, b: Word) returns (Word) { unchecked { a %= b; } return a; }"]
   discard <| get "checked integer arithmetic"
     (checkProgram (workspaceOf ["function good(n: integer) returns (integer) { return n + 1; }"]))
   rejectedByInference "unchecked arithmetic on integer"
     ["function bad(n: integer) returns (integer) { unchecked { return n + 1; } }"]
   rejected "a block as an expression"
     ["function bad() returns (Word) { let x: Word = unchecked { 1 }; return x; }"]
-  IO.println "SOURCE_CORE_UNCHECKED_PASS: unchecked `+`, `-` and `*` wrap on Words with their compound forms, `unchecked` stays a name, blocks reach no lambda body or helper, and nested blocks, unchecked `/` and `%`, unchecked `integer` arithmetic and blocks as expressions are rejected"
+  IO.println "SOURCE_CORE_UNCHECKED_PASS: unchecked `+`, `-` and `*` wrap on Words with their compound forms, unchecked `/` and `%` panic with 0x12 on a zero divisor (also compound and at a mapping element), `unchecked` stays a name, blocks reach no lambda body or helper, and nested blocks, unchecked `integer` arithmetic and blocks as expressions are rejected"
 
 end Tests.SourceCoreUncheckedExecution
 end

@@ -2260,7 +2260,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include extension faithful observations sameLayouts in
 /-- The sole family supplies these actual smaller expression results. The
 finite head/loop recipes are proved internally at the exact indexed protocol. -/
-theorem preserving_kits (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
+theorem preserving_kits [FunctionCalls.FaultTokens faults] (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
     (certificates := certificates) (expressionSyntax := expressionSyntax)) (budget : Nat)
     (expressions : ∀ context, (origin index).validity context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
@@ -2279,7 +2279,7 @@ theorem preserving_kits (index : Index (headers := headers) (keys := keys) (regi
 include extension faithful observations sameLayouts in
 /-- Native finite kits use the same original strict expression children and
 return the same indexed witness; no joint body closure is asserted here. -/
-theorem reflecting_kits (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_kits [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
     (certificates := certificates) (expressionSyntax := expressionSyntax)) (budget : Nat)
     (expressions : ∀ context, (origin index).validity context →
@@ -2792,7 +2792,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include extension faithful observations sameLayouts in
 /-- The sole existing measured Family composes genuine finite catalog kits
 with this source dispatcher; all actual reached entry fields remain intact. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressions : PreservingExpressions (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax) functions wellFormed)
     (size : Nat) : ∀ index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
@@ -2811,7 +2811,7 @@ theorem preserves_at
 include extension faithful observations sameLayouts in
 /-- The same Family consumes original native completions and preserves the
 independent Source grade and each branch's actual returned protocol witness. -/
-theorem reflects_at (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (expressions : ReflectingExpressions (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax) functions wellFormed)
     (size : Nat) : ∀ index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
@@ -2870,7 +2870,7 @@ include extension faithful observations functionTypes uninitialized missing in
 /-- The original shared measured family closes this authentic builtin profile.
 Only its proved expression fragment is lifted through administrative effects;
 body allocation still consumes the actual marked producer and selected gate. -/
-theorem body_preserves_at (size : Nat) :
+theorem body_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (origin generation profile escaped) size := by
@@ -2899,7 +2899,7 @@ include extension faithful observations functionTypes uninitialized missing in
 /-- Reflection uses the same exact runtime ledger and original source method
 profile. Its source grade is reconstructed from each original native child,
 with all actual body pool transitions retained by the shared family. -/
-theorem body_reflects_at (size : Nat) :
+theorem body_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocol headers keys)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions program
       (origin generation profile escaped) size := by
@@ -2941,7 +2941,7 @@ include profile escaped represented owner sameFrame heaps extension faithful obs
 /-- An original source method outcome runs the actual hook, parameters and
 closed builtin body. The exact reached body pool supplies caller restoration;
 no expression or body meaning is a premise. -/
-theorem invocation_preserves {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem invocation_preserves [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size sourceBody dictionary before arguments outcome after) :
     ∃ value finalStore finalMap finalWorld,
       Evaluates (DataPatternValues.packValues payloads :: installed.captured) store
@@ -2964,7 +2964,7 @@ include profile escaped represented owner sameFrame heaps extension faithful obs
 /-- Completed native method execution reflects its independent source outcome
 through the same actual parameter/body/restoration chain and full dictionary.
 The returned caller state preserves the reached pool's ordered records. -/
-theorem invocation_reflects {size : Nat} {value : Value} {finalStore : Store}
+theorem invocation_reflects [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: installed.captured) store
       (generation.output.rename installed.embedding.lift) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -3026,7 +3026,7 @@ include extension faithful observations functionTypes uninitialized missing in
 /-- The original shared measured family closes this authentic builtin profile.
 Only its proved expression fragment is lifted through administrative effects;
 body allocation still consumes the actual marked producer and selected gate. -/
-theorem body_preserves_at (size : Nat) :
+theorem body_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner principal.named)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions (Program.ofChecked compiled.sourceProgram)
       (origin principal profile escaped) size := by
@@ -3055,7 +3055,7 @@ include extension faithful observations functionTypes uninitialized missing in
 /-- Reflection uses the same exact runtime ledger and original source method
 profile. Its source grade is reconstructed from each original native child,
 with all actual body pool transitions retained by the shared family. -/
-theorem body_reflects_at (size : Nat) :
+theorem body_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (CallableIndexedOwnedOriginCanonicalState.protocol (headers := headers) owner principal.named)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) functions (Program.ofChecked compiled.sourceProgram)
       (origin principal profile escaped) size := by
@@ -3097,7 +3097,7 @@ include profile escaped represented observed sameFrame heaps extension faithful 
 /-- An original source method outcome runs the actual hook, parameters and
 closed builtin body. The exact reached body pool supplies caller restoration;
 no expression or body meaning is a premise. -/
-theorem invocation_preserves {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem invocation_preserves [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome (Program.ofChecked compiled.sourceProgram) size principal.sourceBody principal.dictionary before arguments outcome after) :
     ∃ value finalStore finalMap finalWorld,
       Evaluates (DataPatternValues.packValues payloads :: installed.captured) store
@@ -3123,7 +3123,7 @@ include profile escaped represented observed sameFrame heaps extension faithful 
 /-- Completed native method execution reflects its independent source outcome
 through the same actual parameter/body/restoration chain and full dictionary.
 The returned caller state preserves the reached pool's ordered records. -/
-theorem invocation_reflects {size : Nat} {value : Value} {finalStore : Store}
+theorem invocation_reflects [FunctionCalls.FaultTokens faults] {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: installed.captured) store
       (principal.cached.compilation.output.rename installed.embedding.lift) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -3248,7 +3248,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   owners uninitialized missing escaped profiles in
 /-- Source traces keep their original grades and the actual reached per-header
 formation packet. Strict callees come only from the shared measured fold. -/
-theorem preserves_nested_at (size : Nat) : ∀ header, header ∈ headers →
+theorem preserves_nested_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3319,7 +3319,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   uninitialized missing escaped profiles in
 /-- Native completions return their original grades and the actual reached per-header
 formation packet. Strict callees come only from the shared measured fold. -/
-theorem reflects_nested_at (size : Nat) : ∀ header, header ∈ headers →
+theorem reflects_nested_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3390,7 +3390,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   owners uninitialized missing escaped profiles in
 /-- Genuine parameter observations wrap the input; forgetting the final packet
 returns the exact reached base pool from the internally closed family. -/
-theorem preserves_at (size : Nat) : ∀ header, header ∈ headers →
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyPreservesAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3407,7 +3407,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   uninitialized missing escaped profiles in
 /-- Genuine parameter observations wrap the input; forgetting the final packet
 returns the exact reached base pool from the internally closed family. -/
-theorem reflects_at (size : Nat) : ∀ header, header ∈ headers →
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ header, header ∈ headers →
     RecursiveNamedCatalogInvocationBounds.Stateful.BodyReflectsAtWith
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
@@ -3424,7 +3424,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   owners uninitialized missing escaped profiles in
 /-- The original nested Tree closes all expression children and uses only the
 strictly smaller bodies already closed by the same mutual family. -/
-theorem expression_preserves_at
+theorem expression_preserves_at [FunctionCalls.FaultTokens faults]
     (header : CallableIndexedOwnedFunctionValues.Header compiled program) (member : header ∈ headers)
     (context : SourceSemantics.Context)
     (valid : RecursiveNamedCatalogMutualMeaning.ContextFor true header.solved context header.function.evidence)
@@ -3451,7 +3451,7 @@ include prefixZero profile complete globals slots sameLayouts extension faithful
   uninitialized missing escaped profiles in
 /-- The original nested Tree closes all expression children and uses only the
 strictly smaller bodies already closed by the same mutual family. -/
-theorem expression_reflects_at
+theorem expression_reflects_at [FunctionCalls.FaultTokens faults]
     (header : CallableIndexedOwnedFunctionValues.Header compiled program) (member : header ∈ headers)
     (context : SourceSemantics.Context)
     (valid : RecursiveNamedCatalogMutualMeaning.ContextFor true header.solved context header.function.evidence)
@@ -3550,7 +3550,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
   owners uninitialized missing escaped profiles principalGlobals body bodyUninitialized bodyMissing in
 /-- The original nested body Tree closes expressions internally. Its actual
 input and returned formation packet contain exactly the real reached pools. -/
-theorem preserves_at (size : Nat) :
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.PreservesAt
       (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner principal)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -3604,7 +3604,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
   uninitialized missing escaped profiles principalGlobals body bodyUninitialized bodyMissing in
 /-- The same native body proof returns its independent Source grade and the
 actual post state, including every ordered record produced by callees. -/
-theorem reflects_at (size : Nat) :
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt
       (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner principal)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
@@ -3682,7 +3682,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
   owners uninitialized missing escaped profiles principalGlobals body bodyUninitialized bodyMissing observed sourceSeed in
 /-- A strict Source invocation child uses its authentic parameter Entry and
 actual reached pool. All expression and named body meanings are closed here. -/
-theorem source_continuation (budget : Nat) :
+theorem source_continuation [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedLambdaInvocationBounds.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
       captured code history inputs (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile)
       owner caller (CallableIndexedOwnedLambdaInvocationBounds.BodyOrigin.nested code inputs body bodyEscaped) budget := by
@@ -3701,7 +3701,7 @@ include prefixZero complete globals slots sameLayouts extension faithful observa
   uninitialized missing escaped profiles principalGlobals body bodyUninitialized bodyMissing observed sourceSeed in
 /-- Native invocation reflection consumes its own complete measured Prefix and
 retains the independent Source grade and the same body-produced final pool. -/
-theorem native_continuation (budget : Nat) :
+theorem native_continuation [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedLambdaInvocationBounds.NativeContinuation (arguments := arguments)
       captured code history inputs (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile)
       owner caller (CallableIndexedOwnedLambdaInvocationBounds.BodyOrigin.nested code inputs body bodyEscaped) budget := by

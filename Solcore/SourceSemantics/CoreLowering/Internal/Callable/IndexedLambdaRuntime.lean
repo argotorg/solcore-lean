@@ -485,7 +485,7 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension faithful observations functionTypes valid unique owners uninitialized missing transport catalog authorized in
-private theorem expressions_preserves (budget size : Nat) (within : size ≤ budget)
+private theorem expressions_preserves [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (BodyPreservesAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -503,7 +503,7 @@ private theorem expressions_preserves (budget size : Nat) (within : size ≤ bud
           (fun smaller strict => children smaller (Nat.le_of_lt strict)) bodies))
 
 include extension faithful observations functionTypes valid uninitialized missing transport catalog authorized in
-private theorem expressions_reflects (budget size : Nat) (within : size ≤ budget)
+private theorem expressions_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
       (BodyReflectsAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -577,7 +577,7 @@ include extension faithful observations functionTypes owners family valid unique
 /-- Same-D canonical expression preservation closes every named body through
 the one existing catalog strong induction. The protected source entry remains
 independent of the lambda's native type and installed ghost. -/
-theorem expressions_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem expressions_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificates evidence headers compilation fuel source context solved reasonAt) faults P := by
   have bodies := RecursiveNamedCatalogMutualMeaning.preserves_at_runtime_evidence
@@ -593,7 +593,7 @@ theorem expressions_preserves_at (budget size : Nat) (within : size ≤ budget) 
 include extension faithful observations functionTypes family valid uninitialized missing transport catalog in
 /-- Reflection uses only original native children. The catalog strong induction
 returns independently measured source traces for the same full dictionaries. -/
-theorem expressions_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem expressions_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Certificates evidence headers compilation fuel source context solved reasonAt) faults P := by
   have bodies := RecursiveNamedCatalogMutualMeaning.reflects_at_runtime_evidence
@@ -639,7 +639,7 @@ include body extension observations functionTypes owners family uninitialized mi
 /-- The source grade is the original parent-supplied body grade. Named callee
 meaning is closed by CatalogFamily's static profiles and the existing mutual
 induction; the lambda ghost remains in its independent source entry. -/
-theorem Body.preserves_sized (budget size : Nat) (within : size ≤ budget)
+theorem Body.preserves_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -691,7 +691,7 @@ theorem Body.preserves_sized (budget size : Nat) (within : size ≤ budget)
 include body extension observations functionTypes family uninitialized missing escaped in
 /-- Reflection consumes the original native body witness. No source execution
 or preservation theorem is used to obtain its independent source grade. -/
-theorem Body.reflects_sized (budget size : Nat) (within : size ≤ budget)
+theorem Body.reflects_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -995,7 +995,7 @@ include complete globals slots extension family valid sameSource unique owners u
 /-- The same expression fold closes ordered children. Only actual named callee
 profiles enter the existing catalog strong induction; nested formation supplies
 its smaller static receipt without a runtime body execution premise. -/
-theorem expressions_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem expressions_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry F) program context evidence source Cert faults P := by
   have bodies := RecursiveNamedCatalogMutualMeaning.preserves_at_runtime_evidence
@@ -1027,7 +1027,7 @@ theorem expressions_preserves_at (budget size : Nat) (within : size ≤ budget) 
 include complete globals slots extension family valid sameSource uninitialized missing in
 /-- Native reflection uses the original ordered children and obtains an
 independent source grade. Formation compares only the same pure native leaf. -/
-theorem expressions_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem expressions_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry F) program context evidence source Cert faults P := by
   have bodies := RecursiveNamedCatalogMutualMeaning.reflects_at_runtime_evidence
@@ -1152,7 +1152,7 @@ include body complete globals slots extension owners family uninitialized missin
 /-- The source grade is the original parent-supplied body grade. Named callee
 meaning is closed by CatalogFamily's static profiles and the existing mutual
 induction; the lambda ghost remains in its independent source entry. -/
-theorem Body.preserves_sized (budget size : Nat) (within : size ≤ budget)
+theorem Body.preserves_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -1205,7 +1205,7 @@ theorem Body.preserves_sized (budget size : Nat) (within : size ≤ budget)
 include body complete globals slots extension family uninitialized missing escaped in
 /-- Reflection consumes the original native body witness. No source execution
 or preservation theorem is used to obtain its independent source grade. -/
-theorem Body.reflects_sized (budget size : Nat) (within : size ≤ budget)
+theorem Body.reflects_sized [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -1449,7 +1449,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
     faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
 
 include extension uninitialized missing in
-theorem Entry.preserves
+theorem Entry.preserves [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {copies environment : Dynamic.Environment} {copied bound after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
@@ -1468,7 +1468,7 @@ theorem Entry.preserves
   exact CallableIndexedLambdaSemanticCalls.Entry.preserves captured code history body.semantic profile extension uninitialized missing entry copy allocated trace
 
 include extension uninitialized missing in
-theorem Entry.reflects
+theorem Entry.reflects [FunctionCalls.FaultTokens faults]
     (entry : Entry captured code history body profile registry arguments nativeArguments before store location current currentGhost)
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
@@ -1486,7 +1486,7 @@ theorem Entry.reflects
   exact CallableIndexedLambdaSemanticCalls.Entry.reflects captured code history body.semantic profile extension uninitialized missing entry evaluated
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem reflects [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {result : Value} {finalStore : Store}
     (evaluated : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
       store applyPayload result finalStore) :
@@ -1501,7 +1501,7 @@ theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dyn
   exact CallableIndexedLambdaSemanticCalls.reflects captured code history body.semantic profile extension represented heaps locals reference read currentCarried unmapped allowed uninitialized missing evaluated
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
-theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+theorem preserves [FunctionCalls.FaultTokens faults] {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : FunctionCallBody.Outcome program callerContext callerEvidence function.evidence before (.closure function) arguments outcome after) :
     ∃ result finalStore finalMap finalWorld,

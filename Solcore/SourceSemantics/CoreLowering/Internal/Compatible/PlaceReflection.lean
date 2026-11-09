@@ -23,12 +23,13 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 def remainder (prepared : Prepared) (keyType : Ty) (next : Expr) (outputType : Ty)
-    (operator : Option BinaryOp) (invalid : Word) : Expr :=
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) : Expr :=
   LanguageResult.bind outputType
     (modified prepared.route.leafType operator false (.var 1) (.var 0) invalid)
     (LanguageResult.bind outputType
       (.apply (setter prepared keyType) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-      (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))
+      (Frontend.SourceCoreDataPlaces.guard outputType operator
+        (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))
 
 structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -408,7 +409,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    {operator : Syntax.ValueAssignOp}
+    [FunctionCalls.FaultTokens faults] {operator : Syntax.ValueAssignOp}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
@@ -436,8 +437,8 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
   have targetType := (resolved_type sourceTrace resolution.currentRead).trans resolution.currentType
   obtain ⟨latest⟩ := right.meaning.latest
   have cellType : latest.cell.type = target.rootType := latest.type.trans targetType.symm
-  obtain ⟨replacement, replacementValue, replacementRep, applied, modified, _⟩ :=
-    CompatiblePlaceModifier.initialized_success observations profile snapshotRep right.related
+  obtain ⟨replacement, replacementValue, replacementRep, modified, outcome⟩ :=
+    CompatiblePlaceModifier.initialized_outcome observations profile snapshotRep right.related
       (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment)
       (.var (index := 1) rfl) (.var (index := 0) rfl) right.store invalid
@@ -493,19 +494,45 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
       obtain ⟨futureWorld, _, represented, helperHeaps, extension, helperFrame, _⟩ := reflectSetter setterEvaluated
       cases represented with
       | updated root changed updatedRep =>
-        cases remaining with
-        | letE writeEvaluated continuation =>
-          obtain ⟨after, resultEq, sourceWritten, finalHeaps, writeFrame, metadata, _⟩ :=
-            CompatiblePlaceCommitReflection.reflects_storeCell helperHeaps (reference.extend (.refl _) extension) latest.read
-              updatedRep (.var (index := 5) rfl) (.var (index := 0) rfl) writeEvaluated
-          subst_vars
-          have changed := DataPlaceCommitReflection.update_of_replacement changed (fun _ => resolution.selectedEq.symm ▸ applied)
-          exact .committed (.intro sourceTrace rhsTrace (.intro latest.read cellType root changed sourceWritten))
-            finalHeaps (resolution.maps.trans right.meaning.maps) ((resolution.worlds.trans right.meaning.worlds).trans extension)
-            (((resolution.frame.trans right.meaning.frame).trans helperFrame).trans writeFrame)
-            ((resolution.metadata.trans right.meaning.metadata).trans metadata) (slots :=
-              [.unit, updatedValue, replacementValue, right.value, .inRight .unit resolution.snapshot, packValues resolution.values,
-                .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) rfl continuation
+        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨passes, remaining⟩ | ⟨operation, selected, zero, resultEq, storeEq⟩
+        · rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, _⟩
+          · cases remaining with
+            | letE writeEvaluated continuation =>
+              obtain ⟨after, resultEq, sourceWritten, finalHeaps, writeFrame, metadata, _⟩ :=
+                CompatiblePlaceCommitReflection.reflects_storeCell helperHeaps (reference.extend (.refl _) extension) latest.read
+                  updatedRep (.var (index := 5) rfl) (.var (index := 0) rfl) writeEvaluated
+              subst_vars
+              have changed := DataPlaceCommitReflection.update_of_replacement changed (fun _ => resolution.selectedEq.symm ▸ applied)
+              exact .committed (.intro sourceTrace rhsTrace (.intro latest.read cellType root changed sourceWritten))
+                finalHeaps (resolution.maps.trans right.meaning.maps) ((resolution.worlds.trans right.meaning.worlds).trans extension)
+                (((resolution.frame.trans right.meaning.frame).trans helperFrame).trans writeFrame)
+                ((resolution.metadata.trans right.meaning.metadata).trans metadata) (slots :=
+                  [.unit, updatedValue, replacementValue, right.value, .inRight .unit resolution.snapshot, packValues resolution.values,
+                    .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) rfl continuation
+          · -- The check passed, so the divisor is not zero.
+            rw [selected, zero] at passes
+            cases passes with
+            | total total => cases total _ rfl
+            | nonzero nonzero => exact (nonzero rfl).elim
+        · rcases outcome with ⟨applied, _⟩ | ⟨_, _, _, panicked⟩
+          · -- An applied source operation has a nonzero divisor, so the check passed.
+            have passes := CompatiblePlaceModifier.passes_of_applies observations profile right.related applied
+              (prepared.route.leafType = .integer)
+            rw [selected, zero] at passes
+            cases passes with
+            | total total => cases total _ rfl
+            | nonzero nonzero => exact (nonzero rfl).elim
+          · -- The latest root is traversable, so the source panics on its operands.
+            obtain ⟨_, read⟩ := changed.readable
+            have panicked : Dynamic.AssignmentOperandsPanic operator target.selected right.right
+                SourceCorePanics.divisionByZero := by
+              rw [resolution.selectedEq]; exact panicked
+            subst resultEq storeEq
+            exact .fault (.panic sourceTrace rhsTrace latest.read cellType root read panicked) rfl
+              (FunctionCalls.FaultTokens.panic _) helperHeaps (resolution.maps.trans right.meaning.maps)
+              ((resolution.worlds.trans right.meaning.worlds).trans extension)
+              ((resolution.frame.trans right.meaning.frame).trans helperFrame)
+              (resolution.metadata.trans right.meaning.metadata)
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTailReflection
 end
@@ -720,7 +747,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -775,7 +802,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
     {expression : ExpressionLowerer} {scope : Scope} {reasonAt : ExpressionId → Word}
     {codes : List SourceCoreBasic.LoweredExpr} {certificate : GenericExpressionMeaning.Certificate}
     {administrativeContext : Core.Context} {reference rhs next : Expr} {outputType resultType : Ty}
-    {operator : Option BinaryOp} {bitNot : Bool} {invalidOperand : Word}
+    {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
@@ -2212,7 +2239,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
         prepare compilation fuel route invalid missing = .ok prepared) →
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}

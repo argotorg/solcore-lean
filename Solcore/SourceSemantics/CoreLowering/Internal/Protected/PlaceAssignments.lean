@@ -1478,6 +1478,8 @@ theorem preserves_prefix_bounded_with_producers (budget : Nat) {compilation : So
         have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
+        have passes := CompatiblePlaceModifier.passes_of_applies observations operatorProfile rightRep applies
+          (prepared.route.leafType = .integer)
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _⟩ :=
           CompatiblePlaceModifier.preserves observations operatorProfile snapshotRep rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
@@ -1541,7 +1543,8 @@ theorem preserves_prefix_bounded_with_producers (budget : Nat) {compilation : So
                 ((ContinuationAgreement.bind rhsResult.evaluated).trans
                   ((ContinuationAgreement.bind modifiedEvaluated).trans
                     ((ContinuationAgreement.bind setterEvaluated).trans
-                      (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten)))))))
+                      ((DataPlaceGuard.agreement passes).trans
+                        (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten))))))))
 
 theorem preserves_prefix_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -2883,8 +2886,8 @@ theorem preserves_bounded_with_producers_with_receipt (budget : Nat) {compilatio
     obtain ⟨latest⟩ := rhsResult.latest
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
-    obtain ⟨replacement, replacementValue, replacementRep, _, modifiedEvaluated, valid⟩ :=
-      CompatiblePlaceModifier.initialized_success observations operatorProfile snapshotRep rightRep
+    obtain ⟨replacement, replacementValue, replacementRep, modifiedEvaluated, _⟩ :=
+      CompatiblePlaceModifier.initialized_outcome observations operatorProfile snapshotRep rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -3241,6 +3244,198 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentStructuralFault
 
+namespace Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentPanic
+open CompatibleRenamedPlace
+open Core Frontend SourceInference GeneralHeap DataPatternValues GenericExpressionMeaning
+open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute CompatiblePlaceKeys CompatiblePlaceLiveRoot
+open SourceCoreCompatibleDataPlaces DataPlaceExecution
+
+private theorem resolved_nonempty {checked : Checked} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
+    {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
+    {steps : List PreparedStep} {keys : List (ExpressionId × Ty)}
+    (path : PreparedPath checked source site root projections position steps keys leaf)
+    {sources : List Dynamic.Value} {resolved : List Dynamic.EvaluatedProjection}
+    (shaped : DataPlaceKeyOrder.Values projections sources resolved) (nonempty : steps ≠ []) : resolved ≠ [] := by
+  have lengths : steps.length = resolved.length := by
+    clear nonempty
+    induction path generalizing sources resolved with
+    | nil => cases shaped; rfl
+    | member _ _ _ _ ih => cases shaped with | member tail => exact congrArg Nat.succ (ih tail)
+    | index _ _ _ ih => cases shaped with | index tail => exact congrArg Nat.succ (ih tail)
+  intro empty
+  rw [empty, List.length_nil] at lengths
+  exact nonempty (List.eq_nil_of_length_eq_zero lengths)
+
+private theorem none_read {projections : List Dynamic.EvaluatedProjection} {selected : Option Dynamic.Value}
+    (read : Dynamic.ProjectionsRead none projections selected) : projections = [] := by
+  cases read
+  rfl
+
+/- A source panic on the operands runs the setter on the readable latest root, then
+fails at the modifier's check before the write. -/
+namespace Stateful
+universe u v
+
+theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
+    {operator : Syntax.ValueAssignOp}
+    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
+      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
+    {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial currentSelected : Option Dynamic.Value} {code : UInt8}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (_heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequenceMeaning : ∀ target,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target) →
+      RuntimeEnvironmentHasTypes world
+        (.cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (OptionalCell.referenceType prepared.route.rootType :: actualContext) ambient.definitions →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (ids := DataPlaceKeyOrder.sourceKeys place.projections) (sourceTypes := sourceTypes) (codes := codes) (faults := faults)
+        (environment := environment) (actual := .cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (ξ := DataPlaceChildExpressions.prefixRenaming 1 ξ)
+        (payloadModel compilation.checked registry functions) initialState budget)
+    (rhsMeaning : ProtectedPlaceRhs.PreservesAfter (checked := compilation.checked) (registry := registry) (functions := functions)
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (prepared := prepared) (place := place) (codes := codes) (sourceTypes := sourceTypes) (leaf := leaf)
+      (faults := faults) (id := rhs) (node := node) (lowered := lowered) (environment := environment)
+      (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initialState budget)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {resolveSize rhsSize : Nat}
+    (resolve : SourceExecutionSize.SourcePlaceResolves program resolveSize context evidence source environment before place sourceTarget targetHeap)
+    (evaluate : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right rhsHeap)
+    (resolveBound : resolveSize ≤ budget) (rhsBound : rhsSize < budget)
+    (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
+    (initialValue : Dynamic.RootInitialValue cell initial)
+    (pathRead : Dynamic.ProjectionsRead initial sourceTarget.projections currentSelected)
+    (panics : Dynamic.AssignmentOperandsPanic operator sourceTarget.selected right code)
+    (next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    ∃ finalStore finalMap finalWorld,
+      Evaluates coreEnvironment store
+        (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) (lowered.expression.rename ξ) next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+        (.inLeft outputType (.word (SourceCorePanics.reason code))) finalStore ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld rhsHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before rhsHeap ∧
+      ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, rhsHeap, finalStore, canonical⟩ := by
+  have closed := virtual_closed layout ordinary
+  have respects := environment_respects environments.runtime_hasTypes actualTyped agrees
+  have getterTyped := getter_typed layout closed respects
+  have setterTyped := setter_typed layout closed respects
+  obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
+    layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
+    environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve resolveBound
+  obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
+  obtain ⟨rightResult, rhsStore, rhsMap, rhsWorld, rhsResult, rhsPost⟩ :=
+    rhsMeaning resolve.sound resolution resolutionState resolutionRelated rhsBound (.value evaluate)
+  cases represented : rhsResult.represented with
+  | @value _ rightValue rightRep =>
+    obtain ⟨rhsState, rhsRelated⟩ := rhsPost
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
+      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have snapshotRep := rhsResult.saved_snapshot
+    have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
+      simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
+    have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
+    have arguments := layout.views.arguments resolution.shaped keyRep (fun _ _ _found => by simpa only [Nat.zero_add] using _found)
+    obtain ⟨latest⟩ := rhsResult.latest
+    have cellEq := sourceRead.functional latest.read
+    have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
+    obtain ⟨replacement, replacementValue, replacementRep, modifiedEvaluated, outcome⟩ :=
+      CompatiblePlaceModifier.initialized_outcome observations operatorProfile snapshotRep rightRep
+        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
+        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
+    rw [resolution.selectedEq] at panics
+    -- The panic fixes a panicking modifier, a zero divisor and its code.
+    obtain ⟨operation, selected, zero, sameCode⟩ : ∃ operation,
+        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ ∧
+          rightValue = .word Word.zero ∧ code = SourceCorePanics.divisionByZero := by
+      rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, other⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
+      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics other⟩
+    subst zero sameCode
+    have present : ∃ sourceRoot, initial = some sourceRoot := by
+      cases initial with
+      | some value => exact ⟨value, rfl⟩
+      | none => exact (resolved_nonempty layout.path resolution.shaped layout.nonempty (none_read pathRead)).elim
+    obtain ⟨sourceRoot, rfl⟩ := present
+    obtain ⟨_, changed⟩ := DataPlaceUpdateTotality.read_update pathRead replacement
+    have rootExists : ∃ optional rootValue,
+        RootRead compilation.checked registry functions rhsMap rhsWorld prepared rhsHeap rhsStore sourceTarget.location resolution.target
+          cell optional sourceRoot rootValue := by
+      cases initialValue with
+      | initialized =>
+        obtain ⟨value, root⟩ := CompatibleHeap.HeapRepresents.initialized_root rhsResult.heaps reference sourceRead
+        exact ⟨_, value, root⟩
+      | emptyMapping key value =>
+        obtain ⟨native, root⟩ := CompatibleHeap.HeapRepresents.virtual_root rhsResult.heaps reference sourceRead
+          (layout.virtual key value cellType.symm) registryExtension
+        exact ⟨_, native, root⟩
+    obtain ⟨optional, rootValue, root⟩ := rootExists
+    have keyLength : prepared.keyTypes.length = resolution.values.length := layout.keyTypes ▸ keyRep.length.2
+    have typedEnvironment : RuntimeEnvironmentHasTypes rhsWorld
+        (modifiedEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+          (.inRight .unit resolution.snapshot) (.word Word.zero) replacementValue coreEnvironment)
+        (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
+          OptionalCell.referenceType prepared.route.rootType :: actualContext)
+        ambient.definitions :=
+      .cons replacementRep.runtime_hasType (.cons rightRep.runtime_hasType (.cons (.inRight snapshotRep.runtime_hasType)
+        (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
+          (actualTyped.weaken (resolution.worlds.trans rhsResult.worlds))))))
+    have currentPath : PreparedPath compilation.checked source site cell.type place.projections
+        0 prepared.steps prepared.keys leaf := cellType ▸ layout.path
+    have currentArguments : Arguments compilation.checked registry functions rhsMap rhsWorld source site resolution.values
+        currentPath sourceTarget.projections := by simpa only [cellType] using arguments
+    obtain ⟨_, helperStore, futureWorld, setterEvaluated, helperHeaps, extension, frame⟩ :=
+      CompatiblePlaceWriteback.setter_preserves root rhsResult.heaps currentArguments replacementRep changed layout.nonempty
+        faithful observations keyLength typedEnvironment setterTyped (.var rfl) (.var rfl) (.var rfl)
+    let reached := transport.extend rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap)
+    have phaseRelated := transport.related rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap)
+    refine ⟨helperStore, rhsMap, futureWorld, ?_, helperHeaps,
+      resolution.maps.trans rhsResult.maps, (resolution.worlds.trans rhsResult.worlds).trans extension,
+      (resolution.frame.trans rhsResult.frame).trans frame, resolution.metadata.trans rhsResult.metadata,
+      reached, protocol.trans (protocol.trans resolutionRelated rhsRelated) phaseRelated⟩
+    unfold execute
+    simp only [packed_renamed_type]
+    have snapshotEvaluated := resolution.snapshotEvaluated
+    simp only [packed_renamed_type] at snapshotEvaluated
+    exact .letE (.var coreLookup)
+      (LanguageResult.bind_success _ resolution.keysEvaluated
+        (LanguageResult.bind_success _ snapshotEvaluated
+          (LanguageResult.bind_success _ rhsResult.evaluated
+            (LanguageResult.bind_success _ modifiedEvaluated
+              (LanguageResult.bind_success _ setterEvaluated (DataPlaceGuard.panic_of_selected selected))))))
+
+
+end Stateful
+end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentPanic
+
 
 /-! Every independently specified assignment fault in the nonempty equal or
 numeric profile is preserved. Unbound/dangling roots contradict actual lexical
@@ -3264,7 +3459,7 @@ theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compil
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -3374,13 +3569,14 @@ theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compil
     | @value _ rightValue rightRep =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
         .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
-      obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceModifier.initialized_success observations operatorProfile
-        rhsResult.saved_snapshot rightRep
-        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
-          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
-        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
+      have valid := CompatiblePlaceModifier.initialized_valid observations operatorProfile rhsResult.saved_snapshot rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
+  | panic resolve evaluate currentRead _ initialValue pathRead panics =>
+    obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
+      ProtectedPlaceAssignmentPanic.Stateful.preserves_bounded_with_producers budget layout ordinary registryExtension protocol transport faithful observations _rhsGenerated _found rhsView rhsCoreType
+        operatorProfile environments _heaps locals agrees actualTyped initialState sequenceMeaning rhsMeaning slot rootTyped resolve evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead initialValue pathRead panics (next.rename ξ) outputType invalid
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, FunctionCalls.FaultTokens.panic _, finalHeaps, maps, worlds, frame, metadata, reached, related⟩
   | structuralUpdate resolve evaluate currentRead sameType initialValue fault =>
     obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
       ProtectedPlaceAssignmentStructuralFault.Stateful.preserves_bounded_with_producers_with_receipt budget layout ordinary registryExtension protocol transport faithful observations _rhsGenerated _found rhsView rhsCoreType
@@ -3397,7 +3593,7 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -3406,7 +3602,7 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -3466,7 +3662,7 @@ theorem preserves_bounded_with_diagnostics (budget : Nat) {compilation : SourceC
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -3553,7 +3749,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -3563,7 +3759,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -3609,7 +3805,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
@@ -3618,7 +3814,7 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -3661,7 +3857,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    [FunctionCalls.FaultTokens faults] (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
@@ -3670,7 +3866,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
-    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
@@ -3765,7 +3961,7 @@ theorem reflects_reachable_bounded_with_rhs (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
+    [FunctionCalls.FaultTokens faults] (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) (bounded : size ≤ budget) :
@@ -3800,7 +3996,7 @@ theorem reflects_reachable_bounded_with_rhs (budget : Nat)
       have modifier := modifier_total observations profile saved rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
-      rcases modifier with ⟨invalidOperands, failed⟩ | ⟨updated, updatedValue, replacement, applied, modified⟩
+      rcases modifier with ⟨invalidOperands, failed⟩ | ⟨updated, updatedValue, replacement, outcome, modified⟩
       · have failed : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
             (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
             (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by
@@ -3819,12 +4015,33 @@ theorem reflects_reachable_bounded_with_rhs (budget : Nat)
         | value rhsTrace =>
           obtain ⟨latest⟩ := result.latest
           obtain ⟨initial, initialValue⟩ := cell_initial latest.related
+          rcases outcome with applied | ⟨operation, selected, zero, panics⟩
+          case inr =>
+            -- The setter runs and the check fails, so the source panics without a write.
+            have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ := by
+              simpa only [layout.sameType] using selected
+            subst zero
+            have nativeModified : Evaluates
+                (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value (.word Word.zero) actual) rhsStore
+                (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+                (.inRight .word updatedValue) rhsStore := by simpa only [layout.sameType] using modified
+            have evaluation := phase.wrap (LanguageResult.bind_success outputType result.evaluated
+              (LanguageResult.bind_success outputType nativeModified
+                (LanguageResult.bind_success outputType
+                  (setter_evaluates layout snapshot.value (.word Word.zero) updatedValue latest.nativeRead)
+                  (DataPlaceGuard.panic_of_selected selected))))
+            obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound evaluation
+            exact .fault (.panic (RecursiveNamedBareAssignmentContracts.resolves_sized snapshot bare) rhsTrace latest.read
+              (latest.type.trans snapshot.type.symm) initialValue .nil panics) rfl (FunctionCalls.FaultTokens.panic _)
+              result.heaps result.maps result.worlds result.frame result.metadata rhsPost
           have nativeModified : Evaluates
               (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
               (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
               (.inRight .word updatedValue) rhsStore := by simpa only [layout.sameType] using modified
+          have passes := CompatiblePlaceModifier.passes_of_applies observations profile rightRep applied
+            (prepared.route.leafType = .integer)
           obtain ⟨after, commitStore, _, written, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, agreement⟩ :=
-            commit_with_write layout snapshot bare result rightRep replacement applied nativeModified actualTyped
+            commit_with_write layout snapshot bare result rightRep replacement applied nativeModified passes actualTyped
           have terminal := (agreement .unit outputType).wrap
             (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
               (Evaluates.unit (environment := writtenEnvironment prepared.route.rootType snapshot.target .unit
@@ -3863,7 +4080,7 @@ theorem reflects_reachable_bounded (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
+    [FunctionCalls.FaultTokens faults] (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) (bounded : size ≤ budget) :
@@ -3897,7 +4114,7 @@ theorem reflects_reachable_bounded (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
+    [FunctionCalls.FaultTokens faults] (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) (bounded : size ≤ budget) :
@@ -3931,7 +4148,7 @@ theorem reflects_reachable
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
+    [FunctionCalls.FaultTokens faults] (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) :
@@ -3963,7 +4180,7 @@ theorem reflects
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
+    [FunctionCalls.FaultTokens faults] (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) :

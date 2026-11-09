@@ -573,7 +573,7 @@ def Root.of_compiled
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -636,7 +636,7 @@ def RootAt.of_compiled
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1241,7 +1241,7 @@ def RootData.of_steps_compiled {directSites : DeclarationInstantiation → Prop}
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1302,7 +1302,7 @@ def RootData.of_sites_compiled {directSites : DeclarationInstantiation → Prop}
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1364,7 +1364,7 @@ def CanonicalRootAt.of_steps_compiled {directSites : DeclarationInstantiation �
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1432,7 +1432,7 @@ def CanonicalRootAt.of_sites_compiled {directSites : DeclarationInstantiation �
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1499,7 +1499,7 @@ def RootData.of_general_compiled
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -1542,7 +1542,7 @@ def CanonicalRootAt.of_general_compiled
       context invocation.source)
     (covers : invocation.evidence.Covers context)
     (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
-    (uninitialized : ∀ current id code,
+    [FunctionCalls.FaultTokens semanticFaults] (uninitialized : ∀ current id code,
       CompatibleExpressionReads.LoweredRead readFuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         invocation.source context reasonAt current id code →
@@ -2966,10 +2966,12 @@ theorem binary_dispatch {operator : Syntax.BinaryOp} {left right : ExpressionId}
   · obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (actualForm.symm.trans form)
     exact dispatch
 
+/-- A trait-dispatched operator evaluates its right operand, strict or
+panicking alike. -/
 private theorem dispatch_continues {operator : Syntax.BinaryOp} {traitName methodName : String}
     (dispatch : BinaryTraitDispatch operator traitName methodName) (value : Dynamic.Value) :
     EvaluatesRightOperand operator value := by
-  cases dispatch <;> exact .strict (by constructor)
+  cases dispatch <;> first | exact .strict (by constructor) | exact .panicking (by constructor)
 
 include port in
 theorem binary_continues {operator : Syntax.BinaryOp} {left right : ExpressionId}

@@ -300,6 +300,28 @@ inductive ResultAt (size : Nat)
       (related : callerProtocol.Relates initial reached) (stable : StableRows (bridge.pool reached)) :
       ResultAt size context stages invocation faults scope writtenContext assignment operator rhs
         environment canonical actual before store mapping world initial next output value finalStore
+  /-- The compound operation panics once the root is read; nothing is written. -/
+  | panic {sourceSize : Nat} {target : Dynamic.ResolvedPlace}
+      {right : Dynamic.Value} {after : Dynamic.Heap} {current : Dynamic.Cell}
+      {initialValue selected : Option Dynamic.Value} {code : UInt8} {token : Word}
+      {finalMap : LocationMap} {finalWorld : StoreTyping}
+      (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
+      (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before rhs (.value right) after)
+      (currentRead : Dynamic.Heap.Reads after target.location current)
+      (rootType : current.type = target.rootType)
+      (initialized : Dynamic.RootInitialValue current initialValue)
+      (path : Dynamic.ProjectionsRead initialValue target.projections selected)
+      (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+      (same : value = .inLeft output (.word token))
+      (matched : faults (.semantic (.panic code)) token)
+      (heaps : GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel (payloadModel compiled.compatible.checked registry functions) (GeneralizedLocalInstanceValues.model compiled.indexed)) finalMap finalWorld after finalStore)
+      (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
+      (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
+      (effect : CellAwareScopeAuthority.Effect (GeneralizedLocalInstanceValues.model compiled.indexed) mapping world before store finalMap finalWorld after finalStore)
+      (reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+      (related : callerProtocol.Relates initial reached) (stable : StableRows (bridge.pool reached)) :
+      ResultAt size context stages invocation faults scope writtenContext assignment operator rhs
+        environment canonical actual before store mapping world initial next output value finalStore
   | success {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace}
       {right updated : Dynamic.Value} {middle after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
@@ -367,7 +389,7 @@ theorem target_snapshot :
     exact ⟨snapshot.resolved, .intro empty snapshot.lookup snapshot.read snapshot.root⟩
 
 include transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare authority physical owner sameLocation in
-theorem reflects_bounded (budget : Nat)
+theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (boundedReflection : ReflectsBelow bridge context (payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (invalidToken : AssignmentOperandDiagnostics.OperandsLaw
       (fun reason token => faults (.semantic reason) token) operator head.invalid)
@@ -397,6 +419,10 @@ theorem reflects_bounded (budget : Nat)
     | operands snapshot trace currentRead rootType initialized path invalidOperands same matched finalHeaps maps worlds preservation metadata effect post =>
       obtain ⟨reached, related⟩ := post
       exact .operands snapshot trace currentRead rootType initialized path invalidOperands same matched finalHeaps maps worlds preservation metadata effect reached related
+        (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation)
+    | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata effect post =>
+      obtain ⟨reached, related⟩ := post
+      exact .panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata effect reached related
         (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation)
     | success snapshot trace rightTyped middleTyped write finalHeaps maps worlds preservation metadata effect count typed strict remaining post =>
       obtain ⟨reached, related⟩ := post
@@ -513,6 +539,41 @@ theorem preserves_operands {sourceSize : Nat}
         environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees slot writable next output invalid invalidToken
     obtain ⟨reached, related⟩ := post
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, effect,
+      reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
+
+include extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare authority physical owner sameLocation in
+/-- A source panic on the operands: the setter runs and the check fails. -/
+theorem preserves_panic {sourceSize : Nat}
+    (meaning : PreservesAt bridge context (payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults sourceSize)
+    {right : Dynamic.Value} {after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} {code : UInt8}
+    (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
+    (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+    (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before rhs (.value right) after)
+    (next : Expr) (output : Ty) :
+    ∃ finalStore finalMap finalWorld,
+      Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word (SourceCorePanics.reason code))) finalStore ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel (payloadModel compiled.compatible.checked registry functions) (GeneralizedLocalInstanceValues.model compiled.indexed)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalInstanceValues.model compiled.indexed) mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  cases shape with
+  | projected layout _ =>
+    have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
+    rw [bare, List.length_nil] at length
+    exact False.elim (layout.nonempty (List.eq_nil_of_length_eq_zero length))
+  | bare empty layout =>
+    have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
+    obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect, post⟩ :=
+      ProtectedCellStagedBareAssignment.preserves_panic_with_rhs callerProtocol initial layout empty extension snapshot panics
+        (fun snapshot => rhs_preserves_at bridge functions snapshot sourceSize meaning generated found sourceTyped
+          environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace)
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView)
+        environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees slot writable next output invalid
+    obtain ⟨reached, related⟩ := post
+    exact ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
 
 end Heads
@@ -1360,7 +1421,7 @@ include transport extension environments heaps locals agrees actualTyped initial
 /-- Structural write failure is checked against the latest root after the
 successful RHS. Represented initialized scalar operands cannot create an
 additional operand fault in this projected profile. -/
-theorem preserves_write_fault (budget : Nat)
+theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (meaning : PreservesBelow bridge context (payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (errors : ProtectedPlaceReachedDiagnostics.ShapeErrors (.initial compiled.compatible.checked) registry functions callerProtocol invocation.source context certificate
       scope administrative environment assignment.target head.prepared operator head.invalid initial
@@ -1408,13 +1469,20 @@ theorem preserves_write_fault (budget : Nat)
     | operands read rootType initialValue pathRead invalidOperands =>
       have rightRep : ValueRep compiled.compatible.checked registry functions rhsMap rhsWorld leaf right native prepared.route.leafType :=
         .compatible rightView (by simpa only [payloadModel, renamed, rightType] using rightRep)
-      obtain ⟨replacement, replacementValue, replacementRep, applies, evaluated, valid⟩ :=
-        CompatiblePlaceModifier.initialized_success observations profile ordinaryRhs.saved_snapshot rightRep
-          (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
-            (.inRight .unit resolution.snapshot) native actual)
-          (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
+      have valid := CompatiblePlaceModifier.initialized_valid observations profile ordinaryRhs.saved_snapshot rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
+    | panic read rootType initialValue pathRead panics =>
+      obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect, reached, related⟩ :=
+        CellAwareStagedProjectedFaults.preserves_panic GeneralizedLocalDescriptorHeap.ordinary_cells layout ordinary extension callerProtocol transport faithful observations
+          generated found rightView rightType profile environments agrees actualTyped initial resolution coreLookup
+          resolutionState resolutionRelated ordinaryRhs rhsPost read initialValue pathRead panics (next.rename ξ) output invalid
+      refine ⟨_, finalStore, finalMap, finalWorld, ?_, RecursiveStageMeaning.FaultTokens.panic _,
+        finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
+        StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
+      change Evaluates actual store ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression
+        next output (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) _ _
+      simpa only [execute_rename layout.path (virtual_closed layout ordinary), renamed_packed, Expr.rename] using evaluated
     | structural read rootType initialValue fault =>
       obtain ⟨token, count, root, finalStore, finalMap, finalWorld, _sourceFault, _initial, _receipt,
           evaluated, finalHeaps, maps, worlds, frame, metadata, effect, reached, related, diagnostic⟩ :=
@@ -1486,7 +1554,7 @@ variable {named : SourceCoreGeneralFunctions.Function}
   (assignmentTyped : SourceAssignmentHasType invocation.source context assignment operator rhs)
 
 include transport extension environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame unique assignmentTyped projected observations faithful in
-theorem reflects_bounded (budget : Nat)
+theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (boundedReflection : ReflectsBelow bridge context (payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (functionTypes : FunctionRuntimeViews functions)
     (errors : ProtectedPlaceReachedDiagnostics.ShapeErrors (.initial compiled.compatible.checked) registry functions callerProtocol invocation.source context certificate
@@ -1663,7 +1731,7 @@ variable
         initial (fun reason token => faults (.semantic reason) token) head.shape)
 
 include transport sourceEq unique found form projected extension faithful observations diagnostics in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareScopeExpressionBounds.PreservesBelow bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (tail : CellAwareScopeFlowBounds.PreservesAtMost bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named producer stages invocation faults
       administrative scope mode rest expected type body budget) :
@@ -1753,7 +1821,7 @@ theorem preserves (budget : Nat)
         effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport sourceEq unique found form projected extension faithful observations diagnostics in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
     (children : CellAwareScopeExpressionBounds.ReflectsBelow bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (tail : CellAwareScopeFlowBounds.ReflectsAtMost bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named producer stages invocation faults
       administrative scope mode rest expected type body budget) :
@@ -1858,7 +1926,7 @@ variable
     (fun reason token => faults (.semantic reason) token) operator head.invalid)
 
 include transport sourceEq unique found form bare extension invalidToken in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareScopeExpressionBounds.PreservesBelow bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (tail : CellAwareScopeFlowBounds.PreservesAtMost bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named producer stages invocation faults
       administrative scope mode rest expected type body budget) :
@@ -1877,6 +1945,8 @@ theorem preserves (budget : Nat)
     ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
     ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
       currentRead, rootType, initialized, path, invalid⟩ |
+    ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, contextEq, outcomeEq, childTrace,
+      currentRead, rootType, initialized, path, panics⟩ |
     ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
   · subst finalContext
     subst outcome
@@ -1901,6 +1971,18 @@ theorem preserves (budget : Nat)
     exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
       preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  · subst finalContext
+    subst outcome
+    have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+      rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+    obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+        preservation, metadata, effect, reached, related, stable⟩ :=
+      CellAwareScopeBareAssignmentHeads.preserves_panic bridge functions extension head bare
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
+        (children childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
+      preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
       rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
     have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -1923,7 +2005,7 @@ theorem preserves (budget : Nat)
       effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport sourceEq unique found form bare extension invalidToken in
-theorem reflects (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareScopeExpressionBounds.ReflectsBelow bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named stages invocation certificate faults budget)
     (tail : CellAwareScopeFlowBounds.ReflectsAtMost bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) named producer stages invocation faults
       administrative scope mode rest expected type body budget) :
@@ -1949,6 +2031,12 @@ theorem reflects (budget : Nat)
     cases same
     exact ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
       .assignBareOperands (lookupStatement?_sound found) form snapshot trace currentRead rootType initialized path invalid,
+      .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata effect reached related stable =>
+    cases same
+    exact ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+      .assignBarePanic (lookupStatement?_sound found) form snapshot trace currentRead rootType initialized path panics,
       .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   | success snapshot childTrace write middleHeaps maps worlds preservation metadata effect count typed reached related nextAdmitted strict remaining =>

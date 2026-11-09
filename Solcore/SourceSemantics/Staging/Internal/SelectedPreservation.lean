@@ -831,6 +831,16 @@ theorem expression_fault_step (selectedBodies : SelectedPreservation.SelectedBod
           obtain ⟨_secondTyped, afterTyped, secondExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers (locals.mono firstExtends) middleTyped rightTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @binaryPanic firstSize secondSize scope context environment before middle after id left operator right a b code
+      occurrence first _continues second _panics =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | binary leftTyped rightTyped _ =>
+          obtain ⟨_firstTyped, middleTyped, firstExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
+            runtime covers locals heap leftTyped first
+          obtain ⟨_secondTyped, afterTyped, secondExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
+            runtime covers (locals.mono firstExtends) middleTyped rightTyped second
+          exact ⟨afterTyped, firstExtends.trans secondExtends⟩
   | @unaryMethod operandSize bodySize scope context environment before argumentsHeap bound after id operator operand input
       requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
       occurrence dispatch method operandTrace rootsEq selected parameters allocate body resultRule =>
@@ -1724,6 +1734,16 @@ theorem for_items_step (size : Nat)
               | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+  | @assignmentPanic childSize scope context environment before after assignment operator rhs target right
+      currentCell initial currentSelected rest code _snapshot child _currentRead _rootType _initialValue _pathRead _panics =>
+      cases typed with
+      | cons headTyped _ =>
+          cases headTyped with
+          | assignValue assignmentTyped =>
+              cases assignmentTyped with
+              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+                  have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
+                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | bitNotFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
   | @bitNot nextSize scope context finalContext environment before written after assignment target updated rest outcome
       snapshot write next =>
@@ -2361,6 +2381,17 @@ theorem statements_step (size : Nat)
               exact fault_statements post.heap_typed post.heap_extends
   | @assignBareOperands childSize mode scope context environment before after id rest node assignment operator rhs
       target right currentCell initial currentSelected contains form _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _completeTail, _fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap rhsTyped child
+              exact fault_statements post.heap_typed post.heap_extends
+  | @assignBarePanic childSize mode scope context environment before after id rest node assignment operator rhs
+      target right currentCell initial currentSelected code contains form _snapshot child _currentRead _rootType _initialValue _pathRead _panics =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _completeTail, _fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with

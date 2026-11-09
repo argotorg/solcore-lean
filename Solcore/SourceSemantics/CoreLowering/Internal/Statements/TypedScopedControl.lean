@@ -477,7 +477,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource} {conte
 include extension contextValid unique uninitialized missing in
 /-- The entire finite source sequence determines a native execution. No child
 execution or universal child meaning is a certificate premise. -/
-theorem Tree.preserves {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope mode statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -558,7 +558,7 @@ theorem Tree.preserves {mode : Bool} {scope : Scope} {statements : List Statemen
 include extension contextValid uninitialized missing in
 /-- Every completed generated flow constructs its independent source trace.
 The returned expression trace is derived from the actual native subtree. -/
-theorem Tree.reflects {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope mode statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -1178,7 +1178,7 @@ private theorem sequence_reflects {scope : Scope} {mode : Bool} {id : StatementI
       .fault matched, middleHeaps, maps, worlds, frame, metadata⟩
 
 include extension contextValid unique uninitialized missing in
-private theorem conditional_preserves {scope : Scope} {id : StatementId} {node : StatementNode}
+private theorem conditional_preserves [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
     {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
@@ -1271,7 +1271,7 @@ private theorem selected_intro {id : StatementId} {node : StatementNode} {condit
       | fault failed => exact .fault (.ifFalseBody (lookupStatement?_sound found) form conditionTrace failed)
 
 include extension contextValid uninitialized missing in
-private theorem conditional_reflects {scope : Scope} {id : StatementId} {node : StatementNode}
+private theorem conditional_reflects [FunctionCalls.FaultTokens faults] {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
     {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
@@ -1327,7 +1327,7 @@ private theorem conditional_reflects {scope : Scope} {id : StatementId} {node : 
 include extension contextValid unique uninitialized missing in
 /-- The entire finite source sequence determines a native execution. No child
 execution or universal child meaning is a certificate premise. -/
-theorem Tree.preserves {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope mode statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -1386,7 +1386,7 @@ theorem Tree.preserves {mode : Bool} {scope : Scope} {statements : List Statemen
 include extension contextValid uninitialized missing in
 /-- Every completed generated flow constructs its independent source trace.
 The returned expression trace is derived from the actual native subtree. -/
-theorem Tree.reflects {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree readFuel values source context solved reasonAt scope mode statements expected type code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}

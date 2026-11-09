@@ -98,11 +98,17 @@ def Table.diagnostic? (table : Table) (reason : Core.Word) : Option Diagnostic :
       match table.additional.find? fun site => decide (site.1 = reason) with
       | some site => some site.2
       | none =>
-        (table.reads.find? fun site => decide (site.reason = reason)).map fun site => {
-          error := .uninitializedLocal site.binder
-          site := .occurrence site.expression.occurrence
-          span := some site.span
-        }
+        match table.reads.find? fun site => decide (site.reason = reason) with
+        | some site => some {
+            error := .uninitializedLocal site.binder
+            site := .occurrence site.expression.occurrence
+            span := some site.span
+          }
+        | none => (SourceCorePanics.code? reason).map fun code => {
+            error := .panic code
+            site := .declaration table.owner
+            span := none
+          }
 
 theorem Table.fallthrough_diagnostic (table : Table) :
     table.diagnostic? Core.Word.zero = some {
@@ -122,6 +128,48 @@ theorem Table.read_diagnostic {table : Table} {site : ReadSite}
       site := .occurrence site.expression.occurrence
       span := some site.span
     } := by simp [Table.diagnostic?, positive, ordinary, noBoundary, found]
+
+/-- No reason of the table lies in the panic range, so the reason of a panic
+decodes as that panic. -/
+def Table.PanicFree (table : Table) : Prop :=
+  table.escapedReason.val < SourceCorePanics.base ∧
+    (∀ site ∈ table.reads, site.reason.val < SourceCorePanics.base) ∧
+    ∀ item ∈ table.additional, item.1.val < SourceCorePanics.base
+
+/-- A panic reason decodes as its panic, at the table's function. -/
+theorem Table.panic_diagnostic {table : Table} (free : table.PanicFree) (code : UInt8) :
+    table.diagnostic? (SourceCorePanics.reason code) = some {
+      error := .panic code
+      site := .declaration table.owner
+      span := none
+    } := by
+  obtain ⟨escaped, reads, additional⟩ := free
+  have high := SourceCorePanics.base_le_reason code
+  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
+  have nonzero : SourceCorePanics.reason code ≠ Core.Word.zero := by
+    intro same
+    have value := congrArg Fin.val same
+    change (SourceCorePanics.reason code).val = 0 at value
+    omega
+  have notEscaped : SourceCorePanics.reason code ≠ table.escapedReason := by
+    intro same
+    have value := congrArg Fin.val same
+    omega
+  have noAdditional :
+      table.additional.find? (fun site => decide (site.1 = SourceCorePanics.reason code)) = none := by
+    apply List.find?_eq_none.mpr
+    intro item member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := additional item member
+    omega
+  have noRead :
+      table.reads.find? (fun site => decide (site.reason = SourceCorePanics.reason code)) = none := by
+    apply List.find?_eq_none.mpr
+    intro site member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := reads site member
+    omega
+  simp [Table.diagnostic?, nonzero, notEscaped, noAdditional, noRead, SourceCorePanics.code?_reason]
 
 theorem Table.escaped_diagnostic (table : Table)
     (positive : table.escapedReason ≠ Core.Word.zero) :

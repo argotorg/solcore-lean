@@ -440,7 +440,7 @@ theorem reflects_children {budget : Nat}
 include support globals selected semantic assignmentInterpretation in
 /-- The original named body enters the same protected lexical engine and
 returns the exact reached pool, including cells captured by its result. -/
-theorem preserves
+theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -534,7 +534,7 @@ theorem preserves
 include support globals selected semantic assignmentInterpretation in
 /-- Native completion is inverted through its real flow prefix and footer;
 no selected final Source context is assumed. -/
-theorem reflects
+theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
     (layouts : header.layouts = compiled.indexed.layouts) {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
@@ -806,6 +806,8 @@ def at_scope {fuel : Nat}
       header.context child (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child faults //
       support.rawType = header.function.resultType ∧ support.reasonAt = header.reasonAt } := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled receiver)
   have sourceEq := stages.source selected
   have unique : NodeOccurrencesUnique child.source := sourceEq ▸ header.unique
   have declarations := RecursiveNamedHeaderScopeDeclarations.header_scope

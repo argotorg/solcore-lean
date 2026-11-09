@@ -246,7 +246,7 @@ variable
 include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem preserves_flow_on
+theorem preserves_flow_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -301,7 +301,7 @@ theorem preserves_flow_on
 include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     RecursiveNamedHeaderContracts.AtMost budget
@@ -316,7 +316,7 @@ end ForModel
 include chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i)) :
     RecursiveNamedHeaderContracts.AtMost budget
@@ -346,7 +346,7 @@ variable
 include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem reflects_flow_on
+theorem reflects_flow_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -401,7 +401,7 @@ theorem reflects_flow_on
 include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     Below budget
@@ -416,7 +416,7 @@ end ForModel
 include chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i)) :
     Below budget
@@ -467,7 +467,7 @@ include functions members profile chosen domains wellFormed sameLayouts owners i
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem source_at_entry_on
+theorem source_at_entry_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -519,7 +519,7 @@ include functions members profile chosen domains wellFormed sameLayouts owners i
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem source_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem source_at_entry [FunctionCalls.FaultTokens faults] (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i))
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
@@ -554,7 +554,7 @@ include chosen domains wellFormed sameLayouts owners idsUnique complete globals 
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem source_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem source_at_entry [FunctionCalls.FaultTokens faults] (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i))
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
@@ -604,7 +604,7 @@ include functions members profile chosen domains wellFormed sameLayouts complete
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem native_at_entry_on
+theorem native_at_entry_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -653,7 +653,7 @@ include functions members profile chosen domains wellFormed sameLayouts complete
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem native_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem native_at_entry [FunctionCalls.FaultTokens faults] (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i))
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
@@ -685,7 +685,7 @@ include chosen domains wellFormed sameLayouts complete globals slots prefixZero 
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem native_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem native_at_entry [FunctionCalls.FaultTokens faults] (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i))
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
@@ -732,7 +732,7 @@ include functions members profile chosen domains wellFormed sameLayouts owners i
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem source_continuation_on
+theorem source_continuation_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -760,7 +760,7 @@ include functions members profile chosen domains wellFormed sameLayouts owners i
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem source_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
@@ -776,7 +776,7 @@ include chosen domains wellFormed sameLayouts owners idsUnique complete globals 
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem source_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
@@ -807,7 +807,7 @@ include functions members profile chosen domains wellFormed sameLayouts complete
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem native_continuation_on
+theorem native_continuation_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -835,7 +835,7 @@ include functions members profile chosen domains wellFormed sameLayouts complete
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem native_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
@@ -851,7 +851,7 @@ include chosen domains wellFormed sameLayouts complete globals slots prefixZero 
   extension faithful observations functionTypes uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem native_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
@@ -999,7 +999,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable in
 /-- The same positive factory internally supplies the genuine nested Source continuation. -/
-theorem source_continuation_on
+theorem source_continuation_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1030,7 +1030,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable in
 /-- The same positive factory internally supplies the genuine nested Source continuation. -/
-theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem source_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index)) :
@@ -1050,7 +1050,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable in
 /-- Reflection keeps the independent Source grade of the same literal nested continuation. -/
-theorem native_continuation_on
+theorem native_continuation_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1081,7 +1081,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable in
 /-- Reflection keeps the independent Source grade of the same literal nested continuation. -/
-theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem native_continuation [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index)) :
@@ -1119,7 +1119,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- One internally built continuation feeds the original invocation and restoration once. -/
-theorem invocation_preserves_on
+theorem invocation_preserves_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1149,7 +1149,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- One internally built continuation feeds the original invocation and restoration once. -/
-theorem invocation_preserves (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem invocation_preserves [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index))
@@ -1174,7 +1174,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- Native completion invokes the same continuation and restores the actual caller pool once. -/
-theorem invocation_reflects_on
+theorem invocation_reflects_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1205,7 +1205,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- Native completion invokes the same continuation and restores the actual caller pool once. -/
-theorem invocation_reflects (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem invocation_reflects [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index))
@@ -1231,7 +1231,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The genuine payload application edge retains that same invocation tuple. -/
-theorem application_preserves_on
+theorem application_preserves_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1258,7 +1258,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The genuine payload application edge retains that same invocation tuple. -/
-theorem application_preserves (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem application_preserves [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index))
@@ -1283,7 +1283,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The real application child keeps its strict native bound and independent Source grade. -/
-theorem application_reflects_on
+theorem application_reflects_on [FunctionCalls.FaultTokens faults]
     (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
       (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
@@ -1309,7 +1309,7 @@ include functions members functionTypes profile member domains wellFormed sameLa
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The real application child keeps its strict native bound and independent Source grade. -/
-theorem application_reflects (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem application_reflects [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       functions owner index))
@@ -1336,7 +1336,7 @@ include member domains wellFormed sameLayouts owners idsUnique complete globals 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable in
 /-- The same positive factory internally supplies the genuine nested Source continuation. -/
-theorem source_continuation_chosen (outer budget : Nat) (within : budget ≤ outer)
+theorem source_continuation_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index)) :
@@ -1355,7 +1355,7 @@ include member domains wellFormed sameLayouts complete globals slots prefixZero 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable in
 /-- Reflection keeps the independent Source grade of the same literal nested continuation. -/
-theorem native_continuation_chosen (outer budget : Nat) (within : budget ≤ outer)
+theorem native_continuation_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index)) :
@@ -1392,7 +1392,7 @@ include member domains wellFormed sameLayouts owners idsUnique complete globals 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- One internally built continuation feeds the original invocation and restoration once. -/
-theorem invocation_preserves_chosen (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem invocation_preserves_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index))
@@ -1416,7 +1416,7 @@ include member domains wellFormed sameLayouts complete globals slots prefixZero 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- Native completion invokes the same continuation and restores the actual caller pool once. -/
-theorem invocation_reflects_chosen (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem invocation_reflects_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index))
@@ -1441,7 +1441,7 @@ include member domains wellFormed sameLayouts owners idsUnique complete globals 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The genuine payload application edge retains that same invocation tuple. -/
-theorem application_preserves_chosen (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem application_preserves_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index))
@@ -1465,7 +1465,7 @@ include member domains wellFormed sameLayouts complete globals slots prefixZero 
   extension faithful observations uninitialized missing rebuilt operandIncluded unaryIncluded interprets
   beforeTyped argumentsTyped stable represented heaps locals in
 /-- The real application child keeps its strict native bound and independent Source grade. -/
-theorem application_reflects_chosen (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem application_reflects_chosen [FunctionCalls.FaultTokens faults] (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults)
       (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) owner index))

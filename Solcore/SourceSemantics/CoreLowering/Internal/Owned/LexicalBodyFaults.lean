@@ -195,7 +195,8 @@ theorem decoded_token_below
     {table : SourceCoreFaultSites.Table}
     (rebuilt : issued.tableForRegistry registry extension = .ok table)
     {token : Word} {diagnostic : Diagnostic}
-    (decoded : table.diagnostic? token = some diagnostic) : token.val < issued.nextReason := by
+    (decoded : table.diagnostic? token = some diagnostic)
+    (notPanic : SourceCorePanics.code? token = none) : token.val < issued.nextReason := by
   obtain ⟨base, initialExtra, reserved⟩ := CompatiblePlaceMissingPreparationRanges.prepare_reserved_receipt accepted
   obtain ⟨extra, _extraAccepted, tableEq, origins⟩ := issued.tableForRegistry_receipt rebuilt
   by_cases zero : token = Word.zero
@@ -220,7 +221,7 @@ theorem decoded_token_below
       | none =>
         simp only [first] at decoded
         cases found : table.reads.find? (fun read => decide (read.reason = token)) with
-        | none => simp [found] at decoded
+        | none => simp [found, notPanic] at decoded
         | some read =>
           have matched : read.reason = token := of_decide_eq_true (List.find?_some
             (p := fun candidate : SourceCoreFaultSites.ReadSite => decide (candidate.reason = token)) found)
@@ -228,6 +229,122 @@ theorem decoded_token_below
             simpa only [tableEq, reserved.sameRoot] using List.mem_of_find?_eq_some found
           rw [← matched]
           exact reserved.readsBelow read member
+
+/-- The appended callable rows lie below the panic range, so a panic reason
+decodes in the receiver as in the preappend table. -/
+theorem appendCallable_panic (compiled : SourceCoreUnifiedCompilation.Compiled)
+    {table : SourceCoreFaultSites.Table} {token : Word} (high : SourceCorePanics.base ≤ token.val) :
+    (appendCallable compiled.indexed table).diagnostic? token = table.diagnostic? token := by
+  have rows := compiled.panicFree.2
+  cases present : compiled.indexed.base.callableDiagnostics with
+  | none => simp only [appendCallable, present]
+  | some callable =>
+    simp only [present] at rows
+    rw [appendCallable, present]
+    apply diagnostic_append
+    apply List.find?_eq_none.mpr
+    intro item member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := rows item (List.mem_filter.mp member).1
+    omega
+
+/-- A reason in the panic range misses every row of a table free of panic
+reasons. -/
+theorem panicFree_misses {table : SourceCoreFaultSites.Table} (free : table.PanicFree) {token : Word}
+    (high : SourceCorePanics.base ≤ token.val) :
+    token ≠ Word.zero ∧ token ≠ table.escapedReason ∧
+      table.additional.find? (fun item => decide (item.1 = token)) = none ∧
+      table.reads.find? (fun site => decide (site.reason = token)) = none := by
+  obtain ⟨escaped, reads, additional⟩ := free
+  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro same
+    have value := congrArg Fin.val same
+    change token.val = 0 at value
+    omega
+  · intro same
+    have value := congrArg Fin.val same
+    omega
+  · apply List.find?_eq_none.mpr
+    intro item member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := additional item member
+    omega
+  · apply List.find?_eq_none.mpr
+    intro site member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := reads site member
+    omega
+
+/-- The callable append keeps a table's own rows, so it keeps their bounds. -/
+theorem appendCallable_panicFree {checked : SourceCoreCompatibleCatalog.Checked}
+    {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
+    {table : SourceCoreFaultSites.Table} (free : (appendCallable prepared table).PanicFree) :
+    table.PanicFree := by
+  unfold appendCallable at free
+  split at free
+  · exact free
+  · exact ⟨free.1, free.2.1, fun item member => free.2.2 item (List.mem_append_left _ member)⟩
+
+/-- Every table issued at a compiled program is free of panic reasons: the
+compatible inventory, including its reserved metadata ranges, and the callable
+rows lie below the panic range. -/
+theorem issued_panicFree (compiled : SourceCoreUnifiedCompilation.Compiled)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    {registry : SourceCoreRawMetadata.Registry}
+    {extension : SourceCoreRawMetadata.Extends compiled.compatible.checked.staticRegistry registry}
+    {table : SourceCoreFaultSites.Table}
+    (issued : IssuedAt compiled.indexed entry registry extension table) : table.PanicFree := by
+  have free := compiled.panicFree
+  obtain ⟨base, rebuilt, rfl⟩ := issued
+  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
+  have baseFree : base.PanicFree := by
+    cases present : compiled.indexed.base.diagnostics with
+    | none =>
+      simp only [present] at rebuilt
+      subst rebuilt
+      exact ⟨positive, by simp, by simp⟩
+    | some diagnostics =>
+      simp only [present] at rebuilt
+      have next : diagnostics.nextReason ≤ SourceCorePanics.base := by
+        have bound := free.1
+        simp only [present] at bound
+        exact bound
+      obtain ⟨root, sources, accepted⟩ :=
+        CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled present
+      obtain ⟨programBase, initialExtra, reserved⟩ :=
+        CompatiblePlaceMissingPreparationRanges.prepare_reserved_receipt accepted
+      obtain ⟨extra, _, tableEq, origins⟩ := diagnostics.tableForRegistry_receipt rebuilt
+      have sameEscaped : base.escapedReason = programBase.rootTable.escapedReason := by
+        rw [tableEq, reserved.sameRoot]
+      have sameReads : base.reads = programBase.rootTable.reads := by
+        rw [tableEq, reserved.sameRoot]
+      refine ⟨?_, ?_, ?_⟩
+      · rw [sameEscaped]
+        have below := reserved.escapedBelow
+        omega
+      · intro read member
+        rw [sameReads] at member
+        have below := reserved.readsBelow read member
+        omega
+      · intro row member
+        have member : row ∈ diagnostics.fixed ++ extra := by simpa only [tableEq] using member
+        rcases List.mem_append.mp member with fixed | expanded
+        · have below := reserved.fixedBelow row fixed
+          omega
+        · have below := extra_token_below reserved rebuilt (origins row expanded)
+          omega
+  have rows := free.2
+  cases callablePresent : compiled.indexed.base.callableDiagnostics with
+  | none => simpa only [appendCallable, callablePresent] using baseFree
+  | some callable =>
+    simp only [callablePresent] at rows
+    simp only [appendCallable, callablePresent]
+    refine ⟨baseFree.1, baseFree.2.1, ?_⟩
+    intro item member
+    rcases List.mem_append.mp member with old | new
+    · exact baseFree.2.2 item old
+    · exact rows item (List.mem_filter.mp new).1
 
 /-- The sealed compiler supplies compatible preparation and callable allocation.
 The actual completion supplies the receiving rebuild and exact public append;
@@ -249,10 +366,13 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
   rw [present] at actualRebuilt
   have same : actual = table := Except.ok.inj (actualRebuilt.symm.trans rebuilt)
   subst actual
-  rw [tableEq, appendCallable_diagnostic_of_below
-    ((CompatiblePublicCallableAllocationReceipts.of_compiled compiled present).below
-      (decoded_token_below accepted rebuilt decoded))]
-  exact decoded
+  by_cases panic : SourceCorePanics.base ≤ token.val
+  · rw [tableEq, appendCallable_panic compiled panic]
+    exact decoded
+  · rw [tableEq, appendCallable_diagnostic_of_below
+      ((CompatiblePublicCallableAllocationReceipts.of_compiled compiled present).below
+        (decoded_token_below accepted rebuilt decoded (SourceCorePanics.code?_eq_none (Nat.lt_of_not_le panic))))]
+    exact decoded
 
 /-- Both reached-place fields are constructed internally from the same exact
 preappend decoder and public receiver. The actual reached state, prepared place
@@ -864,7 +984,7 @@ variable
   (unique : NodeOccurrencesUnique source) (wellFormed : ProgramWellFormed program)
 
 include transport extension faithful observations functionTypes unique wellFormed in
-theorem expression_preserves {context : SourceSemantics.Context}
+theorem expression_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context}
     (inputs : StaticContext (compiled := compiled) (program := program) (registry := registry) (faults := faults) (source := source) (certificates := certificates) functions evidence context)
     (size : Nat) :
     NamedLexicalFlowFaultPostContracts.ExpressionPreservesAt
@@ -888,7 +1008,7 @@ theorem expression_preserves {context : SourceSemantics.Context}
   | fault reason => exact CallableIndexedOwnedAdmittedBuiltinFaultBounds.NativeFaultAt.at_fault retained evaluated
 
 include transport extension faithful observations functionTypes unique wellFormed in
-theorem expression_reflects {context : SourceSemantics.Context}
+theorem expression_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context}
     (inputs : StaticContext (compiled := compiled) (program := program) (registry := registry) (faults := faults) (source := source) (certificates := certificates) functions evidence context)
     (size : Nat) :
     NamedLexicalFlowFaultPostContracts.ExpressionReflectsAt
@@ -928,7 +1048,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (extend : ∀ {context nextContext binder}, validity context → BinderExtends source.owner context binder nextContext → validity nextContext)
 
 include definitions registered producer bindings acquire unique transport extension faithful observations functionTypes wellFormed contexts extend in
-theorem flow_preserves (budget size : Nat) (bounded : size ≤ budget)
+theorem flow_preserves [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
@@ -956,7 +1076,7 @@ theorem flow_preserves (budget size : Nat) (bounded : size ≤ budget)
     tree valid sourceFacts unique environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
 
 include definitions registered producer bindings acquire unique transport extension faithful observations functionTypes wellFormed contexts extend in
-theorem flow_reflects (budget size : Nat) (bounded : size ≤ budget)
+theorem flow_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
@@ -1138,7 +1258,7 @@ private theorem body_unmapped : frameLocation ∉ entry.mapping := by
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Authentic static child certificates populate the shared Tree and finish
 at this actual parameter state. The fault post remains at the body store. -/
-theorem source_body_with_post (size : Nat) :
+theorem source_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
   exact with_static (extension := extension) (faithful := faithful) (observations := observations)
@@ -1200,7 +1320,7 @@ where
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Native finish selects its genuine strict flow child. The Source grade is
 constructed independently by the same shared producer at the reached state. -/
-theorem native_body_with_post (size : Nat) :
+theorem native_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
   exact with_static (extension := extension) (faithful := faithful) (observations := observations)
@@ -1271,7 +1391,7 @@ where
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Strict membership retains the same concrete Source body producer. -/
-theorem source_below (budget : Nat) :
+theorem source_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1281,7 +1401,7 @@ theorem source_below (budget : Nat) :
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Each native member uses its own actual measured body completion. -/
-theorem native_below (budget : Nat) :
+theorem native_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1299,7 +1419,7 @@ variable (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
 include inputs parameters extension faithful observations functionTypes wellFormed in
 /-- The actual parameter receipt supplies deep Source admission, all rows and
 its literal stable hook. No body semantics is supplied by the caller. -/
-theorem source_at_parameters (size : Nat) :
+theorem source_at_parameters [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) parameters.body parameters.reached size :=
   source_body_with_post functions extension faithful observations functionTypes wellFormed
@@ -1307,7 +1427,7 @@ theorem source_at_parameters (size : Nat) :
 
 include inputs parameters extension faithful observations functionTypes wellFormed in
 /-- Native reflection starts at the same real hook and parameter state. -/
-theorem native_at_parameters (size : Nat) :
+theorem native_at_parameters [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) parameters.body parameters.reached size :=
   native_body_with_post functions extension faithful observations functionTypes wellFormed
@@ -1437,7 +1557,7 @@ variable
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- The original lexical allocation/readiness and finish producers run once.
 The genuine fault post stays at the returned bodyStore. -/
-theorem source_body_with_post (size : Nat) :
+theorem source_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size :=
   CallableIndexedOwnedLexicalNamedBodyFaultBounds.source_body_with_post.with_static functions validity entry reached
@@ -1447,7 +1567,7 @@ theorem source_body_with_post (size : Nat) :
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Native reflection selects the actual allocation suffix completion; its
 Source grade is reconstructed independently by the shared lexical producer. -/
-theorem native_body_with_post (size : Nat) :
+theorem native_body_with_post [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size :=
   CallableIndexedOwnedLexicalNamedBodyFaultBounds.native_body_with_post.with_static functions validity entry reached
@@ -1455,7 +1575,7 @@ theorem native_body_with_post (size : Nat) :
     (static_inputs functions allocation annotation validity inputs) size
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
-theorem source_below (budget : Nat) :
+theorem source_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1464,7 +1584,7 @@ theorem source_below (budget : Nat) :
     functionTypes wellFormed entry reached sourceReceipt rows stable child
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
-theorem native_below (budget : Nat) :
+theorem native_below [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
         (faults := faults) entry reached) := by
@@ -1482,7 +1602,7 @@ variable (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
 include inputs parameters extension faithful observations functionTypes wellFormed in
 /-- The actual parameter receipt supplies native frame/read facts, deep Source
 admission, all live rows and its stable hook at this same body entry. -/
-theorem source_at_parameters (size : Nat) :
+theorem source_at_parameters [FunctionCalls.FaultTokens faults] (size : Nat) :
     SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) parameters.body parameters.reached size :=
   source_body_with_post functions allocation annotation validity inputs extension faithful observations
@@ -1490,7 +1610,7 @@ theorem source_at_parameters (size : Nat) :
     (parameters.source wellFormed) parameters.rows parameters.stable_owner size
 
 include inputs parameters extension faithful observations functionTypes wellFormed in
-theorem native_at_parameters (size : Nat) :
+theorem native_at_parameters [FunctionCalls.FaultTokens faults] (size : Nat) :
     NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) parameters.body parameters.reached size :=
   native_body_with_post functions allocation annotation validity inputs extension faithful observations
@@ -1602,7 +1722,7 @@ variable {functions}
 include source rows stable extension faithful observations functionTypes wellFormed in
 /-- The shared lexical Tree/finish producer runs once for each genuine strict
 body member at this literal parameter state and returned bodyStore. -/
-theorem SupportedInputs.source_below
+theorem SupportedInputs.source_below [FunctionCalls.FaultTokens faults]
     (inputs : SupportedInputs (registry := registry) (faults := faults) functions header)
     (budget : Nat) : RecursiveNamedBoundedContracts.Below budget
       (SourceBodyAtWithPost (FaultPost functions (registry := registry)) (faults := faults) entry reached) := by
@@ -1615,7 +1735,7 @@ theorem SupportedInputs.source_below
 include source rows stable extension faithful observations functionTypes wellFormed in
 /-- The shared lexical Tree/finish producer runs once for each genuine strict
 body member at this literal parameter state and returned bodyStore. -/
-theorem SupportedInputs.native_below
+theorem SupportedInputs.native_below [FunctionCalls.FaultTokens faults]
     (inputs : SupportedInputs (registry := registry) (faults := faults) functions header)
     (budget : Nat) : RecursiveNamedBoundedContracts.Below budget
       (NativeBodyAtWithPost (FaultPost functions (registry := registry)) (faults := faults) entry reached) := by
@@ -1656,7 +1776,7 @@ variable {functions}
 include admitted wellFormed sourceRuntime covers locals argumentTypes application inputs extension faithful observations functionTypes in
 /-- The original successful arguments supply the exact parameter receipt;
 only the concrete strict body producer is invoked. -/
-theorem source_invocations (budget : Nat) :
+theorem source_invocations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedExpressionHeads.SourceInvocationsForWithPost (post := FaultPost functions (registry := registry)) (source := source) (context := context)
       (evidence := evidence) (faults := faults) functions owner
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (keys := keys) functions registry header) bridge initial
@@ -1683,7 +1803,7 @@ theorem source_invocations (budget : Nat) :
 include admitted wellFormed sourceRuntime covers locals argumentTypes application inputs extension faithful observations functionTypes in
 /-- The original successful arguments supply the exact parameter receipt;
 only the concrete strict body producer is invoked. -/
-theorem native_invocations (budget : Nat) :
+theorem native_invocations [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedExpressionHeads.NativeInvocationsForWithPost (post := FaultPost functions (registry := registry)) (source := source) (context := context)
       (evidence := evidence) (faults := faults) functions owner
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (keys := keys) functions registry header) bridge initial
@@ -1799,7 +1919,7 @@ def ReflectsHeadAtWithPost (size : Nat) : Prop :=
 include wellFormed sourceRuntime covers unique sameLayouts extension faithful observations functionTypes owners idsUnique in
 /-- Strict actual argument children and a genuine selected static body domain
 derive both providers internally, then retain the original reached admission. -/
-theorem preserves_head_with_body_post (budget size : Nat) (within : size ≤ budget)
+theorem preserves_head_with_body_post [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : RecursiveNamedBoundedContracts.Below budget
       (CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
         (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)
@@ -1839,7 +1959,7 @@ theorem preserves_head_with_body_post (budget size : Nat) (within : size ≤ bud
 include wellFormed sourceRuntime covers unique sameLayouts extension faithful observations functionTypes in
 /-- Strict actual argument children and a genuine selected static body domain
 derive both providers internally, then retain the original reached admission. -/
-theorem reflects_head_with_body_post (budget size : Nat) (within : size ≤ budget)
+theorem reflects_head_with_body_post [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (children : RecursiveNamedBoundedContracts.Below budget
       (CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
         (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)

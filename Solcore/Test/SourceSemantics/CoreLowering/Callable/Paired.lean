@@ -313,7 +313,7 @@ include extension faithful observations runtimeViews owners uninitialized missin
   readPolicy lowerPolicy leafPolicy projectPolicy syntaxTree found typed accepted in
 /-- The actual contextual hook supplies every child certificate. No raw or
 body runtime law is a premise of this source-to-native consumer. -/
-theorem accepted_preserves :
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] :
     ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       (Program.ofChecked compilerProgram) context evidence source
       (fun current identifier code => current = scope ∧ identifier = id ∧ code = output)
@@ -329,7 +329,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
   readPolicy lowerPolicy leafPolicy projectPolicy syntaxTree found typed accepted in
 /-- Reflection measures the actual completion; an independent source run and
 preservation are not inputs. The source context's residual flag is untouched. -/
-theorem accepted_reflects :
+theorem accepted_reflects [FunctionCalls.FaultTokens faults] :
     ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       (Program.ofChecked compilerProgram) context evidence source
       (fun current identifier code => current = scope ∧ identifier = id ∧ code = output)
@@ -2745,7 +2745,7 @@ variable {entry : ProtectedExpressionMeaning.Entry}
   (transport : ProtectedExpressionMeaning.Transport entry) (binders : ProtectedExpressionMeaning.Binds entry)
 
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault transport binders in
-theorem closed_source (budget size : Nat) (within : size ≤ budget)
+theorem closed_source [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -2785,7 +2785,7 @@ theorem closed_source (budget size : Nat) (within : size ≤ budget)
     budget size within expressions environments heaps locals agrees typed reference read unmapped installed trace
 
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault transport binders in
-theorem closed_native (budget size : Nat) (within : size ≤ budget)
+theorem closed_native [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -2911,7 +2911,7 @@ variable {values : SourceCoreCompatibleValues.Context}
 
 include extension faithful observations functionTypes certificates uninitialized missing in
 /-- The only semantic children come from the actual builtin certificate family. -/
-theorem closed_builtin_preserves (size : Nat) : ∀ i, PreservesAt functions program (origins i) size := by
+theorem closed_builtin_preserves [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ i, PreservesAt functions program (origins i) size := by
   apply CallableRuntimeBodyMutualMeaning.preserves_at origins functions extension program faithful observations
   intro i context valid budget child within _
   rw [certificates i context]
@@ -2926,7 +2926,7 @@ theorem closed_builtin_preserves (size : Nat) : ∀ i, PreservesAt functions pro
 include extension faithful observations functionTypes certificates uninitialized missing in
 /-- Reflection starts from each original native completion and returns an
 independent source grade and the full retained entry. -/
-theorem closed_builtin_reflects (size : Nat) : ∀ i, ReflectsAt functions program (origins i) size := by
+theorem closed_builtin_reflects [FunctionCalls.FaultTokens faults] (size : Nat) : ∀ i, ReflectsAt functions program (origins i) size := by
   apply CallableRuntimeBodyMutualMeaning.reflects_at origins functions extension program faithful observations functionTypes
   intro i context valid budget child within _
   rw [certificates i context]

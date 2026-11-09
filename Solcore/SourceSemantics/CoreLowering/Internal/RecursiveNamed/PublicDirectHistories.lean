@@ -218,7 +218,7 @@ include receiver stagePrepared profile observations extension semantic family na
   prepared atRecipe nativeAt handleType imported in
 /-- Finite completion of the actual direct checkpoint constructs an independent
 Source application and the complete returned caller postcondition. -/
-theorem completed_reflects_unit
+theorem completed_reflects_unit [FunctionCalls.FaultTokens semanticFaults]
     (started : checkpoint.HandleStart session handle .unit inputFuel)
     {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
     (completed : checkpoint.NativeDone executionFuel value finalStore)
@@ -253,7 +253,7 @@ include receiver stagePrepared profile observations extension semantic family na
   prepared atRecipe nativeAt handleType imported in
 /-- One successful public invokePacked call retains its actual indexed start,
 export, value and session alongside independent Source execution. -/
-theorem public_invoke_succeeded_reflects_unit
+theorem public_invoke_succeeded_reflects_unit [FunctionCalls.FaultTokens semanticFaults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
     {publicCompletion : SourceCoreExecution.Completion publicArtifact}
@@ -642,7 +642,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType input started parameterView metadata in
 /-- Actual current history and packed encoding close the direct native result
 against independent Source execution, including the ordered Source arguments. -/
-theorem completed_reflects_at_arity
+theorem completed_reflects_at_arity [FunctionCalls.FaultTokens semanticFaults]
     {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
     (completed : checkpoint.NativeDone executionFuel value finalStore)
     (invocation : Staging.Recursive.Scope) :
@@ -666,7 +666,7 @@ theorem completed_reflects_at_arity
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input started parameterView metadata in
-theorem completed_reflects
+theorem completed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
     (completed : checkpoint.NativeDone executionFuel value finalStore)
     (invocation : Staging.Recursive.Scope) :
@@ -686,7 +686,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType input started parameterView metadata in
 /-- The actual callable, encoded input and genuine Source arity derive native
 completion for every sufficient fuel, including effects before a Source fault. -/
-theorem has_sufficient_fuel_at_arity {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
+theorem has_sufficient_fuel_at_arity [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource)
     (arity : RecursivePublicCallableArity.Arity (Program.ofChecked recipe.compiled.sourceProgram) entry.source sources.length)
     {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
@@ -711,7 +711,7 @@ theorem has_sufficient_fuel_at_arity {invocation : Staging.Recursive.Scope} {sou
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input started parameterView metadata in
 /-- Source success supplies the arity without an additional boundary receipt. -/
-theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages sourceSize
@@ -800,7 +800,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Scalars and handles at arbitrary product depth use their original public
 encoding. The actual callable row determines the Source argument vector, including
 the distinction between zero parameters and one Unit-valued parameter. -/
-theorem public_invoke_succeeded_function_tree
+theorem public_invoke_succeeded_function_tree [FunctionCalls.FaultTokens semanticFaults]
     {sourceRegistry : SourceCoreRawMetadata.Registry}
     (atRegistry : session.RegistryAt sourceRegistry)
     (receiving : SourceCoreRawMetadata.Extends sourceRegistry completion.result.context.registry)
@@ -868,7 +868,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Metadata-bearing packed values use the same public continuation when their
 actual encoded registry extends into the receiving registry. The callee's
 Source signature follows from history and the original selection. -/
-theorem public_resume_succeeded
+theorem public_resume_succeeded [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
@@ -1241,7 +1241,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType input in
 /-- A genuine failed public resumption reflects to Source and keeps earlier
 captures at its returned heap without a final heap typing premise. -/
-theorem public_resume_failed_at_arity
+theorem public_resume_failed_at_arity [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
@@ -1309,7 +1309,7 @@ theorem public_resume_failed_at_arity
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input in
-theorem public_resume_failed
+theorem public_resume_failed [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
@@ -1347,7 +1347,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType input atRecipe in
 /-- Actual public invocation recovers its own startup and failed resumption.
 Inputs consisting of scalars, handles and products derive metadata identity. -/
-theorem public_invoke_failed_function_tree
+theorem public_invoke_failed_function_tree [FunctionCalls.FaultTokens semanticFaults]
     {sourceRegistry : SourceCoreRawMetadata.Registry}
     (atRegistry : session.RegistryAt sourceRegistry)
     (receiving : SourceCoreRawMetadata.Extends sourceRegistry completion.result.context.registry)
@@ -1485,7 +1485,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Actual Source execution implies public function export for every sufficient
 native budget and every positive output budget. The authentic issuer/slot
 receipt is supplied by initialization and retained by real session events. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     (exportsReady : session.ExportsReady)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
@@ -1647,7 +1647,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- The public invocation keeps all previous handles and appends the selected
 function leaves of this same actual output. No Source representation or raw
 result equality is supplied by the caller. -/
-theorem public_invoke_succeeded_collects_function_tree
+theorem public_invoke_succeeded_collects_function_tree [FunctionCalls.FaultTokens semanticFaults]
     {sourceRegistry : SourceCoreRawMetadata.Registry}
     (atRegistry : session.RegistryAt sourceRegistry)
     (receiving : SourceCoreRawMetadata.Extends sourceRegistry completion.result.context.registry)
@@ -1775,7 +1775,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Every genuine public resume with enough native fuel and at least one
 output-validation step succeeds with the Source Word and the actual reached
 history. Raw result annotations may differ from the retained Source type. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
@@ -1950,7 +1950,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType entrySource input started parameterView metadata in
 /-- Actual current history and packed encoding close the direct native result
 against independent Source execution, including the ordered Source arguments. -/
-theorem completed_reflects
+theorem completed_reflects [FunctionCalls.FaultTokens semanticFaults]
     {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
     (completed : checkpoint.NativeDone executionFuel value finalStore)
     (invocation : Staging.Recursive.Scope) :
@@ -1975,7 +1975,7 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType entrySource input started parameterView metadata in
 /-- An independent application of this actual encoded input has sufficient
 native fuel at the original checkpoint and retains the full semantic post. -/
-theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource)
     (arity : sources.length = function.parameters.length)
     {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
@@ -2074,7 +2074,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Scalars and handles at arbitrary product depth use their original public
 encoding. Actual closure arity determines the Source argument vector, including
 the distinction between zero parameters and one Unit-valued parameter. -/
-theorem public_invoke_succeeded_function_tree
+theorem public_invoke_succeeded_function_tree [FunctionCalls.FaultTokens semanticFaults]
     {sourceRegistry : SourceCoreRawMetadata.Registry}
     (atRegistry : session.RegistryAt sourceRegistry)
     (receiving : SourceCoreRawMetadata.Extends sourceRegistry completion.result.context.registry)
@@ -2142,7 +2142,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Metadata-bearing packed values use the same public continuation when their
 actual encoded registry extends into the receiving registry. The callee's
 Source signature follows from history and the original selection. -/
-theorem public_resume_succeeded
+theorem public_resume_succeeded [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
@@ -2266,7 +2266,7 @@ include receiver stagePrepared profile observations extension semantic family na
 /-- Every genuine public resume with enough native fuel and at least one
 output-validation step succeeds with the Source Word and the actual reached
 history. Raw result annotations may differ from the retained Source type. -/
-theorem public_resume_has_sufficient_fuel
+theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFaults]
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
     {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
     {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}

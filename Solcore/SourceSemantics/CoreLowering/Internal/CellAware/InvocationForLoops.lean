@@ -915,7 +915,7 @@ variable
     (fun reason token => faults (.semantic reason) token) operator head.invalid)
 
 include transport sourceEq unique bare extension invalidToken in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.PreservesBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForPostBounds.PreservesAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest expected type body budget) :
@@ -934,6 +934,8 @@ theorem preserves (budget : Nat)
     ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
     ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
       currentRead, rootType, initialized, path, invalid⟩ |
+    ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, contextEq, outcomeEq, childTrace,
+      currentRead, rootType, initialized, path, panics⟩ |
     ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
   · subst finalContext
     subst outcome
@@ -958,6 +960,18 @@ theorem preserves (budget : Nat)
     exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
       preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  · subst finalContext
+    subst outcome
+    have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+      rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
+    obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+        preservation, metadata, effect, reached, related, stable⟩ :=
+      CellAwareInvocationBareAssignmentHeads.preserves_panic bridge functions extension head bare
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
+        (children childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
+      preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
       rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
     have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -980,7 +994,7 @@ theorem preserves (budget : Nat)
       effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport sourceEq unique bare extension invalidToken in
-theorem reflects (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.ReflectsBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForPostBounds.ReflectsAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest expected type body budget) :
@@ -1006,6 +1020,12 @@ theorem reflects (budget : Nat)
     cases same
     exact ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
       .assignmentOperands snapshot trace currentRead rootType initialized path invalid,
+      .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata effect reached related stable =>
+    cases same
+    exact ⟨Staging.Recursive.Size.stepSize [_], context, _, _, _, _,
+      .assignmentPanic snapshot trace currentRead rootType initialized path panics,
       .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   | success snapshot childTrace write middleHeaps maps worlds preservation metadata effect count typed reached related nextAdmitted strict remaining =>
@@ -1077,7 +1097,7 @@ variable
         initial (fun reason token => faults (.semantic reason) token) head.shape)
 
 include transport sourceEq unique projected extension faithful observations diagnostics in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.PreservesBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForPostBounds.PreservesAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest expected type body budget) :
@@ -1091,7 +1111,7 @@ theorem preserves (budget : Nat)
   have assignmentTyped := sourceEq.symm ▸ facts.1
   have suffix : ∃ control final, ForItemsHaveType (bodyIndex.source) control context rest final := ⟨control, facts.2⟩
   cases trace with
-  | assignment snapshot _ _ _ | assignmentFailure snapshot _ | assignmentOperands snapshot _ _ _ _ _ _ =>
+  | assignment snapshot _ _ _ | assignmentFailure snapshot _ | assignmentOperands snapshot _ _ _ _ _ _ | assignmentPanic snapshot _ _ _ _ _ _ =>
     cases snapshot with | intro empty _ _ _ => exact (projected empty).elim
   | unbound empty _ | dangling empty _ _ => exact (projected empty).elim
   | projectedAssignmentRootFault _ failed => exact False.elim (failed.excluded head.writable locals)
@@ -1168,7 +1188,7 @@ theorem preserves (budget : Nat)
         effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport sourceEq unique projected extension faithful observations diagnostics in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.ReflectsBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForPostBounds.ReflectsAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest expected type body budget) :
@@ -2395,7 +2415,7 @@ variable
     (fun reason token => faults (.semantic reason) token) operator head.invalid)
 
 include transport unique bare assignmentTyped extension invalidToken in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.PreservesBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForInitialBounds.PreservesAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest test postItems statements expected type body budget) :
@@ -2410,6 +2430,8 @@ theorem preserves (budget : Nat)
     ⟨childSize, failure, sameSize, outcomeEq, childTrace⟩ |
     ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, outcomeEq, childTrace,
       currentRead, rootType, initialized, path, invalid⟩ |
+    ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, outcomeEq, childTrace,
+      currentRead, rootType, initialized, path, panics⟩ |
     ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
   · subst outcome
     have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
@@ -2430,6 +2452,17 @@ theorem preserves (budget : Nat)
         environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
         (children childSize childStrict) snapshot invalid childTrace body (LocalLoop.controlType type) invalidToken
     exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
+      preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  · subst outcome
+    have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+      simp only [sameSize, Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
+    obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+        preservation, metadata, effect, reached, related, stable⟩ :=
+      CellAwareInvocationBareAssignmentHeads.preserves_panic bridge functions extension head bare
+        environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
+        (children childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
       preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
@@ -2454,7 +2487,7 @@ theorem preserves (budget : Nat)
       effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport unique bare assignmentTyped extension invalidToken in
-theorem reflects (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.ReflectsBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForInitialBounds.ReflectsAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest test postItems statements expected type body budget) :
@@ -2476,6 +2509,12 @@ theorem reflects (budget : Nat)
     cases same
     exact ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
       assignment_operands snapshot trace currentRead rootType initialized path invalid,
+      .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
+      fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  | panic snapshot trace currentRead rootType initialized path panics same matched finalHeaps maps worlds preservation metadata effect reached related stable =>
+    cases same
+    exact ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize [_]], _, _, _, _,
+      assignment_panic snapshot trace currentRead rootType initialized path panics,
       .fault matched, finalHeaps, maps, worlds, preservation, metadata, effect, reached, related,
       fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
   | success snapshot childTrace write middleHeaps maps worlds preservation metadata effect count typed reached related nextAdmitted strict remaining =>
@@ -2549,7 +2588,7 @@ variable
         initial (fun reason token => faults (.semantic reason) token) head.shape)
 
 include transport unique projected assignmentTyped extension faithful observations diagnostics in
-theorem preserves (budget : Nat)
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.PreservesBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForInitialBounds.PreservesAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest test postItems statements expected type body budget) :
@@ -2634,7 +2673,7 @@ theorem preserves (budget : Nat)
         effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
 include transport unique projected assignmentTyped extension faithful observations diagnostics in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
     (children : CellAwareInvocationExpressionBounds.ReflectsBelow (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex stages invocation certificate faults budget)
     (tail : CellAwareInvocationForInitialBounds.ReflectsAtMost (attachment := attachment) bridge context (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) bodyIndex producer stages invocation faults
       administrative scope rest test postItems statements expected type body budget) :

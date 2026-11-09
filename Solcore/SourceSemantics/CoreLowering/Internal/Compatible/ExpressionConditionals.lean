@@ -391,7 +391,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -536,19 +536,19 @@ theorem preserves_with_literals_and_post
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
             .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
             firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
     | invalid firstTrace continues secondTrace failed =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata, _⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _⟩ :=
         leftIH leftFound environments heaps locals agrees (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, _, _, _, second, represented, _, maps, worlds, _⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, _⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue) (.value secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
@@ -556,8 +556,15 @@ theorem preserves_with_literals_and_post
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨_, _, applied, _, _⟩ := profile.right_success leftPayload rightPayload continues first second
-          exact False.elim (binary_fault_excluded applied failed)
+          rcases profile.right_outcome leftPayload rightPayload continues first second with
+            ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
+          · exact False.elim (binary_fault_excluded applied failed)
+          · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
+            exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
+              .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+              firstFrame.trans frame, firstMetadata.trans heapMetadata,
+              ExpressionFailurePostContracts.OutcomePost.panic ordinaryJoins
+                (binary_panic_fault metadata form firstTrace continues secondTrace panics)⟩
 
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeSites thenTreeSites elseTreeSites conditionIH thenIH elseIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
@@ -613,7 +620,7 @@ theorem preserves_with_literals_and_post
         exact False.elim (invalid trivial)
 
 
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -744,14 +751,23 @@ theorem reflects_with_literals_and_post
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              obtain ⟨sourceResult, result, applied, resultRep, combined⟩ :=
-                profile.right_success leftPayload rightPayload continues leftEvaluation rightEvaluation
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
-              cases trace with
-              | value secondTrace =>
-                exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
-                  .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation with
+                ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
+                    .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                cases trace with
+                | value secondTrace =>
+                  exact ⟨_, after, finalMap, finalWorld,
+                    binary_intro metadata form (.invalid firstTrace continues secondTrace (.panic panics)),
+                    .fault (FunctionCalls.FaultTokens.panic code), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                    firstFrame.trans frame, firstMetadata.trans heapMetadata,
+                    ExpressionFailurePostContracts.OutcomePost.panic ordinaryJoins
+                      (binary_panic_fault metadata form firstTrace continues secondTrace panics)⟩
 
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeSites thenTreeSites elseTreeSites conditionIH thenIH elseIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
@@ -809,7 +825,7 @@ theorem reflects_with_literals_and_post
 
 
 include extension unique uninitialized in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -828,7 +844,7 @@ theorem preserves_with_literals
           exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension valid unique uninitialized in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -837,7 +853,7 @@ theorem preserves :
 
 
 include extension uninitialized in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -856,7 +872,7 @@ theorem reflects_with_literals
           exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension valid uninitialized in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree

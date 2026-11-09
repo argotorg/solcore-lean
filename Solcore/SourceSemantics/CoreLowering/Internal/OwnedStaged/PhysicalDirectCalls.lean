@@ -2338,7 +2338,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include receiver profile wellFormed observations extension semantic terminals namedSupport methodSupport in
 /-- Every ordinary and method body uses only strictly smaller Source grades. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   induction size using Nat.strongRecOn with
   | ind budget ih =>
@@ -2398,7 +2398,7 @@ theorem preserves (size : Nat) :
 
 include receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
 /-- Every ordinary and method body uses only strictly smaller native grades. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   subst stages
   induction size using Nat.strongRecOn with

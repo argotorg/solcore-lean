@@ -315,7 +315,7 @@ include extension faithful observations runtimeViews owners uninitialized missin
   certified environments heaps locals agrees actualTyped installed in
 /-- Every raw argument/body obligation is supplied by catalog mutual induction.
 The only source execution input is the independent original raw-form trace. -/
-theorem raw_preserves :
+theorem raw_preserves [FunctionCalls.FaultTokens faults] :
     RawFormPreserves (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before actual mapping world store node ξ receipt.operand := by
   intro outcome after raw
@@ -344,7 +344,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
   certified environments heaps locals agrees actualTyped installed in
 /-- Only the actual native completion is measured. Reflection constructs its
 independent source trace and never consumes preservation or a source run. -/
-theorem raw_reflects :
+theorem raw_reflects [FunctionCalls.FaultTokens faults] :
     RawFormReflects (compilerProgram := compilerProgram) (context := context) (evidence := evidence) (registry := registry)
       functions faults source environment before actual mapping world store node ξ receipt.operand := by
   intro value finalStore completed
@@ -454,7 +454,7 @@ include checkedAccepted extension definitions registered faithful observations r
   methodUninitialized methodMissing emitted steps chain ledger methodEntry in
 /-- The final consumer closes raw arguments and recursive ordinary bodies and
 then preserves the independent original ordered output path. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome (Program.ofChecked compilerProgram) context evidence source environment before id outcome after) :
     ∃ value finalStore finalMap finalWorld,
@@ -476,7 +476,7 @@ include extension definitions registered faithful observations runtimeViews unin
   methodUninitialized methodMissing emitted steps chain methodEntry in
 /-- Original native completion supplies both the raw call and the ordered path
 completion. No prior source execution or preservation law is an input. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens faults]
     {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (output.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,

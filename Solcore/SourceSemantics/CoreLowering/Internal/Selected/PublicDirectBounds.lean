@@ -101,6 +101,8 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
           invocation context before (.closure function) sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
           outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
   have children : ∀ childSize,
       SelectedCompilationMixedRootBounds.ReflectsRootsAt
         (headers := headers) (keys := keys)
@@ -164,6 +166,8 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
         outcome after value finalStore finalMap finalWorld callFaults := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree compiled support.issued)
   have children : ∀ childSize,
       SelectedCompilationMixedRootBounds.PreservesRootsAt
         (headers := headers) (keys := keys)

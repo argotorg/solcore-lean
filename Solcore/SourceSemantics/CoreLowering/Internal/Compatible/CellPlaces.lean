@@ -237,7 +237,7 @@ theorem Certificate.cell_completed {fuel : Nat} {context : ValuesContext} {sourc
     (heapTyped : Dynamic.HeapWellTyped sourceContext heap)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
+    {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) reason)
     {value : Value} {finalStore : Store} (evaluation : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ outcome after,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
@@ -446,6 +446,7 @@ theorem cell_commit_with_write {compilation : SourceCoreCompatibleDataPlaces.Con
     (modified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
       (modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
       (.inRight .word updatedValue) rhsStore)
+    (passes : SourceCoreDataPlaces.Passes (binaryOperator (prepared.route.leafType = .integer) operator) rightValue)
     {actualContext : Core.Context} (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions) :
     ∃ after finalStore,
       Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
@@ -489,7 +490,8 @@ theorem cell_commit_with_write {compilation : SourceCoreCompatibleDataPlaces.Con
       ((ContinuationAgreement.bind rhs.evaluated).trans
         ((ContinuationAgreement.bind modified).trans
           ((ContinuationAgreement.bind (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)).trans
-            (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten)))))
+            ((DataPlaceGuard.agreement passes).trans
+              (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten))))))
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignment
 end
 
@@ -527,7 +529,7 @@ theorem initialized_prefix_cells_sized (layout : Layout prepared)
     (represented : ValueRep checked registry functions mapping world prepared.route.rootSourceType sourceValue value prepared.route.rootType)
     (lookup : actual[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ updated replacement after finalStore slots,
       Dynamic.BitNotSnapshot (some sourceValue) updated ∧
       Dynamic.Heap.Writes heap location (some updated) after ∧
@@ -536,7 +538,7 @@ theorem initialized_prefix_cells_sized (layout : Layout prepared)
       AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       CellAwareScopeAuthority.Effect instances mapping world heap store mapping world after finalStore ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
-      (∀ next output, ContinuationAgreement actual store
+      (SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
           next output operator true invalid).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
@@ -564,11 +566,11 @@ theorem initialized_prefix_cells_sized (layout : Layout prepared)
   have modifier : Evaluates (rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
       store (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid)
       (.inRight .word replacement) store := by simpa only [← layout.sameType] using modified
-  have agreement : ∀ next output, ContinuationAgreement actual store
+  have agreement : SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
         next output operator true invalid).rename ξ)
       (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-    intro next output
+    intro passes next output
     rw [execute_rename layout]
     exact (ContinuationAgreement.letE (.var lookup)).trans
       ((ContinuationAgreement.bind (CompatibleBareBitNotNative.keys_evaluates _ _)).trans
@@ -577,7 +579,8 @@ theorem initialized_prefix_cells_sized (layout : Layout prepared)
             ((ContinuationAgreement.bind modifier).trans
               ((ContinuationAgreement.bind (CompatibleBareBitNotNative.setter_evaluates layout
                 (.inRight .unit value) replacement nativeRead)).trans
-                (ContinuationAgreement.letE (.storeCell (.var rfl) nativeRead (.inRight (.var rfl)) coreWritten)))))))
+                ((DataPlaceGuard.agreement passes).trans
+                  (ContinuationAgreement.letE (.storeCell (.var rfl) nativeRead (.inRight (.var rfl)) coreWritten))))))))
 
   refine ⟨updated, replacement, _, finalStore, slots, applies, written, related, finalHeaps, frame,
     .of_write written, writeEffect, rfl, ?_, agreement, ?_⟩
@@ -585,10 +588,15 @@ theorem initialized_prefix_cells_sized (layout : Layout prepared)
     exact .cons .unit (.cons related.runtime_hasType (.cons related.runtime_hasType
       (.cons .unit (.cons (.inRight represented.runtime_hasType) (.cons .unit (.cons (.cellRef reference.typed) actualTyped))))))
   · intro next output result after size completed
-    have terminal := (agreement .unit output).wrap
+    rw [execute_rename layout] at completed
+    have passes := RecursiveNamedBareAssignmentContracts.execute_unit_passes_sized
+      (.var lookup) (CompatibleBareBitNotNative.keys_evaluates _ _)
+      (CompatibleBareBitNotNative.getter_evaluates layout nativeRead) rhs modifier
+      (CompatibleBareBitNotNative.setter_evaluates layout (.inRight .unit value) replacement nativeRead) completed
+    have terminal := (agreement passes .unit output).wrap
       (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
         (Evaluates.unit (environment := slots ++ actual) (store := finalStore)))
-    rw [execute_rename layout] at terminal completed
+    rw [execute_rename layout] at terminal
     exact RecursiveNamedBareAssignmentContracts.execute_continuation_sized
       (.var lookup) (CompatibleBareBitNotNative.keys_evaluates _ _)
       (CompatibleBareBitNotNative.getter_evaluates layout nativeRead) rhs modifier
@@ -738,7 +746,8 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-      environment before place updated after) (operator : Option BinaryOp) (invalid : Word) :
+      environment before place updated after) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    (passes : SourceCoreDataPlaces.Passes operator .unit) :
     ∃ replacement finalStore slots,
       ValueRep compilation.checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType ∧
       GenericHeap.CellHeapRepresents cells mapping world after finalStore ∧
@@ -787,7 +796,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
               subst replacement
               have same := writes_functional generatedWrite sourceWrite
               subst generatedAfter
-              exact ⟨native, finalStore, slots, related, finalHeaps, frame, metadata, effect, count, typed, agreement⟩
+              exact ⟨native, finalStore, slots, related, finalHeaps, frame, metadata, effect, count, typed, agreement passes⟩
 
 /-- The sole runtime premise is completion of the real renamed code. It
 produces an independent source fault/write and the actual typed continuation. -/
@@ -805,7 +814,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {faults : FaultRep} {next : Expr} {output : Ty} {operator : Option BinaryOp} {invalid : Word}
+    {faults : FaultRep} {next : Expr} {output : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
     {result : Value} {finalStore : Store}
     (token : faults (.invalidUnaryOperand .bitNot) invalid)
     {size : Nat} (completed : EvaluationSize size actual store
@@ -858,7 +867,7 @@ theorem reflects (layout : Layout prepared) (bare : place.projections = [])
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    {faults : FaultRep} {next : Expr} {output : Ty} {operator : Option BinaryOp} {invalid : Word}
+    {faults : FaultRep} {next : Expr} {output : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
     {result : Value} {finalStore : Store}
     (token : faults (.invalidUnaryOperand .bitNot) invalid)
     (completed : Evaluates actual store
@@ -907,7 +916,7 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
     (trace : Dynamic.SourcePlaceBitNotFaults program context evidence source environment before place reason after)
-    (next : Expr) (output : Ty) (operator : Option BinaryOp) (invalid : Word) :
+    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     reason = .invalidUnaryOperand .bitNot ∧ after = before ∧
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
@@ -1006,6 +1015,7 @@ theorem preserves_prefix_cells {updated : Dynamic.Value} {after : Dynamic.Heap}
   obtain ⟨_, finalStore, slots, _, finalHeaps, frame, metadata, effect, count, typed, continuation⟩ :=
     CompatibleCellRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare head.profile
       environments ordinaryCells heaps locals agrees actualTyped head.slot head.writable trace (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
+      (CompatiblePlaceModifier.passes_of_total rfl _ _)
   exact ⟨finalStore, mapping, world, slots, finalHeaps, .refl _, .refl _, frame, metadata, effect, count, typed, continuation⟩
 
 include ordinaryCells environments heaps locals agrees in
@@ -1949,6 +1959,50 @@ theorem preserves
       (.refl heap) (.refl mapping) extension).trans
       (CellAwareScopeAuthority.Effect.write_ordinary helperHeaps.injective root.sourceRead ordinary
         (root.reference.extend (.refl _) extension) written nativeWrite)⟩
+
+
+/-- The setter alone, for a modifier check that fails before the write: the
+helper allocations extend the world and leave the source heap unchanged. -/
+theorem setter_preserves
+    {cells : GenericHeap.CellModel ambient.definitions}
+    {instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions}
+    (root : RootRead checked registry functions mapping world prepared heap store location target cell optional sourceRoot rootValue)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {leaf : TypeSystem.Ty}
+    {sourceProjections : List PlaceProjection} {position : Nat} {keySites : List (ExpressionId × Ty)}
+    {path : PreparedPath checked source site cell.type sourceProjections position prepared.steps keySites leaf}
+    {keys : List Value} {projections : List Dynamic.EvaluatedProjection}
+    (arguments : Arguments checked registry functions mapping world source site keys path projections)
+    {replacementSource updated : Dynamic.Value} {replacement : Value}
+    (replacementRep : ValueRep checked registry functions mapping world leaf replacementSource replacement prepared.route.leafType)
+    (changed : Dynamic.ProjectionsUpdate (fun _ value => value = replacementSource) (some sourceRoot) projections updated)
+    (nonempty : prepared.steps ≠ [])
+    {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
+    (observations : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
+    {environment : Environment} {context : Core.Context} {keyType : Ty}
+    {referenceExpression keyExpression replacementExpression : Expr}
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    (setterTyped : HasType context
+      (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
+    (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysSelected : Selects environment keyExpression (packValues keys))
+    (replacementSelected : Selects environment replacementExpression replacement) :
+    ∃ native helperStore futureWorld,
+      Evaluates environment store
+        (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+        (.inRight .word native) helperStore ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld heap helperStore ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping helperStore ∧
+      CellAwareScopeAuthority.Effect instances mapping world heap store mapping futureWorld heap helperStore := by
+  have tree := arguments.updateTree root.payload replacementRep changed prepared
+  obtain ⟨native, helperStore, administrative, _, evaluated, appended, _⟩ :=
+    CompatiblePlaceWriteback.setter_at root tree nonempty faithful observations keyLength environment keyType referenceExpression keyExpression replacementExpression
+      referenceSelected keysSelected replacementSelected
+  obtain ⟨futureWorld, extension, helperHeaps, _, frame⟩ :=
+    CellMappingHeap.evaluation_preserves_frame heaps environmentTyped setterTyped evaluated appended
+  exact ⟨native, helperStore, futureWorld, evaluated, helperHeaps, extension, frame,
+    appended.symm ▸ CellAwareScopeAuthority.Effect.append store administrative (.refl heap) (.refl mapping) extension⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceWriteback
 end

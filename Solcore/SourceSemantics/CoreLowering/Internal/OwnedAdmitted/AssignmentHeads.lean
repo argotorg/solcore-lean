@@ -219,7 +219,7 @@ theorem preserves_prefix_bounded (budget : Nat)
         initial reached admitted wellFormed runtime covers locals assignmentTyped trace preservation⟩, continuation⟩
 
 include observations extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
-theorem preserves_fault_reachable_bounded (budget : Nat)
+theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
@@ -250,7 +250,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩
 
 include observations transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers bare in
-theorem reflects_reachable_bounded (budget : Nat)
+theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
@@ -465,7 +465,7 @@ theorem preserves_prefix_bounded (budget : Nat)
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected in
 /-- A fault retains the actual latest key, getter or RHS state and every row's
 stable history without claiming deep typing of a fault heap. -/
-theorem preserves_fault_reachable_bounded (budget : Nat)
+theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
@@ -502,7 +502,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected in
 /-- Native success restores admission at the actual written prefix and keeps
 its strict remaining continuation, distinct from the eventual final store. -/
-theorem reflects_reachable_bounded (budget : Nat)
+theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions)
@@ -610,7 +610,7 @@ theorem preserves_prefix_bounded (budget : Nat)
   · exact CallableIndexedOwnedAdmittedProjectedAssignmentHeads.preserves_prefix_bounded bridge functions extension evidence transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers budget boundedMeaning trace bounded
 
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers in
-theorem preserves_fault_reachable_bounded (budget : Nat)
+theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
@@ -630,7 +630,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
   · exact CallableIndexedOwnedAdmittedProjectedAssignmentHeads.preserves_fault_reachable_bounded bridge functions extension evidence transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers budget boundedMeaning errors trace bounded next output
 
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers in
-theorem reflects_reachable_bounded (budget : Nat)
+theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions)
@@ -693,7 +693,7 @@ theorem assignment_prefix (runtime : Dynamic.SourceRuntimeValid program context 
     wellFormed runtime covers budget meaning trace bounded
 
 include extension transport faithful observations unique wellFormed in
-theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid program context source)
+theorem assignment_fault [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid program context source)
     (covers : evidence.Covers context) (budget : Nat)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -707,7 +707,7 @@ theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid program context s
     wellFormed runtime covers budget meaning errors trace bounded next output
 
 include extension transport faithful observations unique wellFormed in
-theorem assignment_reflection (runtime : Dynamic.SourceRuntimeValid program context source)
+theorem assignment_reflection [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid program context source)
     (covers : evidence.Covers context) (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -847,7 +847,7 @@ theorem preserves_prefix_bounded_for
     same, originalReady, finalReady, typedExtension, finalLocals⟩
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed in
-theorem preserves_fault_reachable_bounded_for
+theorem preserves_fault_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid program context source)
     (covers : ∀ context, validity context → evidence.Covers context)
@@ -903,7 +903,7 @@ theorem preserves_fault_reachable_bounded_for
       tree errors valid ⟨staticFinal, itemTyping⟩ environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed in
-theorem reflects_reachable_bounded_for
+theorem reflects_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid program context source)
     (covers : ∀ context, validity context → evidence.Covers context)
@@ -1007,7 +1007,7 @@ theorem post_preserves_bounded_for
       tree valid ⟨staticFinal, itemTyping⟩ agrees reference state read guarded ready continued trace bounded
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed in
-theorem post_fault_reachable_bounded_for
+theorem post_fault_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid program context source)
     (covers : ∀ context, validity context → evidence.Covers context)
@@ -1058,7 +1058,7 @@ theorem post_fault_reachable_bounded_for
       tree errors valid ⟨staticFinal, itemTyping⟩ agrees reference state read guarded ready continued trace bounded
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed in
-theorem post_reflects_reachable_bounded_for
+theorem post_reflects_reachable_bounded_for [FunctionCalls.FaultTokens faults]
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid program context source)
     (covers : ∀ context, validity context → evidence.Covers context)
@@ -1464,7 +1464,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (transport : AdministrativeTransport callerProtocol)
 
 include transport in
-theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+theorem loop_preserves_bounded_for [FunctionCalls.FaultTokens faults] (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaning : Below budget (fun size => CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
       (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       context evidence source certificate faults size))
@@ -1708,7 +1708,7 @@ variable {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
   (covers : evidence.Covers context)
 
 include observations extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
-theorem preserves_fault_with_operands (budget : Nat)
+theorem preserves_fault_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid)
@@ -1739,7 +1739,7 @@ theorem preserves_fault_with_operands (budget : Nat)
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩
 
 include observations transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers bare in
-theorem reflects_with_operands (budget : Nat)
+theorem reflects_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid)
@@ -1827,7 +1827,7 @@ variable {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected in
 /-- A fault retains the actual latest key, getter or RHS state and every row's
 stable history without claiming deep typing of a fault heap. -/
-theorem preserves_fault_with_diagnostics (budget : Nat)
+theorem preserves_fault_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (errors : ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol source context certificate
@@ -1867,7 +1867,7 @@ theorem preserves_fault_with_diagnostics (budget : Nat)
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected in
 /-- Native success restores admission at the actual written prefix and keeps
 its strict remaining continuation, distinct from the eventual final store. -/
-theorem reflects_with_diagnostics (budget : Nat)
+theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions)

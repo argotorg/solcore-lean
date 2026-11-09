@@ -151,7 +151,7 @@ theorem profile_witnesses : ∀ header, header ∈ headers →
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped outputs syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -177,7 +177,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped outputs syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -300,7 +300,7 @@ theorem interpreted_outputs : ∀ header, header ∈ headers →
     inputs.operandsTyped inputs.assignments inputs.unaryTyped inputs.operands inputs.unary inputs.places (inputs.children actualEntry)
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -317,7 +317,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
     sameLedger runtimeLedger budget size within
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -480,7 +480,7 @@ theorem ready_inputs (header : CallableIndexedOwnedFunctionValues.Header compile
     inputs.children, inputs.operands, inputs.unary, inputs.places⟩⟩
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -497,7 +497,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
     sameLedger runtimeLedger budget size within
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -1027,7 +1027,7 @@ theorem ready_inputs (wellFormed : ProgramWellFormed (Program.ofChecked compiled
   exact ⟨typed.2, typed.1, inputs.children, inputs.operands, inputs.unary, inputs.places⟩
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -1044,7 +1044,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
     sameLedger runtimeLedger budget size within
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -1346,7 +1346,7 @@ variable (receipt : CallableIndexedOwnedPublicPreparedTokenReadyNamedExpressionB
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected receipt diagnosticsFound origin retained signatures rebuilt interprets in
 /-- A fault retains the actual latest key, getter or RHS state and every row's
 stable history without claiming deep typing of a fault heap. -/
-theorem preserves_fault (budget : Nat)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel compiled.compatible.checked registry functions)
         context evidence (header.function.source) certificate faults size))
@@ -1370,7 +1370,7 @@ theorem preserves_fault (budget : Nat)
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected receipt diagnosticsFound origin retained signatures rebuilt interprets in
 /-- Native success restores admission at the actual written prefix and keeps
 its strict remaining continuation, distinct from the eventual final store. -/
-theorem reflects (budget : Nat)
+theorem reflects [FunctionCalls.FaultTokens faults] (budget : Nat)
     (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge (payloadModel compiled.compatible.checked registry functions)
         context evidence (header.function.source) certificate faults size)) (functionTypes : FunctionRuntimeViews functions)
@@ -1465,7 +1465,7 @@ variable {diagnostics : SourceCoreCompatibleDataPlaceFaultSites.Program (.initia
   (signatures : context.signatures = compiled.compatible.checked.signatures)
 
 include extension transport faithful observations unique wellFormed receipt diagnosticsFound rebuilt interprets included signatures in
-theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
+theorem assignment_fault [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
     (covers : evidence.Covers context) (budget : Nat)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -1494,7 +1494,7 @@ theorem assignment_fault (runtime : Dynamic.SourceRuntimeValid (Program.ofChecke
         budget meaning trace bounded next output
 
 include extension transport faithful observations unique wellFormed receipt diagnosticsFound rebuilt interprets included signatures in
-theorem assignment_reflection (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
+theorem assignment_reflection [FunctionCalls.FaultTokens faults] (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context header.function.source)
     (covers : evidence.Covers context) (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -1602,7 +1602,7 @@ variable (interprets : ∀ context, Validity header context →
 
 include extension faithful observations producer acquire transport bindings wellFormed sourceRuntime
   diagnosticsFound rebuilt operandIncluded unaryIncluded interprets in
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (_meaning : ∀ context, Validity header context → RecursiveNamedHeaderContracts.AtMost budget
       (fun size => CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -1695,7 +1695,7 @@ theorem preserves_flow (budget : Nat)
 
 include extension observations producer acquire transport bindings wellFormed sourceRuntime
   diagnosticsFound rebuilt operandIncluded unaryIncluded interprets faithful in
-theorem reflects_flow (budget : Nat) (_functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (_functionTypes : FunctionRuntimeViews functions)
     (_reflection : ∀ context, Validity header context → RecursiveNamedBoundedContracts.Below budget
       (fun size => CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -1881,7 +1881,7 @@ variable (interpretations : ∀ receipt : CallableIndexedOwnedPublicCatalogPrepa
 
 include extension faithful observations producer acquire transport bindings wellFormed diagnosticsFound rebuilt
   operandIncluded unaryIncluded complete sourceReceipt children stable gate escapedFault interpretations in
-theorem preserves_at_entry (budget size : Nat) (within : size ≤ budget)
+theorem preserves_at_entry [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (meaning : ∀ context, Validity header context → RecursiveNamedHeaderContracts.AtMost budget
       (fun child => CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
@@ -1924,7 +1924,7 @@ theorem preserves_at_entry (budget size : Nat) (within : size ≤ budget)
 
 include extension faithful observations producer acquire transport bindings wellFormed diagnosticsFound rebuilt
   operandIncluded unaryIncluded complete sourceReceipt children stable gate escapedFault interpretations in
-theorem reflects_at_entry (budget size : Nat) (within : size ≤ budget)
+theorem reflects_at_entry [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget)
     (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity header context → RecursiveNamedBoundedContracts.Below budget
       (fun child => CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -2139,7 +2139,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs in
 /-- Strict actual callee receipts close the original expression fold. The
 chosen public flow and existing finish then return this same parameter pool. -/
-private theorem preserves_step (budget : Nat)
+private theorem preserves_step [FunctionCalls.FaultTokens faults] (budget : Nat)
     (below : ∀ index : Index (headers := headers) (registry := registry) functions owner,
       RecursiveNamedBoundedContracts.Below budget (Family (faults := faults) functions owner index))
     (index : Index (headers := headers) (registry := registry) functions owner) :
@@ -2194,7 +2194,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs in
 /-- Reflection recovers an independent Source grade at the same actual
 parameter input, keeping its full reached exit and returned pool. -/
-private theorem reflects_step (budget : Nat)
+private theorem reflects_step [FunctionCalls.FaultTokens faults] (budget : Nat)
     (below : ∀ index : Index (headers := headers) (registry := registry) functions owner,
       RecursiveNamedBoundedContracts.Below budget (Family (faults := faults) functions owner index))
     (index : Index (headers := headers) (registry := registry) functions owner) :
@@ -2251,7 +2251,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs in
 /-- The existing measured closer closes both meanings of every actual public
 parameter receipt. No completed body or expression law is an input. -/
-theorem closed_at (size : Nat) :
+theorem closed_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ index : Index (headers := headers) (registry := registry) functions owner,
       Family (faults := faults) functions owner index size := by
   apply CallableRuntimeBodyMutualMeaning.close_family (Family (faults := faults) functions owner)
@@ -2274,7 +2274,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs in
 /-- The actual Source continuation consumes only the corresponding closed
 strict child; original parameter continuation agreement stays unchanged. -/
-theorem source_bodies (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
+theorem source_bodies [FunctionCalls.FaultTokens faults] (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) (budget : Nat) :
     CallableIndexedOwnedPreparedNamedParameterReceipts.SourceBodiesFor
       (headers := headers) (functions := functions) (owner := owner) (registry := registry) (faults := faults) header budget := by
@@ -2291,7 +2291,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs in
 /-- The actual measured native prefix and saved caller restoration stay
 original. Reflection returns the independent Source grade at this receipt. -/
-theorem native_bodies (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
+theorem native_bodies [FunctionCalls.FaultTokens faults] (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) (budget : Nat) :
     CallableIndexedOwnedPreparedNamedParameterReceipts.NativeBodiesFor
       (headers := headers) (functions := functions) (owner := owner) (registry := registry) (faults := faults) header budget := by
@@ -2327,7 +2327,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
 /-- Ordinary and direct named calls close internally at authentic actual
 parameter receipts, while the original runtime expression fold keeps the
 caller's complete packet and actual post. -/
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)
@@ -2351,7 +2351,7 @@ include prefixZero extension faithful observations functionTypes wellFormed comp
   operandIncluded unaryIncluded uninitialized missing escaped inputs transport sourceRuntime covers unique callerUninitialized callerMissing in
 /-- Native reflection retains the same caller pool and recovers a separate
 Source grade using the closed actual parameter family. -/
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots caller)
@@ -2409,12 +2409,19 @@ inductive ErrorView : Dynamic.SemanticFault → SourceTypedRuntime.RuntimeError 
       ErrorView (.invalidAssignmentOperands operator)
         (.invalidAssignmentOperands operator none (some rawType))
   | unary : ErrorView (.invalidUnaryOperand .bitNot) (.invalidUnaryOperand .bitNot none)
+  | panic (code : UInt8) : ErrorView (.panic code) (.panic code)
 
 /-- Every related token is decoded by this exact table. No other table or
  caller-supplied semantic verdict enters the concrete relation. -/
 def faults (table : SourceCoreFaultSites.Table) : FunctionCalls.FaultRep :=
   fun reason token => ∃ diagnostic,
     table.diagnostic? token = some diagnostic ∧ ErrorView reason diagnostic.error
+
+/-- A table without reasons in the panic range decodes every panic, so its
+relation has the panic law. -/
+theorem tokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
+    FunctionCalls.FaultTokens (faults table) :=
+  ⟨fun code => ⟨_, SourceCoreFaultSites.Table.panic_diagnostic free code, .panic code⟩⟩
 
 /-- The literal decoder equation and finite view construct the relation. -/
 theorem of_decoded {table : SourceCoreFaultSites.Table} {reason : Dynamic.SemanticFault}
@@ -2543,7 +2550,7 @@ theorem interpreted_outputs : ∀ header, header ∈ headers →
     actualEntry sites (inputs.localReceipts actualEntry)
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))
@@ -2560,7 +2567,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
     sameLedger runtimeLedger budget size within
 
 include extension faithful observations functionTypes wellFormed sourceRuntime covers unique uninitialized missing ordinary publicReceipts catalog calleeUninitialized calleeMissing escaped complete staticInputs syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget) :
     CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       (CallableIndexedOwnedIndirectCallerProtocol.forget_slots (caller (headers := headers) (callerCompilation := callerCompilation) owner))

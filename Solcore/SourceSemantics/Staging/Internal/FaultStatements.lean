@@ -352,6 +352,16 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
               have post := expression_value wellFormed runtime covers locals heap rhsTyped child
               exact ⟨post.heap_typed, post.heap_extends⟩
+  | @assignBarePanic childSize mode scope context environment before after id rest node assignment operator rhs
+      target right currentCell initial currentSelected code contains form _snapshot child _currentRead _rootType _initialValue _pathRead _panics =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              have post := expression_value wellFormed runtime covers locals heap rhsTyped child
+              exact ⟨post.heap_typed, post.heap_extends⟩
   | bitNotBareFault => exact ⟨heap, .refl _⟩
   | @bitNotBare nextSize mode scope context finalContext environment before written after
       id rest node assignment target updated outcome contains form snapshot write next =>
@@ -984,6 +994,16 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
             exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
   | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
       currentCell initial currentSelected rest _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+            have post := expression_value wellFormed runtime covers locals heap rhsTyped child
+            exact ⟨post.heap_typed, post.heap_extends⟩
+  | @assignmentPanic childSize scope context environment before after assignment operator rhs target right
+      currentCell initial currentSelected rest code _snapshot child _currentRead _rootType _initialValue _pathRead _panics =>
       cases typed with
       | cons headTyped _ =>
         cases headTyped with

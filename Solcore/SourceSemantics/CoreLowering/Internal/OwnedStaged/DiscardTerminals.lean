@@ -124,7 +124,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
-  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _ =>
+  | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _ =>
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
@@ -611,7 +611,7 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 
 include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
-private theorem internal_preserves_below {context invocation scope expression lowered}
+private theorem internal_preserves_below [FunctionCalls.FaultTokens semanticFaults] {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults)
     (budget : Nat) :
     PreservesBelow bridge context model stages invocation (Point scope expression lowered) callFaults budget := by
@@ -624,7 +624,7 @@ private theorem internal_preserves_below {context invocation scope expression lo
 
 include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
-private theorem internal_reflects_below
+private theorem internal_reflects_below [FunctionCalls.FaultTokens semanticFaults]
     (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {context invocation scope expression lowered}
     (root : RootAt compiled context invocation scope expression lowered semanticFaults)
@@ -671,7 +671,7 @@ include bridge receiver stagePrepared observations extension semantic
 /-- Original statement inversion selects both genuine children. Successful
 head effects feed the tail at its reached Admission and the inserted native
 temporary binder. The public theorem accepts no child execution law. -/
-theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {finalContext : SourceSemantics.Context}
     {bodyOutcome : Staging.Recursive.BodyOutcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
       stages size invocation context environment before (statement :: rest) finalContext bodyOutcome after) :
@@ -745,7 +745,7 @@ include bridge receiver stagePrepared observations extension semantic
 /-- Native inversion supplies strict executed children. Reflection rebuilds
 the original discard and terminal Source traces with independent grades,
 retaining the same stores, record relations and exact nested Failure. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
       ((LocalSequence.discard (LocalLoop.controlType terminalCode.type) firstCode.expression
@@ -1072,7 +1072,7 @@ include bridge receiver stagePrepared observations extension semantic
   environments heaps locals agrees actualTyped admitted in
 /-- The receipt's exact head/tail actions, original frame and static call ports
 construct both expression meanings before the original flow is preserved. -/
-theorem preserves {size : Nat} {finalContext : SourceSemantics.Context}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {finalContext : SourceSemantics.Context}
     {bodyOutcome : Staging.Recursive.BodyOutcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
       stages size invocation context environment before (statement :: next :: rest)
@@ -1109,7 +1109,7 @@ include bridge receiver stagePrepared observations extension semantic
   environments heaps locals agrees actualTyped admitted in
 /-- Native inversion uses the same receipt and independently issued children.
 The returned original grades and reached state come from the flow family. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
       ((LocalSequence.discard (LocalLoop.controlType result) receipt.first.expression
@@ -1273,7 +1273,7 @@ include bridge receiver stagePrepared observations extension semantic
   environments heaps locals agrees actualTyped admitted in
 /-- The complete Source trace constructs its actual BodyResult and the whole
 native code from the same internally issued head and terminal certificates. -/
-theorem preserves_body {size : Nat} {finalContext : SourceSemantics.Context}
+theorem preserves_body [FunctionCalls.FaultTokens semanticFaults] {size : Nat} {finalContext : SourceSemantics.Context}
     {bodyOutcome : Staging.Recursive.BodyOutcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Statements (Program.ofChecked compiled.sourceProgram)
       stages size invocation context environment before (statement :: next :: rest)
@@ -1319,7 +1319,7 @@ include bridge receiver stagePrepared observations extension semantic
   environments heaps locals agrees actualTyped admitted in
 /-- Footer inversion obtains a real strict flow child. Its constructive
 reflection and deterministic footer retain the original completed endpoint. -/
-theorem reflects_body (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+theorem reflects_body [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (code.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,

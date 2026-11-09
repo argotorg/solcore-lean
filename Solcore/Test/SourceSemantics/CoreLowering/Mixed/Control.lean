@@ -1793,6 +1793,8 @@ private def compound : (operator : Syntax.ValueAssignOp) → IO (PLift (WordComp
   | .uncheckedAdd => pure ⟨.uncheckedAdd⟩
   | .uncheckedSubtract => pure ⟨.uncheckedSubtract⟩
   | .uncheckedMultiply => pure ⟨.uncheckedMultiply⟩
+  | .uncheckedDivide => pure ⟨.uncheckedDivide⟩
+  | .uncheckedModulo => pure ⟨.uncheckedModulo⟩
 
 structure Statement (source : TypedSource) (control : ControlContext)
     (context : SourceSemantics.Context) (id : StatementId) where

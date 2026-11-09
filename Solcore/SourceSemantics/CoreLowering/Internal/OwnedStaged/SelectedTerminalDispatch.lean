@@ -2580,7 +2580,7 @@ include receiver prepared stagePrepared sourceEq occurrence certified found sour
 /-- One original native parent completion either gives full Source parent
 meaning or retains its actual named application prefix. Concrete call branches
 share the same reached state; no caller or argument trace is replayed. -/
-theorem reflects_parent_or_global (budget : Nat)
+theorem reflects_parent_or_global [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}
@@ -2728,7 +2728,7 @@ include receiver prepared stagePrepared sourceEq occurrence certified found sour
 /-- One original Source parent constructs its complete native result or
 retains the authentic named suffix. The concrete call producers reuse the
 literal callee and argument evaluations and their reached pool. -/
-theorem preserves_parent_or_global (budget : Nat)
+theorem preserves_parent_or_global [FunctionCalls.FaultTokens semanticFaults] (budget : Nat)
     (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
       bridge context model stages invocation certificate callFaults budget)
     (packets : ∀ {mapping world function native bindings parameterCore resultCore}

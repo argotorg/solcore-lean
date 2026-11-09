@@ -685,7 +685,7 @@ def evaluateStrictWordBinary? (operator : Syntax.BinaryOp) (left right : Core.Wo
   | .lessEqual => some (.bool (!(decide (left > right))))
   | .greaterEqual => some (.bool (!(decide (left < right))))
   | .shiftLeft | .shiftRight | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply
-  | .logicalAnd | .logicalOr => none
+  | .uncheckedDivide | .uncheckedModulo | .logicalAnd | .logicalOr => none
 
 end Solcore.Frontend
 
@@ -727,7 +727,8 @@ theorem evaluateStrictWordBinary?_isSome_iff
     (evaluateStrictWordBinary? operator left right).isSome = true ↔
       operator ≠ .logicalAnd ∧ operator ≠ .logicalOr ∧
         operator ≠ .shiftLeft ∧ operator ≠ .shiftRight ∧ operator ≠ .uncheckedAdd ∧
-          operator ≠ .uncheckedSubtract ∧ operator ≠ .uncheckedMultiply := by
+          operator ≠ .uncheckedSubtract ∧ operator ≠ .uncheckedMultiply ∧
+            operator ≠ .uncheckedDivide ∧ operator ≠ .uncheckedModulo := by
   cases operator <;> simp [evaluateStrictWordBinary?]
 
 end Solcore.Frontend

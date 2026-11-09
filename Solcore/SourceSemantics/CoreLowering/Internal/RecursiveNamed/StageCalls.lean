@@ -254,6 +254,11 @@ open Core Frontend Frontend.SourceInference GeneralHeap CoreProof ReadOnly
 abbrev Certificate := GenericExpressionMeaning.Certificate
 abbrev FaultRep := Staging.Recursive.Failure → Word → Prop
 
+/-- `FunctionCalls.FaultTokens` for staged failures: a semantic panic fails
+with its code's reason. -/
+class FaultTokens (faults : FaultRep) : Prop where
+  panic (code : UInt8) : faults (.semantic (.panic code)) (Frontend.SourceCorePanics.reason code)
+
 inductive ResultRepresentsFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (sourceType : TypeSystem.Ty) (type : Ty) (faults : FaultRep) :
     Staging.Recursive.Outcome → Value → Prop where

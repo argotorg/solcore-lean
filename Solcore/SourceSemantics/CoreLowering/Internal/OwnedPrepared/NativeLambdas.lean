@@ -2325,7 +2325,7 @@ variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
 include sameSource factory extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- E at sizes at most n constructs F at n using the same actual body recipe.
 All E premises here are induction hypotheses; none is stored in qualification. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (expressionIH : ∀ currentContext, Validity (program := Program.ofChecked compiled.sourceProgram) captured code currentContext →
       RecursiveNamedHeaderContracts.AtMost budget (fun size => ∀ compilerScope,
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -2348,7 +2348,7 @@ theorem preserves_flow (budget : Nat)
 include sameSource factory extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- The native strict E family constructs F reflection with its independently
 measured Source grade. The original prepared flow executes only once. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (expressionIH : ∀ currentContext, Validity (program := Program.ofChecked compiled.sourceProgram) captured code currentContext →
       Below budget (fun size => ∀ compilerScope,
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt

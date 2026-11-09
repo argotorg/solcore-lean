@@ -1282,7 +1282,7 @@ include extension faithful observations wellFormed rebuilt operandIncluded unary
   represented heaps locals reference currentCarried allowed beforeTyped argumentsTyped stable in
 /-- Prepared flow and typed finish are derived internally from strict members
 of the same expression family at the actual parameter entry. -/
-theorem invocation_preserves (budget : Nat)
+theorem invocation_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -1308,7 +1308,7 @@ include extension faithful observations wellFormed rebuilt operandIncluded unary
   represented heaps locals reference currentCarried allowed beforeTyped argumentsTyped stable in
 /-- Native body completion uses only strict same-family children. The Source
 call grade is reconstructed independently before the same caller restoration. -/
-theorem invocation_reflects (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem invocation_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
@@ -1334,7 +1334,7 @@ theorem invocation_reflects (budget : Nat) (functionTypes : FunctionRuntimeViews
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets
   represented heaps locals reference currentCarried allowed beforeTyped argumentsTyped stable in
 /-- The authentic payload apply edge preserves the same invocation result. -/
-theorem application_preserves (budget : Nat)
+theorem application_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -1360,7 +1360,7 @@ include extension faithful observations wellFormed rebuilt operandIncluded unary
   represented heaps locals reference currentCarried allowed beforeTyped argumentsTyped stable in
 /-- The real apply edge keeps its strict body grade separate from the newly
 constructed Source grade and unchanged reached caller pool. -/
-theorem application_reflects (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem application_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) captured code context →
       Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
@@ -2046,7 +2046,7 @@ variable
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Original prepared head/loop producers discharge same-body flow preservation
 at the receiving registry from strict expression children and reached tables. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context,
       Validity (program := Program.ofChecked compiled.sourceProgram) captured sameCode context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
@@ -2066,7 +2066,7 @@ theorem preserves_flow (budget : Nat)
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Native flow keeps its own strict grade and independent Source completion. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context,
       Validity (program := Program.ofChecked compiled.sourceProgram) captured sameCode context →
       RecursiveNamedCatalogInvocationBounds.Below budget (fun size =>

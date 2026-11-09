@@ -76,7 +76,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
@@ -96,7 +96,7 @@ theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynami
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem named_fault (budget : Nat) (errors : head.ReachableErrors registry faults)
+theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
     (next : Expr) (output : Ty) :
@@ -115,7 +115,7 @@ theorem named_fault (budget : Nat) (errors : head.ReachableErrors registry fault
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
-theorem named_reflects (budget : Nat) (errors : head.ReachableErrors registry faults)
+theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
@@ -599,7 +599,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped unique owners in
-theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
@@ -621,7 +621,7 @@ theorem named_preserves (budget : Nat) {updated : Dynamic.Value} {after : Dynami
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped unique owners in
-theorem named_fault (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
     (next : Expr) (outputType : Ty) (invalid : Word)
     (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
@@ -642,7 +642,7 @@ theorem named_fault (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dyn
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped in
-theorem named_reflects (budget : Nat) {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
+theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
     (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
@@ -1267,7 +1267,7 @@ variable {checked : Checked} {base : Base checked}
 include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Concrete body meaning supplies every source budget, with the real frame
 reference recovered from the all-target catalog entry. -/
-theorem builtin_body_preserves_at (size : Nat) :
+theorem builtin_body_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix)
       functions registry (Header.of_body body) faults size := by
   intro arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost
@@ -1286,7 +1286,7 @@ theorem builtin_body_preserves_at (size : Nat) :
 include extension uninitialized missing faithful functionLeaves functionTypes in
 /-- Reflection consumes the original native body completion. The concrete
 source derivation receives its own size after it has been reconstructed. -/
-theorem builtin_body_reflects_at (size : Nat) :
+theorem builtin_body_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix)
       functions registry (Header.of_body body) faults size := by
   intro arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost
@@ -1316,7 +1316,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} {evidence : 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- One concrete installed body and concrete recursive builtin arguments close
 the bounded head, without an external child or body execution premise. -/
-theorem builtin_named_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem builtin_named_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedCatalog.Head [Header.of_body body] compilation source context
@@ -1336,7 +1336,7 @@ theorem builtin_named_preserves_at (budget size : Nat) (within : size ≤ budget
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
 /-- Original native completion reflects through the concrete argument and body
 proofs; the reconstructed source expression has a separate finite cost. -/
-theorem builtin_named_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem builtin_named_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedCatalog.Head [Header.of_body body] compilation source context
@@ -1534,7 +1534,7 @@ private def Leaf : GenericExpressionMeaning.Certificate := fun scope id lowered 
   CompatibleExpressionBuiltins.Tree readFuel values source context solved reasonAt scope id lowered
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
-theorem leaf_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem leaf_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
@@ -1551,7 +1551,7 @@ theorem leaf_preserves_at (budget size : Nat) (within : size ≤ budget) :
           program evidence callerValid unique callerUninitialized callerMissing)) size builtin
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
-theorem leaf_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem leaf_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
@@ -1572,7 +1572,7 @@ private def Calls : CompatibleExpressionCalls.CallHeads :=
   RecursiveNamedCatalog.Head [Header.of_body body] compilation source context
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
-theorem data_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem data_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedDataExpressionHeadBounds.Certificate
@@ -1586,7 +1586,7 @@ theorem data_preserves_at (budget size : Nat) (within : size ≤ budget) :
     callerValid unique owners callerUninitialized callerMissing budget child childWithin
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
-theorem data_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem data_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RecursiveNamedDataExpressionHeadBounds.Certificate
@@ -1601,7 +1601,7 @@ theorem data_reflects_at (budget size : Nat) (within : size ≤ budget) :
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- A primitive parent consumes the same data-head budget. -/
-theorem parent_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem parent_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source
@@ -1609,13 +1609,13 @@ theorem parent_preserves_at (budget size : Nat) (within : size ≤ budget) :
           (Calls body (source := source) (context := context) (compilation := compilation)) values source context reasonAt
           (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at functions program evidence entry_transport budget size within unique
+  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at (faults := faults) functions program evidence entry_transport budget size within unique
   intro child childWithin
   exact data_preserves_at functions extension body uninitialized missing faithful functionLeaves functionTypes
     callerValid unique owners callerUninitialized callerMissing budget child childWithin
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
-theorem parent_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem parent_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source
@@ -1623,7 +1623,7 @@ theorem parent_reflects_at (budget size : Nat) (within : size ≤ budget) :
           (Calls body (source := source) (context := context) (compilation := compilation)) values source context reasonAt
           (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at functions program evidence entry_transport budget size within
+  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at (faults := faults) functions program evidence entry_transport budget size within
   intro child childWithin
   exact data_reflects_at functions extension body uninitialized missing faithful functionLeaves functionTypes
     callerValid callerUninitialized callerMissing budget child childWithin
@@ -1833,7 +1833,7 @@ private def Leaf : GenericExpressionMeaning.Certificate := fun scope id lowered 
   CompatibleExpressionBuiltins.Tree readFuel values source context solved reasonAt scope id lowered
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
-theorem leaf_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem leaf_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
@@ -1850,7 +1850,7 @@ theorem leaf_preserves_at (budget size : Nat) (within : size ≤ budget) :
           program evidence callerValid unique callerUninitialized callerMissing)) size builtin
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
-theorem leaf_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem leaf_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
@@ -1868,12 +1868,12 @@ theorem leaf_reflects_at (budget size : Nat) (within : size ≤ budget) :
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- Head composition consumes concrete leaf proofs at the inclusive budget. -/
-theorem composed_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem composed_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at functions program evidence
+  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at (faults := faults) functions program evidence
     entry_transport budget size within unique
   intro child childWithin
   exact leaf_preserves_at functions extension body uninitialized missing faithful functionLeaves functionTypes
@@ -1881,12 +1881,12 @@ theorem composed_preserves_at (budget size : Nat) (within : size ≤ budget) :
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
 /-- Reflection reconstructs source costs independently of native costs. -/
-theorem composed_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem composed_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at functions program evidence
+  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at (faults := faults) functions program evidence
     entry_transport budget size within
   intro child childWithin
   exact leaf_reflects_at functions extension body uninitialized missing faithful functionLeaves functionTypes
@@ -1894,26 +1894,26 @@ theorem composed_reflects_at (budget size : Nat) (within : size ≤ budget) :
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- A second structural layer keeps the same budget, even for groups. -/
-theorem twice_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem twice_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (Head values.checked source
         (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at functions program evidence
+  apply RecursiveNamedExpressionCompositionsBounds.Head.preserves_at (faults := faults) functions program evidence
     entry_transport budget size within unique
   intro child childWithin
   exact composed_preserves_at functions extension body uninitialized missing faithful functionLeaves functionTypes
     callerValid unique owners callerUninitialized callerMissing budget child childWithin
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
-theorem twice_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem twice_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (Head values.checked source
         (Leaf body (source := source) (context := context) (compilation := compilation) (solved := solved) (reasonAt := reasonAt) (readFuel := readFuel)))) faults
       (protectedEntry [Header.of_body body] locations capturePrefix compilation.administrativePrefix) := by
-  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at functions program evidence
+  apply RecursiveNamedExpressionCompositionsBounds.Head.reflects_at (faults := faults) functions program evidence
     entry_transport budget size within
   intro child childWithin
   exact composed_reflects_at functions extension body uninitialized missing faithful functionLeaves functionTypes
@@ -2058,7 +2058,7 @@ def Leaf : GenericExpressionMeaning.Certificate := fun scope id lowered =>
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- The argument obligation is closed by the concrete singleton body grammar. -/
-theorem contracted_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem contracted_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (BuiltinCalls.Typed.Head values source (Leaf body (source := source) (context := context) (compilation := compilation)
@@ -2073,7 +2073,7 @@ theorem contracted_preserves_at (budget size : Nat) (within : size ≤ budget) :
 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
 /-- Native argument completion reconstructs an independently sized Source call. -/
-theorem contracted_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem contracted_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (BuiltinCalls.Typed.Head values source (Leaf body (source := source) (context := context) (compilation := compilation)
@@ -2363,7 +2363,7 @@ variable {checked : Checked} {base : Base checked}
   {faults : FunctionCalls.FaultRep}
 
 include extension faithful functionLeaves functionTypes in
-theorem actual_functions_preserves_at
+theorem actual_functions_preserves_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
@@ -2411,7 +2411,7 @@ theorem actual_functions_preserves_at
 
 
 include extension faithful functionLeaves functionTypes in
-theorem actual_functions_reflects_at
+theorem actual_functions_reflects_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
@@ -2492,7 +2492,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} {evidence : 
 include extension uninitialized missing faithful functionLeaves functionTypes sameLedger runtime unique owners callerUninitialized callerMissing in
 /-- Every child is supplied by the same recursive Tree; the concrete body
 certificate closes the actual remaining body family. -/
-theorem concrete_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem concrete_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RuntimeExpressions [Header.of_body body] compilation readFuel source context solved reasonAt) faults
@@ -2511,7 +2511,7 @@ theorem concrete_preserves_at (budget size : Nat) (within : size ≤ budget) :
 include extension uninitialized missing faithful functionLeaves functionTypes sameLedger runtime callerUninitialized callerMissing in
 /-- Completed Core code produces an independent source trace; the body is
 proved from its finite static certificate rather than supplied as execution. -/
-theorem concrete_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (RuntimeExpressions [Header.of_body body] compilation readFuel source context solved reasonAt) faults
@@ -2595,7 +2595,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} {evidence : 
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid unique owners callerUninitialized callerMissing in
 /-- Every child is supplied by the same recursive Tree; the concrete body
 certificate closes the actual remaining body family. -/
-theorem concrete_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem concrete_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Tree (RecursiveNamedCatalog.Head [Header.of_body body] compilation source context)
@@ -2615,7 +2615,7 @@ theorem concrete_preserves_at (budget size : Nat) (within : size ≤ budget) :
 include extension uninitialized missing faithful functionLeaves functionTypes callerValid callerUninitialized callerMissing in
 /-- Completed Core code produces an independent source trace; the body is
 proved from its finite static certificate rather than supplied as execution. -/
-theorem concrete_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Tree (RecursiveNamedCatalog.Head [Header.of_body body] compilation source context)
@@ -2837,7 +2837,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
 /-- An actual named call may occur at any certified data/control/argument
 position. Static concrete body receipts and finite tree induction supply all
 body and child meaning; installed closure/frame observations stay explicit. -/
-theorem tree_preserves (unique : NodeOccurrencesUnique source)
+theorem tree_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome program context caller source environment before id outcome after) :
@@ -2856,7 +2856,7 @@ include extension faithful leaves runtimeViews valid uninitialized missing bodyU
   tree found environments heaps locals agrees typed installed in
 /-- Full finite native completion reconstructs the independent source outcome,
 including faults reached inside a named child's ordered arguments or body. -/
-theorem tree_reflects {value : Core.Value} {finalStore : Core.Store}
+theorem tree_reflects [FunctionCalls.FaultTokens faults] {value : Core.Value} {finalStore : Core.Store}
     (complete : Evaluates actual store (lowered.expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
       Dynamic.ExpressionEvaluatesOutcome program context caller source environment before id outcome after ∧
@@ -3015,7 +3015,7 @@ variable {checked : Checked} {base : Base checked}
   {faults : FunctionCalls.FaultRep}
 
 include extension faithful functionLeaves functionTypes in
-theorem actual_functions_preserves_at
+theorem actual_functions_preserves_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
@@ -3063,7 +3063,7 @@ theorem actual_functions_preserves_at
 
 
 include extension faithful functionLeaves functionTypes in
-theorem actual_functions_reflects_at
+theorem actual_functions_reflects_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}

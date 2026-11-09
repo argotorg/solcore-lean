@@ -199,7 +199,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include extension faithful observations sameLayouts in
 /-- The sole family supplies these actual smaller expression results. The
 finite head/loop recipes are proved internally at the exact indexed protocol. -/
-theorem preserving_kits (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
+theorem preserving_kits [FunctionCalls.FaultTokens faults] (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
     (certificates := certificates) (expressionSyntax := expressionSyntax)) (budget : Nat)
     (expressions : ∀ context, (origin index).validity context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
@@ -218,7 +218,7 @@ theorem preserving_kits (index : Index (headers := headers) (keys := keys) (regi
 include extension faithful observations sameLayouts in
 /-- Native finite kits use the same original strict expression children and
 return the same indexed witness; no joint body closure is asserted here. -/
-theorem reflecting_kits (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_kits [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
     (certificates := certificates) (expressionSyntax := expressionSyntax)) (budget : Nat)
     (expressions : ∀ context, (origin index).validity context →
@@ -1901,7 +1901,7 @@ variable (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.
 include extension faithful observations sameLayouts in
 /-- The sole existing measured Family composes genuine finite catalog kits
 with this source dispatcher; all actual reached entry fields remain intact. -/
-theorem preserves_at
+theorem preserves_at [FunctionCalls.FaultTokens faults]
     (expressions : PreservingExpressions (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax) functions wellFormed)
     (size : Nat) : ∀ index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
@@ -1920,7 +1920,7 @@ theorem preserves_at
 include extension faithful observations sameLayouts in
 /-- The same Family consumes original native completions and preserves the
 independent Source grade and each branch's actual returned protocol witness. -/
-theorem reflects_at (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_at [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (expressions : ReflectingExpressions (headers := headers) (keys := keys) (registry := registry) (faults := faults)
       (certificates := certificates) (expressionSyntax := expressionSyntax) functions wellFormed)
     (size : Nat) : ∀ index : Index (headers := headers) (keys := keys) (registry := registry) (faults := faults)
@@ -1998,7 +1998,7 @@ variable {source : TypedSource} {context : SourceSemantics.Context} (evidence : 
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique owners idsUnique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem preserves_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : CallableIndexedOwnedExtendedJointReadyContinuations.PreservingBelow
       (headers := headers) (keys := keys) (registry := registry) (faults := faults)
@@ -2016,7 +2016,7 @@ theorem preserves_at_runtime (sameLedger : context.solvedRequirements = solved)
 
 include prefixZero globalCounts transport extension faithful observations functionTypes wellFormed sourceRuntime covers unique
   uninitialized missing sameLayouts escaped profiles syntaxTrees in
-theorem reflects_at_runtime (sameLedger : context.solvedRequirements = solved)
+theorem reflects_at_runtime [FunctionCalls.FaultTokens faults] (sameLedger : context.solvedRequirements = solved)
     (runtimeLedger : RuntimeRequirementLedgerValid context) (budget size : Nat) (within : size ≤ budget)
     (below : CallableIndexedOwnedExtendedJointReadyContinuations.ReflectingBelow
       (headers := headers) (keys := keys) (registry := registry) (faults := faults)

@@ -70,7 +70,7 @@ include bridge bindings definitions registered producer acquire transport extens
 /-- Preservation follows the original staged Source children and allocation.
 Lexical restoration preserves the returned value's captured cells and the
 same native store; it changes only the caller's lexical observations. -/
-theorem preserves_position {budget : Nat}
+theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       PreservesAt bridge context model stages invocation (certificates context) faults childSize)
     (unique : NodeOccurrencesUnique invocation.source)
@@ -260,6 +260,8 @@ theorem preserves_position {budget : Nat}
           ⟨childSize, failure, sameSize, contextEq, outcomeEq, childTrace⟩ |
           ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, contextEq, outcomeEq, childTrace,
             currentRead, rootType, initialized, path, invalid⟩ |
+          ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, contextEq, outcomeEq, childTrace,
+            currentRead, rootType, initialized, path, panics⟩ |
           ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
         · subst finalContext
           subst outcome
@@ -291,6 +293,21 @@ theorem preserves_position {budget : Nat}
           exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
             preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
               (context := context) (expected := expected) (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
+        · subst finalContext
+          subst outcome
+          have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
+          obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_panic
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
+              (context := context) (expected := expected) (failure := .semantic (.panic _)) reached stable⟩
         · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
             rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp)) within
           have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -823,6 +840,8 @@ theorem preserves_position {budget : Nat}
           ⟨childSize, failure, sameSize, outcomeEq, childTrace⟩ |
           ⟨childSize, right, currentCell, initialValue, currentSelected, sameSize, outcomeEq, childTrace,
             currentRead, rootType, initialized, path, invalid⟩ |
+          ⟨childSize, right, currentCell, initialValue, currentSelected, code, sameSize, outcomeEq, childTrace,
+            currentRead, rootType, initialized, path, panics⟩ |
           ⟨childSize, tailSize, right, middle, written, updated, sameSize, childTrace, write, remainingTrace⟩
         · subst outcome
           have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
@@ -852,6 +871,20 @@ theorem preserves_position {budget : Nat}
           exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
             preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
               (context := context) (expected := expected) (failure := .semantic (.invalidAssignmentOperands operator)) reached stable⟩
+        · subst outcome
+          have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
+            rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
+          obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds,
+              preservation, metadata, reached, related, stable⟩ :=
+            CallableIndexedOwnedAdmittedStagedBareAssignmentHeads.preserves_panic
+              (compiled := compiled) (values := .initial compiled.compatible.checked)
+              (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+              (context := context) (scope := scope) (administrative := administrative)
+              bridge functions extension head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+              (typedChildren childSize childStrict) snapshot panics childTrace body (LocalLoop.controlType type)
+          exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, maps, worlds,
+            preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge
+              (context := context) (expected := expected) (failure := .semantic (.panic _)) reached stable⟩
         · have childStrict : childSize < budget := Nat.lt_of_lt_of_le (by
             rw [sameSize]; simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero]; omega) within
           have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
@@ -1064,7 +1097,7 @@ theorem preserves_position {budget : Nat}
             last, callerProtocol.trans related lastRelated, post⟩
 
 include bridge bindings definitions registered producer acquire transport extension faithful observations in
-theorem preserves_at {budget : Nat}
+theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       PreservesAt bridge context model stages invocation (certificates context) faults childSize)
     (unique : NodeOccurrencesUnique invocation.source)

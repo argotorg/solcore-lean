@@ -89,7 +89,7 @@ theorem operands : AssignmentOperandDiagnostics.OperandsLaw faults operator head
   | projected _ _ _ _ errors => exact fun previous right invalid => semantic _ _ (errors previous right invalid)
 
 include site semantic in
-theorem shape_errors
+theorem shape_errors [FunctionCalls.FaultTokens faults]
     (ready : Ready functions protocol source invalidProjection missingDefault registry faults)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
     {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}

@@ -541,7 +541,7 @@ include parentTyped wellFormed runtime covers locals admitted tree unique parent
   rebuilt operandIncluded unaryIncluded interprets in
 /-- The selected prepared packet constructs its own body continuation from
 strict expression children, preserving the whole fourth-bind witness. -/
-theorem reflects_selected (budget : Nat)
+theorem reflects_selected [FunctionCalls.FaultTokens faults] (budget : Nat)
     (reflection : ∀ context, CallableIndexedOwnedTypedLambdaBodyContinuations.Validity
         (program := Program.ofChecked compiled.sourceProgram) captured code context →
       RecursiveNamedCatalogInvocationBounds.Below budget (fun size =>
@@ -874,7 +874,7 @@ include parentTyped wellFormed runtime covers locals admitted tree unique parent
   dispatch selected extension faithful observations rebuilt operandIncluded unaryIncluded interprets in
 /-- The true Source suffix constructs its native execution. Prepared body
 meaning uses only strict children at the genuine parameter entry. -/
-theorem preserves_selected (budget : Nat)
+theorem preserves_selected [FunctionCalls.FaultTokens faults] (budget : Nat)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile)) context evidence source certificate faults size)
     {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -2207,7 +2207,7 @@ variable (i : OrdinaryIndex compiled)
 include coverage extension faithful observations functionTypes wellFormed in
 /-- The builtin producer runs once. Only its extra primitive fault post is
 forgotten; the same semantic tuple and admitted reached state are returned. -/
-theorem preserves_at (size : Nat) :
+theorem preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) i.captured i.code context →
       PreservesAt (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions i context size := by
   intro context valid scope id lowered certified node found sourceTyped mapping world administrative environment
@@ -2228,7 +2228,7 @@ theorem preserves_at (size : Nat) :
 include coverage extension faithful observations functionTypes wellFormed in
 /-- Reflection keeps the independently returned Source grade and the exact
 native completion's returned state when forgetting that extra post. -/
-theorem reflects_at (size : Nat) :
+theorem reflects_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     ∀ context, Validity (program := Program.ofChecked compiled.sourceProgram) i.captured i.code context →
       ReflectsAt (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions i context size := by
   intro context valid scope id lowered certified node found sourceTyped mapping world administrative environment
@@ -2248,7 +2248,7 @@ theorem reflects_at (size : Nat) :
 
 include coverage extension faithful observations functionTypes wellFormed in
 /-- Primitive coverage closes this literal expression family directly. -/
-theorem family_at (size : Nat) :
+theorem family_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     Family (headers := headers) (keys := keys) (registry := registry) (faults := faults) functions i size := by
   intro context valid
   exact ⟨preserves_at functions i coverage extension faithful observations functionTypes wellFormed size context valid,
@@ -2269,7 +2269,7 @@ variable {table : SourceCoreFaultSites.Table}
 
 include coverage extension faithful observations functionTypes wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- The prepared head and loop recipes derive actual Source flow internally. -/
-theorem preserves_flow (size : Nat) :
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (size : Nat) :
     FlowPreserves i.captured i.code i.support.body.toBody functions (registry := registry) (faults := faults)
       (headers := headers) (keys := keys) size := by
   exact CallableIndexedOwnedContextualLambdaPreparedBodyBounds.preserves_flow
@@ -2282,7 +2282,7 @@ theorem preserves_flow (size : Nat) :
 include coverage extension faithful observations functionTypes wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Exact native flow grade uses the original Below result at size+1. No
 Source grade is equated with that native grade. -/
-theorem reflects_flow (size : Nat) :
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (size : Nat) :
     FlowReflects i.captured i.code i.support.body.toBody functions (registry := registry) (faults := faults)
       (headers := headers) (keys := keys) size := by
   exact CallableIndexedOwnedContextualLambdaPreparedBodyBounds.reflects_flow
@@ -2302,7 +2302,7 @@ variable (history : History i.code) (owner : CallableIndexedOwnedFunctionValues.
 
 include coverage extension faithful observations functionTypes wellFormed rebuilt operandIncluded unaryIncluded interprets beforeTyped argumentsTyped stable in
 /-- Actual Source parameter entry, flow and typed finish are closed here. -/
-theorem source_continuation (budget : Nat) :
+theorem source_continuation [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
       (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments)
       i.captured i.code history i.support.body.toBody.toContext functions owner caller budget := by
@@ -2315,7 +2315,7 @@ theorem source_continuation (budget : Nat) :
 
 include coverage extension faithful observations functionTypes wellFormed rebuilt operandIncluded unaryIncluded interprets beforeTyped argumentsTyped stable in
 /-- The same native parameter prefix uses genuine allocation and typed finish. -/
-theorem native_continuation (budget : Nat) :
+theorem native_continuation [FunctionCalls.FaultTokens faults] (budget : Nat) :
     CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
       (registry := registry) (faults := faults) (arguments := arguments)
       i.captured i.code history i.support.body.toBody.toContext functions owner caller budget := by

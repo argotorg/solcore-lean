@@ -107,7 +107,7 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated parameters heaps in
 /-- A retained zero-parameter closure reflects its actual packed Unit call.
 Static body coverage closes every recursive child through the existing numeric family. -/
-theorem reflects_unit {invocation : Staging.Recursive.Scope}
+theorem reflects_unit [FunctionCalls.FaultTokens semanticFaults] {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: .unit :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :

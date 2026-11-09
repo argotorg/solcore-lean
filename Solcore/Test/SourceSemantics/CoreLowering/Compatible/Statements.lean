@@ -208,7 +208,7 @@ theorem staged_modifier (operator : Syntax.ValueAssignOp) (notWordOnly : operato
       ¬ Dynamic.AssignmentOperandsInvalid operator (some (.integer left)) (.integer right) :=
   CompatiblePlaceModifier.initialized_success (sourceType := .comptime .integer) (operator := operator)
     (environment := [.integer right, .inRight .unit (.integer left)]) observations (.inr (.inr ⟨rfl, notWordOnly⟩))
-    (.compatible (actual := .integer) rfl (.integer left)) (.compatible (actual := .integer) rfl (.integer right))
+    (.inr (fun same => by cases same)) (.compatible (actual := .integer) rfl (.integer left)) (.compatible (actual := .integer) rfl (.integer right))
     (.var rfl) (.var rfl) [] Word.zero
 
 private theorem child_compiled {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
@@ -406,7 +406,13 @@ private theorem rootWritable : WritableLocal context binder.id rootType :=
 private def diagnostics (registry : SourceCoreRawMetadata.Registry) (prepared : Prepared) : GenericExpressionMeaning.FaultRep :=
   fun reason token =>
     (∃ root resolved count, FaultToken checked registry root prepared.steps resolved reason token count) ∨
-    ∃ location, reason = .uninitializedLocation location ∧ token = prepared.invalidProjection
+    (∃ location, reason = .uninitializedLocation location ∧ token = prepared.invalidProjection) ∨
+    ∃ code, reason = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+
+/-- Every panic fails with its code's reason. -/
+private instance (registry : SourceCoreRawMetadata.Registry) (prepared : Prepared) :
+    FunctionCalls.FaultTokens (diagnostics registry prepared) :=
+  ⟨fun code => .inr (.inr ⟨code, rfl, rfl⟩)⟩
 
 /-- Actual describe/prepare/checker and authentic initial-cell receipts are
 static inputs. The only execution premise is the completed emitted assignment;
@@ -441,7 +447,7 @@ theorem whole {route : Route} {prepared : Prepared}
       environment (nativeEnvironment prepared) := .cons reference (.nil .nil)
   exact CompatiblePlaceAssignmentReflection.reflects (node := node) (index := 0) layout ordinary registryExtension
     (childReflects registry _) functionViews faithful observations
-    (fun receipt => .inl ⟨_, _, _, receipt⟩) (fun location => .inr ⟨location, rfl, rfl⟩)
+    (fun receipt => .inl ⟨_, _, _, receipt⟩) (fun location => .inr (.inl ⟨location, rfl, rfl⟩))
     ⟨rfl, rfl⟩ (by cbv) leafView leafEq.symm (.inl rfl) environments heaps (localAgrees initial)
     (by simp [scope, SourceCoreLocalCell.lookup?, assignment]) (rootEq ▸ rootWritable) completed
 
@@ -700,7 +706,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (unmapped : location ∉ mapping)
 
 include matched sourceSignatures expressions sites tails sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_preserves :
+theorem compiled_preserves [FunctionCalls.FaultTokens faults] :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       TypedScopedStatements.FlowRep (values := values) (registry := registry) functions finalMap finalWorld faults .bool .bool (.returned (.bool true)) value ∧
@@ -714,7 +720,7 @@ theorem compiled_preserves :
     uninitialized missing faithful observations errors unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
 include matched sourceSignatures expressions sites tails sameDefinitions layoutDefinitions registered extension valid uninitialized missing faithful observations errors environments heaps locals agrees typed reference read unmapped in
-theorem compiled_reflects (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
+theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : FunctionRuntimeViews functions) {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
       TypedScopedStatements.Executes mode program context [] source environment before [statement 0, statement 1] finalContext outcome sourceHeap ∧
@@ -806,7 +812,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -865,7 +871,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -937,7 +943,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -1387,7 +1393,7 @@ theorem actual_preserves_prefix {certified : Certified checked.catalog.definitio
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [.function .unit .word]
       (scope .word) sourceEnvironment (canonical .word) := .cons ref (.nil (.cons readerTyped .nil))
   exact CompatibleRenamedBareBitNot.preserves_prefix_of_lower writable rfl (.inl rfl) environments heaps
-    (localAgrees (some (.word seven))) (agrees .word) actualTyped
+    (localAgrees (some (.word seven))) (agrees .word) actualTyped (by rfl)
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) sourceUpdate
 
 private def exercise (raw : TypeSystem.Ty) (type : Core.Ty) (initial expected : Value) (succeeds : Bool) : IO Unit := do
@@ -1506,7 +1512,11 @@ private theorem prepared : (SourceCoreCompatibleCatalog.prepare signatures 10 [.
 private def checked := (SourceCoreCompatibleCatalog.prepare signatures 10 [.word, .unit]).toOption.get prepared
 private def values := SourceCoreCompatibleValues.Context.initial checked
 private def reason := Word.ofNatModulo 29
-private def faults : FunctionCalls.FaultRep := fun _ token => token = reason
+private def faults : FunctionCalls.FaultRep := fun fault token =>
+  (token = reason) ∨
+  ∃ code, fault = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private def onError (_ : SourceCoreAllocationLayouts.Error) : SourceCoreBasic.Error := .traversalExhausted (.declaration owner)
 private def policy (layouts : SourceCoreAllocationLayouts.Prepared) (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat) : SourceCoreLoops.Policy := {
   lowerExpression := fun _ _ _ id _ => .error (.missingExpression id)
@@ -1562,7 +1572,7 @@ theorem compiled_preserves {layouts : SourceCoreAllocationLayouts.Prepared} {fra
       AdministrativePreserved [] store finalMap finalStore ∧
       Dynamic.HeapMetadataExtend ⟨[]⟩ ⟨[⟨.word, none, none⟩, ⟨.word, none, none⟩]⟩ := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact (Tree.body_preserves (values := values) (ambient := ambient) (faults := faults) functions definitions registered (.refl _) program [] valid (fun _ _ => rfl) tree
+  exact (Tree.body_preserves (values := values) (ambient := ambient) (faults := faults) functions definitions registered (.refl _) program [] valid (fun _ _ => .inl rfl) tree
     reason reason unique environments heaps .nil agrees typed reference read sourceTrace).2
 
 /-- Conversely a completed generated body reconstructs source execution;
@@ -1590,7 +1600,7 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
       LocationMap.Extends [] finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved [] store finalMap finalStore ∧ Dynamic.HeapMetadataExtend ⟨[]⟩ after := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := faults) functions definitions registered (.refl _) program [] valid (fun _ _ => rfl) tree
+  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := faults) functions definitions registered (.refl _) program [] valid (fun _ _ => .inl rfl) tree
     reason reason environments heaps .nil agrees typed reference read completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
@@ -1748,6 +1758,11 @@ private theorem sourceFailure : Dynamic.FunctionStatementsExecuteOutcome program
   exact .localUninitialized (owned := []) (coercions := []) (cell := ⟨.bool, none, none⟩)
     rfl .head (.intro .head) rfl rfl (by rintro ⟨key, value, impossible⟩; cases impossible)
 
+/-- Every fault but a panic fails with `reason`; a panic fails with its code's reason. -/
+private def anyReason : FunctionCalls.FaultRep := fun fault token =>
+  token = reason ∨ ∃ code, fault = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+private instance : FunctionCalls.FaultTokens anyReason := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
+
 /-- Failure before the marked allocation retains the original lexical context
 and source heap; its finite generated execution follows from actual compilation. -/
 theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepared} {frame : SourceCoreCallableIndexedFrames.Layout}
@@ -1767,13 +1782,13 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       CompatibleStatements.BodyRep (values := values) (registry := values.registry) functions finalMap finalWorld
-        (fun _ token => token = reason) .unit .unit (.fault (.uninitializedLocation ⟨0⟩)) value ∧
+        anyReason .unit .unit (.fault (.uninitializedLocation ⟨0⟩)) value ∧
       CompatibleAmbientHeap.HeapRepresents checked values.registry functions finalMap finalWorld (sourceHeap none) finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend (sourceHeap none) (sourceHeap none) := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact (Tree.body_preserves (values := values) (ambient := ambient) (faults := fun _ token => token = reason)
-    functions definitions registered (.refl _) program [] (valid _ (.inl rfl)) (valid _ (.inr rfl)) (fun _ _ => rfl)
+  exact (Tree.body_preserves (values := values) (ambient := ambient) (faults := anyReason)
+    functions definitions registered (.refl _) program [] (valid _ (.inl rfl)) (valid _ (.inr rfl)) (fun _ _ => .inl rfl)
     tree reason reason unique environments heaps (.cons (.intro .head) rfl (.ordinary rfl rfl) .nil)
     agrees typed reference read unmapped sourceFailure).2
 
@@ -1800,13 +1815,13 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
       Dynamic.FunctionStatementsExecuteOutcome program initial [] source sourceEnvironment heap
         [statement 0, statement 1] resultContext outcome after ∧
       CompatibleStatements.BodyRep (values := values) (registry := values.registry) functions finalMap finalWorld
-        (fun _ token => token = reason) .unit .unit outcome value ∧
+        anyReason .unit .unit outcome value ∧
       CompatibleAmbientHeap.HeapRepresents checked values.registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := fun _ token => token = reason)
-    functions definitions registered (.refl _) program [] (valid _ (.inl rfl)) (valid _ (.inr rfl)) (fun _ _ => rfl)
+  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := anyReason)
+    functions definitions registered (.refl _) program [] (valid _ (.inl rfl)) (valid _ (.inr rfl)) (fun _ _ => .inl rfl)
     tree reason reason environments heaps locals agrees typed reference read unmapped completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
@@ -2048,6 +2063,11 @@ private theorem failureContext_ne_full : context3 ≠ context4 := by
   have impossible : 4 = 5 := congrArg (fun context => context.locals.length) same
   omega
 
+/-- Every fault but a panic fails with `reason`; a panic fails with its code's reason. -/
+private def anyReason : FunctionCalls.FaultRep := fun fault token =>
+  token = reason ∨ ∃ code, fault = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+private instance : FunctionCalls.FaultTokens anyReason := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
+
 /-- Three successful bindings precede the fault. Reflection recovers that
 intermediate context and represented lexical environment from actual code. -/
 theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {frame : SourceCoreCallableIndexedFrames.Layout}
@@ -2070,15 +2090,15 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
       Dynamic.FunctionStatementsExecuteOutcome program initial [] source sourceEnvironment heap
         statements resultContext outcome after ∧
       CompatibleStatements.BodyRep (values := values) (registry := values.registry) functions finalMap finalWorld
-        (fun _ token => token = reason) .unit .unit outcome value ∧
+        anyReason .unit .unit outcome value ∧
       CompatibleAmbientHeap.HeapRepresents checked values.registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       LexicalResult checked ambient.definitions finalMap finalWorld administrative source.owner
         initial scope sourceEnvironment resultContext after := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := fun _ token => token = reason)
-    functions definitions registered (.refl _) program [] (fun _ _ => rfl)
+  exact Tree.body_reflects (values := values) (ambient := ambient) (faults := anyReason)
+    functions definitions registered (.refl _) program [] (fun _ _ => .inl rfl)
     tree valid reason reason environments heaps locals agrees typed reference read unmapped completed
 
 theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepared} {frame : SourceCoreCallableIndexedFrames.Layout}
@@ -2098,15 +2118,15 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
       CompatibleStatements.BodyRep (values := values) (registry := values.registry) functions finalMap finalWorld
-        (fun _ token => token = reason) .unit .unit (.fault (.uninitializedLocation ⟨2⟩)) value ∧
+        anyReason .unit .unit (.fault (.uninitializedLocation ⟨2⟩)) value ∧
       CompatibleAmbientHeap.HeapRepresents checked values.registry functions finalMap finalWorld heap3 finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend sourceHeap heap3 ∧
       LexicalResult checked ambient.definitions finalMap finalWorld administrative source.owner
         initial scope sourceEnvironment context3 heap3 := by
   obtain ⟨flow, rfl, tree⟩ := certified accepted
-  exact Tree.body_preserves (values := values) (ambient := ambient) (faults := fun _ token => token = reason)
-    functions definitions registered (.refl _) program [] (fun _ _ => rfl)
+  exact Tree.body_preserves (values := values) (ambient := ambient) (faults := anyReason)
+    functions definitions registered (.refl _) program [] (fun _ _ => .inl rfl)
     tree valid reason reason unique environments heaps (.cons (.intro .head) rfl (.ordinary rfl rfl) .nil)
     agrees typed reference read unmapped sourceFailure
 
@@ -2195,7 +2215,11 @@ private def program : SourceSemantics.Program := ⟨signatures, [], []⟩
 private def compilation : SourceCoreFunctions.Context := ⟨⟨[], [], [], []⟩, ⟨owner, []⟩, [], 0, [], Word.zero⟩
 private def noBody : SourceCoreFunctions.BodyLowerer := fun _ _ _ _ _ _ _ _ _ => .ok .unit
 private def reason : Word := Word.ofNatModulo 17
-private def faults : FunctionCalls.FaultRep := fun fault token => (∃ location, fault = .uninitializedLocation location) ∧ token = reason
+private def faults : FunctionCalls.FaultRep := fun fault token =>
+  ((∃ location, fault = .uninitializedLocation location) ∧ token = reason) ∨
+  ∃ code, fault = .panic code ∧ token = Solcore.Frontend.SourceCorePanics.reason code
+/-- Every panic fails with its code's reason. -/
+private instance : FunctionCalls.FaultTokens faults := ⟨fun code => .inr ⟨code, rfl, rfl⟩⟩
 private theorem unique : NodeOccurrencesUnique source := by cbv; decide
 private theorem boolAdmitted : TypeAdmissible context .bool :=
   .bool ((TypeParameterBindersWellFormed.ofSignatures signatures).withLocal binder.id binder.scheme)
@@ -2346,7 +2370,7 @@ theorem compiled_reflects {ambient : AmbientDefinitions checked.catalog.definiti
       CompatibleAmbientHeap.HeapRepresents checked values.registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  Tree.body_reflects (values := values) (ambient := ambient) functions (.refl _) program [] valid (fun _ location => ⟨⟨location, rfl⟩, rfl⟩)
+  Tree.body_reflects (values := values) (ambient := ambient) functions (.refl _) program [] valid (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩)
     certified reason reason environments heaps locals agrees completed
 
 private def frameLayout : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
@@ -2427,7 +2451,7 @@ theorem initialized_preserves : ∃ value finalStore finalMap finalWorld,
     .control (.cons (.expression (lookupStatement?_sound (show source.lookupStatement? (statement 10) = some discardNode by cbv)) rfl localEvaluation)
       (.terminal (.returnValue (lookupStatement?_sound (show source.lookupStatement? (statement 11) = some returnNode by cbv)) rfl pairEvaluation) (.returned _)))
   have result := Tree.body_preserves (values := values) (ambient := ambient) functions (.refl _) program [] valid unique
-    (faults := faults) (fun _ location => ⟨⟨location, rfl⟩, rfl⟩) certified reason reason
+    (faults := faults) (fun _ location => .inl ⟨⟨location, rfl⟩, rfl⟩) certified reason reason
     environments heaps (locals _) (ξ := Renaming.id) (show EnvironmentsAgree Renaming.id environment environment from fun {_ _} found => found) sourceTrace
   simpa only [Expr.rename_id, code, values, SourceCoreCompatibleValues.Context.initial] using result.2
 
@@ -2513,7 +2537,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -2569,7 +2593,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -2778,7 +2802,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {faults : FaultRep} [FunctionCalls.FaultTokens faults] {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -2978,7 +3002,7 @@ variable {values : ValuesContext} {readFuel : Nat} {source : TypedSource} {conte
 include extension valid unique uninitialized missing in
 /-- Arbitrary certified index children discharge the head's preservation
 obligations, including native comparator allocation under the inserted slot. -/
-theorem head_preserves :
+theorem head_preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (CompatibleExpressionIndices.Tree readFuel values source context solved reasonAt)) faults :=
@@ -2988,7 +3012,7 @@ theorem head_preserves :
 include extension valid uninitialized missing in
 /-- Completed native heads construct their independent source result without
 being given source child traces in advance. -/
-theorem head_reflects :
+theorem head_reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (Head values.checked source (CompatibleExpressionIndices.Tree readFuel values source context solved reasonAt)) faults :=
@@ -3168,7 +3192,7 @@ variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include ordinary unique closed residual signatures readPolicy lowerPolicy leafPolicy extension valid uninitialized missing in
-theorem accepted_preserves :
+theorem accepted_preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       semantics sourceContext evidence source
       (Accepted (sourceContext := sourceContext) (values := values)
@@ -3182,7 +3206,7 @@ theorem accepted_preserves :
     found environments heaps lexical agrees actualTyped trace
 
 include ordinary unique closed residual signatures readPolicy lowerPolicy leafPolicy extension valid uninitialized missing in
-theorem accepted_reflects :
+theorem accepted_reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       semantics sourceContext evidence source
       (Accepted (sourceContext := sourceContext) (values := values)
@@ -3414,7 +3438,7 @@ variable {compilationValues : SourceCoreCompatibleValues.Context} {fuel : Nat} {
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension valid unique uninitialized missing in
-theorem keys_preserves {scope : Scope}
+theorem keys_preserves [FunctionCalls.FaultTokens faults] {scope : Scope}
     {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}
     {path : PreparedPath compilationValues.checked source site root projections 0 steps keySites leaf}
@@ -3446,7 +3470,7 @@ theorem keys_preserves {scope : Scope}
 include extension valid uninitialized missing in
 /-- Every completed packed-key computation reconstructs either the ordered
 source key trace and authenticated path arguments, or its exact source fault. -/
-theorem keys_reflects {scope : Scope}
+theorem keys_reflects [FunctionCalls.FaultTokens faults] {scope : Scope}
     {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}
     {path : PreparedPath compilationValues.checked source site root projections 0 steps keySites leaf}
@@ -3492,7 +3516,7 @@ variable {administrativeContext : Core.Context} {environment : Dynamic.Environme
 include extension valid unique uninitialized missing in
 /-- Every source RHS outcome executes under the actual saved snapshot slots.
 The returned live-root receipt is derived from the IH's new heap. -/
-theorem rhs_preserves
+theorem rhs_preserves [FunctionCalls.FaultTokens faults]
     (generated : CompatibleExpressionTyped.Tree fuel compilationValues source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilationValues.checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
@@ -3508,7 +3532,7 @@ include extension valid uninitialized missing in
 /-- Completed RHS code reconstructs the independent source outcome and the
 post-RHS live root, without supplying a source execution or child evaluation IH
 at one preselected runtime environment. -/
-theorem rhs_reflects
+theorem rhs_reflects [FunctionCalls.FaultTokens faults]
     (generated : CompatibleExpressionTyped.Tree fuel compilationValues source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilationValues.checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)

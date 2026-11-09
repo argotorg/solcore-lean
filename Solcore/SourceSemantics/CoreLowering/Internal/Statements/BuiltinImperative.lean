@@ -135,7 +135,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource}
   (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
-theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
+theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
@@ -149,7 +149,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) faithful observations head environments heaps locals agrees actualTyped trace
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -162,7 +162,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
     (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) faithful observations head environments heaps locals agrees actualTyped errors trace next output
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
-theorem reflects (errors : head.Errors registry faults)
+theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -302,7 +302,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_prefix [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code)
@@ -329,7 +329,7 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
     faithful observations tree valid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault_reachable [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
@@ -358,7 +358,7 @@ theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.C
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -386,7 +386,7 @@ theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {s
   all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.reflects_reachable     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults]     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -412,7 +412,7 @@ theorem Tree.reflects_reachable     {context : SourceSemantics.Context} {scope :
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults]     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -437,7 +437,7 @@ theorem Tree.reflects     {context : SourceSemantics.Context} {scope : Scope} {i
   all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_post [FunctionCalls.FaultTokens faults] {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code)
@@ -468,7 +468,7 @@ theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {sc
     faithful observations tree valid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.reflects_post_reachable     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+theorem Tree.reflects_post_reachable [FunctionCalls.FaultTokens faults]     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -509,7 +509,7 @@ theorem Tree.reflects_post_reachable     {context : SourceSemantics.Context} {sc
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
-theorem Tree.reflects_post     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+theorem Tree.reflects_post [FunctionCalls.FaultTokens faults]     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -668,7 +668,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -704,7 +704,7 @@ theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Sc
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -737,7 +737,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
   all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
-theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -773,7 +773,7 @@ theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Sco
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 /-- Original signature, specialized to the unconditional diagnostic policy. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -933,7 +933,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered catalogValid extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -968,7 +968,7 @@ theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Sc
     environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered catalogValid extension uninitialized missing faithful observations functionTypes in
-theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1001,7 +1001,7 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
   all_goals assumption
 
 include definitions registered catalogValid extension uninitialized missing faithful observations functionTypes in
-theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects_reachable [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1036,7 +1036,7 @@ theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Sco
     environments heaps locals agrees actualTyped reference read unmapped evaluated
 
 include definitions registered catalogValid extension uninitialized missing faithful observations functionTypes in
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+theorem Tree.reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
       context scope (.statements mode statements) expected type code)
@@ -1164,7 +1164,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.preserves_reachable
+theorem Certificate.preserves_reachable [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
@@ -1206,7 +1206,7 @@ theorem Certificate.preserves_reachable
     finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.preserves
+theorem Certificate.preserves [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.Ready registry faults certificate.tree)
@@ -1237,7 +1237,7 @@ theorem Certificate.preserves
   all_goals assumption
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.reflects_reachable
+theorem Certificate.reflects_reachable [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
@@ -1307,7 +1307,7 @@ theorem Certificate.reflects_reachable
     ⟨resultContext, control, trace, exit, lexical⟩⟩
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.reflects
+theorem Certificate.reflects [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.Ready registry faults certificate.tree)
@@ -1341,7 +1341,7 @@ include definitions registered catalogValid escapedFault extension faithful func
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
-theorem Certificate.finite_iff_reachable
+theorem Certificate.finite_iff_reachable [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
@@ -1382,7 +1382,7 @@ theorem Certificate.finite_iff_reachable
     exact ⟨runtimeFuel, value, finalStore, completed runtimeFuel (Nat.le_refl _)⟩
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.finite_iff
+theorem Certificate.finite_iff [FunctionCalls.FaultTokens faults]
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     (errors : GenericImperativeMatch.Tree.Ready registry faults certificate.tree)

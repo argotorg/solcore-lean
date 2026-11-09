@@ -181,7 +181,7 @@ include extension semantic unique wellFormed runtime covers in
 /-- The accepted local-read compiler discharges preservation internally. A
 stage failure at this atomic occurrence is impossible; semantic failures keep
 their original token, heap and actual caller state. -/
-theorem preserves_local (size : Nat) :
+theorem preserves_local [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context model registry invocation
       (fun scope id lowered => reads scope id lowered ∧
         ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)) faults size := by
@@ -225,7 +225,7 @@ include extension semantic unique wellFormed runtime covers in
 /-- A completed native read reconstructs the original atomic Source outcome
 at grade one. Lazy mapping initialization retains its exact written cell and
 every caller row at the same final store. -/
-theorem reflects_local (size : Nat) :
+theorem reflects_local [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context model registry invocation
       (fun scope id lowered => reads scope id lowered ∧
         ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)) faults size := by
@@ -257,7 +257,7 @@ theorem reflects_local (size : Nat) :
 
 include extension uninitialized semantic unique wellFormed runtime covers in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context model registry invocation reads faults size := by
   intro scope id lowered receipt
   exact preserves_local bridge functions extension semantic unique wellFormed runtime covers size
@@ -265,7 +265,7 @@ theorem preserves (size : Nat) :
 
 include extension uninitialized semantic unique wellFormed runtime covers in
 /-- The global diagnostic interface follows by restricting it to the actual read. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context model registry invocation reads faults size := by
   intro scope id lowered receipt
   exact reflects_local bridge functions extension semantic unique wellFormed runtime covers size
@@ -392,7 +392,7 @@ private theorem source_group_inv
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -994,7 +994,7 @@ private theorem source_children
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _
-  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _
+  | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _
   | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _
@@ -1588,7 +1588,7 @@ private theorem product_values :
 include extension sameLedger runtimeLedger uninitializedOn semantic unique wellFormed runtime covers in
 /-- LiteralSites recursion proves each actual Source child internally. A read
 uses its genuine local certificate; no read or whole-child meaning is supplied. -/
-theorem preserves_reached (size : Nat) :
+theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -1638,7 +1638,7 @@ theorem preserves_reached (size : Nat) :
 include extension sameLedger runtimeLedger uninitializedOn semantic unique wellFormed runtime covers in
 /-- Reflection follows the same finite sites at independent native grades.
 Grouping recurses at the same grade; actual pair binds supply strict children. -/
-theorem reflects_reached (size : Nat) :
+theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel registry invocation
       (fun scope id lowered => trees scope id lowered ∧
         Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
@@ -1687,7 +1687,7 @@ theorem reflects_reached (size : Nat) :
 
 include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel registry invocation trees faults size := by
   intro scope id lowered tree
   exact preserves_reached (faultRoot := id) bridge functions extension sameLedger runtimeLedger faults
@@ -1696,7 +1696,7 @@ theorem preserves (size : Nat) :
 
 include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
 /-- Global diagnostic facts restrict to each authentic expression root. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel registry invocation trees faults size := by
   intro scope id lowered tree
   exact reflects_reached (faultRoot := id) bridge functions extension sameLedger runtimeLedger faults
@@ -1974,7 +1974,7 @@ theorem children
   | unary occurrence _ _ | unaryOperandFault occurrence _
   | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _
-  | binaryInvalid occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _
+  | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _
   | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
@@ -2235,7 +2235,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _
   | binaryLeftFault owned _ | binaryLeftInvalid owned _ _
   | binaryShortCircuit owned _ _ | binaryRightFault owned _ _ _
-  | binary owned _ _ _ _ | binaryInvalid owned _ _ _ _
+  | binary owned _ _ _ _ | binaryInvalid owned _ _ _ _ | binaryPanic owned _ _ _ _
   | conditional owned _ _ | conditionalFault owned _
   | calleeFault owned _ | notCallable owned _ _ | rejected owned _ _
   | argumentsFault owned _ _ _ | sourceArity owned _ _ _ _
@@ -2449,6 +2449,14 @@ inductive BinaryTrace (program : Program) (size : Nat) (context : SourceSemantic
       (firstSizeSmaller : firstSize < size) (secondSizeSmaller : secondSize < size) :
       BinaryTrace program size context registry invocation environment before left right operator
         (.fault (.semantic (.invalidBinaryOperands operator))) after
+  | panic {firstSize secondSize a b code middle after}
+      (first : Staging.Recursive.Size.Expression program registry firstSize invocation context environment before left (.value a) middle)
+      (continues : Dynamic.EvaluatesRightOperand operator a)
+      (second : Staging.Recursive.Size.Expression program registry secondSize invocation context environment middle right (.value b) after)
+      (panics : Dynamic.BinaryPrimitivePanics operator a b code)
+      (firstSizeSmaller : firstSize < size) (secondSizeSmaller : secondSize < size) :
+      BinaryTrace program size context registry invocation environment before left right operator
+        (.fault (.semantic (.panic code))) after
 
 
 inductive ConditionalTrace (program : Program) (size : Nat) (context : SourceSemantics.Context)
@@ -2524,7 +2532,7 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
       obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (actual occurrence)
       refine .invalid child invalid ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
     (metadata : Metadata checked invocation.source id node type)
@@ -2569,6 +2577,9 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
   | binaryInvalid occurrence first continues second invalid =>
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (actual occurrence)
       refine .invalid first continues second invalid ?_ ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
+  | binaryPanic occurrence first continues second panics =>
+      obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (actual occurrence)
+      refine .panic first continues second panics ?_ ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
@@ -2599,7 +2610,7 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (actual occurrence)
       refine .fault child ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorSourceBounds
 end
@@ -2671,7 +2682,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 /-- Strict Source children preserve the exact staged result and owned state. -/
-theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : PreservesBelow bridge context model stages invocation certificate faults budget) :
@@ -2786,11 +2797,30 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second
+            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
             have same := actualApplied.functional applied
             subst sourceResult
             exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
               .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+              firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+      | panic firstTrace continues secondTrace panics firstSmaller secondSmaller =>
+        obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, middleState, firstRelated, firstPost⟩ :=
+          leftIH _ (Nat.lt_of_lt_of_le firstSmaller bounded) environments heaps locals agrees actualTyped initial admitted firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          rw [leftType] at payload
+          obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, reached, related, _post⟩ :=
+            rightIH _ (Nat.lt_of_lt_of_le secondSmaller bounded) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (GenericExpressionMeaning.agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2 secondTrace
+          rw [GenericExpressionMeaning.rename_prefix] at second
+          cases represented with
+          | value rightPayload =>
+            rw [rightType] at rightPayload
+            have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
+            exact ⟨_, finalStore, finalMap, finalWorld,
+              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics,
+              .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
               firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
       | invalid firstTrace continues secondTrace failed firstSmaller secondSmaller =>
         obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, middleState, firstRelated, firstPost⟩ :=
@@ -2807,8 +2837,10 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨_, _, applied, _, _⟩ := profile.right_success leftPayload rightPayload continues first second
-            exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            rcases profile.right_outcome leftPayload rightPayload continues first second with
+              ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
+            · exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            · exact False.elim (failed.excludes_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
@@ -2868,7 +2900,7 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
     CallableIndexedOwnedAdmittedStagedExpressionBounds.after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame⟩
 
 /-- Completed native children produce their own staged grades and exact state. -/
-theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique invocation.source) (wellFormed : ProgramWellFormed program)
     (runtime : Dynamic.SourceRuntimeValid program context invocation.source) (covers : invocation.evidence.Covers context)
     (meaning : ReflectsBelow bridge context model stages invocation certificate faults budget) :
@@ -2970,13 +3002,18 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              obtain ⟨sourceResult, result, applied, resultRep, combined⟩ :=
-                profile.right_success leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
-              have secondTrace := trace
-              exact ⟨_, _, after, finalMap, finalWorld, .binary occurrence firstTrace continues secondTrace applied,
-                .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+                ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨_, panics, combined⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                have secondTrace := trace
+                exact ⟨_, _, after, finalMap, finalWorld, .binary occurrence firstTrace continues secondTrace applied,
+                  .value (outputType ▸ resultRep),   finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
+              · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
+                have secondTrace := trace
+                exact ⟨_, _, after, finalMap, finalWorld, .binaryPanic occurrence firstTrace continues secondTrace panics,
+                  .fault (RecursiveStageMeaning.FaultTokens.panic _),   finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
@@ -3688,7 +3725,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _
   | binaryLeftFault owned _ | binaryLeftInvalid owned _ _
   | binaryShortCircuit owned _ _ | binaryRightFault owned _ _ _
-  | binary owned _ _ _ _ | binaryInvalid owned _ _ _ _
+  | binary owned _ _ _ _ | binaryInvalid owned _ _ _ _ | binaryPanic owned _ _ _ _
   | conditional owned _ _ | conditionalFault owned _
   | calleeFault owned _ | notCallable owned _ _ | rejected owned _ _
   | argumentsFault owned _ _ _ | sourceArity owned _ _ _ _
@@ -3840,7 +3877,7 @@ private theorem tuple_reflects {children : GenericExpressionMeaning.Certificate}
 include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
 /-- The positive finite tree supplies every child law by structural descent;
 legacy pair rules retain their own actual strictly smaller Source children. -/
-theorem preserves (size : Nat) :
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     PreservesAt bridge context valueModel registry invocation trees faults size := by
   intro scope id lowered tree
   induction tree generalizing size with
@@ -3860,7 +3897,7 @@ theorem preserves (size : Nat) :
 include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
 /-- The singleton helper can have the same native grade as its child. The
 actual static child tree, not a false numeric decrease, supplies that result. -/
-theorem reflects (size : Nat) :
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] (size : Nat) :
     ReflectsAt bridge context valueModel registry invocation trees faults size := by
   intro scope id lowered tree
   induction tree generalizing size with

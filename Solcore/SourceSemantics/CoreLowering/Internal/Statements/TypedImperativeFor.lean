@@ -234,7 +234,7 @@ variable (functions) (extension : SourceCoreRawMetadata.Extends values.registry 
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension uninitialized missing in
-theorem condition_preserves {condition : ExpressionId} {node : ExpressionNode}
+theorem condition_preserves [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {node : ExpressionNode}
     (tree : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (unique : NodeOccurrencesUnique source)
@@ -260,7 +260,7 @@ theorem condition_preserves {condition : ExpressionId} {node : ExpressionNode}
     related, heaps, maps, worlds, frame, metadata⟩
 
 include extension uninitialized missing in
-theorem condition_reflects {condition : ExpressionId} {node : ExpressionNode}
+theorem condition_reflects [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {node : ExpressionNode}
     (tree : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
@@ -409,7 +409,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem post_preserves {items : List ForItemForm} {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment}
+theorem post_preserves [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment}
     (tree : TypedForHeader.Tree layouts owner active frameLayout globals onError readFuel values source solved reasonAt ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (unique : NodeOccurrencesUnique source)
@@ -433,7 +433,7 @@ theorem post_preserves {items : List ForItemForm} {finalContext : SourceSemantic
     tail.heaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+theorem post_fault [FunctionCalls.FaultTokens faults] {items : List ForItemForm} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (tree : TypedForHeader.Tree layouts owner active frameLayout globals onError readFuel values source solved reasonAt ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
     (errors : TypedForHeader.Tree.Errors registry faults tree)
@@ -458,7 +458,7 @@ theorem post_fault {items : List ForItemForm} {finalContext : SourceSemantics.Co
     matched, heaps, maps, worlds, preservation, metadata⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem post_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem post_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {items : List ForItemForm} {value : Value} {finalStore : Store}
     (tree : TypedForHeader.Tree layouts owner active frameLayout globals onError readFuel values source solved reasonAt ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope items postCode)
@@ -536,7 +536,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       SourceCoreRawMetadata.Extends values.registry registry →
       (∀ id location, faults (.uninitializedLocation location) (reasonAt id)) →
       (∀ id key value tag, MetadataRep registry (.mapping key value) tag → faults (.missingMappingDefault value) ((reasonAt id).add tag)) →
@@ -567,7 +567,7 @@ theorem iterations_success
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       SourceCoreRawMetadata.Extends values.registry registry →
       (∀ id location, faults (.uninitializedLocation location) (reasonAt id)) →
       (∀ id key value tag, MetadataRep registry (.mapping key value) tag → faults (.missingMappingDefault value) ((reasonAt id).add tag)) →
@@ -593,7 +593,7 @@ theorem iterations_success
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore) ?_ ?_ ?_ ?_ ?_ trace
   · intro context evidence source environment before after condition post statements conditionEvaluation
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -606,7 +606,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap bodyHeap postHeap after condition post statements bodyFinalContext postFinalContext bodyEnvironment postEnvironment outcome
       conditionEvaluation bodyEvaluation postEvaluation next nextIH
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -632,7 +632,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap bodyHeap postHeap after condition post statements bodyFinalContext postFinalContext bodyEnvironment postEnvironment outcome
       conditionEvaluation bodyEvaluation postEvaluation next nextIH
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -658,7 +658,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap after condition post statements bodyFinalContext bodyEnvironment
       conditionEvaluation bodyEvaluation
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -675,7 +675,7 @@ theorem iterations_success
   · intro context evidence source environment before conditionHeap after condition post statements bodyFinalContext returned
       conditionEvaluation bodyEvaluation
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -721,7 +721,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       SourceCoreRawMetadata.Extends values.registry registry →
       (∀ id location, faults (.uninitializedLocation location) (reasonAt id)) →
       (∀ id key value tag, MetadataRep registry (.mapping key value) tag → faults (.missingMappingDefault value) ((reasonAt id).add tag)) →
@@ -757,7 +757,7 @@ theorem iterations_fault
       {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
       {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
       {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
-      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep} [FunctionCalls.FaultTokens faults],
       SourceCoreRawMetadata.Extends values.registry registry →
       (∀ id location, faults (.uninitializedLocation location) (reasonAt id)) →
       (∀ id key value tag, MetadataRep registry (.mapping key value) tag → faults (.missingMappingDefault value) ((reasonAt id).add tag)) →
@@ -788,7 +788,7 @@ theorem iterations_fault
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore) ?_ ?_ ?_ ?_ ?_ ?_ ?_ trace
   · intro context evidence source environment before after condition post statements reason conditionFault
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.fault conditionFault)
@@ -796,7 +796,7 @@ theorem iterations_fault
     | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, Core.LoopExecution.condition_failure evaluated, .fault matched, progress⟩
   · intro context evidence source environment before after condition post statements value actualType conditionEvaluation notBoolean runtimeType
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -806,7 +806,7 @@ theorem iterations_fault
       exact False.elim (notBoolean trivial)
   · intro context evidence source environment before conditionHeap after condition post statements bodyContext reason conditionEvaluation bodyFault
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -822,7 +822,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap after condition post statements bodyFinalContext bodyEnvironment finalContext reason
       conditionEvaluation bodyEvaluation postEvaluation
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -845,7 +845,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap after condition post statements bodyFinalContext bodyEnvironment finalContext reason
       conditionEvaluation bodyEvaluation postEvaluation
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -868,7 +868,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap postHeap after condition post statements bodyFinalContext postFinalContext bodyEnvironment postEnvironment reason
       conditionEvaluation bodyEvaluation postEvaluation next nextIH
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -894,7 +894,7 @@ theorem iterations_fault
   · intro context evidence source environment before conditionHeap bodyHeap postHeap after condition post statements bodyFinalContext postFinalContext bodyEnvironment postEnvironment reason
       conditionEvaluation bodyEvaluation postEvaluation next nextIH
       readFuel values scope solved reasonAt ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults _
       extension uninitialized missing conditionTree found valid unique agrees reference correct postCorrect postFailed state
     obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
       condition_preserves functions extension program evidence uninitialized missing conditionTree found valid unique agrees state (.value conditionEvaluation)
@@ -1024,7 +1024,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource} {conte
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include extension uninitialized missing in
-theorem iterations_reflect {condition : ExpressionId} {node : ExpressionNode}
+theorem iterations_reflect [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {node : ExpressionNode}
     {post : List ForItemForm} {statements : List StatementId} {expected : TypeSystem.Ty}
     (conditionTree : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
@@ -1244,7 +1244,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include extension uninitialized missing unique definitions registered faithful observations in
-theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves [FunctionCalls.FaultTokens faults] {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
@@ -1299,7 +1299,7 @@ theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNod
       represented, installedProgress.trans progress⟩
 
 include extension uninitialized missing unique definitions registered faithful observations in
-theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
+theorem loop_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -1388,7 +1388,7 @@ abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
     TypedForHeader.Tree.Errors registry faults tree
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem header_preserves (unique : NodeOccurrencesUnique source)
+theorem header_preserves [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeader functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError) (readFuel := readFuel)
@@ -1433,7 +1433,7 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
         frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2⟩
 
 include definitions registered extension uninitialized missing faithful observations in
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem header_reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeader functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError) (readFuel := readFuel)

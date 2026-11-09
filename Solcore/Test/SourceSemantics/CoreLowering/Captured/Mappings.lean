@@ -1240,6 +1240,8 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedFactory fixture}
     (invocation : Staging.Recursive.Scope) :
     ∃ after : RetainedState support call.completion.session entries,
       SourceInvocation support invocation state.heap entry.source argument (.value (.word word)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -1314,6 +1316,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
         SourceCall support support.actual.header
           (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
           ⟨[]⟩ [.word seed] (.value entry.source) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ :=
     first.start_receipt
@@ -1526,6 +1530,8 @@ theorem export_error_meaning {fixture : CompiledFixture} {observed : ObservedFac
     ∃ source : Dynamic.Value, ∃ after : RetainedState support call.returned entries,
       SourceInvocation support invocation state.heap entry.source argument (.value source) after.heap ∧
       call.returned.ExportsReady := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
   have semantic : ∀ reason token,
       CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
@@ -1660,6 +1666,8 @@ private theorem forward_word {fixture : CompiledFixture} {observed : ObservedFac
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceInvocation support invocation state.heap entry.source argument (.value (.word word)) after) :
     ForwardWordAt support publicSession entries handle argument word after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨publicCheckpoint, accepted, _resumed⟩ := call.executed
   obtain ⟨checkpoint, atCheckpoint, original⟩ :=
     RecursiveNamedPublicDirectHandleMeaning.recover_handle_start state.atSession accepted
@@ -1801,6 +1809,8 @@ private theorem forward_initial {fixture : CompiledFixture} {observed : Observed
     {invocation : Staging.Recursive.Scope} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
     (trace : SourceCall support support.actual.header invocation ⟨[]⟩ [.word seed] (.value sourceResult) after) :
     InitialForwardAt support first after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ := first.start_receipt
   obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
@@ -1962,6 +1972,8 @@ theorem initial_named_export_meaning {fixture : CompiledFixture} {observed : Obs
       SourceCall support support.actual.header
         (RecursiveStageRegistry.scope stages.sidecar [] support.actual.header.function)
         ⟨[]⟩ [.word seed] (.value source) state.heap ∧ first.call.returned.ExportsReady := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨recipe, artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, _program, sessionAt, checkpointAt, started⟩ :=
     RecursiveNamedPublicExecutionMeaning.actual_start fixture.accepted first.opened first.call.started
@@ -2020,6 +2032,8 @@ theorem next_named_export_meaning {fixture : CompiledFixture} {observed : Observ
     ∃ source : Dynamic.Value, ∃ after : RetainedState support call.returned entries,
       SourceCall support support.actual.header invocation state.heap [.word seed] (.value source) after.heap ∧
       call.returned.ExportsReady := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have selected : ∀ request : RecursiveNamedPublicHistoryFrontdoor.Started
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers support.rows) fixture.recipePrepared
       call.checkpoint state.session observed.row.key [.word seed] zeroOutputOptions.inputValidationFuel
@@ -2125,6 +2139,8 @@ theorem named_factory_meaning {fixture : CompiledFixture} {observed : ObservedFa
       call.handle.sourceType = .function (.mapping .word .word) .word ∧
       ∃ after : RetainedState support call.completion.session (entries ++ [entry]),
         SourceCall support support.actual.header invocation state.heap [.word seed] (.value entry.source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.input] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started

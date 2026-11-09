@@ -1476,7 +1476,7 @@ variable (functions : FunctionModel compiled.compatible.checked.catalog (Callabl
 include extension faithful observations producer acquire transport in
 /-- Strict admitted expression children construct only the finite Source
 prefixes and recipe producers used by the existing shared body fold. -/
-theorem preserving_kits
+theorem preserving_kits [FunctionCalls.FaultTokens faults]
     (expressions : ∀ context, (source_origin origin runtime).validity context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
@@ -1530,7 +1530,7 @@ theorem preserving_kits
 include extension faithful observations producer acquire transport in
 /-- Native children retain their own strict budget. The same actual recipe
 producers return independent Source grades and the original reached states. -/
-theorem reflecting_kits (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_kits [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (expressions : ∀ context, (source_origin origin runtime).validity context →
       RecursiveNamedBoundedContracts.Below budget (fun size =>
         CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -1658,7 +1658,7 @@ theorem admitted_child_reflects {context : SourceSemantics.Context} {size : Nat}
 include extension faithful observations producer acquire transport in
 /-- The shared Ready family supplies these exact smaller expression results;
 the finite catalog producers are constructed internally from them. -/
-theorem preserving_ready_kits
+theorem preserving_ready_kits [FunctionCalls.FaultTokens faults]
     (expressions : ∀ context, (source_origin origin runtime).validity context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
         RecursiveNamedLexicalContracts.Stateful.WithReady.ExpressionPreservesAt callerProtocol (readiness bridge)
@@ -1673,7 +1673,7 @@ theorem preserving_ready_kits
 
 include extension faithful observations producer acquire transport in
 /-- The native family uses the same real child witness at its strict budget. -/
-theorem reflecting_ready_kits (functionTypes : FunctionRuntimeViews functions)
+theorem reflecting_ready_kits [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions)
     (expressions : ∀ context, (source_origin origin runtime).validity context →
       RecursiveNamedBoundedContracts.Below budget (fun size =>
         RecursiveNamedLexicalContracts.Stateful.WithReady.ExpressionReflectsAt callerProtocol (readiness bridge)

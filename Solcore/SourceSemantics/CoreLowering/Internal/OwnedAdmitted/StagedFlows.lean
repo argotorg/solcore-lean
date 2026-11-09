@@ -2889,11 +2889,17 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
 
+/-- Plain `=` has no compound operation to panic. -/
+theorem equal_no_panic {previous : Option Dynamic.Value} {right : Dynamic.Value} {code : UInt8}
+    (panics : Dynamic.AssignmentOperandsPanic .equal previous right code) : False := by
+  cases panics with
+  | compound corresponds _ => cases corresponds
+
 include bridge bindings definitions registered producer acquire transport extension in
 /-- Native completion determines the actual ordered lexical Source trace,
 including the distinct context after successful allocation and initializer
 faults before allocation. The returned caller state retains the entire heap. -/
-theorem reflects_at {budget : Nat}
+theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
     (children : ∀ context childSize, childSize < budget →
       ReflectsAt bridge context model stages invocation (certificates context) faults childSize)
     (graph : OccurrenceGraphWellFormed invocation.source)
@@ -3072,6 +3078,7 @@ theorem reflects_at {budget : Nat}
           exact fault_post bridge reached stable
       | operands _ _ _ _ _ _ invalid _ _ _ _ _ _ _ _ _ _ =>
           exact (AssignmentOperandDiagnostics.invalid_not_equal invalid rfl).elim
+      | panic _ _ _ _ _ _ panics _ _ _ _ _ _ _ _ _ _ => exact (equal_no_panic panics).elim
       | success snapshot childTrace write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
           have tailTyped := ProtectedStateImperativeStatementSuffixTyping.assignment graph.nodeOccurrencesUnique sourceTyped found form
           obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,

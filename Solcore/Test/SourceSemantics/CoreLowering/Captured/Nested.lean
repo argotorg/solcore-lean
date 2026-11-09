@@ -868,6 +868,9 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
     fixture.recipe.compiled.indexed.ancestry.graph.inputs.callableSelected
   let registry := receiver.completion.result.context.registry
   let faults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics
+  haveI : FunctionCalls.FaultTokens faults := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled
+      (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed))
   obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal observed.expression.id observed.statement
     observed.roots observed.foundStatement observed.returnStatement
   obtain ⟨support⟩ := actual.support stages terminal diagnostic expression point (registry := registry) (faults := faults)
@@ -2488,6 +2491,8 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (invocation : Staging.Recursive.Scope) :
     ∃ after : RetainedState support call.completion.session entries,
       SourceInvocation support invocation state.heap entry.source (.value (.word word)) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have unitInput : RecursiveNamedPublicFunctionHistoryInputs.Input entries
       support.makeHeader.header.function.context .unit .unit .unit :=
     .data ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩ ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
@@ -3148,6 +3153,8 @@ theorem RetainedState.make_typed_handle
       ∃ after : RetainedState support call.completion.session (entries ++ [entry]),
         SourceCall support support.makeHeader.header invocation state.heap [.word word]
           (.value entry.source) after.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.makeInput, support.readInput] support.rows support.complete
     state.atRecipe state.history.current.1 state.atSession call.started
@@ -3276,6 +3283,8 @@ theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : Obser
         SourceCall support support.makeHeader.header
           (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
           ⟨[]⟩ [.word seed] (.value entry.source) state.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
       opened, prepared, sessionAt, checkpointAt, started⟩ :=
     fixture.actual_start first.opened first.started
@@ -3512,6 +3521,8 @@ theorem collect {fixture : CompiledFixture} {observed : ObservedProgram fixture}
         [sourceArgument first.source second.source] (.value (sourceArgument first.source second.source)) next.heap ∧
       CollectedAt (fixture := fixture) call.completion call.firstOutput call.secondOutput call.repeatedOutput
         call.returned (sourceArgument first.source second.source) added := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have input := mapping_input (context := support.makeHeader.header.function.context)
     first second firstMember secondMember firstType secondType firstHandle secondHandle
   obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
@@ -3784,6 +3795,8 @@ theorem forward_word {fixture : CompiledFixture} {observed : ObservedProgram fix
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceInvocation support invocation state.heap entry.source (.value (.word word)) after) :
     ForwardWordAt support publicSession entries handle word after := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   have unitInput : RecursiveNamedPublicFunctionHistoryInputs.Input entries
       support.makeHeader.header.function.context .unit .unit .unit :=
     .data ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
@@ -3983,6 +3996,8 @@ theorem SequenceWitness.forward_collection {fixture : CompiledFixture} {observed
     ForwardCollectionAt meaning.support sequence.named.completion.session [meaning.first, meaning.second, meaning.named]
       sequence.named.handle (mappingArgument sequence.first.handle sequence.second.handle sequence.first.handle)
       (sourceArgument meaning.first.source meaning.second.source) meaning.collectedState.heap := by
+  haveI := CallableIndexedOwnedPublicDecodedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree fixture.recipe.compiled receiver.issued)
   let state := meaning.issuedState
   have initialReady := (SourceCoreExecution.Bootstrap.ReadyAt.single sequence.first.ready).exportsReady sequence.first.authority
   have firstReady := sequence.first.executed.exportsReady initialReady

@@ -179,7 +179,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((header.reasonAt id).add tag))
 
 include extension escapedFault profiles trees errors faithful observations runtimeViews uninitialized missing in
-theorem concrete_preserves_at (size : Nat) :
+theorem concrete_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat) :
     BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   apply RecursiveNamedCatalogBodyFinishBounds.body_preserves_at functions escapedFault profiles size
   intro administrative valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
@@ -189,7 +189,7 @@ theorem concrete_preserves_at (size : Nat) :
     environments heaps locals agrees typed reference read unmapped trace.sound
 
 include extension escapedFault profiles trees errors faithful observations runtimeViews uninitialized missing in
-theorem concrete_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults size := by
   apply RecursiveNamedCatalogBodyFinishBounds.body_reflects_at functions escapedFault profiles budget size within
   intro administrative child _ valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -345,7 +345,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Sufficient fuel follows from a finite independent source execution,
 including language faults represented by the normal result carrier. -/
-theorem finite_source_has_native_fuel {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem finite_source_has_native_fuel [FunctionCalls.FaultTokens faults] {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : NamedCalls.BodyOutcome program header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld required,
@@ -364,7 +364,7 @@ theorem finite_source_has_native_fuel {outcome : Dynamic.ExpressionOutcome} {aft
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
 /-- Every machine completion reflects. No relation between source and
 native fuel, and no assumption of source termination, enters this consumer. -/
-theorem any_completed_machine_has_source_meaning
+theorem any_completed_machine_has_source_meaning [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {fuel : Nat} {value : Value} {finalStore : Store}
     (completed : runStateful fuel
@@ -668,7 +668,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem independent_call_preserved [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -686,7 +686,7 @@ theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOut
     caller member represented heaps trace (Nat.le_refl size)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem completed_call_reflected
+theorem completed_call_reflected [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -865,7 +865,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem independent_call_preserved [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -883,7 +883,7 @@ theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOut
     caller member represented heaps trace (Nat.le_refl size)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem completed_call_reflected
+theorem completed_call_reflected [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -1397,7 +1397,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+theorem independent_call_preserved [FunctionCalls.FaultTokens faults] {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence before arguments outcome after) :
     ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store,
       ∃ value finalStore finalMap finalWorld,
@@ -1415,7 +1415,7 @@ theorem independent_call_preserved {size : Nat} {outcome : Dynamic.ExpressionOut
     caller member represented heaps trace (Nat.le_refl size)
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller member represented heaps in
-theorem completed_call_reflected
+theorem completed_call_reflected [FunctionCalls.FaultTokens faults]
     (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world before store)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -1932,7 +1932,7 @@ variable {checked : Checked} {base : Base checked}
 variable {callerCompilation : SourceCoreFunctions.Context} (evidence : Dynamic.EvidenceEnvironment)
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
-theorem actual_preserves_at
+theorem actual_preserves_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
@@ -1976,7 +1976,7 @@ theorem actual_preserves_at
 
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
-theorem actual_reflects_at
+theorem actual_reflects_at [FunctionCalls.FaultTokens faults]
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}

@@ -113,7 +113,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_empty_post_preserves {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_empty_post_preserves [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {reason : Word} {administrative : Core.Context}
     (budget size : Nat) (bounded : size ≤ budget)
@@ -144,7 +144,7 @@ theorem concrete_named_empty_post_preserves {context : SourceSemantics.Context} 
     size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_named_empty_post_reflects {context : SourceSemantics.Context} {scope : Scope}
+theorem concrete_named_empty_post_reflects [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {reason : Word} {administrative : Core.Context}
     (budget size : Nat) (bounded : size ≤ budget)
@@ -390,7 +390,7 @@ variable {checked : Checked} {base : Base checked}
 
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_preserves (budget : Nat)
+theorem concrete_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -411,7 +411,7 @@ theorem concrete_preserves (budget : Nat)
     valid unique owners uninitialized missing budget child within
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_reflects (budget : Nat)
+theorem concrete_reflects [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -434,7 +434,7 @@ theorem concrete_reflects (budget : Nat)
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The inclusive endpoint used by a source-body strong induction. No N+1
 budget and no callee law at N is supplied by this consumer. -/
-theorem concrete_preserves_at_top (size : Nat)
+theorem concrete_preserves_at_top [FunctionCalls.FaultTokens faults] (size : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -453,7 +453,7 @@ theorem concrete_preserves_at_top (size : Nat)
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing bodyUninitialized bodyMissing in
 /-- A completed native body gives its own source size, without relating source
 cost to the original native budget. -/
-theorem concrete_native_only (budget size : Nat) (smaller : size < budget)
+theorem concrete_native_only [FunctionCalls.FaultTokens faults] (budget size : Nat) (smaller : size < budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -591,7 +591,7 @@ variable {checked : Checked} {base : Base checked}
 
 
 include definitions registered extension faithful observations runtimeViews catalogValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_preserves (budget : Nat)
+theorem concrete_preserves [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -612,7 +612,7 @@ theorem concrete_preserves (budget : Nat)
     valid unique owners uninitialized missing budget child within
 
 include definitions registered extension faithful observations runtimeViews catalogValid unique uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_reflects (budget : Nat)
+theorem concrete_reflects [FunctionCalls.FaultTokens faults] (budget : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -635,7 +635,7 @@ theorem concrete_reflects (budget : Nat)
 include definitions registered extension faithful observations runtimeViews catalogValid unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The inclusive endpoint used by a source-body strong induction. No N+1
 budget and no callee law at N is supplied by this consumer. -/
-theorem concrete_preserves_at_top (size : Nat)
+theorem concrete_preserves_at_top [FunctionCalls.FaultTokens faults] (size : Nat)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -654,7 +654,7 @@ theorem concrete_preserves_at_top (size : Nat)
 include definitions registered extension faithful observations runtimeViews catalogValid unique uninitialized missing bodyUninitialized bodyMissing in
 /-- A completed native body gives its own source size, without relating source
 cost to the original native budget. -/
-theorem concrete_native_only (budget size : Nat) (smaller : size < budget)
+theorem concrete_native_only [FunctionCalls.FaultTokens faults] (budget size : Nat) (smaller : size < budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax
@@ -786,7 +786,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {statements rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code body : Expr}
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing in
-private theorem builtin_preserves_at (size : Nat)
+private theorem builtin_preserves_at [FunctionCalls.FaultTokens faults] (size : Nat)
     (tree : BuiltinLexicalStatements.Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code) :
     PreservesAt (entry := entry) functions program evidence (source := source) (context := context)
@@ -798,7 +798,7 @@ private theorem builtin_preserves_at (size : Nat)
     program evidence uninitialized missing tree unique valid environments heaps locals agrees typed reference read unmapped trace.sound
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing in
-private theorem builtin_reflects_at (size : Nat)
+private theorem builtin_reflects_at [FunctionCalls.FaultTokens faults] (size : Nat)
     (tree : BuiltinLexicalStatements.Tree layouts owner active frame globals onError readFuel values source solved reasonAt
       context scope mode statements expected type code) :
     ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
@@ -818,7 +818,7 @@ variable {id : StatementId} {node : StatementNode}
     context scope false statements expected type code)
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing found form inner in
-theorem closed_block_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_block_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) id expected type code := by
@@ -827,7 +827,7 @@ theorem closed_block_preserves_at (budget size : Nat) (within : size ≤ budget)
       uninitialized missing unique child inner)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing found form inner in
-theorem closed_block_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_block_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) id expected type code := by
@@ -839,7 +839,7 @@ variable (tail : BuiltinLexicalStatements.Tree layouts owner active frame global
     context scope mode rest expected type body)
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing transport found form inner tail in
-theorem closed_sequence_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_sequence_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     PreservesAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type code body) := by
@@ -850,7 +850,7 @@ theorem closed_sequence_preserves_at (budget size : Nat) (within : size ≤ budg
       uninitialized missing unique child tail)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport found form inner tail in
-theorem closed_sequence_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_sequence_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type code body) := by
@@ -871,7 +871,7 @@ variable {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody :
     context scope false (elseBody.getD []) expected type elseCode)
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing transport found conditionalForm conditionFound conditionType conditionTree thenTree elseTree in
-theorem closed_conditional_preserves_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_conditional_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
@@ -884,7 +884,7 @@ theorem closed_conditional_preserves_at (budget size : Nat) (within : size ≤ b
     (fun child _ => builtin_preserves_at functions definitions registered extension faithful observations runtimeViews program evidence uninitialized missing unique child elseTree)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport found conditionalForm conditionFound conditionType conditionTree thenTree elseTree in
-theorem closed_conditional_reflects_at (budget size : Nat) (within : size ≤ budget) :
+theorem closed_conditional_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (within : size ≤ budget) :
     HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (solved := solved) (faults := faults) (frameLayout := frame) (globals := globals)
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
@@ -1011,7 +1011,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem concrete_preserves_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -1033,7 +1033,7 @@ theorem concrete_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     valid unique owners uninitialized missing budget child within
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
-theorem concrete_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -1194,7 +1194,7 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((body.reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem named_prefix_preserves (budget : Nat) {administrative : Core.Context} {type : Ty}
+theorem named_prefix_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop} {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -1228,7 +1228,7 @@ theorem named_prefix_preserves (budget : Nat) {administrative : Core.Context} {t
     tree valid environments heaps locals agrees actualTyped reference read unmapped installed trace bounded
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing in
-theorem named_prefix_reflects (budget : Nat) {administrative : Core.Context} {type : Ty}
+theorem named_prefix_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -1273,7 +1273,7 @@ variable {administrative : Core.Context} {type : Ty} {context : SourceSemantics.
   (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing postTree valid agrees reference in
-theorem named_post_preserves (budget : Nat) :
+theorem named_post_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostPreservesAt size functions program evidence
         (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
@@ -1292,7 +1292,7 @@ theorem named_post_preserves (budget : Nat) :
     postTree valid agrees reference state continued executed bounded
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing postTree postErrors valid agrees reference in
-theorem named_post_faults (budget : Nat) :
+theorem named_post_faults [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostFaultsAt size functions program evidence
         (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix) (faults := faults)
@@ -1311,7 +1311,7 @@ theorem named_post_faults (budget : Nat) :
     postTree postErrors valid agrees reference state continued executed bounded
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing bodyUninitialized bodyMissing postTree postErrors valid agrees reference in
-theorem named_post_reflects (budget : Nat) :
+theorem named_post_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostReflectsAt size functions program evidence
         (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
@@ -1482,7 +1482,7 @@ variable {values : ValuesContext}
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing transport bindings in
-theorem runtime_prefix_preserves (budget : Nat) {administrative : Core.Context} {type : Ty}
+theorem runtime_prefix_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop} {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (CompatibleExpressionBuiltinRuntime.Certificate fuel values source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -1519,7 +1519,7 @@ theorem runtime_prefix_preserves (budget : Nat) {administrative : Core.Context} 
     tree valid environments heaps locals agrees actualTyped reference read unmapped installed trace bounded
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
-theorem runtime_prefix_reflects (budget : Nat) {administrative : Core.Context} {type : Ty}
+theorem runtime_prefix_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {administrative : Core.Context} {type : Ty}
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : ProtectedForHeader.Tree layouts owner active frame globals onError values source (fun context => (CompatibleExpressionBuiltinRuntime.Certificate fuel values source context solved reasonAt)) ambient.definitions administrative type continuation
@@ -1567,7 +1567,7 @@ variable {administrative : Core.Context} {type : Ty} {context : SourceSemantics.
   (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing transport bindings postTree valid agrees reference in
-theorem runtime_post_preserves (budget : Nat) :
+theorem runtime_post_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostPreservesAt size functions program evidence
         (entry := entry)
@@ -1589,7 +1589,7 @@ theorem runtime_post_preserves (budget : Nat) :
     postTree valid agrees reference state continued executed bounded
 
 include definitions registered extension faithful observations runtimeViews unique uninitialized missing transport bindings postTree postErrors valid agrees reference in
-theorem runtime_post_faults (budget : Nat) :
+theorem runtime_post_faults [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostFaultsAt size functions program evidence
         (entry := entry) (faults := faults)
@@ -1611,7 +1611,7 @@ theorem runtime_post_faults (budget : Nat) :
     postTree postErrors valid agrees reference state continued executed bounded
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings postTree postErrors valid agrees reference in
-theorem runtime_post_reflects (budget : Nat) :
+theorem runtime_post_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) :
     RecursiveNamedHeaderContracts.AtMost budget (fun size =>
       RecursiveNamedForContracts.PostReflectsAt size functions program evidence
         (entry := entry)
@@ -1854,7 +1854,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {administrative : C
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- All condition and body runtime obligations are discharged by the concrete
 named Trees. The actual native head type is retained as a separate static fact. -/
-theorem concrete_whole_preserves {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem concrete_whole_preserves [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -1886,7 +1886,7 @@ include definitions registered extension faithful observations runtimeViews uniq
 /-- Native completion reconstructs the independent source head and its effects.
 Successful body control excludes faults by static Tree inversion, rather than
 by a caller-supplied body execution or universal semantic contract. -/
-theorem concrete_whole_reflects {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem concrete_whole_reflects [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -2073,7 +2073,7 @@ variable {values : ValuesContext} {source : TypedSource} {context : SourceSemant
 
 include transport in
 /-- Runtime validity closes the condition law; the body needs no semantic IH. -/
-theorem runtime_preserves_at {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem runtime_preserves_at [FunctionCalls.FaultTokens faults] {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {expected : TypeSystem.Ty}
     (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition [])
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -2312,7 +2312,7 @@ variable {values : ValuesContext}
 
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings unique in
-theorem runtime_preserves_at {context : SourceSemantics.Context} {scope : Scope}
+theorem runtime_preserves_at [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {administrative : Core.Context} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode postCode : Expr} {post : List ForItemForm} {reason : Word}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -2353,7 +2353,7 @@ theorem runtime_preserves_at {context : SourceSemantics.Context} {scope : Scope}
     size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
-theorem runtime_reflects_at {context : SourceSemantics.Context} {scope : Scope}
+theorem runtime_reflects_at [FunctionCalls.FaultTokens faults] {context : SourceSemantics.Context} {scope : Scope}
     {administrative : Core.Context} {condition : ExpressionId} {conditionNode : ExpressionNode}
     {expected : TypeSystem.Ty} {type : Ty} {conditionCode postCode : Expr} {post : List ForItemForm} {reason : Word}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -2545,7 +2545,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- The actual builtin certificate closes all reached expression leaves. -/
-theorem runtime_preserves_at (unique : NodeOccurrencesUnique source)
+theorem runtime_preserves_at [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
@@ -2570,7 +2570,7 @@ theorem runtime_preserves_at (unique : NodeOccurrencesUnique source)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- Native completion reflects to an independently sized source outcome. -/
-theorem runtime_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem runtime_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -2594,7 +2594,7 @@ theorem runtime_reflects_at (budget size : Nat) (bounded : size ≤ budget)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- The five-way consumer keeps the same trace, grade, frame and heap. -/
-theorem imperative_preserves_at (unique : NodeOccurrencesUnique source)
+theorem imperative_preserves_at [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (budget size : Nat) (bounded : size ≤ budget) {administrative : Core.Context}
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
@@ -2612,7 +2612,7 @@ theorem imperative_preserves_at (unique : NodeOccurrencesUnique source)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- Reflection also only converts the existing three-way FlowRep. -/
-theorem imperative_reflects_at (budget size : Nat) (bounded : size ≤ budget) {administrative : Core.Context}
+theorem imperative_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat) (bounded : size ≤ budget) {administrative : Core.Context}
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericLexicalStatements.Tree layouts owner active frame globals onError values source
@@ -2795,7 +2795,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- The complete concrete expression family closes the sole statement induction. -/
-theorem runtime_preserves_at (unique : NodeOccurrencesUnique source)
+theorem runtime_preserves_at [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (budget size : Nat) (bounded : size ≤ budget) {administrative : Core.Context}
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
@@ -2824,7 +2824,7 @@ theorem runtime_preserves_at (unique : NodeOccurrencesUnique source)
 
 include definitions registered extension faithful observations runtimeViews uninitialized missing transport bindings in
 /-- The complete concrete expression family closes the sole statement induction. -/
-theorem runtime_reflects_at (unique : NodeOccurrencesUnique source)
+theorem runtime_reflects_at [FunctionCalls.FaultTokens faults] (unique : NodeOccurrencesUnique source)
     (budget size : Nat) (bounded : size < budget) {administrative : Core.Context}
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}

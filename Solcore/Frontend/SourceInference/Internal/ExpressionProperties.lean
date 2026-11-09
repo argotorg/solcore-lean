@@ -12758,6 +12758,8 @@ private theorem inferFuel_inferenceProperties_internal :
       | uncheckedAdd => exact finishNonEqual (valueInduction place) success
       | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
       | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
+      | uncheckedDivide => exact finishNonEqual (valueInduction place) success
+      | uncheckedModulo => exact finishNonEqual (valueInduction place) success
   case case71 =>
     simp [InferExprsFuelInferenceProperties, inferExprsFuel]
   case case72 =>
@@ -14136,6 +14138,8 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | uncheckedAdd => exact finishNonEqual (valueInduction place) success
       | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
       | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
+      | uncheckedDivide => exact finishNonEqual (valueInduction place) success
+      | uncheckedModulo => exact finishNonEqual (valueInduction place) success
   -- A grouped place delegates directly to its inner place.
   case case67 =>
     intros

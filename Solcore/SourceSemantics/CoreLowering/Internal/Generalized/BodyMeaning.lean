@@ -202,7 +202,7 @@ structure Result where
     true inputs.context entry.entry.environment entry.entry.heap function.body finalContext bodyOutcome after
 
 include extension frame raw selected selectedBodies uninitialized semantic in
-theorem completes : Nonempty (Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry) := by
+theorem completes [FunctionCalls.FaultTokens semanticFaults] : Nonempty (Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry) := by
   obtain ⟨flow,emitted,tree⟩ := GeneralizedLocalOrdinaryBodyAdmission.tree material inputs frame
   have source := registry.source selected
   rw [← source] at tree
@@ -241,7 +241,7 @@ theorem completes : Nonempty (Result (program := program) (registry := registry)
     determines := result.determines }⟩
 
 include extension frame raw selected selectedBodies uninitialized semantic in
-theorem preserves {size finalContext bodyOutcome outcome after}
+theorem preserves [FunctionCalls.FaultTokens semanticFaults] {size finalContext bodyOutcome outcome after}
     (trace : Staging.Recursive.Size.Statements program registry size invocation inputs.context
       entry.entry.environment entry.entry.heap function.body finalContext bodyOutcome after)
     (matched : Staging.Recursive.BodyResult function.resultType bodyOutcome outcome) :
@@ -255,7 +255,7 @@ theorem preserves {size finalContext bodyOutcome outcome after}
   exact ⟨result,outcomeEq,heap⟩
 
 include extension frame raw selected selectedBodies uninitialized semantic in
-theorem reflects {value finalStore}
+theorem reflects [FunctionCalls.FaultTokens semanticFaults] {value finalStore}
     (completed : Evaluates entry.entry.actualBody entry.entry.store
       (material.code.receipt.body.rename entry.entry.embedding) value finalStore) :
     ∃ result : Result (program := program) (registry := registry) (invocation := invocation) (faults := faults) material inputs view functions entry,
@@ -457,7 +457,7 @@ theorem finish
 include inputs extension atFrame frame raw stable runtime selectedBodies uninitialized semantic in
 /-- Source application selects the actual body and parameter allocation. The
 native call is assembled from the concrete outer wrapper and terminal body. -/
-theorem preserves
+theorem preserves [FunctionCalls.FaultTokens semanticFaults]
     (argumentsRep : CallableIndexedParameterMeaning.Arguments model mapping world
       material.code.receipt.loweredParameters arguments nativeArguments)
     (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)
@@ -493,7 +493,7 @@ theorem preserves
 include inputs extension atFrame frame raw stable runtime selectedBodies uninitialized semantic in
 /-- Native completion reflects through the same authentic view and parameters,
 returning its independent Source grade and the exact restored caller state. -/
-theorem reflects
+theorem reflects [FunctionCalls.FaultTokens semanticFaults]
     (argumentsRep : CallableIndexedParameterMeaning.Arguments model mapping world
       material.code.receipt.loweredParameters arguments nativeArguments)
     (heaps : GenericHeap.CellHeapRepresents cells mapping world before store)

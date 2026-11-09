@@ -122,6 +122,9 @@ inductive RuntimeError where
   | unboundLocal (id : Resolved.LocalId)
   | danglingLocation (location : Location)
   | uninitializedLocal (id : Resolved.LocalId)
+  /-- Solidity's `Panic(code)`, such as `0x12` for unchecked division by zero.
+  `SourceCorePanics.revertData` gives upstream's revert data. -/
+  | panic (code : UInt8)
   | duplicateCallEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingCallEdge (caller : Key) (id : ExpressionId)
   | callRequirementCountMismatch

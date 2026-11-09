@@ -72,7 +72,7 @@ theorem typed_of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared (renamedCodes codes ξ) sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ commit : CompatiblePlaceBitNotCommit.Execution compilation.checked registry functions prepared (renamedCodes codes ξ)
         coreEnvironment resolution.store resolution.mapping resolution.world resolution.target resolution.values
         resolution.snapshot selectedHeap after updated operator invalid,
@@ -168,7 +168,7 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (selected : protocol.State ⟨scope, resolution.mapping, resolution.world, selectedHeap, resolution.store, canonical⟩)
     (related : protocol.Relates initial selected)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
-    (operator : Option BinaryOp) (invalid : Word) :
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ commit : CompatiblePlaceBitNotCommit.Execution compilation.checked registry functions prepared (renamedCodes codes ξ)
         coreEnvironment resolution.store resolution.mapping resolution.world resolution.target resolution.values
         resolution.snapshot selectedHeap after updated operator invalid,
@@ -201,7 +201,7 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {functions : FunctionModel checked.catalog ambient} {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr}
   {environment : Environment} {store : Store} {mapping : LocationMap} {world : StoreTyping}
   {target : Location} {keys : List Value} {snapshot : Value} {before after : Dynamic.Heap}
-  {updated : Dynamic.Value} {operator : Option BinaryOp} {invalid : Word}
+  {updated : Dynamic.Value} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
 
 private theorem unit_rhs (environment : Environment) (store : Store) :
     Evaluates environment store (shift 3 (LanguageResult.success .unit)) (.inRight .word .unit) store := by
@@ -241,6 +241,9 @@ theorem Execution.reflects_size (execution : Execution checked registry function
         obtain ⟨same, stores⟩ := evaluation_deterministic setterEvaluated.sound execution.setter
         cases same
         subst_vars
+        -- The right-hand side is Unit, so the modifier's check cannot fail.
+        rcases DataPlaceGuard.inv_sized remaining with ⟨_, child, bound, remaining⟩ | ⟨_, _, impossible, _, _⟩
+        case inr => cases impossible
         cases remaining with
         | letE written continuation =>
           obtain ⟨optional, read⟩ := execution.read
@@ -264,7 +267,7 @@ theorem Execution.prefix_agreement
       resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid)
     {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target))
-    (next : Expr) (output : Ty) :
+    (passes : SourceCoreDataPlaces.Passes operator .unit) (next : Expr) (output : Ty) :
     ContinuationAgreement environment initialStore
       (execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next output operator true invalid)
       (writtenEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
@@ -277,7 +280,8 @@ theorem Execution.prefix_agreement
         ((ContinuationAgreement.bind (unit_rhs _ _)).trans
           ((ContinuationAgreement.bind execution.modified).trans
             ((ContinuationAgreement.bind execution.setter).trans
-              (ContinuationAgreement.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) execution.written)))))))
+              ((DataPlaceGuard.agreement passes).trans
+                (ContinuationAgreement.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) execution.written))))))))
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCommit
 end

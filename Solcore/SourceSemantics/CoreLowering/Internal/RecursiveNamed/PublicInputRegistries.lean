@@ -54,6 +54,7 @@ private theorem suffix_preserved {context : SourceCoreCompatibleDataPlaceFaultSi
     {left right : SourceCoreFaultSites.Table}
     (leftBuilt : program.tableForRegistry registry leftExtension = .ok left)
     (rightBuilt : program.tableForRegistry future rightExtension = .ok right)
+    (bounded : program.nextReason ≤ SourceCorePanics.base)
     (preserves : ∀ {oldRows newRows},
       missingDiagnostics registry program.missing = .ok oldRows →
       missingDiagnostics future program.missing = .ok newRows →
@@ -101,7 +102,20 @@ private theorem suffix_preserved {context : SourceCoreCompatibleDataPlaceFaultSi
       | none =>
         simp only [appended] at decoded
         cases readAt : base.rootTable.reads.find? (fun site => decide (site.reason = token)) with
-        | none => simp only [readAt, Option.map_none] at decoded; cases decoded
+        | none =>
+          simp only [readAt] at decoded
+          -- The token decodes as a panic, so it lies above every new row.
+          have high : SourceCorePanics.base ≤ token.val := by
+            refine Nat.le_of_not_lt fun below => ?_
+            simp [SourceCorePanics.code?_eq_none below] at decoded
+          have absent : newRows.find? (fun item => decide (item.1 = token)) = none := by
+            apply List.find?_eq_none.mpr
+            intro added addedMember matched
+            have addedEq : added.1 = token := of_decide_eq_true matched
+            have belowBound := extra_below reserved rightBuilt (newOrigins added addedMember)
+            rw [addedEq] at belowBound
+            omega
+          simpa only [absent, Option.none_or, appended, readAt] using decoded
         | some read =>
           have member := List.mem_of_find?_eq_some readAt
           have same : read.reason = token := of_decide_eq_true (List.find?_some (p := fun site : SourceCoreFaultSites.ReadSite => decide (site.reason = token)) readAt)
@@ -130,6 +144,10 @@ private theorem issued_preserved_of_rows (compiled : SourceCoreUnifiedCompilatio
     (decoded : left.result.diagnostics.diagnostic? token = some diagnostic) :
     right.result.diagnostics.diagnostic? token = some diagnostic := by
   obtain ⟨root, sources, prepared⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled present
+  have bounded : program.nextReason ≤ SourceCorePanics.base := by
+    have bound := compiled.panicFree.1
+    simp only [present] at bound
+    exact bound
   obtain ⟨leftBase, leftBuilt, leftTable⟩ := leftIssued
   obtain ⟨rightBase, rightBuilt, rightTable⟩ := rightIssued
   rw [present] at leftBuilt rightBuilt
@@ -137,7 +155,7 @@ private theorem issued_preserved_of_rows (compiled : SourceCoreUnifiedCompilatio
   rw [rightTable]
   cases callableAt : compiled.indexed.base.callableDiagnostics with
   | none =>
-    have result := suffix_preserved prepared leftBuilt rightBuilt preserves [] (by simp)
+    have result := suffix_preserved prepared leftBuilt rightBuilt bounded preserves [] (by simp)
       (by simpa only [appendCallable, callableAt, List.append_nil] using decoded)
     simpa only [appendCallable, callableAt, List.append_nil] using result
   | some callable =>
@@ -151,7 +169,7 @@ private theorem issued_preserved_of_rows (compiled : SourceCoreUnifiedCompilatio
       intro row member
       have bound : callable.unknown.val ≤ row.1.val := of_decide_eq_true (List.mem_filter.mp member).2
       exact Nat.le_trans (CompatibleCallableDiagnosticBounds.prepare_unknown allocated).2 bound
-    have result := suffix_preserved prepared leftBuilt rightBuilt preserves suffix above
+    have result := suffix_preserved prepared leftBuilt rightBuilt bounded preserves suffix above
       (by simpa only [appendCallable, callableAt, suffix] using decoded)
     simpa only [appendCallable, callableAt, suffix] using result
 
@@ -370,7 +388,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel_with_evidence
+theorem has_sufficient_fuel_with_evidence [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -391,7 +409,7 @@ theorem has_sufficient_fuel_with_evidence
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program_with_evidence
+theorem completed_reflects_program_with_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -461,7 +479,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel_with
+theorem has_sufficient_fuel_with [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -478,7 +496,7 @@ theorem has_sufficient_fuel_with
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program_with
+theorem completed_reflects_program_with [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -546,7 +564,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -564,7 +582,7 @@ theorem has_sufficient_fuel
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started represented heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program
+theorem completed_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -1113,7 +1131,7 @@ theorem source_arguments :
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel_evidence
+theorem has_sufficient_fuel_evidence [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -1132,7 +1150,7 @@ theorem has_sufficient_fuel_evidence
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program_evidence
+theorem completed_reflects_program_evidence [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -1207,7 +1225,7 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
-theorem has_sufficient_fuel
+theorem has_sufficient_fuel [FunctionCalls.FaultTokens faults]
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
     ∃ value finalStore finalMap finalWorld required,
@@ -1224,7 +1242,7 @@ theorem has_sufficient_fuel
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Original checkpoint completion reflects through the same initial state.
 Source representation, staging and heap conditions remain independent. -/
-theorem completed_reflects_program
+theorem completed_reflects_program [FunctionCalls.FaultTokens faults]
     (admitted : Staging.ProgramHasStages program)
     (heapTyped : Dynamic.HeapWellTyped header.function.context before)
     (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
@@ -1378,7 +1396,7 @@ include extension faithful observations runtimeViews uninitialized missing escap
 /-- A success from one actual facade run reflects to a Source (SourceSemantics.Program.ofChecked recipe.compiled.sourceProgram) outcome
 at its same native result/store. The returned public session remains aligned
 with the exact indexed export session and its full semantic heap relation. -/
-theorem run_succeeded_reflects_program_evidence
+theorem run_succeeded_reflects_program_evidence [FunctionCalls.FaultTokens faults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
@@ -1423,7 +1441,7 @@ theorem run_succeeded_reflects_program_evidence
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- An actual public failure reconstructs a Source fault with the same token
 relation, final heap, and the exact returned indexed session. -/
-theorem run_failed_reflects_program_evidence
+theorem run_failed_reflects_program_evidence [FunctionCalls.FaultTokens faults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicSession : SourceCoreExecution.Session publicArtifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
@@ -1475,7 +1493,7 @@ theorem run_failed_reflects_program_evidence
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- A Source Word result reaches the same public checkpoint at sufficient
 native fuel and exports that Word at a positive output budget. -/
-theorem word_preserved_at_resume_evidence
+theorem word_preserved_at_resume_evidence [FunctionCalls.FaultTokens faults]
     {publicArtifact : SourceCoreExecution.Artifact}
     {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
     (atCheckpoint : publicCheckpoint.IndexedAt checkpoint)

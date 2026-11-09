@@ -852,7 +852,7 @@ variable
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Original prepared head/loop producers discharge same-body flow preservation
 at the receiving registry from strict expression children and reached tables. -/
-theorem preserves_flow (budget : Nat)
+theorem preserves_flow [FunctionCalls.FaultTokens faults] (budget : Nat)
     (meaning : ∀ context,
       Validity (program := Program.ofChecked compiled.sourceProgram) captured sameCode context →
       RecursiveNamedHeaderContracts.AtMost budget (fun size =>
@@ -872,7 +872,7 @@ theorem preserves_flow (budget : Nat)
 
 include extension faithful observations wellFormed rebuilt operandIncluded unaryIncluded interprets in
 /-- Native flow keeps its own strict grade and independent Source completion. -/
-theorem reflects_flow (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
+theorem reflects_flow [FunctionCalls.FaultTokens faults] (budget : Nat) (functionTypes : FunctionRuntimeViews functions)
     (reflection : ∀ context,
       Validity (program := Program.ofChecked compiled.sourceProgram) captured sameCode context →
       RecursiveNamedCatalogInvocationBounds.Below budget (fun size =>

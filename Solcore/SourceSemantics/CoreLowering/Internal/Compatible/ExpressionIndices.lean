@@ -131,7 +131,7 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
 include extension unique in
-theorem preserves_with_literals_and_post
+theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -192,7 +192,7 @@ theorem preserves_with_literals_and_post
         exact False.elim (missing_excludes missing selected)
 
 include extension in
-theorem reflects_with_literals_and_post
+theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
     {post : ExpressionFailurePostContracts.ExpressionFaultPost}
     {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
     (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
@@ -243,7 +243,7 @@ theorem reflects_with_literals_and_post
             finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
 
 include extension unique uninitialized in
-theorem preserves_with_literals
+theorem preserves_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -264,7 +264,7 @@ theorem preserves_with_literals
           exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension contextValid unique uninitialized in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
@@ -273,7 +273,7 @@ theorem preserves :
 
 
 include extension uninitialized in
-theorem reflects_with_literals
+theorem reflects_with_literals [FunctionCalls.FaultTokens faults]
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults) :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -294,7 +294,7 @@ theorem reflects_with_literals
           exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension contextValid uninitialized in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree

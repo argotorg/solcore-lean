@@ -973,7 +973,7 @@ theorem reflects_with_post {post : ExpressionFailurePostContracts.ExpressionFaul
                     (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata, terminalPost⟩
 
 include extension faithful functionLeaves functionTypes valid unique uninitialized missing in
-theorem preserves :
+theorem preserves [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   exact ExpressionFailurePostContracts.TypedPreserves.forget
@@ -984,7 +984,7 @@ theorem preserves :
       (IndexFaultPostContracts.trivial_index_joins values program context evidence source))
 
 include extension faithful functionLeaves functionTypes valid uninitialized missing in
-theorem reflects :
+theorem reflects [FunctionCalls.FaultTokens faults] :
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   exact ExpressionFailurePostContracts.TypedReflects.forget
