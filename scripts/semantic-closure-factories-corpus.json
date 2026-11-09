@@ -1,0 +1,1108 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-closure-factories",
+  "coverageKind": "core-ast-features",
+  "boundaryVersion": "word-primitive-boundary-bank-v1",
+  "emitterVersion": "solcore-source-closure-factories-v1",
+  "generatorVersion": "core-closure-captures-v1",
+  "profileVersion": "runtime-closure-factories-v1/plan-seed-v1",
+  "wrapperVersion": "solcore-closure-factories-contract-v1",
+  "requiredFeatures": [],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "2",
+    "255",
+    "256",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+  ],
+  "closureFactoriesRequirements": {
+    "capture": [
+      "arg",
+      "body-value",
+      "closure",
+      "input",
+      "nothing",
+      "param",
+      "value"
+    ],
+    "field": [
+      "body-read",
+      "body-write",
+      "factory-read",
+      "factory-write",
+      "run-read",
+      "run-write"
+    ],
+    "write": [
+      "captured-closure",
+      "captured-param",
+      "captured-value",
+      "own-closure",
+      "own-param",
+      "own-value"
+    ],
+    "outer": [
+      "later-rebind",
+      "later-write"
+    ],
+    "call": [
+      "apply",
+      "captured",
+      "direct",
+      "in-body",
+      "loop",
+      "repeat",
+      "twice"
+    ],
+    "closure": [
+      "alias",
+      "discard",
+      "lambda",
+      "loop",
+      "make",
+      "nested",
+      "realias",
+      "relambda",
+      "remake"
+    ],
+    "factory": [
+      "captures-param",
+      "captures-value",
+      "chained",
+      "checked-effect",
+      "closure-result",
+      "free",
+      "in-body",
+      "instances",
+      "lambda-result",
+      "later-write",
+      "literal-argument",
+      "method",
+      "runtime-argument"
+    ],
+    "outcome": [
+      "panic-0x11",
+      "panic-0x12",
+      "return"
+    ],
+    "panicSite": [
+      "body",
+      "factory",
+      "run"
+    ]
+  },
+  "cases": [
+    {
+      "id": "factories-4-0",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-1",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-2",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-3",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-4",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-5",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-6",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-4-7",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-0",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-1",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-2",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-3",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-4",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-5",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-6",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-6-7",
+      "generation": {
+        "seed": "6",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-0",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-1",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-2",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-3",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-4",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-5",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-6",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-13-7",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-0",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-1",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-2",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-3",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-4",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-5",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-6",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-15-7",
+      "generation": {
+        "seed": "15",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-0",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-1",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-2",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-3",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-4",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-5",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-6",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-18-7",
+      "generation": {
+        "seed": "18",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-0",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-1",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-2",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-3",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-4",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-5",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-6",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-21-7",
+      "generation": {
+        "seed": "21",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-0",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-1",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-2",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-3",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-4",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-5",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-6",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-23-7",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-0",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-1",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-2",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-3",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-4",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-5",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-6",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-30-7",
+      "generation": {
+        "seed": "30",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-0",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-1",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-2",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-3",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-4",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-5",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-6",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-33-7",
+      "generation": {
+        "seed": "33",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-0",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-1",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-2",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-3",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-4",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-5",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-6",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-49-7",
+      "generation": {
+        "seed": "49",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-0",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-1",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-2",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-3",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-4",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-5",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-6",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-50-7",
+      "generation": {
+        "seed": "50",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-0",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-1",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-2",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-3",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-4",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-5",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-6",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-55-7",
+      "generation": {
+        "seed": "55",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-0",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-1",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-2",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-3",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-4",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-5",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-6",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-59-7",
+      "generation": {
+        "seed": "59",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-0",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-1",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-2",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-3",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-4",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-5",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-6",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "factories-104-7",
+      "generation": {
+        "seed": "104",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    }
+  ]
+}

@@ -358,7 +358,8 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.REVERTING_SCHEMAS, (runner.MEMORY_CASE_SCHEMA, runner.MEMORY_CALL_CASE_SCHEMA,
                                                     runner.REVERT_DATA_CASE_SCHEMA, runner.HALT_CASE_SCHEMA,
                                                     runner.CHECKED_ARITHMETIC_CASE_SCHEMA, runner.MEMORY_ARRAY_CASE_SCHEMA,
-                                                    runner.ARRAY_ABI_CASE_SCHEMA))
+                                                    runner.ARRAY_ABI_CASE_SCHEMA, runner.CLOSURE_CAPTURES_CASE_SCHEMA,
+                                                    runner.CLOSURE_FACTORIES_CASE_SCHEMA))
         self.assertEqual(runner.HALTING_SCHEMAS, (runner.HALT_CASE_SCHEMA,))
 
     def test_revert_data_plan_envelope_and_shape_inventory(self):
@@ -423,6 +424,50 @@ class CaseProfileTests(unittest.TestCase):
         self.assertEqual(runner.CASE_PROFILES[runner.HALT_CASE_SCHEMA], "runtime-halts")
         self.assertEqual(runner.CASE_CONTRACTS[runner.HALT_CASE_SCHEMA], "SynthesizedHalts")
         self.assertEqual(runner.HALT_VERSIONS, ("profileVersion", "boundaryVersion"))
+
+    def test_closure_plan_envelopes_and_shape_inventories(self):
+        captures, factories = runner.CLOSURE_CAPTURES_CASE_SCHEMA, runner.CLOSURE_FACTORIES_CASE_SCHEMA
+        observe = {"observe": {"var": {"param": 0}}}
+        plan = {"schema": "solcore-lean.closure-captures-plan.v1", "factories": [],
+                "steps": [{"lambda": [], "result": {"var": {"param": 0}}}, observe]}
+        runner.validate_closure_plan_envelope(plan, captures)
+        factory = {"method": True, "body": [], "returns": {"lambda": [], "result": {"var": {"param": 0}}}}
+        factory_plan = {"schema": "solcore-lean.closure-factories-plan.v1", "factories": [factory],
+                        "steps": [{"make": 0, "argument": {"lit": "1"}}, observe]}
+        runner.validate_closure_plan_envelope(factory_plan, factories)
+        for invalid in (None, {}, {**plan, "extra": 0}, {**plan, "schema": factory_plan["schema"]}, {**plan, "steps": []},
+                        {**plan, "steps": [observe] * 11}, {**plan, "factories": [factory]}):
+            with self.assertRaises(ValueError):
+                runner.validate_closure_plan_envelope(invalid, captures)
+        for invalid in ({**factory_plan, "factories": []}, {**factory_plan, "factories": [factory] * 3},
+                        {**factory_plan, "factories": [{**factory, "method": 1}]},
+                        {**factory_plan, "factories": [{"method": True}]}):
+            with self.assertRaises(ValueError):
+                runner.validate_closure_plan_envelope(invalid, factories)
+        for case_schema, dimensions, counts in (
+                (captures, runner.CLOSURE_CAPTURES_SHAPES,
+                 {"capture": 6, "field": 4, "write": 6, "outer": 2, "call": 7, "closure": 6, "outcome": 3,
+                  "panicSite": 2}),
+                (factories, runner.CLOSURE_FACTORIES_SHAPES,
+                 {"capture": 7, "field": 6, "write": 6, "outer": 2, "call": 7, "closure": 9, "factory": 13,
+                  "outcome": 3, "panicSite": 3})):
+            shapes = {key: list(values) for key, values in dimensions.items()}
+            runner.validate_closure_shapes(shapes, case_schema)
+            first = next(iter(shapes))
+            for invalid in (None, {}, {**shapes, "extra": []}, {**shapes, first: list(reversed(shapes[first]))},
+                            {**shapes, first: ["unknown"]}, {key: values for key, values in shapes.items() if key != first}):
+                with self.assertRaises(ValueError):
+                    runner.validate_closure_shapes(invalid, case_schema)
+            self.assertEqual({key: len(values) for key, values in dimensions.items()}, counts)
+        self.assertEqual((sum(map(len, runner.CLOSURE_CAPTURES_SHAPES.values())),
+                          sum(map(len, runner.CLOSURE_FACTORIES_SHAPES.values()))), (36, 56))
+        self.assertEqual(runner.CASE_PROFILES[captures], "runtime-closure-captures")
+        self.assertEqual(runner.CASE_PROFILES[factories], "runtime-closure-factories")
+        self.assertEqual(runner.CASE_CONTRACTS[captures], "SynthesizedClosureCaptures")
+        self.assertEqual(runner.CASE_CONTRACTS[factories], "SynthesizedClosureFactories")
+        self.assertEqual(runner.CLOSURE_VERSIONS, ("profileVersion", "boundaryVersion"))
+        self.assertNotIn(captures, runner.OUTPUT_SCHEMAS)
+        self.assertNotIn(factories, runner.HALTING_SCHEMAS)
 
     def test_array_plan_envelopes_selectors_calldata_and_return_data(self):
         memory, abi = runner.MEMORY_ARRAY_CASE_SCHEMA, runner.ARRAY_ABI_CASE_SCHEMA
@@ -1007,7 +1052,7 @@ class AggregateCallGraphProfileTests(unittest.TestCase):
         self.assertNotIn(schema, others)
         self.assertEqual(len({runner.CASE_CONTRACTS[s] for s in (schema, *others)}), 4)
         self.assertEqual(len({runner.CASE_PROFILES[s] for s in (schema, *others)}), 4)
-        self.assertEqual(len(runner.CASE_PROFILES), 32)
+        self.assertEqual(len(runner.CASE_PROFILES), 34)
         self.assertEqual(set(runner.CASE_PROFILES), set(runner.CASE_CONTRACTS))
         self.assertEqual(len(set(runner.CASE_PROFILES.values())), len(runner.CASE_PROFILES))
         self.assertEqual(len(set(runner.CASE_CONTRACTS.values())), len(runner.CASE_CONTRACTS))

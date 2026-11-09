@@ -252,15 +252,46 @@ ARRAY_PLAN_KEYS = {MEMORY_ARRAY_CASE_SCHEMA: ("memoryArrayPlan", "memoryArraySha
                                               "solcore-lean.memory-array-plan.v1"),
                    ARRAY_ABI_CASE_SCHEMA: ("arrayAbiPlan", "arrayAbiShapes", ARRAY_ABI_SHAPES,
                                            "solcore-lean.array-abi-plan.v1")}
+CLOSURE_CAPTURES_CASE_SCHEMA = "solcore-lean.semantic-closure-captures-case.v1"
+CLOSURE_FACTORIES_CASE_SCHEMA = "solcore-lean.semantic-closure-factories-case.v1"
+CLOSURE_VERSIONS = ("profileVersion", "boundaryVersion")
+# The specified shape values of the closure capture profile, from the plan and the runs its
+# plan reaches at the eight boundary inputs, never measured on a compiled path.
+CLOSURE_CAPTURES_SHAPES = {
+    "capture": ("arg", "body-value", "closure", "input", "nothing", "value"),
+    "field": ("body-read", "body-write", "run-read", "run-write"),
+    "write": ("captured-closure", "captured-param", "captured-value", "own-closure", "own-param", "own-value"),
+    "outer": ("later-rebind", "later-write"),
+    "call": ("apply", "captured", "direct", "in-body", "loop", "repeat", "twice"),
+    "closure": ("alias", "lambda", "loop", "nested", "realias", "relambda"),
+    "outcome": ("panic-0x11", "panic-0x12", "return"),
+    "panicSite": ("body", "run")}
+# The closure factory profile's specified shape values, the same way.
+CLOSURE_FACTORIES_SHAPES = {
+    "capture": ("arg", "body-value", "closure", "input", "nothing", "param", "value"),
+    "field": ("body-read", "body-write", "factory-read", "factory-write", "run-read", "run-write"),
+    "write": ("captured-closure", "captured-param", "captured-value", "own-closure", "own-param", "own-value"),
+    "outer": ("later-rebind", "later-write"),
+    "call": ("apply", "captured", "direct", "in-body", "loop", "repeat", "twice"),
+    "closure": ("alias", "discard", "lambda", "loop", "make", "nested", "realias", "relambda", "remake"),
+    "factory": ("captures-param", "captures-value", "chained", "checked-effect", "closure-result", "free", "in-body",
+                "instances", "lambda-result", "later-write", "literal-argument", "method", "runtime-argument"),
+    "outcome": ("panic-0x11", "panic-0x12", "return"),
+    "panicSite": ("body", "factory", "run")}
+CLOSURE_PLAN_KEYS = {CLOSURE_CAPTURES_CASE_SCHEMA: ("closureCapturesPlan", "closureCapturesShapes",
+                                                    CLOSURE_CAPTURES_SHAPES, "solcore-lean.closure-captures-plan.v1"),
+                     CLOSURE_FACTORIES_CASE_SCHEMA: ("closureFactoriesPlan", "closureFactoriesShapes",
+                                                     CLOSURE_FACTORIES_SHAPES, "solcore-lean.closure-factories-plan.v1")}
 # Cases whose original Core returns data rather than one Word: an array ABI plan's T[] result,
 # or its fold as 32 bytes.
 OUTPUT_SCHEMAS = (ARRAY_ABI_CASE_SCHEMA,)
 # Cases whose original Core can stop with revert data: std's OutOfBounds() revert at an
 # out-of-range access, a revert data or halt plan's site, a checked arithmetic plan's
-# Panic or std's DirtyHigherBitsForInteger(), or an array plan's Panic or that rejection;
-# three reverts with the same data are a match only for them.
+# Panic or std's DirtyHigherBitsForInteger(), an array plan's Panic or that rejection, or
+# a closure plan's checked Panic; three reverts with the same data are a match only for them.
 REVERTING_SCHEMAS = (MEMORY_CASE_SCHEMA, MEMORY_CALL_CASE_SCHEMA, REVERT_DATA_CASE_SCHEMA, HALT_CASE_SCHEMA,
-                     CHECKED_ARITHMETIC_CASE_SCHEMA, MEMORY_ARRAY_CASE_SCHEMA, ARRAY_ABI_CASE_SCHEMA)
+                     CHECKED_ARITHMETIC_CASE_SCHEMA, MEMORY_ARRAY_CASE_SCHEMA, ARRAY_ABI_CASE_SCHEMA,
+                     CLOSURE_CAPTURES_CASE_SCHEMA, CLOSURE_FACTORIES_CASE_SCHEMA)
 # Cases whose original Core can halt with INVALID; three INVALID halts are a match only
 # for them.
 HALTING_SCHEMAS = (HALT_CASE_SCHEMA,)
@@ -296,7 +327,8 @@ CASE_PROFILES = {CASE_SCHEMA: "closed-g0", INPUT_CASE_SCHEMA: "runtime-word",
                  MEMORY_CALL_CASE_SCHEMA: "runtime-memory-calls", REVERT_DATA_CASE_SCHEMA: "runtime-revert-data",
                  HALT_CASE_SCHEMA: "runtime-halts", CHECKED_ARITHMETIC_CASE_SCHEMA: "runtime-checked-arithmetic",
                  SHIFT_CASE_SCHEMA: "runtime-shifts", MEMORY_ARRAY_CASE_SCHEMA: "runtime-memory-arrays",
-                 ARRAY_ABI_CASE_SCHEMA: "runtime-array-abi"}
+                 ARRAY_ABI_CASE_SCHEMA: "runtime-array-abi", CLOSURE_CAPTURES_CASE_SCHEMA: "runtime-closure-captures",
+                 CLOSURE_FACTORIES_CASE_SCHEMA: "runtime-closure-factories"}
 CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedInput",
                   PRIMITIVE_CASE_SCHEMA: "SynthesizedPrimitives", ASSEMBLY_CASE_SCHEMA: "SynthesizedAssembly",
                   ASSEMBLY_MEMORY_CASE_SCHEMA: "SynthesizedAssemblyMemory",
@@ -314,7 +346,8 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   MEMORY_CALL_CASE_SCHEMA: "SynthesizedMemoryCalls", REVERT_DATA_CASE_SCHEMA: "SynthesizedRevertData",
                   HALT_CASE_SCHEMA: "SynthesizedHalts", CHECKED_ARITHMETIC_CASE_SCHEMA: "SynthesizedCheckedArithmetic",
                   SHIFT_CASE_SCHEMA: "SynthesizedShifts", MEMORY_ARRAY_CASE_SCHEMA: "SynthesizedMemoryArrays",
-                  ARRAY_ABI_CASE_SCHEMA: "SynthesizedArrayAbi"}
+                  ARRAY_ABI_CASE_SCHEMA: "SynthesizedArrayAbi", CLOSURE_CAPTURES_CASE_SCHEMA: "SynthesizedClosureCaptures",
+                  CLOSURE_FACTORIES_CASE_SCHEMA: "SynthesizedClosureFactories"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
 UPSTREAM_COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
 BACKEND_COMMIT = "6bd0ce661ea327c149429b00fee3c8608616040f"
@@ -971,6 +1004,36 @@ def validate_array_shapes(values, schema) -> dict:
     return values
 
 
+def validate_closure_plan_envelope(plan, schema) -> dict:
+    """Validate the envelope and the counts; native replay checks every statement, scope,
+    factory and call against the profile and the seed."""
+    if (not isinstance(plan, dict) or plan.get("schema") != CLOSURE_PLAN_KEYS[schema][3]
+            or set(plan) != {"schema", "factories", "steps"}):
+        raise ValueError("unsupported closure plan schema")
+    if not isinstance(plan["steps"], list) or not 1 <= len(plan["steps"]) <= 10:
+        raise ValueError("closure plan requires one to ten steps")
+    factories = plan["factories"]
+    if (not isinstance(factories, list)
+            or not (1 <= len(factories) <= 2 if schema == CLOSURE_FACTORIES_CASE_SCHEMA else not factories)
+            or any(not isinstance(factory, dict) or set(factory) != {"method", "body", "returns"}
+                   or type(factory["method"]) is not bool for factory in factories)):
+        raise ValueError("closure plan factories are outside the profile")
+    return plan
+
+
+def validate_closure_shapes(values, schema) -> dict:
+    """Native replay authenticates the shapes; Python checks their envelope."""
+    label, dimensions = CLOSURE_PLAN_KEYS[schema][1], CLOSURE_PLAN_KEYS[schema][2]
+    if not isinstance(values, dict) or set(values) != set(dimensions):
+        raise ValueError(f"{label} must name every closure shape dimension")
+    for key, allowed in dimensions.items():
+        found = values[key]
+        if (not isinstance(found, list) or any(not isinstance(v, str) or v not in allowed for v in found)
+                or found != sorted(set(found))):
+            raise ValueError(f"{label} {key} must be a sorted unique inventory of known shapes")
+    return values
+
+
 def integer_convert(name: str, value: int) -> int:
     """A Word converted to an integer type as the generators convert it: its low bits,
     sign-extended for a signed type."""
@@ -1132,6 +1195,8 @@ def validate_case(case: dict) -> None:
         validate_integer_plan(case.get(INTEGER_PLAN_KEYS[case["schema"]][0]), case["schema"])
     if case["schema"] in ARRAY_PLAN_KEYS:
         validate_array_plan(case.get(ARRAY_PLAN_KEYS[case["schema"]][0]), case["schema"])
+    if case["schema"] in CLOSURE_PLAN_KEYS:
+        validate_closure_plan_envelope(case.get(CLOSURE_PLAN_KEYS[case["schema"]][0]), case["schema"])
     if case["schema"] == CALL_GRAPH_LOOP_CASE_SCHEMA:
         validate_call_graph_loop_plan(case.get("loopPlan"))
     if case["schema"] == ASSEMBLY_LOOP_CASE_SCHEMA:
@@ -1239,6 +1304,13 @@ def validate_case(case: dict) -> None:
         if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
             raise ValueError("array referenceNodes must be an integer from 1 to 4,096")
         validate_array_shapes(provenance.get(ARRAY_PLAN_KEYS[case["schema"]][1]), case["schema"])
+    if case["schema"] in CLOSURE_PLAN_KEYS:
+        for key in CLOSURE_VERSIONS:
+            if not isinstance(provenance.get(key), str) or not provenance[key]:
+                raise ValueError(f"missing closure provenance {key}")
+        if type(provenance.get("referenceNodes")) is not int or not 1 <= provenance["referenceNodes"] <= 4096:
+            raise ValueError("closure referenceNodes must be an integer from 1 to 4,096")
+        validate_closure_shapes(provenance.get(CLOSURE_PLAN_KEYS[case["schema"]][1]), case["schema"])
     contract = case.get("contract", {})
     if not isinstance(contract, dict):
         raise ValueError("case contract metadata is missing")
@@ -1267,7 +1339,7 @@ def validate_case(case: dict) -> None:
 def validate_replayed_case(case: dict, fresh: dict) -> None:
     """Native replay authenticates source and program; saved output is no oracle."""
     validate_case(fresh)
-    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "checkedArithmeticPlan", "shiftPlan", "memoryArrayPlan", "arrayAbiPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
+    for key in ("program", "source", "provenance", "contract", "input", "loopPlan", "nestedLoopPlan", "recursionPlan", "recursiveLoopPlan", "loopClosurePlan", "assemblyPlan", "assemblyMemoryPlan", "assemblyLoopPlan", "enumPlan", "traitPlan", "hierarchyPlan", "memoryValuePlan", "memoryCallPlan", "revertDataPlan", "haltPlan", "checkedArithmeticPlan", "shiftPlan", "memoryArrayPlan", "arrayAbiPlan", "closureCapturesPlan", "closureFactoriesPlan", "genericPlan", "closurePlan", "comptimePlan", "modulePlan", "sourceBundle"):
         if fresh.get(key) != case.get(key):
             raise ValueError(f"case replay changed {key}")
 
@@ -1775,6 +1847,8 @@ def execute(args, report: dict) -> None:
         SHIFT_CASE_SCHEMA: "runtime Word input, << >> <<= >>= of Words and std's uint8 to uint256 and int8 to int256 by amounts of a Word or an unsigned type converted from the input with offsets or literal amounts, arithmetic >> for signed types, amounts of at least the width, inside and outside unchecked blocks, versus an exact integer Core reference, Sonatina O0, run(uint256) ABI Word",
         MEMORY_ARRAY_CASE_SCHEMA: "runtime Word input, T[] memory arrays of std's integer types made with new T[](n), literals, aliases, toArray copies and helper results, element reads and checked, unchecked and memref writes, the four read-only slice forms over arrays, slices, grid rows and a storage array, T[][] grids, the storage array's push, pop and setLength and a loop over a length, versus a Core reference over length and element cells whose right injection is Panic(0x11), Panic(0x12), Panic(0x31), Panic(0x32) or Panic(0x41), compared exactly, Sonatina O0, run(uint256) ABI Word",
         ARRAY_ABI_CASE_SCHEMA: "runtime Word input encoded with one or two T[] or calldata<T[]> parameters of std's integer types whose lengths and elements the input makes, memory arrays, slices and grids over them, std's DirtyHigherBitsForInteger() for a narrow element its decoder rejects, eagerly or when read, and a T[] result std's encoder masks or sign-extends, versus the memory array Core reference with the return data, compared exactly, Sonatina O0, run(T[],[T[],]uint256) ABI",
+        CLOSURE_CAPTURES_CASE_SCHEMA: "runtime Word input, Word locals and closures of one run body captured by value, writes through captures to per-call copies, repeated calls, rebinding to lambdas over old values, aliases and nested lambdas, direct calls and generic sc_apply and sc_twice, a bounded while loop and a contract field read and written at call time, with checked uint256 + and / as Panic(0x11) and Panic(0x12), versus checked Core snapshot cells copied at every call, Sonatina O0, run(uint256) ABI Word",
+        CLOSURE_FACTORIES_CASE_SCHEMA: "runtime Word input, one or two free or method factories returning closures over their parameter and locals, run's names reused in factories, factory effects on the field and checked operations, factories called from run and lambda bodies, made, discarded and remade, with the closure capture profile's forms, versus checked Core snapshot cells with every factory run where it is called, Sonatina O0, run(uint256) ABI Word",
         FUNCTION_CASE_SCHEMA: "runtime Word input, acyclic named Word functions, Sonatina O0, run(uint256) ABI Word",
         MUTATION_CASE_SCHEMA: "runtime Word input, local Word mutation and acyclic named functions, Sonatina O0, run(uint256) ABI Word",
         AGGREGATE_CASE_SCHEMA: "runtime Word input, internal Word pairs/sums, matches, private cells and acyclic named functions, Sonatina O0, run(uint256) ABI Word",

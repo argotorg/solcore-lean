@@ -11,6 +11,7 @@ import Solcore.Synthesis.Internal.MemoryCalls
 import Solcore.Synthesis.Internal.RevertData
 import Solcore.Synthesis.Internal.Integers
 import Solcore.Synthesis.Internal.Arrays
+import Solcore.Synthesis.Internal.Captures
 
 /-! Bounded command-line case generation, observation, replay and reduction. -/
 set_option autoImplicit false
@@ -112,6 +113,12 @@ private def generator (command : String) : Option Generator :=
   | "array-abi-generate" => some ⟨false, true, true,
       fun seed nodes count attempts fuel _ inputs acceptance =>
         ArrayAbi.generateCases seed nodes count attempts fuel inputs acceptance⟩
+  | "closure-captures-generate" => some ⟨false, true, true,
+      fun seed nodes count attempts fuel _ inputs acceptance =>
+        ClosureCaptures.generateCases seed nodes count attempts fuel inputs acceptance⟩
+  | "closure-factories-generate" => some ⟨false, true, true,
+      fun seed nodes count attempts fuel _ inputs acceptance =>
+        ClosureFactories.generateCases seed nodes count attempts fuel inputs acceptance⟩
   | "function-generate" => some ⟨true, true, true,
       fun seed nodes count attempts fuel revision inputs acceptance =>
         Function.generateCases seed nodes count attempts fuel revision inputs acceptance⟩
@@ -192,7 +199,9 @@ private def maximumNodes (command : String) : Nat :=
   else if command == "checked-arithmetic-generate" then CheckedArithmetic.maximumNodes
   else if command == "shift-generate" then Shifts.maximumNodes
   else if command == "memory-arrays-generate" then MemoryArrays.maximumNodes
-  else if command == "array-abi-generate" then ArrayAbi.maximumNodes else 512
+  else if command == "array-abi-generate" then ArrayAbi.maximumNodes
+  else if command == "closure-captures-generate" then ClosureCaptures.maximumNodes
+  else if command == "closure-factories-generate" then ClosureFactories.maximumNodes else 512
 
 private def execute (args : List String) : IO Json := do
   if let command :: seed :: nodes :: count :: attempts :: fuel :: options := args then
@@ -305,6 +314,16 @@ private def execute (args : List String) : IO Json := do
       let plan ← get (ArrayAbi.checkedPlan (← readJson file))
       let input ← get (Primitive.inputWord input)
       get (ArrayAbi.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
+  | "closure-captures-emit" :: file :: input :: rest =>
+      let plan ← get (ClosureCaptures.checkedPlan (← readJson file))
+      let input ← get (Primitive.inputWord input)
+      get (ClosureCaptures.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
+        (← fuelValue rest))
+  | "closure-factories-emit" :: file :: input :: rest =>
+      let plan ← get (ClosureFactories.checkedPlan (← readJson file))
+      let input ← get (Primitive.inputWord input)
+      get (ClosureFactories.emitCase plan input (Json.mkObj [("kind", toJson "imported")])
         (← fuelValue rest))
   | "function-emit" :: file :: input :: rest =>
       let function ← get (Function.checkedFunction (← readJson file))
@@ -462,6 +481,12 @@ private def execute (args : List String) : IO Json := do
       else if (json.getObjValAs? String "schema").toOption == some ArrayAbi.caseSchema then
         let checked ← get (ArrayAbi.caseProgram json)
         return ArrayAbi.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some ClosureCaptures.caseSchema then
+        let checked ← get (ClosureCaptures.caseProgram json)
+        return ClosureCaptures.observe checked.plan checked.input fuel
+      else if (json.getObjValAs? String "schema").toOption == some ClosureFactories.caseSchema then
+        let checked ← get (ClosureFactories.caseProgram json)
+        return ClosureFactories.observe checked.plan checked.input fuel
       else
         let checked ← get (caseProgram json)
         return observe checked fuel
@@ -529,7 +554,11 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some MemoryArrays.caseSchema then
           MemoryArrays.replayCase json fuel
         else if (json.getObjValAs? String "schema").toOption == some ArrayAbi.caseSchema then
-          ArrayAbi.replayCase json fuel else replayCase json fuel)
+          ArrayAbi.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some ClosureCaptures.caseSchema then
+          ClosureCaptures.replayCase json fuel
+        else if (json.getObjValAs? String "schema").toOption == some ClosureFactories.caseSchema then
+          ClosureFactories.replayCase json fuel else replayCase json fuel)
   | "shrink" :: file :: limit :: rest =>
       let json ← readJson file
       let limit ← natural "shrink limit" limit 4096
@@ -595,8 +624,12 @@ private def execute (args : List String) : IO Json := do
         else if (json.getObjValAs? String "schema").toOption == some MemoryArrays.caseSchema then
           MemoryArrays.shrinkCases json limit fuel
         else if (json.getObjValAs? String "schema").toOption == some ArrayAbi.caseSchema then
-          ArrayAbi.shrinkCases json limit fuel else shrinkCases json limit fuel)
-  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|assembly-memory-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|enum-generate|trait-generate|hierarchy-generate|memory-values-generate|memory-calls-generate|revert-data-generate|halt-generate|checked-arithmetic-generate|shift-generate|memory-arrays-generate|array-abi-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands, assembly-loop-generate, enum-generate, trait-generate, hierarchy-generate, memory-values-generate, memory-calls-generate, revert-data-generate, halt-generate, checked-arithmetic-generate, shift-generate, memory-arrays-generate or array-abi-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate, generic-generate or halt-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|assembly-memory-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit|enum-emit|trait-emit|hierarchy-emit|memory-values-emit|memory-calls-emit|revert-data-emit|halt-emit|checked-arithmetic-emit|shift-emit|memory-arrays-emit|array-abi-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
+          ArrayAbi.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some ClosureCaptures.caseSchema then
+          ClosureCaptures.shrinkCases json limit fuel
+        else if (json.getObjValAs? String "schema").toOption == some ClosureFactories.caseSchema then
+          ClosureFactories.shrinkCases json limit fuel else shrinkCases json limit fuel)
+  | _ => throw (IO.userError "usage: semantic-case-tool generate|input-generate|primitive-generate|assembly-generate|assembly-memory-generate|call-graph-generate|call-graph-loop-generate|assembly-loop-generate|aggregate-call-graph-generate|enum-generate|trait-generate|hierarchy-generate|memory-values-generate|memory-calls-generate|revert-data-generate|halt-generate|checked-arithmetic-generate|shift-generate|memory-arrays-generate|array-abi-generate|closure-captures-generate|closure-factories-generate|function-generate|mutation-generate|aggregate-generate|loop-generate|nested-loop-generate|recursion-generate|recursive-loop-generate|loop-closure-generate|generic-generate|closure-generate|comptime-generate|module-generate SEED NODES COUNT ATTEMPTS FUEL [G0-GENERATOR-VERSION, not for call-graph commands, assembly-loop-generate, enum-generate, trait-generate, hierarchy-generate, memory-values-generate, memory-calls-generate, revert-data-generate, halt-generate, checked-arithmetic-generate, shift-generate, memory-arrays-generate, array-abi-generate, closure-captures-generate or closure-factories-generate] [seeded-inputs-v1/splitmix64, not for generate] [exclude-boundary-identity-v1, not for generate, loop-generate, nested-loop-generate, recursion-generate, recursive-loop-generate, loop-closure-generate, call-graph-loop-generate, assembly-loop-generate, generic-generate or halt-generate] | emit PROGRAM.json [FUEL] | input-emit|primitive-emit|call-graph-emit|aggregate-call-graph-emit|function-emit|mutation-emit|aggregate-emit FUNCTION.json INPUT [FUEL] | loop-emit|nested-loop-emit|recursion-emit|recursive-loop-emit|loop-closure-emit|assembly-emit|assembly-memory-emit|call-graph-loop-emit|assembly-loop-emit|generic-emit|closure-emit|comptime-emit|module-emit|enum-emit|trait-emit|hierarchy-emit|memory-values-emit|memory-calls-emit|revert-data-emit|halt-emit|checked-arithmetic-emit|shift-emit|memory-arrays-emit|array-abi-emit|closure-captures-emit|closure-factories-emit PLAN.json INPUT [FUEL] | observe CASE.json [FUEL] | replay CASE.json [FUEL] | shrink CASE.json LIMIT [FUEL]")
 
 def main (args : List String) : IO UInt32 := do
   try

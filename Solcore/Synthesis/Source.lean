@@ -10,6 +10,7 @@ import Solcore.Synthesis.Internal.MemoryCalls
 import Solcore.Synthesis.Internal.RevertData
 import Solcore.Synthesis.Internal.Integers
 import Solcore.Synthesis.Internal.Arrays
+import Solcore.Synthesis.Internal.Captures
 import Solcore.Synthesis.Internal.CallGraphs
 import Solcore.Synthesis.Internal.Loops
 import Solcore.Synthesis.Internal.Aggregates

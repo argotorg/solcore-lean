@@ -1709,12 +1709,13 @@ class EnumCoverageTests(unittest.TestCase):
         self.assertEqual(campaign.inputs_per_function(self.PROFILE, campaign.RANDOM_INPUT_SELECTION), 12)
         self.assertEqual((campaign.minimum_nodes(self.PROFILE), campaign.maximum_nodes(self.PROFILE)), (256, 4096))
         # Every profile but the trait, trait hierarchy, memory value, memory call, revert data, halt,
-        # checked arithmetic, shift, memory array and array ABI profiles keeps the 512-node maximum.
+        # checked arithmetic, shift, memory array, array ABI and closure profiles keeps the 512-node maximum.
         self.assertEqual({campaign.maximum_nodes(profile) for profile in campaign.PROFILES
                           if profile not in (self.PROFILE, 'runtime-traits', 'runtime-trait-hierarchies',
                                              'runtime-memory-values', 'runtime-memory-calls',
                                              'runtime-revert-data', 'runtime-halts', 'runtime-checked-arithmetic',
-                                             'runtime-shifts', 'runtime-memory-arrays', 'runtime-array-abi')}, {512})
+                                             'runtime-shifts', 'runtime-memory-arrays', 'runtime-array-abi',
+                                             'runtime-closure-captures', 'runtime-closure-factories')}, {512})
         self.assertIsNone(campaign.g0_version(self.PROFILE, {'generatorVersion': 'core-enum-match-v1'}))
         self.assertEqual({key: len(values) for key, values in campaign.m2.ENUM_SHAPES.items()},
                          {'constructors': 3, 'fields': 8, 'declarations': 7, 'views': 3, 'patterns': 13,
@@ -2186,7 +2187,8 @@ class MemoryCoverageTests(unittest.TestCase):
                          (campaign.m2.MEMORY_CASE_SCHEMA, campaign.m2.MEMORY_CALL_CASE_SCHEMA,
                           campaign.m2.REVERT_DATA_CASE_SCHEMA, campaign.m2.HALT_CASE_SCHEMA,
                           campaign.m2.CHECKED_ARITHMETIC_CASE_SCHEMA, campaign.m2.MEMORY_ARRAY_CASE_SCHEMA,
-                          campaign.m2.ARRAY_ABI_CASE_SCHEMA))
+                          campaign.m2.ARRAY_ABI_CASE_SCHEMA, campaign.m2.CLOSURE_CAPTURES_CASE_SCHEMA,
+                          campaign.m2.CLOSURE_FACTORIES_CASE_SCHEMA))
         for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES, campaign.LOOP_PROFILES):
             self.assertNotIn(self.PROFILE, group)
         self.assertEqual(campaign.profile_inputs(self.PROFILE), campaign.PRIMITIVE_INPUTS)
@@ -2531,7 +2533,7 @@ class MemoryCallCoverageTests(unittest.TestCase):
     def test_only_the_large_pure_profiles_retain_compact_cases(self):
         self.assertEqual(campaign.COMPACT_CASE_PROFILES, ('runtime-assembly-memory', 'runtime-traits',
             'runtime-trait-hierarchies', 'runtime-memory-values', self.PROFILE, 'runtime-memory-arrays',
-            'runtime-array-abi'))
+            'runtime-array-abi', 'runtime-closure-captures', 'runtime-closure-factories'))
         self.assertTrue(set(campaign.COMPACT_CASE_PROFILES) <= set(campaign.RUNTIME_INPUT_PROFILES))
         case = memory_call_policy_case()
         with tempfile.TemporaryDirectory() as directory:
@@ -3151,6 +3153,138 @@ class ArrayCoverageTests(unittest.TestCase):
             manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts' / corpus).read_text()))
             shapes = campaign.m2.ARRAY_PLAN_KEYS[campaign.PROFILE_SCHEMAS[profile]][2]
             self.assertEqual(manifest[self.PROFILES[profile][3]], {key: list(values) for key, values in shapes.items()})
+            self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
+            self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
+                                for entry in manifest['cases']))
+            self.assertEqual(len(manifest['cases']), count)
+
+
+def closure_capture_plan(profile):
+    """A minimal plan of the profile: a lambda and an observation, or a factory's closure."""
+    observe = {'observe': {'var': {'param': 0}}}
+    if profile == 'runtime-closure-factories':
+        factory = {'method': False, 'body': [], 'returns': {'lambda': [], 'result': {'var': {'param': 0}}}}
+        return {'schema': 'solcore-lean.closure-factories-plan.v1', 'factories': [factory],
+                'steps': [{'make': 0, 'argument': {'lit': '1'}}, observe]}
+    return {'schema': 'solcore-lean.closure-captures-plan.v1', 'factories': [],
+            'steps': [{'lambda': [], 'result': {'var': {'param': 0}}}, observe]}
+
+
+def closure_capture_case(profile):
+    """A case whose provenance carries the plan's authenticated shapes."""
+    schema = campaign.PROFILE_SCHEMAS[profile]
+    key, shapes_key = campaign.m2.CLOSURE_PLAN_KEYS[schema][:2]
+    shapes = {dimension: [] for dimension in campaign.m2.CLOSURE_PLAN_KEYS[schema][2]}
+    shapes.update(capture=['nothing'], closure=['lambda'], outcome=['return'])
+    if profile == 'runtime-closure-factories':
+        shapes.update(capture=['nothing'], closure=['lambda', 'make'], factory=['free', 'lambda-result', 'literal-argument'])
+    return {'schema': schema, key: closure_capture_plan(profile), 'input': '1',
+            'provenance': {shapes_key: shapes, 'generatorVersion': 'core-closure-captures-v1', 'emitterVersion': 'emitter',
+                           'wrapperVersion': 'wrapper', 'profileVersion': profile + '-v1/plan-seed-v1',
+                           'boundaryVersion': 'word-primitive-boundary-bank-v1'}}
+
+
+class ClosureCaptureCoverageTests(unittest.TestCase):
+    PROFILES = {'runtime-closure-captures': ('closure-captures', 'closureCapturesCoverage', 'closureCapturesRequirements'),
+                'runtime-closure-factories': ('closure-factories', 'closureFactoriesCoverage',
+                                              'closureFactoriesRequirements')}
+
+    def manifest(self, profile, generated=False):
+        case = closure_capture_case(profile)
+        requirements = {key: [] for key in campaign.m2.CLOSURE_PLAN_KEYS[case['schema']][2]}
+        first = next(iter(requirements))
+        requirements[first] = case['provenance'][campaign.m2.CLOSURE_PLAN_KEYS[case['schema']][1]][first]
+        key = campaign.m2.CLOSURE_PLAN_KEYS[case['schema']][0]
+        return {'schema': 'solcore-lean.semantic-corpus-manifest.v1', 'profile': profile,
+            **{name: case['provenance'][name] for name in ('generatorVersion', 'emitterVersion', 'wrapperVersion',
+                                                          *campaign.PROFILE_VERSION_FIELDS[profile])},
+            'requiredFeatures': [], 'requiredWordLiterals': [], 'requiredInputs': list(campaign.PRIMITIVE_INPUTS),
+            self.PROFILES[profile][2]: requirements,
+            'cases': [{'id': 'closure', 'input': '255', 'expectedFeatures': [],
+                **({'generation': {'seed': '1', 'maxProgramNodes': 1024}} if generated else {key: case[key]})}]}
+
+    def test_registration(self):
+        for profile, (command, coverage, _) in self.PROFILES.items():
+            self.assertIn(campaign.PROFILE_SCHEMAS[profile], campaign.m2.REVERTING_SCHEMAS)
+            self.assertEqual(campaign.PROFILE_COMMANDS[profile],
+                             (command + '-generate', command + '-emit', command + '-generated'))
+            self.assertEqual(campaign.PROFILE_VERSION_FIELDS[profile], ('profileVersion', 'boundaryVersion'))
+            # A plan whose only observation reads sc_x returns its input.
+            self.assertIn(profile, campaign.IDENTITY_FILTER_PROFILES)
+            self.assertIn(profile, campaign.COMPACT_CASE_PROFILES)
+            self.assertNotIn(campaign.PROFILE_SCHEMAS[profile], campaign.m2.HALTING_SCHEMAS)
+            self.assertNotIn(campaign.PROFILE_SCHEMAS[profile], campaign.m2.OUTPUT_SCHEMAS)
+            for group in (campaign.G0_PROFILES, campaign.HELPER_PROFILES, campaign.CALL_GRAPH_PROFILES,
+                          campaign.LOOP_PROFILES):
+                self.assertNotIn(profile, group)
+            self.assertEqual(campaign.profile_inputs(profile), campaign.PRIMITIVE_INPUTS)
+            self.assertEqual(campaign.inputs_per_function(profile, campaign.RANDOM_INPUT_SELECTION), 12)
+            self.assertEqual((campaign.minimum_nodes(profile), campaign.maximum_nodes(profile)), (256, 2048))
+            self.assertIsNone(campaign.g0_version(profile, {'generatorVersion': 'core-closure-captures-v1'}))
+            summary, seen = CommandLine.run_main(self, '--profile', profile, '--cases', '1')
+            self.assertEqual(seen, [[command + '-generate', '1', '1024', '1', '256', '1000000',
+                                     campaign.RANDOM_INPUT_SELECTION, campaign.RANDOM_ACCEPTANCE]])
+            dimensions = campaign.array_dimensions(profile)
+            self.assertEqual(set(summary[coverage]) - {'classification'},
+                             {prefix + dimension for dimension in dimensions
+                              for prefix in ('generated', 'matched', 'required', 'missing')})
+            for nodes in ('255', '2049'):
+                with self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
+                    CommandLine.run_main(self, '--profile', profile, '--cases', '1', '--nodes', nodes)
+
+    def test_requirements_and_plan_envelopes_are_profile_specific(self):
+        for profile, (_, _, requirement) in self.PROFILES.items():
+            other = next(name for name in self.PROFILES if name != profile)
+            for generated in (False, True):
+                campaign.validate_manifest(self.manifest(profile, generated))
+            value = self.manifest(profile)
+            base = value[requirement]
+            first = next(iter(base))
+            for invalid in (None, {}, {**base, first: ['unknown']}, {**base, first: base[first] * 2},
+                            {key: values for key, values in base.items() if key != first}):
+                with self.assertRaises(ValueError):
+                    campaign.validate_manifest({**value, requirement: invalid})
+            with self.assertRaises(ValueError):
+                campaign.array_requirements({'profile': other, requirement: base}, profile)
+            entry = value['cases'][0]
+            key = campaign.m2.CLOSURE_PLAN_KEYS[campaign.PROFILE_SCHEMAS[profile]][0]
+            plan = entry[key]
+            for invalid in ({**plan, 'steps': []}, {**plan, 'extra': 1}, {**plan, 'factories': None},
+                            {**plan, 'schema': closure_capture_plan(other)['schema']}):
+                with self.assertRaises(ValueError):
+                    campaign.validate_manifest({**value, 'cases': [{**entry, key: invalid}]})
+            with self.assertRaises(ValueError):
+                campaign.validate_manifest({**value, 'cases': [{**entry, 'program': {}}]})
+            with self.assertRaisesRegex(ValueError, 'eight boundary inputs'):
+                campaign.validate_manifest({**value, 'requiredInputs': list(campaign.LOOP_INPUTS)})
+
+    def test_coverage_reads_the_authenticated_shapes(self):
+        for profile in self.PROFILES:
+            case = closure_capture_case(profile)
+            shapes = case['provenance'][campaign.m2.CLOSURE_PLAN_KEYS[case['schema']][1]]
+            self.assertEqual(campaign.specified_arrays(case, profile),
+                             {dimension: set(shapes[key]) for dimension, key in campaign.array_dimensions(profile).items()})
+            other = next(name for name in self.PROFILES if name != profile)
+            self.assertEqual(campaign.specified_arrays(case, other),
+                             {dimension: set() for dimension in campaign.array_dimensions(other)})
+            with self.assertRaises(ValueError):
+                broken = copy.deepcopy(case)
+                broken['provenance'][campaign.m2.CLOSURE_PLAN_KEYS[case['schema']][1]].pop(next(iter(shapes)))
+                campaign.specified_arrays(broken, profile)
+        with tempfile.TemporaryDirectory() as directory:
+            config = options(directory); config.profile = 'runtime-closure-factories'
+            instance = campaign.Campaign(config)
+            instance.record_arrays(closure_capture_case('runtime-closure-factories'), matched=True)
+            self.assertEqual(instance.summary['closureFactoriesCoverage']['matchedFactory'],
+                             ['free', 'lambda-result', 'literal-argument'])
+            self.assertEqual(instance.summary['closureCapturesCoverage']['matchedCapture'], [])
+
+    def test_committed_corpora_require_their_coverage(self):
+        for profile, corpus, count in (('runtime-closure-captures', 'semantic-closure-captures-corpus.json', 80),
+                                       ('runtime-closure-factories', 'semantic-closure-factories-corpus.json', 112)):
+            manifest = campaign.validate_manifest(json.loads((ROOT / 'scripts' / corpus).read_text()))
+            shapes = campaign.m2.CLOSURE_PLAN_KEYS[campaign.PROFILE_SCHEMAS[profile]][2]
+            self.assertEqual(manifest[self.PROFILES[profile][2]], {key: list(values) for key, values in shapes.items()})
             self.assertEqual(manifest['requiredInputs'], list(campaign.PRIMITIVE_INPUTS))
             self.assertTrue(all('generation' in entry and entry['generation']['maxProgramNodes'] == 1024
                                 for entry in manifest['cases']))
@@ -4938,7 +5072,7 @@ class AggregateCallGraphCoverageTests(unittest.TestCase):
 
     def test_profile_is_registered_in_the_input_command_version_node_and_summary_policy_tables(self):
         self.assertIn(self.PROFILE, campaign.PROFILES)
-        self.assertEqual(len(campaign.PROFILES), 32)
+        self.assertEqual(len(campaign.PROFILES), 34)
         self.assertEqual(campaign.PROFILE_SCHEMAS[self.PROFILE], campaign.m2.AGGREGATE_CALL_GRAPH_CASE_SCHEMA)
         self.assertEqual(campaign.PROFILE_COMMANDS[self.PROFILE],
             ('aggregate-call-graph-generate', 'aggregate-call-graph-emit', 'aggregate-call-graph-generated'))
@@ -5637,7 +5771,8 @@ class G0VersionTests(CommandLine, unittest.TestCase):
             {'runtime-call-graphs', 'runtime-call-graph-loops', 'runtime-assembly-loops', 'runtime-aggregate-call-graphs',
              'runtime-enums', 'runtime-traits', 'runtime-trait-hierarchies', 'runtime-memory-values',
              'runtime-memory-calls', 'runtime-revert-data', 'runtime-halts', 'runtime-checked-arithmetic',
-             'runtime-shifts', 'runtime-memory-arrays', 'runtime-array-abi'})
+             'runtime-shifts', 'runtime-memory-arrays', 'runtime-array-abi', 'runtime-closure-captures',
+             'runtime-closure-factories'})
         self.assertEqual(campaign.RANDOM_G0_VERSION, self.V4)
         self.assertEqual(campaign.g0_version('runtime-primitives',
             {'generatorVersion': 'core-primitives-v1/' + self.V1, 'baseGeneratorVersion': self.V1}), self.V1)
@@ -5736,7 +5871,8 @@ class FunctionCountTests(CommandLine, unittest.TestCase):
               'runtime-comptime': 8, 'runtime-modules': 8, 'runtime-enums': 12, 'runtime-traits': 12,
               'runtime-trait-hierarchies': 12, 'runtime-memory-values': 12, 'runtime-memory-calls': 12,
               'runtime-revert-data': 12, 'runtime-halts': 12, 'runtime-checked-arithmetic': 12, 'runtime-shifts': 12,
-              'runtime-memory-arrays': 12, 'runtime-array-abi': 12}
+              'runtime-memory-arrays': 12, 'runtime-array-abi': 12, 'runtime-closure-captures': 12,
+              'runtime-closure-factories': 12}
 
     def test_inputs_per_function_of_every_runtime_input_profile(self):
         self.assertEqual(set(self.SEEDED), set(campaign.RUNTIME_INPUT_PROFILES))

@@ -1,0 +1,798 @@
+{
+  "schema": "solcore-lean.semantic-corpus-manifest.v1",
+  "profile": "runtime-closure-captures",
+  "coverageKind": "core-ast-features",
+  "boundaryVersion": "word-primitive-boundary-bank-v1",
+  "emitterVersion": "solcore-source-closure-captures-v1",
+  "generatorVersion": "core-closure-captures-v1",
+  "profileVersion": "runtime-closure-captures-v1/plan-seed-v1",
+  "wrapperVersion": "solcore-closure-captures-contract-v1",
+  "requiredFeatures": [],
+  "requiredWordLiterals": [],
+  "requiredInputs": [
+    "0",
+    "1",
+    "2",
+    "255",
+    "256",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+    "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+  ],
+  "closureCapturesRequirements": {
+    "capture": [
+      "arg",
+      "body-value",
+      "closure",
+      "input",
+      "nothing",
+      "value"
+    ],
+    "field": [
+      "body-read",
+      "body-write",
+      "run-read",
+      "run-write"
+    ],
+    "write": [
+      "captured-closure",
+      "captured-param",
+      "captured-value",
+      "own-closure",
+      "own-param",
+      "own-value"
+    ],
+    "outer": [
+      "later-rebind",
+      "later-write"
+    ],
+    "call": [
+      "apply",
+      "captured",
+      "direct",
+      "in-body",
+      "loop",
+      "repeat",
+      "twice"
+    ],
+    "closure": [
+      "alias",
+      "lambda",
+      "loop",
+      "nested",
+      "realias",
+      "relambda"
+    ],
+    "outcome": [
+      "panic-0x11",
+      "panic-0x12",
+      "return"
+    ],
+    "panicSite": [
+      "body",
+      "run"
+    ]
+  },
+  "cases": [
+    {
+      "id": "captures-1-0",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-1",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-2",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-3",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-4",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-5",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-6",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-1-7",
+      "generation": {
+        "seed": "1",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-0",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-1",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-2",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-3",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-4",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-5",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-6",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-3-7",
+      "generation": {
+        "seed": "3",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-0",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-1",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-2",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-3",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-4",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-5",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-6",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-4-7",
+      "generation": {
+        "seed": "4",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-0",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-1",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-2",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-3",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-4",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-5",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-6",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-5-7",
+      "generation": {
+        "seed": "5",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-0",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-1",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-2",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-3",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-4",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-5",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-6",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-7-7",
+      "generation": {
+        "seed": "7",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-0",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-1",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-2",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-3",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-4",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-5",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-6",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-13-7",
+      "generation": {
+        "seed": "13",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-0",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-1",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-2",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-3",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-4",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-5",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-6",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-16-7",
+      "generation": {
+        "seed": "16",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-0",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-1",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-2",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-3",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-4",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-5",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-6",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-23-7",
+      "generation": {
+        "seed": "23",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-0",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-1",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-2",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-3",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-4",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-5",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-6",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-58-7",
+      "generation": {
+        "seed": "58",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-0",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "0",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-1",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "1",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-2",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "2",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-3",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "255",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-4",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "256",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-5",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-6",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "expectedFeatures": []
+    },
+    {
+      "id": "captures-413-7",
+      "generation": {
+        "seed": "413",
+        "maxProgramNodes": 1024
+      },
+      "input": "57896044618658097711785492504343953926634992332820282019728792003956564819967",
+      "expectedFeatures": []
+    }
+  ]
+}

@@ -170,6 +170,7 @@ import Solcore.Test.Synthesis.Traits
 import Solcore.Test.Synthesis.Memory
 import Solcore.Test.Synthesis.EventsAndReverts
 import Solcore.Test.Synthesis.Arrays
+import Solcore.Test.Synthesis.Captures
 import Solcore.Test.Synthesis.CallGraphs
 import Solcore.Test.Synthesis.Aggregates
 import Solcore.Test.Synthesis.Storage
@@ -2002,6 +2003,7 @@ def run : IO Unit := do
   SourceRevertDataCases.testSourceHaltCases
   SourceIntegerCases.testSourceIntegerCases
   SourceArrayCases.testSourceArrayCases
+  SourceClosureCaptureCases.testSourceClosureCaptureCases
   CallGraphGenerator.testCallGraphGenerator
   SourceCallGraphEmitter.testSourceCallGraphEmitter
   SourceCallGraphCases.testSourceCallGraphCases
