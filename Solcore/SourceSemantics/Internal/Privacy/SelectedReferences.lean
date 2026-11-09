@@ -1549,13 +1549,21 @@ private abbrev finishUnary (context : SourceInference.Context) (operator : Synta
     (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
 
 private abbrev finishBinary (context : SourceInference.Context) (operator : Syntax.BinaryOp)
-    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :=
+    (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
+    Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := Detail.binaryBuiltinType operator
-  finishOperator context (Detail.binaryOperatorDispatch operator) operand builtin
-    (if Detail.binaryResultIsBool operator then .bool else builtin)
-    (if Detail.binaryResultIsBool operator then .bool else operand)
-    [operand,operand] hasOpenLiteralOperand state
+  if Detail.fixedWordOperator operator operand then
+    pure {
+      type := if Detail.binaryResultIsBool operator then .bool else operand
+      requirements := []
+      state
+    }
+  else
+    let builtin := Detail.binaryBuiltinType operator
+    finishOperator context (Detail.binaryOperatorDispatch operator) operand builtin
+      (if Detail.binaryResultIsBool operator then .bool else builtin)
+      (if Detail.binaryResultIsBool operator then .bool else operand)
+      [operand,operand] hasOpenLiteralOperand state
 
 private theorem bool_private (protectedVars : List TypeVarId) (state : State) :
     Safe protectedVars state Ty.bool := safe_closed _ _ (by simp [Ty.VariablesBelow, Ty.bool, Ty.freeVariables])
@@ -1590,13 +1598,19 @@ private theorem finishBinary_private {protectedVars : List TypeVarId}
     ∀ row ∈ result.state.requirements, row ∉ state.requirements →
       PredicateSafe protectedVars result.state row.predicate := by
   have resolvedSafe := safe_resolved ready operandSafe
-  apply finishOperator_private catalog resolvedSafe _ _ live accepted
-  · split
-    · exact bool_private _ _
-    · cases operator <;> exact safe_closed _ _ (by simp [Detail.binaryBuiltinType, Ty.VariablesBelow, Ty.bool, Ty.word, Ty.freeVariables])
-  · split
+  have resultSafe : Safe protectedVars state
+      (if Detail.binaryResultIsBool operator then .bool else state.resolve operandType) := by
+    split
     · exact bool_private _ _
     · exact resolvedSafe
+  simp only [finishBinary] at accepted
+  split at accepted
+  · cases Except.ok.inj accepted
+    exact ⟨.refl _ _, resultSafe, live, fun _ member fresh => (fresh member).elim⟩
+  apply finishOperator_private catalog resolvedSafe _ resultSafe live accepted
+  split
+  · exact bool_private _ _
+  · cases operator <;> exact safe_closed _ _ (by simp [Detail.binaryBuiltinType, Ty.VariablesBelow, Ty.bool, Ty.word, Ty.freeVariables])
 
 /-- Unary inference protects its operand through the optional real expected
 unification and the selected builtin or trait method result. -/

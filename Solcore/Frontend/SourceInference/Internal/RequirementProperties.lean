@@ -1368,6 +1368,7 @@ theorem inferUnaryOperator_requirements_subset
   all_goals solve_by_elim [unify_requirements_subset,
     addRequirementsWithIds_requirements_subset]
 
+set_option maxHeartbeats 400000 in
 /-- Binary-operator inference changes only unification metadata and may append
 the selected trait method's obligations. -/
 theorem inferBinaryOperator_requirements_subset
@@ -3169,6 +3170,7 @@ private theorem inferUnaryOperator_integerPatterns_eq
   all_goals grind [unify_integerPatternMetadata_eq,
     addRequirementsWithIds_integerPatterns_eq]
 
+set_option maxHeartbeats 400000 in
 private theorem inferBinaryOperator_integerPatterns_eq
     {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
     {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}

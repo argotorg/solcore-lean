@@ -2767,6 +2767,11 @@ private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result
     | obtain ⟨integer, rfl, _⟩ := integer_fields represented; exact .integer integer
   | panicking panicking => cases panicking <;> first
     | obtain ⟨word, rfl, _⟩ := word_fields represented; exact .word word
+  | fixedComparison kind => cases kind <;>
+    (obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag)
+  | fixedBitwise kind =>
+    obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
+    exact .fixed word canonical
   | logicalAnd | logicalOr =>
     obtain ⟨flag, rfl, _⟩ := bool_fields represented
     exact .bool flag

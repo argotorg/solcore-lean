@@ -414,6 +414,16 @@ inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty �
       BinaryProfile operator .word .word .word
   | logicalAnd : BinaryProfile .logicalAnd .bool .bool .word
   | logicalOr : BinaryProfile .logicalOr .bool .bool .word
+  /-- Comparisons on a fixed-width integer type that are Word's on its
+  canonical words. -/
+  | fixedComparison {operator} {type : TypeSystem.FixedInteger}
+      (kind : FixedWordComparison type operator) :
+      BinaryProfile operator (.fixed type) .bool .word
+  /-- Bitwise operators on an unsigned fixed-width integer type, which are
+  Word's and keep words canonical. -/
+  | fixedBitwise {operator} {type : TypeSystem.FixedInteger}
+      (kind : FixedWordBitwise type operator) :
+      BinaryProfile operator (.fixed type) (.fixed type) .word
 
 theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
     {operand result : TypeSystem.Ty} (typed : BinaryOperatorHasType context operator operand operand result []) :
@@ -428,6 +438,8 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   | integerComparison kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
   | booleanAnd => exact ⟨_, .logicalAnd⟩
   | booleanOr => exact ⟨_, .logicalOr⟩
+  | fixedComparison kind => exact ⟨_, .fixedComparison kind⟩
+  | fixedBitwise kind => exact ⟨_, .fixedBitwise kind⟩
   | trait _ profile evidence => cases profile; cases evidence
 
 theorem Mode.binary_strict {operator : Syntax.BinaryOp} (mode : Mode)
@@ -1330,6 +1342,42 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreR
   {mapping : LocationMap} {world : StoreTyping} {operator : Syntax.BinaryOp}
   {operand result : TypeSystem.Ty} {mode : Mode} {a b : Dynamic.Value} {x y : Value}
 
+theorem _root_.Solcore.SourceSemantics.FixedWordComparison.strict {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp}
+    (kind : FixedWordComparison type operator) : Dynamic.StrictBinaryOperator operator := by
+  cases kind <;> constructor
+
+theorem _root_.Solcore.SourceSemantics.FixedWordBitwise.strict {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp}
+    (kind : FixedWordBitwise type operator) : Dynamic.StrictBinaryOperator operator := by
+  cases kind <;> constructor
+
+/-- A value represented at a fixed-width integer type is a canonical word. -/
+theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedInteger}
+    {source : Dynamic.Value} {value : Value} {coreType : Ty}
+    (related : ValueRep checked registry functions mapping world sourceType source value coreType)
+    (view : SourceCoreRawMetadata.runtimeType sourceType = .fixed type) :
+    ∃ word, source = .word word ∧ value = .word word ∧ coreType = .word ∧
+      type.canonical word.val = true := by
+  revert view
+  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
+  | @fixed actual word canonical =>
+      intro view
+      cases view
+      exact ⟨word, rfl, rfl, rfl, canonical⟩
+  | compatible same _ ih => intro view; exact ih (same.symm.trans view)
+  | @constructed metadata id tag sources values types _ _ _ projected _ _ _ =>
+      intro view
+      have scalar : checked.catalog.project metadata.resultType = .ok .word := by
+        rw [← checked.catalog.project_runtimeType, view]
+        rfl
+      cases Except.ok.inj (projected.symm.trans scalar)
+  | unit | bool | word | integer | product | function | proxy | mappingValue =>
+      intro view
+      cases view
+  | nil | cons | empty | entry | absent | present => trivial
+
 theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator)) :
     (∃ output, Dynamic.ShortCircuits operator a output) ∨ Dynamic.EvaluatesRightOperand operator a := by
@@ -1337,6 +1385,8 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
   | word strict => exact .inr (.strict strict)
   | integer strict => exact .inr (.strict strict.toStrict)
   | panicking panicking => exact .inr (.panicking panicking)
+  | fixedComparison kind => exact .inr (.strict kind.strict)
+  | fixedBitwise kind => exact .inr (.strict kind.strict)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -1356,6 +1406,8 @@ theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand resul
   | word strict => cases invalid <;> cases strict
   | integer strict => cases invalid <;> cases strict
   | panicking panicking => cases invalid <;> cases panicking
+  | fixedComparison kind => cases invalid <;> cases kind
+  | fixedBitwise kind => cases invalid <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases invalid with | logicalAnd invalid => exact invalid trivial
@@ -1384,6 +1436,8 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
   | word strict => cases circuit <;> cases strict
   | integer strict => cases circuit <;> cases strict
   | panicking panicking => cases circuit <;> cases panicking
+  | fixedComparison kind => cases circuit <;> cases kind
+  | fixedBitwise kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -1404,6 +1458,10 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
   cases profile with
   | word strict => rw [Mode.binary_strict _ strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | integer strict => rw [Mode.binary_strict _ strict.toStrict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | fixedComparison kind =>
+    rw [Mode.binary_strict _ kind.strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | fixedBitwise kind =>
+    rw [Mode.binary_strict _ kind.strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | panicking panicking =>
     cases panicking <;> exact SourceCorePrimitive.binaryPanicking_right_failure first second
   | logicalAnd =>
@@ -1469,6 +1527,41 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
     exact ⟨sourceResult, coreResult, applied, represented, by
       rw [Mode.binary_strict _ strict.toStrict]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
+  | fixedComparison kind =>
+    refine .inl ?_
+    have strict := kind.strict
+    have operandEq := PrimitiveExpressions.strict_operand_word strict
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
+    obtain ⟨b, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
+    obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
+      (mapping := mapping) (world := world) strict a b
+    refine ⟨sourceResult, coreResult, applied, ?_, by
+      rw [Mode.binary_strict _ strict]
+      exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
+    cases kind <;> exact represented
+  | fixedBitwise kind =>
+    refine .inl ?_
+    have strict := kind.strict
+    obtain ⟨a, rfl, rfl, _, leftCanonical⟩ := fixed_fields leftRep rfl
+    obtain ⟨b, rfl, rfl, _, rightCanonical⟩ := fixed_fields rightRep rfl
+    obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
+      (mapping := mapping) (world := world) strict a b
+    refine ⟨sourceResult, coreResult, applied, ?_, by
+      rw [Mode.binary_strict _ strict]
+      exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
+    cases kind with
+    | bitAnd unsigned =>
+      obtain ⟨result, rfl, rfl⟩ := word_fields represented
+      cases applied
+      exact .fixed _ (Dynamic.unsigned_canonical_bitAnd unsigned rightCanonical)
+    | bitOr unsigned =>
+      obtain ⟨result, rfl, rfl⟩ := word_fields represented
+      cases applied
+      exact .fixed _ (Dynamic.unsigned_canonical_bitOr unsigned leftCanonical rightCanonical)
+    | bitXor unsigned =>
+      obtain ⟨result, rfl, rfl⟩ := word_fields represented
+      cases applied
+      exact .fixed _ (Dynamic.unsigned_canonical_bitXor unsigned leftCanonical rightCanonical)
   | logicalAnd =>
     refine .inl ?_
     obtain ⟨a, rfl, rfl⟩ := bool_fields leftRep
@@ -1530,6 +1623,8 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   | word strict => cases strict <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | integer strict => cases strict <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | panicking panicking => cases panicking <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | fixedComparison kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | fixedBitwise kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

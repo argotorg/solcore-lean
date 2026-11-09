@@ -195,24 +195,9 @@ theorem inferBinaryOperator_classified_unchanged
     {state : State} {result : OperatorInferenceResult}
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
-    Unchanged state result.state := by
-  unfold inferBinaryOperator binaryOperatorTail at success
-  simp_all [bind, Except.bind]
-  repeat' first | split at success
-  all_goals try cases success
-  all_goals try simp_all
-  all_goals try
-    have pureEq := pureState_eq (by assumption)
-    subst_vars
-  all_goals try have unifiedProgress := unify_classified_unchanged (by assumption)
-  all_goals first
-    | exact .refl _
-    | exact unifiedProgress
-    | exact Unchanged.addRequirementsWithIds _ _
-    | exact unifiedProgress.trans (Unchanged.addRequirementsWithIds _ _)
-    | exact (unify_classified_unchanged (state := state) (by assumption)).trans unifiedProgress
-    | exact (unify_classified_unchanged (state := state) (by assumption)).trans
-        (unifiedProgress.trans (Unchanged.addRequirementsWithIds _ _))
+    Unchanged state result.state :=
+  inferBinaryOperator_preserves Unchanged.refl (fun first second => first.trans second)
+    unify_classified_unchanged Unchanged.addRequirementsWithIds success
 
 
 private theorem fresh_classified_unchanged (state : State) :
@@ -665,24 +650,9 @@ theorem inferBinaryOperator_direct_unchanged
     {state : State} {result : OperatorInferenceResult}
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
-    Unchanged state result.state := by
-  unfold inferBinaryOperator binaryOperatorTail at success
-  simp_all [bind, Except.bind]
-  repeat' first | split at success
-  all_goals try cases success
-  all_goals try simp_all
-  all_goals try
-    have pureEq := pureState_eq (by assumption)
-    subst_vars
-  all_goals try have unifiedProgress := unify_direct_unchanged (by assumption)
-  all_goals first
-    | exact .refl _
-    | exact unifiedProgress
-    | exact Unchanged.addRequirementsWithIds _ _
-    | exact unifiedProgress.trans (Unchanged.addRequirementsWithIds _ _)
-    | exact (unify_direct_unchanged (state := state) (by assumption)).trans unifiedProgress
-    | exact (unify_direct_unchanged (state := state) (by assumption)).trans
-        (unifiedProgress.trans (Unchanged.addRequirementsWithIds _ _))
+    Unchanged state result.state :=
+  inferBinaryOperator_preserves Unchanged.refl (fun first second => first.trans second)
+    unify_direct_unchanged Unchanged.addRequirementsWithIds success
 
 
 private theorem fresh_direct_unchanged (state : State) :

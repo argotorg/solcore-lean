@@ -3315,11 +3315,18 @@ private abbrev finishBinaryOperator (context : Context)
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult :=
   let operand := state.resolve left
-  let builtin := binaryBuiltinType operator
-  finishOperator context (binaryOperatorDispatch operator) operand builtin
-    (if binaryResultIsBool operator then .bool else builtin)
-    (if binaryResultIsBool operator then .bool else operand)
-    [operand, operand] hasOpenLiteralOperand state
+  if fixedWordOperator operator operand then
+    pure {
+      type := if binaryResultIsBool operator then .bool else operand
+      requirements := []
+      state
+    }
+  else
+    let builtin := binaryBuiltinType operator
+    finishOperator context (binaryOperatorDispatch operator) operand builtin
+      (if binaryResultIsBool operator then .bool else builtin)
+      (if binaryResultIsBool operator then .bool else operand)
+      [operand, operand] hasOpenLiteralOperand state
 
 private theorem finishBinaryOperator_inferenceProperties
     {context : Context} {operator : Syntax.BinaryOp} {left : Ty}
@@ -3356,8 +3363,13 @@ private theorem finishBinaryOperator_inferenceProperties
           (.builtin .bool))
     · simpa only [returnsBool, Bool.false_eq_true, if_false] using
         resolvedLeftBelow
-  exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
-    (by simpa only [finishBinaryOperator] using success)
+  simp only [finishBinaryOperator] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact ⟨.refl ready.solved, ready, resultTypeBelow⟩
+  · exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
+      success
 
 /-- Successful unary-operator inference makes semantic inference progress,
 preserves readiness, and returns an allocator-bounded result type. -/

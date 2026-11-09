@@ -1190,6 +1190,12 @@ mutual
         | integerComparison kind =>
             exact ⟨applies.preserves (.integerComparison kind) left_typed right_typed,
               before_typed, .refl before⟩
+        | fixedComparison kind =>
+            exact ⟨applies.preserves (.fixedComparison kind) left_typed right_typed,
+              before_typed, .refl before⟩
+        | fixedBitwise kind =>
+            exact ⟨applies.preserves (.fixedBitwise kind) left_typed right_typed,
+              before_typed, .refl before⟩
         | booleanAnd =>
             exact ⟨applies.preserves .booleanAnd left_typed right_typed,
               before_typed, .refl before⟩
@@ -1207,6 +1213,8 @@ mutual
         | wordUnchecked kind => cases selected
         | wordComparison kind => cases selected
         | integerComparison kind => cases selected
+        | fixedComparison kind => cases selected
+        | fixedBitwise kind => cases selected
         | booleanAnd => cases selected
         | booleanOr => cases selected
         | trait static_dispatch profile requirements_prove =>

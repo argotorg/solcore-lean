@@ -339,7 +339,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
               obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := expression_value wellFormed
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
-              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
+              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | booleanAnd | booleanOr => cases method
               | trait staticDispatch profile requirementsProve =>
                 have same := binary_dispatch_same staticDispatch dispatch
                 rcases same with ⟨rfl, rfl⟩

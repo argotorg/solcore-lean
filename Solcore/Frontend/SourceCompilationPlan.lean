@@ -1934,7 +1934,7 @@ private def validateBinaryOperatorRequirementLayout
       | _ => throw (.unsupportedRuntimeBinary specialized.key node.id operator)
     let left ← exactExpression specialized.function.typedBody leftId
     let right ← exactExpression specialized.function.typedBody rightId
-    let builtinInput := SourceInference.Detail.binaryBuiltinType operator
+    let builtinInput := SourceInference.Detail.binaryBuiltinTypeAt operator left.type
     let expectedInput :=
       if builtinInput = Ty.word && left.type = Ty.integer &&
           right.type = Ty.integer then

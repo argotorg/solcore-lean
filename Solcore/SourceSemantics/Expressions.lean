@@ -323,6 +323,24 @@ inductive ComparisonBinaryOperator : Syntax.BinaryOp → Prop where
   | equal : ComparisonBinaryOperator .equal
   | notEqual : ComparisonBinaryOperator .notEqual
 
+/-- The comparisons whose meaning on a fixed-width integer type is Word's on its
+canonical words: `==` and `!=` on every type, and the orderings on the unsigned
+types. -/
+inductive FixedWordComparison (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
+  | equal : FixedWordComparison type .equal
+  | notEqual : FixedWordComparison type .notEqual
+  | less (unsigned : type.signed = false) : FixedWordComparison type .less
+  | greater (unsigned : type.signed = false) : FixedWordComparison type .greater
+  | lessEqual (unsigned : type.signed = false) : FixedWordComparison type .lessEqual
+  | greaterEqual (unsigned : type.signed = false) : FixedWordComparison type .greaterEqual
+
+/-- The bitwise operators whose meaning on an unsigned fixed-width integer type
+is Word's: canonical words stay canonical. -/
+inductive FixedWordBitwise (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
+  | bitAnd (unsigned : type.signed = false) : FixedWordBitwise type .bitAnd
+  | bitXor (unsigned : type.signed = false) : FixedWordBitwise type .bitXor
+  | bitOr (unsigned : type.signed = false) : FixedWordBitwise type .bitOr
+
 /-- The source spelling-to-trait-method assignment for operator forms which
 remain operator nodes after resolution. -/
 inductive BinaryTraitDispatch : Syntax.BinaryOp → String → String → Prop where
@@ -417,6 +435,12 @@ inductive BinaryOperatorHasType (context : Context) :
   | integerComparison {operator : Syntax.BinaryOp}
       (kind : ComparisonBinaryOperator operator) :
       BinaryOperatorHasType context operator .integer .integer .bool []
+  | fixedComparison {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedWordComparison type operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) .bool []
+  | fixedBitwise {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedWordBitwise type operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -455,7 +479,8 @@ theorem requirements_valid
     RequirementIdsValid context requirements := by
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
-      integerComparison | booleanAnd | booleanOr => simp [RequirementIdsValid]
+      integerComparison | fixedComparison | fixedBitwise | booleanAnd | booleanOr =>
+      simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
 end BinaryOperatorHasType

@@ -4063,6 +4063,112 @@ end Tests.SourceCoreFixedIntegerTypes
 end
 
 section
+/-! The first operators on the twelve fixed-width integer types, through the
+public source API: `==` and `!=` on every type, and `< > <= >=` and `& | ^` on
+the unsigned types. On canonical words they are Word's operators, and the
+bitwise results stay canonical. Signed orderings and bitwise operators, `~` and
+the checked arithmetic come with the next steps and are still rejected. -/
+set_option autoImplicit false
+namespace Tests.SourceCoreFixedIntegerOperators
+open Solcore Solcore.Frontend SourceCoreExecution
+
+private def require (condition : Bool) (message : String) : IO Unit :=
+  unless condition do throw (IO.userError message)
+private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
+  | .ok value => pure value
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
+private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
+private def boolean (b : Bool) : Value := .bool b
+private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [],
+  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+private def modulus : Nat := 2 ^ 256
+
+private def workspace : Workspace.RawWorkspace := workspaceOf [
+  "function eq8(x: uint8, y: uint8) returns (bool) { return x == y; }",
+  "function ne16(x: int16, y: int16) returns (bool) { return x != y; }",
+  "function lt32(x: uint32, y: uint32) returns (bool) { return x < y; }",
+  "function le64(x: uint64, y: uint64) returns (bool) { return x <= y; }",
+  "function gt128(x: uint128, y: uint128) returns (bool) { return x > y; }",
+  "function ge256(x: uint256, y: uint256) returns (bool) { return x >= y; }",
+  "function and8(x: uint8, y: uint8) returns (uint8) { return x & y; }",
+  "function or16(x: uint16, y: uint16) returns (uint16) { return x | y; }",
+  "function xor32(x: uint32, y: uint32) returns (uint32) { return x ^ y; }",
+  "function eqSigned(x: int256, y: int256) returns (bool) { return x == y; }",
+  "function mixed(x: uint8, y: uint8) returns (uint8) { let both: uint8 = x & y; return both | (x ^ y); }"
+]
+
+private def names : List String :=
+  ["eq8", "ne16", "lt32", "le64", "gt128", "ge256", "and8", "or16", "xor32", "eqSigned", "mixed"]
+
+private def seed (program : CheckedProgram) (name : String) : IO Seed :=
+  match program.signatures.functions.filter (·.name == name) with
+  | [signature] => pure (SourceCoreCompiler.Seed.declaration signature.id)
+  | _ => throw (IO.userError s!"fixed-width operator fixture missing {name}")
+private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value) :
+    IO (Completion artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.succeeded result) => pure result
+  | .ok (.exportError error _) => throw (IO.userError s!"fixed-width operator export: {reprStr error}")
+  | .ok (.failed reason _) => throw (IO.userError s!"fixed-width operator failure: {reprStr reason}")
+  | .ok (.outOfFuel _) => throw (IO.userError "fixed-width operator execution exhausted")
+  | .error error => throw (IO.userError s!"fixed-width operator invocation: {reprStr error}")
+private def boot (artifact : Artifact) : IO (Session artifact) := do
+  let fresh ← artifact.bootstrapWithReceipt
+  match fresh.val.resume 300000 with
+  | .ready session => pure session
+  | .error error => throw (IO.userError s!"fixed-width operator bootstrap: {reprStr error}")
+  | .outOfFuel _ => throw (IO.userError "fixed-width operator bootstrap exhausted")
+
+/-- Inference itself rejects the program, after loading succeeded. -/
+private def rejectedByInference (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference _] => pure ()
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+def run : IO Unit := do
+  let program ← get "fixed-width operator check" (checkProgram workspace)
+  let seeds ← names.mapM (seed program)
+  let compiled ← get "fixed-width operator compilation"
+    (compile workspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "fixed-width operator root missing")
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × List Value × Value) := [
+    (0, [word 7, word 7], boolean true), (0, [word 255, word 0], boolean false),
+    (1, [word (modulus - 1), word (modulus - 1)], boolean false), (1, [word 3, word (modulus - 3)], boolean true),
+    (2, [word 4, word 9], boolean true), (2, [word 9, word 4], boolean false),
+    (3, [word 9, word 9], boolean true), (3, [word (2 ^ 64 - 1), word 0], boolean false),
+    (4, [word (2 ^ 128 - 1), word 1], boolean true), (4, [word 1, word 1], boolean false),
+    (5, [word (modulus - 1), word (modulus - 1)], boolean true), (5, [word 0, word 1], boolean false),
+    (6, [word 0xF0, word 0x3C], word 0x30),
+    (7, [word 0xF000, word 0x00FF], word 0xF0FF),
+    (8, [word 0xFFFF0000, word 0x0F0F0F0F], word 0xF0F00F0F),
+    (9, [word (modulus - 1), word (modulus - 1)], boolean true), (9, [word (modulus - 1), word 1], boolean false),
+    (10, [word 0xF0, word 0x3C], word 0xFC)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == expected)
+      s!"{names[index]?} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  rejectedByInference "signed ordering is not yet a builtin"
+    ["function bad(x: int8, y: int8) returns (bool) { return x < y; }"]
+  rejectedByInference "signed bitwise is not yet a builtin"
+    ["function bad(x: int8, y: int8) returns (int8) { return x & y; }"]
+  rejectedByInference "checked arithmetic is not yet a builtin"
+    ["function bad(x: uint8, y: uint8) returns (uint8) { return x + y; }"]
+  rejectedByInference "operands of different types"
+    ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
+  rejectedByInference "compound assignment is not yet defined"
+    ["function bad(x: uint8, y: uint8) returns (uint8) { x &= y; return x; }"]
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == and != on signed and unsigned fixed-width types, < > <= >= and & | ^ on unsigned ones, with canonical results, and signed orderings, signed bitwise operators, checked arithmetic, compound assignment and mixed operand types still rejected"
+
+end Tests.SourceCoreFixedIntegerOperators
+end
+
+section
 -- leanmerge: from Solcore.Test.SourceCoreExecution
 #check_failure Solcore.Frontend.SourceCoreExecution.Options.backendPreference
 #check_failure Solcore.Frontend.SourceCoreExecution.Compiled.mk

@@ -477,6 +477,8 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   | word strict => cases circuit <;> cases strict
   | integer strict => cases circuit <;> cases strict
   | panicking panicking => cases circuit <;> cases panicking
+  | fixedComparison kind => cases circuit <;> cases kind
+  | fixedBitwise kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -504,6 +506,8 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | word strict => cases strict <;> exact bind_failed child evaluated
   | integer strict => cases strict <;> exact bind_failed child evaluated
   | panicking panicking => cases panicking <;> exact bind_failed child evaluated
+  | fixedComparison kind => cases kind <;> exact bind_failed child evaluated
+  | fixedBitwise kind => cases kind <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -568,6 +572,49 @@ private theorem tail_outcome (profile : BinaryProfile operator operand result mo
     | inRight actual =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
       exact ⟨_, _, applied, represented, rfl, rfl⟩
+  | fixedComparison kind =>
+    refine .inl ?_
+    have strict := kind.strict
+    have operandEq := PrimitiveExpressions.strict_operand_word strict
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
+    obtain ⟨b, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using rightRep)
+    obtain ⟨output, native, applied, represented, pure⟩ := word_body (functions := model) (registry := rawRegistry)
+      (mapping := mapping) (world := world) strict a b
+    have body : Evaluates (.word b :: .word a :: environment) middle
+        (LanguageResult.success (Mode.body .word operator)) value finalStore := by
+      cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+    cases body with
+    | inRight actual =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
+      refine ⟨_, _, applied, ?_, rfl, rfl⟩
+      cases kind <;> exact represented
+  | fixedBitwise kind =>
+    refine .inl ?_
+    have strict := kind.strict
+    obtain ⟨a, rfl, rfl, _, leftCanonical⟩ := fixed_fields leftRep rfl
+    obtain ⟨b, rfl, rfl, _, rightCanonical⟩ := fixed_fields rightRep rfl
+    obtain ⟨output, native, applied, represented, pure⟩ := word_body (functions := model) (registry := rawRegistry)
+      (mapping := mapping) (world := world) strict a b
+    have body : Evaluates (.word b :: .word a :: environment) middle
+        (LanguageResult.success (Mode.body .word operator)) value finalStore := by
+      cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+    cases body with
+    | inRight actual =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
+      refine ⟨_, _, applied, ?_, rfl, rfl⟩
+      cases kind with
+      | bitAnd unsigned =>
+        obtain ⟨result, rfl, rfl⟩ := word_fields represented
+        cases applied
+        exact .fixed _ (Dynamic.unsigned_canonical_bitAnd unsigned rightCanonical)
+      | bitOr unsigned =>
+        obtain ⟨result, rfl, rfl⟩ := word_fields represented
+        cases applied
+        exact .fixed _ (Dynamic.unsigned_canonical_bitOr unsigned leftCanonical rightCanonical)
+      | bitXor unsigned =>
+        obtain ⟨result, rfl, rfl⟩ := word_fields represented
+        cases applied
+        exact .fixed _ (Dynamic.unsigned_canonical_bitXor unsigned leftCanonical rightCanonical)
   | integer strict =>
     refine .inl ?_
     have operandEq : SourceCoreInteger.binaryOperandType operator = .integer := by cases strict <;> rfl

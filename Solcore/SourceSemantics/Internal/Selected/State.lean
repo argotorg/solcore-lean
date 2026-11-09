@@ -1719,11 +1719,18 @@ private abbrev finishBinaryOperator (context : Frontend.SourceInference.Context)
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult :=
   let operand := state.resolve left
-  let builtin := binaryBuiltinType operator
-  finishOperator context (binaryOperatorDispatch operator) operand builtin
-    (if binaryResultIsBool operator then .bool else builtin)
-    (if binaryResultIsBool operator then .bool else operand)
-    [operand, operand] hasOpenLiteralOperand state
+  if fixedWordOperator operator operand then
+    pure {
+      type := if binaryResultIsBool operator then .bool else operand
+      requirements := []
+      state
+    }
+  else
+    let builtin := binaryBuiltinType operator
+    finishOperator context (binaryOperatorDispatch operator) operand builtin
+      (if binaryResultIsBool operator then .bool else builtin)
+      (if binaryResultIsBool operator then .bool else operand)
+      [operand, operand] hasOpenLiteralOperand state
 
 private theorem finishUnaryOperator_supported
     {cutoff : Nat} {roots : List Ty} {context : Frontend.SourceInference.Context} {operator : Syntax.UnaryOp}
@@ -1765,8 +1772,12 @@ private theorem finishBinaryOperator_supported
     split
     · exact resolved_closed _ _ _ rfl
     · exact resolved_normalized ready supported
-  exact finishOperator_supported (context := context) builtin output
-    (by simpa only [finishBinaryOperator] using success)
+  simp only [finishBinaryOperator] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact ⟨.refl _ _ _, output⟩
+  · exact finishOperator_supported (context := context) builtin output success
 
 theorem inferUnaryOperator
     {cutoff : Nat} {roots : List Ty} {context : Frontend.SourceInference.Context} {operator : Syntax.UnaryOp} {operandType : Ty}

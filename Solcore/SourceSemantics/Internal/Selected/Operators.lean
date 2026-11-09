@@ -1533,6 +1533,8 @@ private theorem binary_primitive_substitution {context target : SourceSemantics.
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
   | integerComparison kind => exact .integerComparison kind
+  | fixedComparison kind => exact .fixedComparison kind
+  | fixedBitwise kind => exact .fixedBitwise kind
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>

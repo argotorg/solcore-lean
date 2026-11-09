@@ -945,12 +945,19 @@ private abbrev finishBinaryOperatorLedger
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error Detail.OperatorInferenceResult :=
   let operand := state.resolve left
-  let builtin := Detail.binaryBuiltinType operator
-  finishOperatorLedger context (Detail.binaryOperatorDispatch operator)
-    operand builtin
-    (if Detail.binaryResultIsBool operator then .bool else builtin)
-    (if Detail.binaryResultIsBool operator then .bool else operand)
-    [operand, operand] hasOpenLiteralOperand state
+  if Detail.fixedWordOperator operator operand then
+    pure {
+      type := if Detail.binaryResultIsBool operator then .bool else operand
+      requirements := []
+      state
+    }
+  else
+    let builtin := Detail.binaryBuiltinType operator
+    finishOperatorLedger context (Detail.binaryOperatorDispatch operator)
+      operand builtin
+      (if Detail.binaryResultIsBool operator then .bool else builtin)
+      (if Detail.binaryResultIsBool operator then .bool else operand)
+      [operand, operand] hasOpenLiteralOperand state
 
 private theorem finishBinaryOperatorLedger_evolution
     {context : Frontend.SourceInference.Context}
@@ -960,8 +967,12 @@ private theorem finishBinaryOperatorLedger_evolution
     (success : finishBinaryOperatorLedger context operator left
       hasOpenLiteralOperand state = .ok result) :
     LedgerEvolution state result.state := by
-  exact finishOperatorLedger_evolution
-    (by simpa only [finishBinaryOperatorLedger] using success)
+  simp only [finishBinaryOperatorLedger] at success
+  split at success
+  · injection success with resultEq
+    subst result
+    exact .refl state
+  · exact finishOperatorLedger_evolution success
 
 /-- Unary operator resolution only performs unification and canonical
 requirement allocation. -/

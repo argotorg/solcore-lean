@@ -1147,13 +1147,21 @@ private abbrev finishUnary (context : SourceInference.Context) (operator : Synta
     (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] openLiteral state
 
 private abbrev finishBinary (context : SourceInference.Context) (operator : Syntax.BinaryOp)
-    (operandType : Ty) (openLiteral : Bool) (state : State) :=
+    (operandType : Ty) (openLiteral : Bool) (state : State) :
+    Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  let builtin := Detail.binaryBuiltinType operator
-  finishOperator context (Detail.binaryOperatorDispatch operator) operand builtin
-    (if Detail.binaryResultIsBool operator then .bool else builtin)
-    (if Detail.binaryResultIsBool operator then .bool else operand)
-    [operand,operand] openLiteral state
+  if Detail.fixedWordOperator operator operand then
+    pure {
+      type := if Detail.binaryResultIsBool operator then .bool else operand
+      requirements := []
+      state
+    }
+  else
+    let builtin := Detail.binaryBuiltinType operator
+    finishOperator context (Detail.binaryOperatorDispatch operator) operand builtin
+      (if Detail.binaryResultIsBool operator then .bool else builtin)
+      (if Detail.binaryResultIsBool operator then .bool else operand)
+      [operand,operand] openLiteral state
 
 private theorem unify_requirements {before after : State} {left right : Ty}
     (accepted : Detail.unify before left right = .ok after) : after.requirements = before.requirements := by
@@ -1222,9 +1230,14 @@ theorem inferBinaryOperator_normalized_issuance
   have finish {before : State} {openLiteral : Bool}
       (accepted : finishBinary context operator left openLiteral before = .ok result) :
       ∀ row ∈ result.state.requirements, row ∉ before.requirements →
-        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) :=
-    finishOperator_formation catalog signatures
-      (fun extension => (extension left).symm ▸ operandFormed) continuation accepted
+        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) := by
+    simp only [finishBinary] at accepted
+    split at accepted
+    · intro row member fresh
+      rw [← Except.ok.inj accepted] at member
+      exact absurd member fresh
+    · exact finishOperator_formation catalog signatures
+        (fun extension => (extension left).symm ▸ operandFormed) continuation accepted
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
     Detail.isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : Detail.isShiftOperator operator = true

@@ -514,31 +514,96 @@ theorem inferUnaryOperator_direct_progress
     | exact (unify_direct_progress (state := state) (by assumption)).trans
         (unifiedProgress.trans (DirectRequirementsProgress.addRequirementsWithIds _ _))
 
+/-- The binary tail keeps the state or appends the selected trait method's
+obligations, so a relation that is reflexive and holds across
+`addRequirementsWithIds` holds across the tail. -/
+theorem binaryOperatorTail_preserves {relation : State → State → Prop}
+    (refl : ∀ state, relation state state)
+    (added : ∀ state predicates, relation state (state.addRequirementsWithIds predicates).2)
+    {context : Context} {operator : Syntax.BinaryOp} {left : Ty}
+    {hasOpenLiteralOperand : Bool} {state : State} {result : OperatorInferenceResult}
+    (success : binaryOperatorTail context operator left hasOpenLiteralOperand state =
+      .ok result) :
+    relation state result.state := by
+  unfold binaryOperatorTail at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals first
+    | exact refl _
+    | exact added _ _
+
+/-- Binary-operator inference unifies its operands, may unify the operand with
+the expected type, and runs the tail, so a relation that composes and that
+unification and the tail keep holds across it. -/
+theorem inferBinaryOperator_preserves {relation : State → State → Prop}
+    (refl : ∀ state, relation state state)
+    (trans : ∀ {first second third : State},
+      relation first second → relation second third → relation first third)
+    (unified : ∀ {before after : State} {first second : Ty},
+      unify before first second = .ok after → relation before after)
+    (added : ∀ state predicates, relation state (state.addRequirementsWithIds predicates).2)
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    relation state result.state := by
+  let openLiteral := isOpenIntegerLiteralTarget state integerLiterals left ||
+    isOpenIntegerLiteralTarget state integerLiterals right
+  by_cases shift : isShiftOperator operator = true
+  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
+      inferBinaryOperator_shift_result shift success
+    exact trans (unified valueResult) (unified amountResult)
+  by_cases unchecked : isUncheckedOperator operator = true
+  · obtain ⟨_, prepared, unifyResult, prepare, tailResult⟩ :=
+      inferBinaryOperator_unchecked_result unchecked success
+    have tail := binaryOperatorTail_preserves refl added tailResult
+    rcases prepare with rfl | wordResult
+    · exact trans (unified unifyResult) tail
+    · exact trans (unified unifyResult) (trans (unified wordResult) tail)
+  unfold inferBinaryOperator at success
+  rw [if_neg shift, if_neg unchecked] at success
+  cases unifyResult : unify state left right with
+  | error error => simp [unifyResult, bind, Except.bind] at success
+  | ok unifiedState =>
+    simp only [unifyResult, bind, Except.bind] at success
+    have first := unified unifyResult
+    cases expected with
+    | none =>
+      simp only [pure, Pure.pure, Except.pure] at success
+      exact trans first (binaryOperatorTail_preserves refl added
+        (show binaryOperatorTail context operator left openLiteral unifiedState = .ok result
+          from success))
+    | some expectedType =>
+      cases skip : (binaryResultIsBool operator ||
+          (unifiedState.resolve left).freeVariables.isEmpty || !openLiteral) with
+      | true =>
+        simp only [openLiteral, skip, if_true, pure, Pure.pure, Except.pure] at success
+        exact trans first (binaryOperatorTail_preserves refl added
+          (show binaryOperatorTail context operator left openLiteral unifiedState = .ok result
+            from success))
+      | false =>
+        simp only [openLiteral, skip, Bool.false_eq_true, if_false] at success
+        cases fitted : unify unifiedState (unifiedState.resolve left) expectedType with
+        | error error => simp [fitted] at success
+        | ok fittedState =>
+          simp only [fitted] at success
+          exact trans first (trans (unified fitted) (binaryOperatorTail_preserves refl added
+            (show binaryOperatorTail context operator left openLiteral fittedState = .ok result
+              from success)))
+
 theorem inferBinaryOperator_direct_progress
     {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
     {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
     {state : State} {result : OperatorInferenceResult}
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
-    DirectRequirementsProgress state result.state := by
-  unfold inferBinaryOperator binaryOperatorTail at success
-  simp_all [bind, Except.bind]
-  repeat' first | split at success
-  all_goals try cases success
-  all_goals try simp_all
-  all_goals try
-    have pureEq := pureState_eq (by assumption)
-    subst_vars
-  all_goals try have unifiedProgress := unify_direct_progress (by assumption)
-  all_goals first
-    | exact .refl _
-    | exact unifiedProgress
-    | exact DirectRequirementsProgress.addRequirementsWithIds _ _
-    | exact unifiedProgress.trans (DirectRequirementsProgress.addRequirementsWithIds _ _)
-    | exact (unify_direct_progress (state := state) (by assumption)).trans unifiedProgress
-    | exact (unify_direct_progress (state := state) (by assumption)).trans
-        (unifiedProgress.trans (DirectRequirementsProgress.addRequirementsWithIds _ _))
-
+    DirectRequirementsProgress state result.state :=
+  inferBinaryOperator_preserves DirectRequirementsProgress.refl
+    (fun first second => first.trans second) unify_direct_progress
+    DirectRequirementsProgress.addRequirementsWithIds success
 
 private theorem fresh_direct_progress (state : State) :
     DirectRequirementsProgress state state.fresh.2 := .refl _

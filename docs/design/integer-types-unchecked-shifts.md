@@ -677,6 +677,10 @@ operands' types are known.
   deterministic.
 - CoreLowering already chooses its lowering mode from the same type
   (`Tree.binary` and `BinaryProfile`).
+- The operators that are Word's on canonical words (step 2 below) need no
+  lookup: the word rules give their result at every one of the twelve types.
+  Only the operators whose meaning differs (signed order, `~`, checked
+  arithmetic) take the lookup, and only those restrict the primitive rules.
 - Compound assignment needs no lookup, because its form holds the target's
   type.
 
@@ -716,7 +720,10 @@ own view keeps the twelve types.
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
-integrated on its own.
+integrated on its own. The operators come before the literals. An operator
+whose operand is an open literal waits for the literal's type and takes it
+(`let a = 1 + 2; let b: uint8 = a;`), so a literal can reach one of the twelve
+types only once the operators have typing rules there.
 
 1. **Types.** The twelve types are builtins (`BuiltinType.fixed`), resolved
    before declared types. Their values are canonical words
@@ -725,18 +732,24 @@ integrated on its own.
    non-canonical argument before the body runs. No operator is defined on the
    twelve types yet, no literal is accepted at them, and open literals still
    default to `word`.
-2. **Literals.** A literal at one of the twelve types is range-checked at
+2. **The operators that are Word's on canonical words.** `==` and `!=` on
+   the twelve types, and `< > <= >=` and `& | ^` on the unsigned ones, are
+   builtins without requirements (`Detail.fixedWordOperator`), with both
+   operands of the same type. On canonical words they compute what Word's
+   operators compute, and `& | ^` keep the words canonical. So they evaluate
+   by the existing word rules, and no rule looks up an operand's type.
+3. **Checked `+ - *`, the signed comparisons and the other bitwise
+   operators**, chosen as above. Checked `+ - *` panic with `0x11`.
+   Comparisons are signed for `intN`. `~` is masked for `uintN`. Compound
+   `+= -= *=` check the result at the guard, after the setter.
+4. **Literals.** A literal at one of the twelve types is range-checked at
    compile time, with builtin `Int` evidence for each type.
-3. **Checked `+ - *`, comparisons and bitwise operators**, chosen as above.
-   Checked `+ - *` panic with `0x11`. Comparisons are signed for `intN`.
-   Bitwise results are masked or sign-extended. Compound `+= -= *=` check the
-   result at the guard, after the setter.
-4. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and
+5. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and
    `MIN / −1` and a negation out of range panic with `0x11`. Quotients round
    toward zero. A unary `-` on a literal folds into the literal.
-5. **The `uint256` default.** Open literals default to `uint256`, and an open
+6. **The `uint256` default.** Open literals default to `uint256`, and an open
    literal in no operator, comparison or requirement is rejected as
    ambiguous. The existing tests that relied on the `word` default change in
    this step.
-6. **Unchecked operators and shifts on the twelve types**, and ports of the
+7. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.

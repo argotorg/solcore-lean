@@ -2778,6 +2778,12 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
   | integer strict =>
     rw [Mode.binary_strict .integer strict.toStrict] at typed
     exact binary_children typed
+  | fixedComparison kind =>
+    rw [Mode.binary_strict .word kind.strict] at typed
+    exact binary_children typed
+  | fixedBitwise kind =>
+    rw [Mode.binary_strict .word kind.strict] at typed
+    exact binary_children typed
   | panicking panicking =>
     -- Unchecked `/` and `%` bind both operands before the checked body.
     have shape : Mode.word.binary operator left right =

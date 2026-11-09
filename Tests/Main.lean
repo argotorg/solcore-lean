@@ -1813,6 +1813,7 @@ def run : IO Unit := do
   SourceCoreShiftExecution.run
   SourceCoreUncheckedExecution.run
   SourceCoreFixedIntegerTypes.run
+  SourceCoreFixedIntegerOperators.run
   SourceCoreClosedLambdaPublicExecution.run
   SourceCoreCapturedLambdaPublicExecution.run
   capturedClosureSessionTests

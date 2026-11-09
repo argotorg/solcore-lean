@@ -996,6 +996,8 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | word strict => cases strict <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | integer strict => cases strict <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | panicking panicking => cases panicking <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedComparison kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedBitwise kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

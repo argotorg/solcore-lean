@@ -16479,6 +16479,29 @@ theorem binaryBuiltin_hasType
     | exact .wordUnchecked (by constructor)
     | (constructor <;> constructor)
 
+/-- The operators that the twelve fixed-width integer types take as builtins
+(`Detail.fixedWordOperator`) have their builtin typing. -/
+theorem binaryFixedWord_hasType
+    (context : SourceSemantics.Context) (operator : Syntax.BinaryOp)
+    (operand : TypeSystem.Ty)
+    (accepted : Detail.fixedWordOperator operator operand = true) :
+    BinaryOperatorHasType context operator operand operand
+      (if Detail.binaryResultIsBool operator then .bool else operand) [] := by
+  cases operand with
+  | constructor id =>
+    cases id with
+    | builtin builtin =>
+      cases builtin with
+      | fixed fixed =>
+        cases signed : fixed.signed <;> cases operator <;>
+          simp [Detail.fixedWordOperator, Detail.binaryResultIsBool, signed] at accepted ⊢
+        all_goals first
+          | exact .fixedComparison (type := fixed) (by constructor <;> assumption)
+          | exact .fixedBitwise (type := fixed) (by constructor <;> assumption)
+      | _ => simp [Detail.fixedWordOperator] at accepted
+    | declaration => simp [Detail.fixedWordOperator] at accepted
+  | _ => simp [Detail.fixedWordOperator] at accepted
+
 /-- Every Word-backed binary builtin also has the staged integer typing used
 while literal targets are being finalized. -/
 theorem binaryInteger_hasType
@@ -16594,51 +16617,58 @@ private def finishBinaryOperator
     Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
       Detail.isOpenIntegerLiteralTarget initial integerLiterals right
   let operand := state.resolve left
-  let builtin := Detail.binaryBuiltinType operator
-  if operand = builtin then
+  if Detail.fixedWordOperator operator operand then
     pure {
-      type := if Detail.binaryResultIsBool operator then .bool else builtin
+      type := if Detail.binaryResultIsBool operator then .bool else operand
       requirements := []
       state
     }
   else
-    match Detail.binaryOperatorDispatch operator with
-    | .function name =>
-        if Detail.isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
-              builtin operand ||
-            Detail.isStagedIntegerOperatorTarget state hasOpenLiteralOperand
-              builtin operand then
-          pure {
-            type := if Detail.binaryResultIsBool operator then .bool else operand
-            requirements := []
-            state
-          }
-        else
-          throw (.unknownVariable name)
-    | .traitMethod traitName methodName =>
-        match ← Detail.operatorTrait? context traitName with
-        | some trait =>
-            let result := if Detail.binaryResultIsBool operator then .bool
-              else operand
-            let predicates ←
-              Detail.operatorTraitPredicates context trait methodName operand
-                [operand, operand] [result]
-            let (requirements, state) :=
-              state.addRequirementsWithIds predicates
-            pure { type := result, requirements, state }
-        | none =>
-            if Detail.isDeferredBuiltinOperatorTarget state
-                  hasOpenLiteralOperand builtin operand ||
-                Detail.isStagedIntegerOperatorTarget state
-                  hasOpenLiteralOperand builtin operand then
-              pure {
-                type := if Detail.binaryResultIsBool operator then .bool
-                  else operand
-                requirements := []
-                state
-              }
-            else
-              throw (.operatorNotSupported traitName operand)
+    let builtin := Detail.binaryBuiltinType operator
+    if operand = builtin then
+      pure {
+        type := if Detail.binaryResultIsBool operator then .bool else builtin
+        requirements := []
+        state
+      }
+    else
+      match Detail.binaryOperatorDispatch operator with
+      | .function name =>
+          if Detail.isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                builtin operand ||
+              Detail.isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                builtin operand then
+            pure {
+              type := if Detail.binaryResultIsBool operator then .bool else operand
+              requirements := []
+              state
+            }
+          else
+            throw (.unknownVariable name)
+      | .traitMethod traitName methodName =>
+          match ← Detail.operatorTrait? context traitName with
+          | some trait =>
+              let result := if Detail.binaryResultIsBool operator then .bool
+                else operand
+              let predicates ←
+                Detail.operatorTraitPredicates context trait methodName operand
+                  [operand, operand] [result]
+              let (requirements, state) :=
+                state.addRequirementsWithIds predicates
+              pure { type := result, requirements, state }
+          | none =>
+              if Detail.isDeferredBuiltinOperatorTarget state
+                    hasOpenLiteralOperand builtin operand ||
+                  Detail.isStagedIntegerOperatorTarget state
+                    hasOpenLiteralOperand builtin operand then
+                pure {
+                  type := if Detail.binaryResultIsBool operator then .bool
+                    else operand
+                  requirements := []
+                  state
+                }
+              else
+                throw (.operatorNotSupported traitName operand)
 
 private theorem finishBinaryOperator_success_case
     {inferenceContext : Frontend.SourceInference.Context}
@@ -16656,6 +16686,13 @@ private theorem finishBinaryOperator_success_case
       operator left right integerLiterals result := by
   unfold finishBinaryOperator at success
   simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
+  by_cases fixed : Detail.fixedWordOperator operator (state.resolve left) = true
+  · rw [if_pos fixed] at success
+    cases success
+    exact .primitive (by
+      rw [← operands_eq]
+      exact binaryFixedWord_hasType semanticContext operator _ fixed)
+  rw [if_neg fixed] at success
   by_cases operand_builtin :
       state.resolve left = Detail.binaryBuiltinType operator
   · simp [operand_builtin] at success
@@ -16751,6 +16788,13 @@ private theorem uncheckedBinaryOperator_success_case
       operator left right integerLiterals result := by
   unfold Detail.binaryOperatorTail at success
   simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
+  by_cases fixed : Detail.fixedWordOperator operator (state.resolve left) = true
+  · rw [if_pos fixed] at success
+    cases success
+    exact .primitive (by
+      rw [← operands_eq]
+      exact binaryFixedWord_hasType semanticContext operator _ fixed)
+  rw [if_neg fixed] at success
   by_cases operand_builtin :
       state.resolve left = Detail.binaryBuiltinType operator
   · simp [operand_builtin] at success

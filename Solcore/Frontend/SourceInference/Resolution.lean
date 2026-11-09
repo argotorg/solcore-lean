@@ -453,6 +453,24 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | .logicalAnd | .logicalOr => .bool
   | _ => .word
 
+/-- The operators on a fixed-width integer type whose builtin meaning is Word's
+on its canonical words: `==` and `!=` on every type, and the orderings and
+`& | ^` on the unsigned types. -/
+def fixedWordOperator (operator : Syntax.BinaryOp) : Ty → Bool
+  | .constructor (.builtin (.fixed fixed)) =>
+      match operator with
+      | .equal | .notEqual => true
+      | .less | .greater | .lessEqual | .greaterEqual
+      | .bitAnd | .bitXor | .bitOr => !fixed.signed
+      | _ => false
+  | _ => false
+
+/-- The builtin operand type of a binary operator at one operand type: the
+operand itself when it is a fixed-width integer type that takes the operator
+as a Word builtin (`fixedWordOperator`), and `binaryBuiltinType` otherwise. -/
+def binaryBuiltinTypeAt (operator : Syntax.BinaryOp) (operand : Ty) : Ty :=
+  if fixedWordOperator operator operand then operand else binaryBuiltinType operator
+
 /-- Select the exact trait method assigned to an operator spelling.  Program
 signature construction rejects duplicate method names, but keeping the
 cardinality check here makes inference reject malformed or independently
@@ -522,53 +540,62 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
-  let builtin := binaryBuiltinType operator
-  if operand = builtin then
+  -- The twelve fixed-width integer types take the operators whose meaning is
+  -- Word's on canonical words (`fixedWordOperator`) as builtins.
+  if fixedWordOperator operator operand then
     pure {
-      type := if binaryResultIsBool operator then .bool else builtin
+      type := if binaryResultIsBool operator then .bool else operand
       requirements := []
       state
     }
   else
-    match binaryOperatorDispatch operator with
-    | .function name =>
-        if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
-              builtin operand ||
-            isStagedIntegerOperatorTarget state hasOpenLiteralOperand
-              builtin operand then
-          pure {
-            type := if binaryResultIsBool operator then .bool else operand
-            requirements := []
-            state
-          }
-        else
-          throw (.unknownVariable name)
-    | .traitMethod traitName methodName =>
-        match ← operatorTrait? context traitName with
-        | some trait =>
-            let result := if binaryResultIsBool operator then .bool else operand
-            let predicates ←
-              operatorTraitPredicates context trait methodName operand
-                [operand, operand] [result]
-            let (requirements, state) :=
-              state.addRequirementsWithIds predicates
+    let builtin := binaryBuiltinType operator
+    if operand = builtin then
+      pure {
+        type := if binaryResultIsBool operator then .bool else builtin
+        requirements := []
+        state
+      }
+    else
+      match binaryOperatorDispatch operator with
+      | .function name =>
+          if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                builtin operand ||
+              isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                builtin operand then
             pure {
-              type := result
-              requirements
+              type := if binaryResultIsBool operator then .bool else operand
+              requirements := []
               state
             }
-        | none =>
-            if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
-                  builtin operand ||
-                isStagedIntegerOperatorTarget state hasOpenLiteralOperand
-                  builtin operand then
+          else
+            throw (.unknownVariable name)
+      | .traitMethod traitName methodName =>
+          match ← operatorTrait? context traitName with
+          | some trait =>
+              let result := if binaryResultIsBool operator then .bool else operand
+              let predicates ←
+                operatorTraitPredicates context trait methodName operand
+                  [operand, operand] [result]
+              let (requirements, state) :=
+                state.addRequirementsWithIds predicates
               pure {
-                type := if binaryResultIsBool operator then .bool else operand
-                requirements := []
+                type := result
+                requirements
                 state
               }
-            else
-              throw (.operatorNotSupported traitName operand)
+          | none =>
+              if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                    builtin operand ||
+                  isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                    builtin operand then
+                pure {
+                  type := if binaryResultIsBool operator then .bool else operand
+                  requirements := []
+                  state
+                }
+              else
+                throw (.operatorNotSupported traitName operand)
 
 def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     (left right : Ty) (expected : Option Ty)
