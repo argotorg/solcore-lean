@@ -1290,7 +1290,7 @@ namespace Solcore.Synthesis.Source.MemoryCalls
 open Solcore.Synthesis.Core.MemoryCalls
 open Solcore.Synthesis.Core.MemoryValues (Ref Fold Width Operand Index)
 
-def emitterVersion : String := "solcore-source-memory-calls-v1"
+def emitterVersion : String := "solcore-source-memory-calls-v2"
 def wrapperVersion : String := "solcore-word-memory-calls-contract-v1"
 def contractName : String := "SynthesizedMemoryCalls"
 def methodName : String := "run"
@@ -1476,7 +1476,7 @@ def emit (plan : Plan) : EmittedProgram := Id.run do
     names := next
   let enumLines := if usesEnum plan then
       ["enum Sc_E {", "    Sc_E0(memory<bytes>, word),", "    Sc_E1(word)", "}", ""] else []
-  let source := ["import * from std;", "import * from std.dispatch;",
+  let source := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] ++
     (usedHelpers plan).flatMap MemoryValues.helperLines ++ enumLines ++
     (plan.helpers.zipIdx.flatMap fun (helper, index) => helperLines plan.helpers index helper) ++

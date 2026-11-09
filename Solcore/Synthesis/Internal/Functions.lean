@@ -501,7 +501,7 @@ namespace Solcore.Synthesis.Source.Function
 
 open Solcore.Synthesis.Core (CheckedWordFunctionDAG)
 
-def emitterVersion : String := "solcore-source-functions-v1"
+def emitterVersion : String := "solcore-source-functions-v2"
 def wrapperVersion : String := "solcore-word-functions-contract-v1"
 
 /-- The G0 features `emit` renders, those of `ScalarRenderer`. -/
@@ -519,7 +519,7 @@ def helperName (index : Nat) : String := "sc_fn" ++ toString index
 Local temporaries are fresh within each function and cannot shadow helper names. -/
 def emit (graph : CheckedWordFunctionDAG) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", ""]
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""]
   for (body, index) in graph.helpers.zipIdx do
     let rendered ← ScalarRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body
     let name := helperName index
@@ -550,7 +550,7 @@ namespace Solcore.Synthesis.Source.Input
 
 open Solcore.Synthesis.Core (CheckedWordFunction)
 
-def emitterVersion : String := "solcore-source-input-v1"
+def emitterVersion : String := "solcore-source-input-v2"
 def wrapperVersion : String := "solcore-word-input-contract-v1"
 
 /-- The G0 features `emit` renders, those of `ScalarRenderer`. -/
@@ -566,7 +566,7 @@ def runtimePath : List String := ["SynthesizedInputDeploy", "SynthesizedInput"]
 its ABI wrapper once, and occupies the outermost scalar binding. -/
 def emit (function : CheckedWordFunction) : Except EmitError EmittedProgram := do
   let body ← ScalarRenderer.render .word ["sc_input"] 8 0 function.body
-  let lines := ["import * from std;", "import * from std.dispatch;", "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);"] ++ body.lines ++
@@ -1351,7 +1351,7 @@ namespace Solcore.Synthesis.Source.Mutation
 
 open Solcore.Synthesis.Core.LocalMutation (CheckedDAG)
 
-def emitterVersion : String := "solcore-source-mutation-v1"
+def emitterVersion : String := "solcore-source-mutation-v2"
 def wrapperVersion : String := "solcore-word-mutation-contract-v1"
 
 /-- The G0 features `emit` renders, those of `MutationRenderer`. -/
@@ -1365,7 +1365,7 @@ def runtimePath : List String := ["SynthesizedMutationDeploy", "SynthesizedMutat
 
 def emit (graph : CheckedDAG) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", ""]
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""]
   for (body, index) in graph.helpers.zipIdx do
     let rendered ← MutationRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← MutationRenderer.requireValue rendered
@@ -1944,7 +1944,7 @@ namespace Solcore.Synthesis.Source.Primitive
 
 open Solcore.Synthesis.Core (CheckedWordFunction)
 
-def emitterVersion : String := "solcore-source-primitives-v1"
+def emitterVersion : String := "solcore-source-primitives-v2"
 def wrapperVersion : String := "solcore-word-primitives-contract-v1"
 
 /-- The G0 features `emit` renders: every operator and form. -/
@@ -1965,7 +1965,8 @@ def opcodeImport : String :=
 
 def emit (function : CheckedWordFunction) : Except EmitError EmittedProgram := do
   let body ← PrimitiveRenderer.render .word ["sc_input"] 8 0 function.body
-  let lines := ["import * from std;", "import * from std.dispatch;", opcodeImport, "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    opcodeImport, "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);"] ++ body.lines ++

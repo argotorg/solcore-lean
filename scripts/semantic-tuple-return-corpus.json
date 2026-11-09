@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-tuple-returns-v1",
+  "emitterVersion": "solcore-source-tuple-returns-v2",
   "functionVersion": "core-tuple-return-contract-v1",
   "generationRecipeRequirements": {
     "templates": [

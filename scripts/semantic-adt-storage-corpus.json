@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-adt-storage-v1",
+  "emitterVersion": "solcore-source-adt-storage-v2",
   "functionVersion": "core-adt-storage-contract-v1",
   "generationRecipeRequirements": {
     "templates": [

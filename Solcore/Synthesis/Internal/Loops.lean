@@ -868,7 +868,7 @@ namespace Solcore.Synthesis.Source.CallGraphLoop
 
 open Solcore.Synthesis.Core.CallGraphLoop (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-call-graph-loops-v1"
+def emitterVersion : String := "solcore-source-call-graph-loops-v2"
 def wrapperVersion : String := "solcore-word-call-graph-loops-contract-v1"
 def contractName : String := "SynthesizedCallGraphLoops"
 def methodName : String := "run"
@@ -883,7 +883,8 @@ def helperName (index : Nat) : String := "sc_fn" ++ toString index
 and the step have fresh local temporaries that cannot shadow wrapper names. -/
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""]
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, ""]
   for (body, index) in plan.graph.helpers.zipIdx do
     let rendered ← CallGraphRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body
     let name := helperName index
@@ -926,7 +927,7 @@ namespace Solcore.Synthesis.Source.Loop
 
 open Solcore.Synthesis.Core.BoundedLoop (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-loops-v2"
+def emitterVersion : String := "solcore-source-loops-v3"
 def wrapperVersion : String := "solcore-word-loops-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -940,7 +941,7 @@ def runtimePath : List String := ["SynthesizedLoopsDeploy", "SynthesizedLoops"]
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ [""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
@@ -1583,7 +1584,7 @@ namespace Solcore.Synthesis.Source.LoopClosure
 
 open Solcore.Synthesis.Core.LoopClosure (CheckedPlan Capture)
 
-def emitterVersion : String := "solcore-source-loop-closures-v1"
+def emitterVersion : String := "solcore-source-loop-closures-v2"
 def wrapperVersion : String := "solcore-word-loop-closures-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -1611,7 +1612,7 @@ def body : Capture → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_apply<a>(f: function (a) returns (a), x: a) returns (a) {",
     "    return f(x);", "}", ""]
@@ -1954,7 +1955,7 @@ namespace Solcore.Synthesis.Source.NestedLoop
 
 open Solcore.Synthesis.Core.NestedLoop (CheckedPlan Bound)
 
-def emitterVersion : String := "solcore-source-nested-loops-v1"
+def emitterVersion : String := "solcore-source-nested-loops-v2"
 def wrapperVersion : String := "solcore-word-nested-loops-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -1975,7 +1976,7 @@ def innerBoundSource (plan : CheckedPlan) : String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ [""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
@@ -2365,7 +2366,7 @@ namespace Solcore.Synthesis.Source.Recursion
 
 open Solcore.Synthesis.Core.Recursion (CheckedPlan Form)
 
-def emitterVersion : String := "solcore-source-recursion-v1"
+def emitterVersion : String := "solcore-source-recursion-v2"
 def wrapperVersion : String := "solcore-word-recursion-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -2400,7 +2401,7 @@ def recursion (form : Form) : List String × String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ [""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
@@ -2740,7 +2741,7 @@ namespace Solcore.Synthesis.Source.RecursiveLoop
 open Solcore.Synthesis.Core.RecursiveLoop (CheckedPlan)
 open Solcore.Synthesis.Core.Recursion (Form)
 
-def emitterVersion : String := "solcore-source-recursive-loops-v1"
+def emitterVersion : String := "solcore-source-recursive-loops-v2"
 def wrapperVersion : String := "solcore-word-recursive-loops-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -2781,7 +2782,7 @@ def recursion (form : Form) (innerMask : Nat) : List String × String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ [""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body

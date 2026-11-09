@@ -1968,7 +1968,7 @@ private def fixtureResults : List (Nat × Nat) := [(0, 567), (1, 4386), (2, 993)
   (2 ^ 255, 567), (2 ^ 256 - 1, 905)]
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "",
   "enum Sc_T0 {",

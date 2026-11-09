@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-bytes-returns-v1",
+  "emitterVersion": "solcore-source-bytes-returns-v2",
   "functionVersion": "core-bytes-return-contract-v1",
   "generationRecipeRequirements": {
     "templates": [

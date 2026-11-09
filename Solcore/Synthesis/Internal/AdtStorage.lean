@@ -691,7 +691,7 @@ namespace Solcore.Synthesis.Source.AdtStorage
 open Solcore.Synthesis.Core
 open Solcore.Synthesis.Core.AdtStorage (CheckedPlan Method Shape Payload WordType payloadOffset offsetConstant multiplier)
 
-def emitterVersion : String := "solcore-source-adt-storage-v1"
+def emitterVersion : String := "solcore-source-adt-storage-v2"
 def wrapperVersion : String := "solcore-word-adt-storage-contract-v1"
 def contractName : String := "SynthesizedAdtStorage"
 def deployPath : List String := ["SynthesizedAdtStorageDeploy"]
@@ -856,7 +856,7 @@ private def typeLines (shape : Shape) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedAdtStorage := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
     "import * from std.StorageGeneric;",
     AggregateRenderer.opcodeImportWith ["mstore", "revert_"] (plan.step.helpers ++ [plan.step.entry]), ""] ++
     typeLines plan.shape
@@ -1735,7 +1735,7 @@ namespace Solcore.Synthesis.Source.EventLog
 
 open Solcore.Synthesis.Core.EventLog (CheckedPlan Site)
 
-def emitterVersion : String := "solcore-source-event-log-v1"
+def emitterVersion : String := "solcore-source-event-log-v2"
 def wrapperVersion : String := "solcore-word-event-log-contract-v1"
 def contractName : String := "SynthesizedLogs"
 def methodName : String := "run"
@@ -1767,7 +1767,7 @@ def siteLines (site : Site) : List String :=
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
   let wrappers := (usedArities plan.sites).map fun topics => "log" ++ toString topics ++ " as " ++ logAlias topics
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith (["sload", "sstore", "mload", "mstore", "revert_"] ++ wrappers)
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do

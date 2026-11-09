@@ -57,7 +57,7 @@ theorem Storage.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
     (emitted_eq : Storage.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;",
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
           storageImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] =
         .ok (names, lines) ∧
       AggregateRenderer.render names .word [.word "sc_arg"] 4 0 plan.step.entry = .ok entry ∧
@@ -80,7 +80,7 @@ theorem Storage.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), storageImport_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;",
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       storageImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] with
   | error error =>
       rw [loop] at emitted_eq
@@ -848,7 +848,7 @@ theorem StorageRollback.emit_success {plan : CheckedPlan} {emitted : EmittedProg
     (emitted_eq : StorageRollback.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;",
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
           rollbackImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] =
         .ok (names, lines) ∧
       AggregateRenderer.render names .word [.word "sc_arg"] 4 0 plan.step.entry = .ok entry ∧
@@ -877,7 +877,7 @@ theorem StorageRollback.emit_success {plan : CheckedPlan} {emitted : EmittedProg
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), rollbackImport_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;",
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       rollbackImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] with
   | error error =>
       rw [loop] at emitted_eq
@@ -1620,7 +1620,7 @@ theorem KeyedStorage.emit_success {plan : CheckedPlan} {emitted : EmittedProgram
     (emitted_eq : KeyedStorage.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;",
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
           rollbackImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] =
         .ok (names, lines) ∧
       AggregateRenderer.render names .word [.word "sc_arg"] 4 0 plan.step.entry = .ok entry ∧
@@ -1652,7 +1652,7 @@ theorem KeyedStorage.emit_success {plan : CheckedPlan} {emitted : EmittedProgram
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), rollbackImport_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;",
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       rollbackImportLine (aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] with
   | error error =>
       rw [loop] at emitted_eq
@@ -2439,7 +2439,7 @@ theorem EventLog.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
     (emitted_eq : EventLog.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;",
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
           logImportLine (logAliases plan.sites ++
             aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] =
         .ok (names, lines) ∧
@@ -2469,7 +2469,7 @@ theorem EventLog.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), logImport_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;",
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       logImportLine (logAliases plan.sites ++
         aggregateAliases (plan.step.helpers ++ [plan.step.entry])), ""] with
   | error error =>

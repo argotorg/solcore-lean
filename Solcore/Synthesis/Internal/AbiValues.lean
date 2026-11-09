@@ -594,7 +594,7 @@ namespace Solcore.Synthesis.Source.DynamicArray
 
 open Solcore.Synthesis.Core.DynamicArray (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-dynamic-array-v2"
+def emitterVersion : String := "solcore-source-dynamic-array-v3"
 def wrapperVersion : String := "solcore-word-dynamic-array-contract-v1"
 def contractName : String := "SynthesizedDynamicArray"
 def methodName : String := "run"
@@ -613,7 +613,7 @@ private def elementLines (index : Nat) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1169,7 +1169,7 @@ namespace Solcore.Synthesis.Source.DynamicBytes
 
 open Solcore.Synthesis.Core.DynamicBytes (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-dynamic-bytes-v1"
+def emitterVersion : String := "solcore-source-dynamic-bytes-v2"
 def wrapperVersion : String := "solcore-word-dynamic-bytes-contract-v1"
 def contractName : String := "SynthesizedBytes"
 def methodName : String := "run"
@@ -1186,7 +1186,7 @@ private def chunkLines (index : Nat) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_", "mload", "calldatasize"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1828,7 +1828,7 @@ namespace Solcore.Synthesis.Source.LongBytes
 
 open Solcore.Synthesis.Core.LongBytes (CheckedPlan chunkCount countSlot tailSlot)
 
-def emitterVersion : String := "solcore-source-long-bytes-v1"
+def emitterVersion : String := "solcore-source-long-bytes-v2"
 def wrapperVersion : String := "solcore-word-long-bytes-contract-v1"
 def contractName : String := "SynthesizedLongBytes"
 def methodName : String := "run"
@@ -1845,7 +1845,7 @@ private def chunkLines (index : Nat) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_", "mload", "calldatasize"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -2471,7 +2471,7 @@ namespace Solcore.Synthesis.Source.NestedArray
 
 open Solcore.Synthesis.Core.NestedArray (CheckedPlan maxRows maxColumns rowSlot cellSlot)
 
-def emitterVersion : String := "solcore-source-nested-array-v1"
+def emitterVersion : String := "solcore-source-nested-array-v2"
 def wrapperVersion : String := "solcore-word-nested-array-contract-v1"
 def contractName : String := "SynthesizedNestedArray"
 def methodName : String := "run"
@@ -2497,7 +2497,7 @@ private def rowLines (row : Nat) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do

@@ -496,7 +496,7 @@ def execute(args, report):
         return execute_returns(args, report, previous, runner, case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
     save(case_path, case)
-    source.write_text(common.compiler_source(case["source"]))
+    source.write_text(case["source"])
     report.update(caseSha256=common.file_digest(case_path), sourceSha256=common.file_digest(source),
         programsSha256=common.digest(common.json_bytes(case["programs"])), provenance=case["provenance"],
         replayOf=str(args.replay) if args.replay else None)
@@ -1462,7 +1462,7 @@ def execute_returns(args, report, previous, runner, case):
     save(case_path, case)
     sources = {role: args.output / f"{role}.sol" for role in ROLES}
     for role in ROLES:
-        sources[role].write_text(common.compiler_source(case["sources"][role]))
+        sources[role].write_text(case["sources"][role])
     report.update(caseSha256=common.file_digest(case_path),
         sourceSha256={role: common.file_digest(sources[role]) for role in ROLES},
         programsSha256=common.digest(common.json_bytes(case["programs"])), provenance=case["provenance"],

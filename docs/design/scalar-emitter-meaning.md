@@ -185,8 +185,8 @@ applications; parenthesized infix `+`, `-`, `*`, `&`, `|`, `^`, `==` and `>`;
 `let x: T = e;` with `T` one of `word`, `bool`, `(word, word)` or
 `sum<word, word>`, `x = e;`, `if (e) { ... } else { ... }`, the pair match
 `match (e) { case (x, y) { ... } }` and the sum match
-`match (e) { case inl(x) { ... } case inr(y) { ... } }`. A file imports `std`
-and `std.dispatch`,
+`match (e) { case inl(x) { ... } case inr(y) { ... } }`. A file starts with
+`pragma solcore;`, imports `std` and `std.dispatch`,
 optionally imports `opcode as alias` pairs from `std.opcodes`, declares free
 functions `function f(p: T, ...) returns (T) { ...; return e; }`, and declares
 one contract with one public method whose parameters and declared result have

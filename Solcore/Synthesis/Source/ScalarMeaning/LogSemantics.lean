@@ -153,7 +153,8 @@ def logImportLine (aliases : List (String × String)) : String :=
     aliases.map fun alias => alias.1 ++ " as " ++ alias.2) ++ "} from std.opcodes;"
 
 def LogFile.lines (file : LogFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;", logImportLine file.opcodeAliases, ""] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    logImportLine file.opcodeAliases, ""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",
     "    function " ++ file.method.name ++ "(" ++ Method.parameterText file.method.parameters ++

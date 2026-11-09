@@ -35,7 +35,8 @@ theorem CallGraphLoop.emit_success {plan : CheckedPlan} {emitted : EmittedProgra
     (emitted_eq : CallGraphLoop.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : Rendered),
       helperLoop CallGraphRenderer.renderWithFunctions plan.graph.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] =
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+          Primitive.opcodeImport, ""] =
         .ok (names, lines) ∧
       CallGraphRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 plan.graph.entry =
         .ok entry ∧
@@ -59,7 +60,8 @@ theorem CallGraphLoop.emit_success {plan : CheckedPlan} {emitted : EmittedProgra
   rw [forIn_helperLoop (render := CallGraphRenderer.renderWithFunctions) (fun _ _ _ _ => rfl)]
     at emitted_eq
   cases loop : helperLoop CallGraphRenderer.renderWithFunctions plan.graph.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] with
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+      Primitive.opcodeImport, ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq
@@ -646,7 +648,7 @@ theorem Generic.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
     (emitted_eq : Generic.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        (["import * from std;", "import * from std.dispatch;"] ++
+        (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
           aliasImportLines (aggregateAliases (plan.step.helpers ++ [plan.step.entry])) ++ ["",
           "function sc_select<a>(flag: bool, left: a, right: a) returns (a) {",
           "    if (flag) {", "        return left;", "    }", "    return right;", "}", ""]) =
@@ -668,7 +670,7 @@ theorem Generic.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), opcodeImports_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    (["import * from std;", "import * from std.dispatch;"] ++
+    (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
       aliasImportLines (aggregateAliases (plan.step.helpers ++ [plan.step.entry])) ++ ["",
       "function sc_select<a>(flag: bool, left: a, right: a) returns (a) {",
       "    if (flag) {", "        return left;", "    }", "    return right;", "}", ""]) with
@@ -1414,7 +1416,7 @@ theorem Loop.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
     (emitted_eq : Loop.emit plan = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop plan.step.helpers 0 []
-        (["import * from std;", "import * from std.dispatch;"] ++
+        (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
           aliasImportLines (aggregateAliases (plan.step.helpers ++ [plan.step.entry])) ++
           [""]) = .ok (names, lines) ∧
       AggregateRenderer.render names .word [.word "sc_arg"] 4 0 plan.step.entry = .ok entry ∧
@@ -1437,7 +1439,7 @@ theorem Loop.emit_success {plan : CheckedPlan} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), opcodeImports_eq] at emitted_eq
   cases loop : aggregateLoop plan.step.helpers 0 []
-    (["import * from std;", "import * from std.dispatch;"] ++
+    (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
       aliasImportLines (aggregateAliases (plan.step.helpers ++ [plan.step.entry])) ++ [""]) with
   | error error =>
       rw [loop] at emitted_eq

@@ -482,7 +482,7 @@ namespace Solcore.Synthesis.Source.CallGraph
 
 open Solcore.Synthesis.Core (CheckedWordFunctionDAG)
 
-def emitterVersion : String := "solcore-source-call-graphs-v1"
+def emitterVersion : String := "solcore-source-call-graphs-v2"
 def wrapperVersion : String := "solcore-word-call-graphs-contract-v1"
 def contractName : String := "SynthesizedCallGraphs"
 def methodName : String := "run"
@@ -497,7 +497,8 @@ def helperName (index : Nat) : String := "sc_fn" ++ toString index
 Local temporaries are fresh within each function and cannot shadow helper names. -/
 def emit (graph : CheckedWordFunctionDAG) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""]
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, ""]
   for (body, index) in graph.helpers.zipIdx do
     let rendered ← CallGraphRenderer.renderWithFunctions names .word ["sc_arg"] 4 0 body
     let name := helperName index

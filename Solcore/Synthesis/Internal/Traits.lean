@@ -1763,7 +1763,7 @@ namespace Solcore.Synthesis.Source.Traits
 open Solcore.Synthesis.Core.Traits
 open Solcore.Synthesis.Source.Enums (enumName constructorName declLines leafText)
 
-def emitterVersion : String := "solcore-source-traits-v1"
+def emitterVersion : String := "solcore-source-traits-v2"
 def wrapperVersion : String := "solcore-word-traits-contract-v1"
 
 def contractName : String := "SynthesizedTraits"
@@ -1987,7 +1987,7 @@ def runLines (plan : Plan) : List String :=
     [indented 8 ("return uint256(" ++ combined ++ ");"), indented 4 "}", "}"]
 
 def emit (plan : Plan) : Solcore.Synthesis.Source.EmittedProgram :=
-  let lines := ["import * from std;", "import * from std.dispatch;", ""] ++
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] ++
     plan.decls.zipIdx.flatMap (fun (decl, index) => declLines plan.decls index decl) ++
     traitLines plan ++ plan.impls.flatMap (implLines plan) ++ plan.helpers.flatMap helperLines ++
     plan.uses.zipIdx.flatMap (fun (use, index) => builderLines plan.decls index use) ++
@@ -2014,7 +2014,7 @@ open Solcore.Synthesis.Source.Enums (enumName declLines)
 
 abbrev Decl := Solcore.Synthesis.Core.Enums.Decl
 
-def emitterVersion : String := "solcore-source-trait-hierarchies-v1"
+def emitterVersion : String := "solcore-source-trait-hierarchies-v2"
 def wrapperVersion : String := "solcore-word-trait-hierarchies-contract-v1"
 
 def contractName : String := "SynthesizedTraitHierarchies"
@@ -2182,7 +2182,7 @@ def runLines (plan : Plan) : List String :=
 
 def emit (plan : Plan) : Solcore.Synthesis.Source.EmittedProgram :=
   let base := plan.base
-  let lines := ["import * from std;", "import * from std.dispatch;", ""] ++
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] ++
     plan.decls.zipIdx.flatMap (fun (decl, index) => declLines plan.decls index decl) ++
     Traits.traitLines base ++ plan.impls.flatMap (Traits.implLines base) ++
     hierarchyLines plan ++ plan.subImpls.flatMap (subImplLines plan) ++ plan.tops.flatMap (topImplLines plan) ++

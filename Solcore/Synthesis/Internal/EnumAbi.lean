@@ -887,7 +887,7 @@ namespace Solcore.Synthesis.Source.EnumArgument
 
 open Solcore.Synthesis.Core.EnumArgument (CheckedPlan Constructor Shape)
 
-def emitterVersion : String := "solcore-source-enum-arguments-v1"
+def emitterVersion : String := "solcore-source-enum-arguments-v2"
 def wrapperVersion : String := "solcore-enum-arguments-contract-v1"
 def contractName : String := "SynthesizedEnumArguments"
 def enumName : String := "SynthesizedEnum"
@@ -945,7 +945,7 @@ def typeLines (shape : Shape) : List String :=
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let constructors := plan.shape.constructors
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
     "import * from std.ABIGeneric;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "mload", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""] ++ typeLines plan.shape
@@ -2126,7 +2126,7 @@ open Solcore.Synthesis.Core.EnumArgument (Constructor Shape)
 open Solcore.Synthesis.Core.EnumArray (CheckedPlan)
 open Solcore.Synthesis.Source.EnumArgument (enumName structName typeLines)
 
-def emitterVersion : String := "solcore-source-enum-array-arguments-v1"
+def emitterVersion : String := "solcore-source-enum-array-arguments-v2"
 def wrapperVersion : String := "solcore-enum-array-arguments-contract-v1"
 def contractName : String := "SynthesizedEnumArrays"
 def methodName : String := "run"
@@ -2178,7 +2178,7 @@ def summands : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
     "import * from std.ABIGeneric;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "mload", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""] ++ typeLines plan.shape
@@ -3487,7 +3487,7 @@ namespace Solcore.Synthesis.Source.EnumReturn
 open Solcore.Synthesis.Core.EnumReturn (CheckedPlan Constructor)
 open Solcore.ContractRuntime (EnumPayload)
 
-def emitterVersion : String := "solcore-source-enum-returns-v1"
+def emitterVersion : String := "solcore-source-enum-returns-v2"
 def wrapperVersion : String := "solcore-enum-returns-contract-v1"
 def contractName : String := "SynthesizedEnumReturns"
 def enumName : String := "SynthesizedEnum"
@@ -3538,7 +3538,7 @@ def completionLines (constructors : List Constructor) : List String :=
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let constructors := plan.shape.constructors
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "import * from std.Generic;",
     "import * from std.ABIGeneric;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), "",

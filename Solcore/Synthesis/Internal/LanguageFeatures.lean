@@ -567,7 +567,7 @@ namespace Solcore.Synthesis.Source.Closure
 
 open Solcore.Synthesis.Core.Closure (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-closures-v2"
+def emitterVersion : String := "solcore-source-closures-v3"
 def wrapperVersion : String := "solcore-word-closures-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -588,7 +588,7 @@ private def secondClosure : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_apply<a>(f: function (a) returns (a), x: a) returns (a) {",
     "    return f(x);", "}", ""]
@@ -932,7 +932,7 @@ namespace Solcore.Synthesis.Source.Comptime
 
 open Solcore.Synthesis.Core.Comptime (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-comptime-v2"
+def emitterVersion : String := "solcore-source-comptime-v3"
 def wrapperVersion : String := "solcore-word-comptime-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -956,7 +956,7 @@ private def runtimeLines : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let constant ← ScalarRenderer.render .word [] 4 0 plan.constant.program.body
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_static(comptime value: word) returns (comptime<word>) {",
     "    return value;", "}", "",
@@ -1329,7 +1329,7 @@ namespace Solcore.Synthesis.Source.Generic
 
 open Solcore.Synthesis.Core.Generic (CheckedPlan Variant)
 
-def emitterVersion : String := "solcore-source-generics-v2"
+def emitterVersion : String := "solcore-source-generics-v3"
 def wrapperVersion : String := "solcore-word-generics-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -1367,7 +1367,7 @@ private def selectedResult : Variant → List String
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["",
     "function sc_select<a>(flag: bool, left: a, right: a) returns (a) {",
     "    if (flag) {", "        return left;", "    }", "    return right;", "}", ""]
@@ -1708,7 +1708,7 @@ namespace Solcore.Synthesis.Source.Modules
 
 open Solcore.Synthesis.Core.Modules (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-modules-v2"
+def emitterVersion : String := "solcore-source-modules-v3"
 def wrapperVersion : String := "solcore-word-modules-contract-v1"
 
 /-- The G0 features `emit` renders in the step: every operator and form. -/
@@ -1754,7 +1754,7 @@ private def join (lines : List String) : String := String.intercalate "\n" lines
 
 private def commonSource (plan : CheckedPlan) : Except EmitError String := do
   let constant ← ScalarRenderer.render .word [] 4 0 plan.constant.program.body
-  return join (["import * from std;",
+  return join (["pragma solcore;", "import * from std;",
     "export { sc_static, sc_constant, sc_apply, sc_select };", "",
     "function sc_static(comptime value: word) returns (comptime<word>) {",
     "    return value;", "}", "",
@@ -1766,7 +1766,7 @@ private def commonSource (plan : CheckedPlan) : Except EmitError String := do
     "    if (flag) {", "        return left;", "    }", "    return right;", "}"])
 
 private def leftSource (plan : CheckedPlan) : Except EmitError String := do
-  let mut lines := ["import * from std;", "import { sc_apply } from common;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import { sc_apply } from common;"] ++
     AggregateRenderer.opcodeImports (plan.step.helpers ++ [plan.step.entry]) ++ ["export { sc_left };", ""]
   let mut names : List String := []
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1788,7 +1788,8 @@ private def leftSource (plan : CheckedPlan) : Except EmitError String := do
     "    return sc_apply(sc_f, input) + sc_cap;", "}"])
 
 private def rightSource : String := join [
-  "import * from std;", "import { sc_apply } from common;", "export { sc_right };", "",
+  "pragma solcore;", "import * from std;", "import { sc_apply } from common;",
+  "export { sc_right };", "",
   "function sc_right(input: word, k: word) returns (word) {",
   "    let sc_cap: word = input ^ k;",
   "    let sc_f: function (word) returns (word) = lam (sc_arg: word) -> word {",
@@ -1797,7 +1798,7 @@ private def rightSource : String := join [
   "    return sc_apply(sc_f, input + 1) + sc_cap;", "}"]
 
 private def entrySource : String := join [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import { sc_constant, sc_select } from common;",
   "import { sc_left } from left;", "import { sc_right } from right;", "",
   "contract " ++ contractName ++ " {",

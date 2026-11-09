@@ -448,7 +448,7 @@ private def originalChecks : IO Unit := do
     source.methodSignature == "run(uint256)" && source.deployPath == ["SynthesizedCallGraphsDeploy"] &&
     source.runtimePath == ["SynthesizedCallGraphsDeploy", "SynthesizedCallGraphs"])
     "call graph wrapper metadata changed"
-  ensure (CallGraph.emitterVersion == "solcore-source-call-graphs-v1" &&
+  ensure (CallGraph.emitterVersion == "solcore-source-call-graphs-v2" &&
     CallGraph.wrapperVersion == "solcore-word-call-graphs-contract-v1" &&
     CallGraph.selector == "0xa444f5e9") "call graph versions or ABI selector changed"
   -- A Bool condition may itself contain calls; only the selected branch calls
@@ -526,7 +526,8 @@ private def formattingChecks : IO Unit := do
     "branch-local helper calls escaped their branch or changed binder scope"
   let identity ← emitted (← checked [.var 0] (call 1 (.var 0)))
   ensure (identity.source == String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, "",
     "function sc_fn0(sc_arg: word) returns (word) {", "    return sc_arg;", "}", "",
     "contract SynthesizedCallGraphs {", "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);", "        let sc_v0: word = sc_input;",
@@ -1140,11 +1141,12 @@ private def sourceChecks : IO Unit := do
     source.methodSignature == "run(uint256)" && source.deployPath == ["SynthesizedCallGraphLoopsDeploy"] &&
     source.runtimePath == ["SynthesizedCallGraphLoopsDeploy", "SynthesizedCallGraphLoops"])
     "call-graph loop wrapper metadata changed"
-  ensure (CallGraphLoop.emitterVersion == "solcore-source-call-graph-loops-v1" &&
+  ensure (CallGraphLoop.emitterVersion == "solcore-source-call-graph-loops-v2" &&
     CallGraphLoop.wrapperVersion == "solcore-word-call-graph-loops-contract-v1" &&
     CallGraphLoop.selector == "0xa444f5e9") "call-graph loop versions or ABI selector changed"
   ensure (source.source == String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, "",
     "function sc_fn0(sc_arg: word) returns (word) {", "    return sc_arg;", "}", "",
     "function sc_step(sc_arg: word) returns (word) {", "    let sc_v0: word = sc_arg;",
     "    let sc_v1: word = sc_fn0(sc_v0);", "    return sc_v1;", "}", "",
@@ -1173,7 +1175,8 @@ private def sourceChecks : IO Unit := do
     | .ok value => pure value
     | .error _ => throw (IO.userError "step rendering failed")
   let expectedPrefix := String.intercalate "\n" ([
-    "import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, "",
     "function sc_fn0(sc_arg: word) returns (word) {"] ++ helper.lines ++
     ["    return " ++ helper.value ++ ";", "}", "", "function sc_step(sc_arg: word) returns (word) {"] ++
     step.lines ++ ["    return " ++ step.value ++ ";", "}", "", "contract SynthesizedCallGraphLoops {"])
@@ -1671,7 +1674,7 @@ private def formattingChecks : IO Unit := do
     "if ((sc_input & 1) == 1)", "if ((sc_input & 2) == 2)", "if ((sc_input & 4) == 4)"] do
     ensure ((emitted.source.splitOn fragment).length == 2)
       s!"nested source lost or duplicated its protocol fragment: {fragment}"
-  ensure (Solcore.Synthesis.Source.NestedCall.emitterVersion == "solcore-source-nested-call-v2" &&
+  ensure (Solcore.Synthesis.Source.NestedCall.emitterVersion == "solcore-source-nested-call-v3" &&
     Solcore.Synthesis.Source.NestedCall.wrapperVersion == "solcore-word-nested-call-v1" &&
     NestedCall.version == "core-nested-word-call-v1") "nested provenance changed"
 

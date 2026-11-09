@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-enum-array-arguments-v1",
+  "emitterVersion": "solcore-source-enum-array-arguments-v2",
   "functionVersion": "core-enum-array-argument-contract-v2",
   "generationRecipeRequirements": {
     "templates": [

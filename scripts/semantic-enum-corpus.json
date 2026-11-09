@@ -3,7 +3,7 @@
   "profile": "runtime-enums",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-enums-v1",
+  "emitterVersion": "solcore-source-enums-v2",
   "generatorVersion": "core-enum-match-v1",
   "profileVersion": "runtime-enums-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-enums-contract-v1",

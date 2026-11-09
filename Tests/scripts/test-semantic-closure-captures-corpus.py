@@ -1011,7 +1011,7 @@ def emit(value, profile):
     body = (["let sc_x: word = Typedef.rep(input);", "let sc_r: word = 0;"] +
             block_lines(True, 0, fresh(), plan["steps"]) + ["return uint256(sc_r);"])
     name = profile["contract"]
-    lines = (["import * from std;", "import * from std.dispatch;", ""] + helpers + free + ["contract " + name + " {"] +
+    lines = (["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] + helpers + free + ["contract " + name + " {"] +
              field + methods + ["    function run(input: uint256) public returns (uint256) {"] + indent(8, body) +
              ["    }", "}"])
     return "\n".join(lines) + "\n"

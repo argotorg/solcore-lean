@@ -2584,7 +2584,7 @@ private def admissionChecks : IO Unit := do
     "the deployment value changed the original Core program"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_, callvalue as sc_callvalue} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -2615,7 +2615,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)] 0)
   ensure ((divided.source.splitOn "import {sload, sstore, mstore, revert_, callvalue as sc_callvalue, div as sc_div, ").length == 2)
     "call-value emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.CallValue.emitterVersion == "solcore-source-call-value-v1" &&
+  ensure (Solcore.Synthesis.Source.CallValue.emitterVersion == "solcore-source-call-value-v2" &&
     Solcore.Synthesis.Source.CallValue.wrapperVersion == "solcore-word-call-value-contract-v1" &&
     Solcore.Synthesis.Source.CallValue.selector == "0x7357f5d2" && CallValue.version == "core-call-value-contract-v1")
     "call-value provenance changed"
@@ -4423,7 +4423,7 @@ private def admissionChecks : IO Unit := do
       ForwardedCall.programOverhead == 169) "the parent program depends on the step or the overhead changed"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mload, mstore, calldataload, gas, call, returndatasize, return_, revert_, invalid, callvalue as sc_callvalue} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -4474,7 +4474,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "invalid, callvalue as sc_callvalue, div as sc_div, ").length == 2)
     "forwarded-value emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.ForwardedCall.emitterVersion == "solcore-source-forwarded-value-v1" &&
+  ensure (Solcore.Synthesis.Source.ForwardedCall.emitterVersion == "solcore-source-forwarded-value-v2" &&
     Solcore.Synthesis.Source.ForwardedCall.wrapperVersion == "solcore-word-forwarded-value-v1" &&
     ForwardedCall.version == "core-forwarded-value-call-v1" &&
     ForwardedCallExecution.parentEndowment == endowment) "forwarded-value provenance changed"

@@ -881,7 +881,7 @@ def emitted_source(plan, contract=NAME, opcodes="import { mload, mstore, mstore8
     helpers = [line for name in memory.HELPERS if name in used for line in memory.HELPER_LINES[name]]
     enum_lines = ["enum Sc_F {", "    Sc_F0(Error, word),", "    Sc_F1(word)", "}", ""] if enum else []
     own = [line for index, h in enumerate(plan["helpers"]) for line in helper_lines(index, h) + [""]]
-    source = (["import * from std;", "import * from std.dispatch;", opcodes, ""] + helpers + enum_lines + own +
+    source = (["pragma solcore;", "import * from std;", "import * from std.dispatch;", opcodes, ""] + helpers + enum_lines + own +
               [f"contract {contract} {{", "    function run(input: uint256) public returns (uint256) {",
                "        let sc_x: word = Typedef.rep(input);", "        let sc_r: word = 0;"] + indent(8, lines) +
               ["        return uint256(sc_r);", "    }", "}"])

@@ -1120,7 +1120,7 @@ private def admissionChecks : IO Unit := do
   ensure (DynamicBytes.programOverhead == 176) "bytes wrapper overhead changed"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_, mload, calldatasize} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -1159,7 +1159,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "import {sload, sstore, mstore, revert_, mload, calldatasize, div as sc_div, ").length == 2)
     "bytes emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.DynamicBytes.emitterVersion == "solcore-source-dynamic-bytes-v1" &&
+  ensure (Solcore.Synthesis.Source.DynamicBytes.emitterVersion == "solcore-source-dynamic-bytes-v2" &&
     Solcore.Synthesis.Source.DynamicBytes.wrapperVersion == "solcore-word-dynamic-bytes-contract-v1" &&
     Solcore.Synthesis.Source.DynamicBytes.selector == "0x220eb9b6" && DynamicBytes.version == "core-dynamic-bytes-contract-v1")
     "bytes provenance changed"
@@ -1846,7 +1846,7 @@ private def expectedChunk (k : Nat) : List String :=
     "            sstore(" ++ toString (k + 1) ++ ", sc_acc);", "        }"]
 
 private def expectedBasic : String := String.intercalate "\n" ([
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_, mload, calldatasize} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -1881,7 +1881,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "import {sload, sstore, mstore, revert_, mload, calldatasize, div as sc_div, ").length == 2)
     "long-bytes emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.LongBytes.emitterVersion == "solcore-source-long-bytes-v1" &&
+  ensure (Solcore.Synthesis.Source.LongBytes.emitterVersion == "solcore-source-long-bytes-v2" &&
     Solcore.Synthesis.Source.LongBytes.wrapperVersion == "solcore-word-long-bytes-contract-v1" &&
     Solcore.Synthesis.Source.LongBytes.selector == "0x220eb9b6" && LongBytes.version == "core-long-bytes-contract-v1")
     "long-bytes provenance changed"

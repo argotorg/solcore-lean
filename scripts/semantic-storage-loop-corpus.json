@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-storage-loops-v1",
+  "emitterVersion": "solcore-source-storage-loops-v2",
   "functionVersion": "core-storage-loop-contract-v1",
   "generationRecipeRequirements": {
     "templates": [

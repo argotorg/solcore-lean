@@ -211,7 +211,7 @@ def InfixStmt.listLines (indent : Nat) : List InfixStmt → List String
 /-- The layout of `SourceFile.lines`, with the generic functions before the
 ordinary ones. -/
 def GenericFile.lines (file : GenericFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
   aliasImportLines file.opcodeAliases ++ [""] ++
   file.generics.flatMap GenericDecl.lines ++
   file.functions.flatMap FunctionDecl.lines ++
@@ -549,7 +549,8 @@ def storageImportLine (aliases : List (String × String)) : String :=
     aliases.map fun alias => alias.1 ++ " as " ++ alias.2) ++ "} from std.opcodes;"
 
 def StorageFile.lines (file : StorageFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;", storageImportLine file.opcodeAliases,
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    storageImportLine file.opcodeAliases,
     ""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",
@@ -732,7 +733,8 @@ def rollbackImportLine (aliases : List (String × String)) : String :=
     aliases.map fun alias => alias.1 ++ " as " ++ alias.2) ++ "} from std.opcodes;"
 
 def RollbackFile.lines (file : RollbackFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;", rollbackImportLine file.opcodeAliases,
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    rollbackImportLine file.opcodeAliases,
     ""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",
@@ -881,7 +883,8 @@ def KeyedStmt.listLines (indent : Nat) : List KeyedStmt → List String
   | statement :: rest => statement.lines indent ++ KeyedStmt.listLines indent rest
 
 def KeyedFile.lines (file : KeyedFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;", rollbackImportLine file.opcodeAliases,
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    rollbackImportLine file.opcodeAliases,
     ""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",
@@ -1018,7 +1021,7 @@ def LoopStmt.listLines (indent : Nat) : List LoopStmt → List String
 
 /-- The layout of `SourceFile.lines` around a loop method body. -/
 def LoopFile.lines (file : LoopFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
   aliasImportLines file.opcodeAliases ++ [""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",

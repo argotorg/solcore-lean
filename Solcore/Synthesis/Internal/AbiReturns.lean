@@ -564,7 +564,7 @@ namespace Solcore.Synthesis.Source.ArrayReturn
 
 open Solcore.Synthesis.Core.ArrayReturn (CheckedPlan Element)
 
-def emitterVersion : String := "solcore-source-array-returns-v1"
+def emitterVersion : String := "solcore-source-array-returns-v2"
 def wrapperVersion : String := "solcore-array-returns-contract-v1"
 def contractName : String := "SynthesizedArrayReturns"
 def methodName : String := "run"
@@ -622,7 +622,7 @@ def elementLines (element : Element) (index : Nat) : List String :=
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let element := plan.shape.element
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "mload", "revert_", "return_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1405,7 +1405,7 @@ namespace Solcore.Synthesis.Source.BytesReturn
 
 open Solcore.Synthesis.Core.BytesReturn (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-bytes-returns-v1"
+def emitterVersion : String := "solcore-source-bytes-returns-v2"
 def wrapperVersion : String := "solcore-bounded-bytes-returns-contract-v1"
 def contractName : String := "SynthesizedBytesReturns"
 def methodName : String := "run"
@@ -1420,7 +1420,7 @@ def multiplierLiteral : String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -2054,7 +2054,7 @@ namespace Solcore.Synthesis.Source.TupleReturn
 
 open Solcore.Synthesis.Core.TupleReturn (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-tuple-returns-v1"
+def emitterVersion : String := "solcore-source-tuple-returns-v2"
 def wrapperVersion : String := "solcore-word-tuple-returns-contract-v1"
 def contractName : String := "SynthesizedTupleReturns"
 def methodName : String := "run"
@@ -2073,7 +2073,7 @@ def returnedWords (arity : Nat) : List String :=
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do

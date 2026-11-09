@@ -1261,10 +1261,10 @@ namespace Solcore.Synthesis.Source.Integers
 
 open Solcore.Synthesis.Core.Integers
 
-def arithmeticEmitterVersion : String := "solcore-source-checked-arithmetic-v1"
+def arithmeticEmitterVersion : String := "solcore-source-checked-arithmetic-v2"
 def arithmeticWrapperVersion : String := "solcore-checked-arithmetic-contract-v1"
 def arithmeticContract : String := "SynthesizedCheckedArithmetic"
-def shiftEmitterVersion : String := "solcore-source-shifts-v1"
+def shiftEmitterVersion : String := "solcore-source-shifts-v2"
 def shiftWrapperVersion : String := "solcore-word-shifts-contract-v1"
 def shiftContract : String := "SynthesizedShifts"
 
@@ -1412,7 +1412,7 @@ def applies (plan : Plan) : Bool := plan.steps.any fun (_, step) => step matches
 
 def imports (plan : Plan) : List String :=
   let signed := plan.type.signed
-  ["import * from std;", "import * from std.unsigned;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.unsigned;"] ++
     (if signed then ["import * from std.signed;"] else []) ++
     (if unchecked plan then [if signed then "import * from std.unchecked.signed;" else
       "import * from std.unchecked.unsigned;"] else []) ++

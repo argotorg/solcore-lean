@@ -3,7 +3,7 @@
   "profile": "runtime-closure-factories",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-closure-factories-v1",
+  "emitterVersion": "solcore-source-closure-factories-v2",
   "generatorVersion": "core-closure-captures-v1",
   "profileVersion": "runtime-closure-factories-v1/plan-seed-v1",
   "wrapperVersion": "solcore-closure-factories-contract-v1",

@@ -3,7 +3,7 @@
   "profile": "runtime-revert-data",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-revert-data-v1",
+  "emitterVersion": "solcore-source-revert-data-v2",
   "generatorVersion": "core-revert-data-v1",
   "profileVersion": "runtime-revert-data-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-revert-data-contract-v1",

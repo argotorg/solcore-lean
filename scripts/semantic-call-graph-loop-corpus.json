@@ -11,7 +11,7 @@
   "boundaryVersion": "word-loop-boundary-bank-v1",
   "stepBoundaryVersion": "word-primitive-boundary-bank-v1",
   "callShapeVersion": "core-call-graph-shapes-v1",
-  "emitterVersion": "solcore-source-call-graph-loops-v1",
+  "emitterVersion": "solcore-source-call-graph-loops-v2",
   "wrapperVersion": "solcore-word-call-graph-loops-contract-v1",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",

@@ -1330,10 +1330,10 @@ set_option autoImplicit false
 namespace Solcore.Synthesis.Source.Captures
 open Solcore.Synthesis.Core.Captures
 
-def capturesEmitterVersion : String := "solcore-source-closure-captures-v1"
+def capturesEmitterVersion : String := "solcore-source-closure-captures-v2"
 def capturesWrapperVersion : String := "solcore-closure-captures-contract-v1"
 def capturesContract : String := "SynthesizedClosureCaptures"
-def factoriesEmitterVersion : String := "solcore-source-closure-factories-v1"
+def factoriesEmitterVersion : String := "solcore-source-closure-factories-v2"
 def factoriesWrapperVersion : String := "solcore-closure-factories-contract-v1"
 def factoriesContract : String := "SynthesizedClosureFactories"
 
@@ -1451,7 +1451,7 @@ def emitWith (contract : String) (plan : Plan) : EmittedProgram :=
   let field := if plan.usesField then ["    sc_n: word;", ""] else []
   let body := ["let sc_x: word = Typedef.rep(input);", "let sc_r: word = 0;"] ++ (blockLines true 0 {} plan.steps).1 ++
     ["return uint256(sc_r);"]
-  let lines := ["import * from std;", "import * from std.dispatch;", ""] ++ helperLines plan ++ free ++
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] ++ helperLines plan ++ free ++
     ["contract " ++ contract ++ " {"] ++ field ++ methods ++
     ["    function run(input: uint256) public returns (uint256) {"] ++ indent 8 body ++ ["    }", "}"]
   { source := String.intercalate "\n" lines ++ "\n", contractName := contract, methodName := "run",

@@ -568,7 +568,7 @@ def emit(plan, profile):
                  or any("assign" in step and step["assign"]["form"] == "apply" and step["assign"]["unchecked"]
                         for _, step in steps))
     applies = any("assign" in step and step["assign"]["form"] == "apply" for _, step in steps)
-    imports = ["import * from std;", "import * from std.unsigned;"] + (["import * from std.signed;"] if kind.signed else [])
+    imports = ["pragma solcore;", "import * from std;", "import * from std.unsigned;"] + (["import * from std.signed;"] if kind.signed else [])
     if unchecked:
         imports.append("import * from std.unchecked.signed;" if kind.signed else "import * from std.unchecked.unsigned;")
     imports.append("import * from std.dispatch;")

@@ -3,7 +3,7 @@
   "profile": "runtime-functions",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-functions-v1",
+  "emitterVersion": "solcore-source-functions-v2",
   "wrapperVersion": "solcore-word-functions-contract-v1",
   "profileVersion": "runtime-functions-v1/seed-chain-v1",
   "functionVersion": "core-word-function-dag-v1",

@@ -3,7 +3,7 @@
   "profile": "runtime-shifts",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-shifts-v1",
+  "emitterVersion": "solcore-source-shifts-v2",
   "generatorVersion": "core-integers-v1",
   "profileVersion": "runtime-shifts-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-shifts-contract-v1",

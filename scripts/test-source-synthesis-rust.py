@@ -16,14 +16,10 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
-import importlib.util
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_WORD = (1 << 256) - 1
-_bundle_spec = importlib.util.spec_from_file_location("semantic_source_bundle", ROOT / "scripts/semantic-source-bundle.py")
-bundle_transport = importlib.util.module_from_spec(_bundle_spec)
-_bundle_spec.loader.exec_module(bundle_transport)
 
 
 def word(value: int) -> dict:
@@ -131,7 +127,7 @@ def validate(case: dict, directory: Path, args: argparse.Namespace) -> dict:
         raise ValueError(f"direct Core did not complete: {direct}")
     expected = f"0x{int(direct['word']):064x}"
     source = directory / "main.sol"
-    source.write_text(bundle_transport.compiler_source(case["source"]))
+    source.write_text(case["source"])
     exported = directory / "hull.json"
     result = run([sys.executable, str(ROOT / "scripts/export-rust-hull.py"), str(source),
                   "--upstream", str(args.upstream), "--output", str(exported)], args.timeout)

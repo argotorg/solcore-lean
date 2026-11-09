@@ -3,7 +3,7 @@
   "profile": "runtime-comptime",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-comptime-v2",
+  "emitterVersion": "solcore-source-comptime-v3",
   "wrapperVersion": "solcore-word-comptime-contract-v1",
   "profileVersion": "runtime-comptime-v2/constant-step-seed-v1",
   "functionVersion": "core-comptime-word-plan-v1",

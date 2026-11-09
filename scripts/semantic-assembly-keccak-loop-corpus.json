@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-assembly-keccak-loops-v1",
+  "emitterVersion": "solcore-source-assembly-keccak-loops-v2",
   "framingVersion": "core-word-log-framing-v1",
   "functionVersion": "core-keccak-loop-contract-v1",
   "generationRecipeRequirements": {

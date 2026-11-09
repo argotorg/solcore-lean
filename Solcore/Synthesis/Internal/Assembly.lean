@@ -522,7 +522,7 @@ namespace Solcore.Synthesis.Source.Assembly
 open Solcore.Synthesis.Core (CheckedWordFunction)
 open AssemblyRenderer (Form)
 
-def emitterVersion : String := "solcore-source-assembly-v1"
+def emitterVersion : String := "solcore-source-assembly-v2"
 def wrapperVersion : String := "solcore-word-assembly-contract-v1"
 
 /-- The G0 features `emit` renders in every form: every operator and form. -/
@@ -547,7 +547,7 @@ def body (form : Form) (function : CheckedWordFunction) : Except EmitError (List
 
 def emit (form : Form) (function : CheckedWordFunction) : Except EmitError EmittedProgram := do
   let (statements, value) ← body form function
-  let lines := ["import * from std;", "import * from std.dispatch;", "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);"] ++ statements ++
@@ -900,7 +900,7 @@ def stepLines (step : CheckedDAG) : Except EmitError (List String) := do
 /-- The imports: std, its dispatch, and `std.opcodes` only for the step's
 opcode aliases. -/
 def importLines (step : CheckedDAG) : List String :=
-  ["import * from std;", "import * from std.dispatch;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (step.helpers ++ [step.entry]) ++ [""]
 
 end Solcore.Synthesis.Source.AssemblyStorage
@@ -927,7 +927,7 @@ namespace Solcore.Synthesis.Source.AssemblyKeccakLoop
 open Solcore.Synthesis.Core.KeccakLoop (CheckedPlan)
 open Solcore.Synthesis.Source.AssemblyStorage (Form)
 
-def emitterVersion : String := "solcore-source-assembly-keccak-loops-v1"
+def emitterVersion : String := "solcore-source-assembly-keccak-loops-v2"
 def wrapperVersion : String := "solcore-word-assembly-keccak-loops-contract-v1"
 def contractName : String := "SynthesizedAssemblyKeccakLoops"
 def methodName : String := "run"
@@ -1403,7 +1403,7 @@ open Solcore.Core.Wire (Expr)
 open Solcore.Synthesis.Core.CallGraphLoop (CheckedPlan)
 open AssemblyLoopRenderer (line)
 
-def emitterVersion : String := "solcore-source-assembly-loops-v1"
+def emitterVersion : String := "solcore-source-assembly-loops-v2"
 def wrapperVersion : String := "solcore-word-assembly-loops-contract-v1"
 def contractName : String := "SynthesizedAssemblyLoops"
 def methodName : String := "run"
@@ -1516,7 +1516,7 @@ def loopStatements (form : Form) (names : List String) (mask : Nat) (nextId : Na
 def emit (form : Form) (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let (names, helpers, nextId) ← helperFunctions form plan.graph.helpers
   let statements ← loopStatements form names plan.mask nextId plan.graph.entry
-  let lines := ["import * from std;", "import * from std.dispatch;", "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);",
@@ -1803,7 +1803,7 @@ namespace Solcore.Synthesis.Source.AssemblyMemory
 open Solcore.Synthesis.Core (CheckedWordFunction)
 open Solcore.Synthesis.Core.AssemblyMemory (Schedule Width)
 
-def emitterVersion : String := "solcore-source-assembly-memory-v1"
+def emitterVersion : String := "solcore-source-assembly-memory-v2"
 def wrapperVersion : String := "solcore-word-assembly-memory-contract-v1"
 
 /-- The G0 features the step's rendering supports: every operator and form. -/
@@ -1846,7 +1846,7 @@ def block (function : CheckedWordFunction) (schedule : Schedule) : Except EmitEr
 
 def emit (function : CheckedWordFunction) (schedule : Schedule) : Except EmitError EmittedProgram := do
   let statements ← block function schedule
-  let lines := ["import * from std;", "import * from std.dispatch;", "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);",
@@ -2318,7 +2318,7 @@ namespace Solcore.Synthesis.Source.AssemblyStorageLoop
 open Solcore.Synthesis.Core.StorageLoop (CheckedPlan)
 open Solcore.Synthesis.Source.AssemblyStorage (Form)
 
-def emitterVersion : String := "solcore-source-assembly-storage-loops-v1"
+def emitterVersion : String := "solcore-source-assembly-storage-loops-v2"
 def wrapperVersion : String := "solcore-word-assembly-storage-loops-contract-v1"
 def contractName : String := "SynthesizedAssemblyStorageLoops"
 def methodName : String := "run"

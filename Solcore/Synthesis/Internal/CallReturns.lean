@@ -1486,7 +1486,7 @@ namespace Solcore.Synthesis.Source.CallReturn
 open Solcore.Synthesis.Core.CallReturn (CheckedPlan Kind Returned Delivery Cell Source)
 open Solcore.Synthesis.Core.EnumReturn (Constructor Shape)
 
-def emitterVersion : String := "solcore-source-call-returns-v1"
+def emitterVersion : String := "solcore-source-call-returns-v2"
 def wrapperVersion : String := "solcore-call-returns-contracts-v1"
 def parentContractName : String := "SynthesizedReturnCaller"
 def childContractName : String := "SynthesizedReturnCallee"
@@ -1522,7 +1522,7 @@ private def enumLines (kind : Kind) : List String :=
   | _ => []
 
 private def stdImports (kind : Kind) : List String :=
-  ["import * from std;", "import * from std.dispatch;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     match kind with
     | .enum _ => ["import * from std.Generic;", "import * from std.ABIGeneric;"]
     | _ => []
@@ -1741,7 +1741,7 @@ namespace Solcore.Synthesis.Source.CallSequence
 open Solcore.Synthesis.Core.CallSequence (CheckedPlan Window)
 open Solcore.Synthesis.Source.CallReturn (EmittedContracts)
 
-def emitterVersion : String := "solcore-source-call-sequences-v1"
+def emitterVersion : String := "solcore-source-call-sequences-v2"
 def wrapperVersion : String := "solcore-call-sequences-contracts-v1"
 
 /-- A Word as a hexadecimal literal. -/
@@ -1749,7 +1749,8 @@ private def literal (value : Nat) : String := "0x" ++ String.ofList (Nat.toDigit
 
 private def multiplierLiteral : String := literal Solcore.Synthesis.Core.CallSequence.multiplier
 
-private def stdImports : List String := ["import * from std;", "import * from std.dispatch;"]
+private def stdImports : List String := ["pragma solcore;", "import * from std;",
+  "import * from std.dispatch;"]
 
 private def name (prefix_ : String) (call : Nat) : String := prefix_ ++ toString call
 
@@ -1942,12 +1943,13 @@ open Solcore.Synthesis.Core.CallBranch (CheckedPlan Site Kind)
 open Solcore.Synthesis.Core.CallSequence (Window)
 open Solcore.Synthesis.Source.CallReturn (EmittedContracts)
 
-def emitterVersion : String := "solcore-source-call-branches-v1"
+def emitterVersion : String := "solcore-source-call-branches-v2"
 def wrapperVersion : String := "solcore-call-branches-contracts-v1"
 
 private def literal (value : Nat) : String := "0x" ++ String.ofList (Nat.toDigits 16 value)
 
-private def stdImports : List String := ["import * from std;", "import * from std.dispatch;"]
+private def stdImports : List String := ["pragma solcore;", "import * from std;",
+  "import * from std.dispatch;"]
 
 private def indent (depth : Nat) (lines : List String) : List String :=
   lines.map fun line => String.ofList (List.replicate (4 * depth) ' ') ++ line

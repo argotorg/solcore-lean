@@ -79,9 +79,7 @@ class BundleTests(unittest.TestCase):
     def test_write_is_exact_and_never_overwrites_an_existing_source(self):
         directory, receipt = self.write()
         for name, source in bundle.validate(self.case).items():
-            # Each file is the emitted text after the pinned compiler's mandatory pragma.
-            self.assertEqual((directory / name).read_bytes(), ("pragma solcore;\n" + source).encode())
-            self.assertEqual(bundle.compiler_source("pragma solcore;\n" + source), "pragma solcore;\n" + source)
+            self.assertEqual((directory / name).read_bytes(), source.encode())
         bundle.audit_files(directory, receipt['files'])
         with self.assertRaises(ValueError):
             bundle.write(directory, self.case)

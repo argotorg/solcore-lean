@@ -2656,10 +2656,10 @@ open Solcore.Synthesis.Core.Arrays
 open Solcore.Synthesis.Core.Integers (IntType Op)
 open Solcore.Synthesis.Source.Integers (convertText intText hexText opSymbol)
 
-def memoryEmitterVersion : String := "solcore-source-memory-arrays-v1"
+def memoryEmitterVersion : String := "solcore-source-memory-arrays-v2"
 def memoryWrapperVersion : String := "solcore-memory-arrays-contract-v1"
 def memoryContract : String := "SynthesizedMemoryArrays"
-def abiEmitterVersion : String := "solcore-source-array-abi-v1"
+def abiEmitterVersion : String := "solcore-source-array-abi-v2"
 def abiWrapperVersion : String := "solcore-array-abi-contract-v1"
 def abiContract : String := "SynthesizedArrayAbi"
 
@@ -2806,7 +2806,7 @@ def uses (plan : Plan) (helper : String) : Bool :=
 
 def imports (plan : Plan) : List String :=
   let type := plan.element
-  ["import * from std;", "import * from std.unsigned;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.unsigned;"] ++
     (if type.signed then ["import * from std.signed;"] else []) ++
     (if unchecked plan then [if type.signed then "import * from std.unchecked.signed;" else
       "import * from std.unchecked.unsigned;"] else []) ++

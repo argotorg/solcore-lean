@@ -405,7 +405,7 @@ private def fixtureBResults : List (Nat × (Nat ⊕ Nat)) := [
   (1001, .inl 101271697361168520248805485127094807716825221348644557259711928758180779855971)]
 
 private def header : List String := [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "import { mload, mstore, mstore8, shr, mod } from std.opcodes;",
   ""]
@@ -1098,7 +1098,7 @@ private def fixtureResults : List (Nat × (Nat ⊕ Nat)) := [
   (1001, .inl 13800937350835242282643099520518083362978033394498188391394767143433918975331)]
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "import { mload, mstore, mstore8, shr, mod } from std.opcodes;",
   "",

@@ -3,7 +3,7 @@
   "profile": "runtime-assembly-loops",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-call-graph-loop-grammar-v1/core-call-graph-grammar-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-assembly-loops-v1",
+  "emitterVersion": "solcore-source-assembly-loops-v2",
   "wrapperVersion": "solcore-word-assembly-loops-contract-v1",
   "profileVersion": "runtime-assembly-loops-v1/form-seed-v1",
   "functionVersion": "core-call-graph-loop-plan-v1",

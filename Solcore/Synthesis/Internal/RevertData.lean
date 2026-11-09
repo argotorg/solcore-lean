@@ -1687,7 +1687,7 @@ namespace Solcore.Synthesis.Source.RevertData
 open Solcore.Synthesis.Core.RevertData
 open Solcore.Synthesis.Core.MemoryValues (Ref Fold Operand)
 
-def emitterVersion : String := "solcore-source-revert-data-v1"
+def emitterVersion : String := "solcore-source-revert-data-v2"
 def wrapperVersion : String := "solcore-word-revert-data-contract-v1"
 def contractName : String := "SynthesizedRevertData"
 def methodName : String := "run"
@@ -1897,7 +1897,8 @@ def emitWith (contract : String) (opcodes : String) (plan : Plan) : EmittedProgr
   let actionHelpers := Source.MemoryValues.helperNames.filter used.contains
   let enum := if usesEnum plan then ["enum Sc_F {", "    Sc_F0(Error, word),", "    Sc_F1(word)", "}", ""] else []
   let helpers := plan.helpers.zipIdx.flatMap fun (helper, index) => helperLines index helper ++ [""]
-  let source := ["import * from std;", "import * from std.dispatch;", opcodes, ""] ++
+  let source := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    opcodes, ""] ++
     actionHelpers.flatMap Source.MemoryValues.helperLines ++ enum ++ helpers ++
     ["contract " ++ contract ++ " {",
      "    function " ++ methodName ++ "(input: uint256) public returns (uint256) {",
@@ -2493,7 +2494,7 @@ def caseSchema : String := "solcore-lean.semantic-halt-case.v1"
 def planSchema : String := "solcore-lean.halt-plan.v1"
 def profileVersion : String := "runtime-halts-v1/plan-seed-v1"
 def haltVersion : String := "core-halt-v1"
-def emitterVersion : String := "solcore-source-halt-v1"
+def emitterVersion : String := "solcore-source-halt-v2"
 def wrapperVersion : String := "solcore-word-halt-contract-v1"
 def contractName : String := "SynthesizedHalts"
 

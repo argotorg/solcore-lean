@@ -3,7 +3,7 @@
   "profile": "runtime-memory-values",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-memory-values-v1",
+  "emitterVersion": "solcore-source-memory-values-v2",
   "generatorVersion": "core-memory-values-v2",
   "profileVersion": "runtime-memory-values-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-memory-values-contract-v1",

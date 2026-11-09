@@ -3,7 +3,7 @@
   "profile": "runtime-traits",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-traits-v1",
+  "emitterVersion": "solcore-source-traits-v2",
   "generatorVersion": "core-trait-instances-v1",
   "profileVersion": "runtime-traits-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-traits-contract-v1",

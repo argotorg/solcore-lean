@@ -39,6 +39,9 @@ tool successfully wrote its report. It is not a successful test campaign.
 Each case contains the original Core Wire program, emitted source, versioned
 provenance, contract metadata and a fresh direct Core observation. The wrapper
 is `SynthesizedG0.run()`, returning a single ABI `uint256` with no inputs.
+Every emitted file starts with `pragma solcore;`, which the pinned compiler
+requires first in a file (`SC0002`), and the harnesses write each file for the
+compiler exactly as emitted.
 
 The same tool accepts:
 

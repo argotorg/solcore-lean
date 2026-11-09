@@ -578,7 +578,7 @@ def emitted_source(plan):
                        f"    sc_inner = {bound};", "    sc_j = 0;", "    while (sc_inner > sc_j) {"] +
                       ["        " + line for line in body] +
                       ["        sc_j = (sc_j + 1);", "    }", "    sc_i = (sc_i + 1);", "}"])
-    source = (["import * from std;", "import * from std.dispatch;",
+    source = (["pragma solcore;", "import * from std;", "import * from std.dispatch;",
                "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] +
               [line for helper in HELPERS if helper in used for line in HELPER_LINES[helper]] +
               [f"contract {NAME} {{", "    function run(input: uint256) public returns (uint256) {",

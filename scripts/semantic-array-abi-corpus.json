@@ -3,7 +3,7 @@
   "profile": "runtime-array-abi",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-array-abi-v1",
+  "emitterVersion": "solcore-source-array-abi-v2",
   "generatorVersion": "core-arrays-v1",
   "profileVersion": "runtime-array-abi-v1/plan-seed-v1",
   "wrapperVersion": "solcore-array-abi-contract-v1",

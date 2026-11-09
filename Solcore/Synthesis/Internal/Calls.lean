@@ -518,7 +518,7 @@ namespace Solcore.Synthesis.Source.CallValue
 
 open Solcore.Synthesis.Core.CallValue (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-call-value-v1"
+def emitterVersion : String := "solcore-source-call-value-v2"
 def wrapperVersion : String := "solcore-word-call-value-contract-v1"
 def contractName : String := "SynthesizedCallValue"
 def methodName : String := "run"
@@ -529,7 +529,7 @@ def runtimePath : List String := ["SynthesizedCallValueDeploy", "SynthesizedCall
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_", "callvalue as sc_callvalue"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1159,7 +1159,7 @@ namespace Solcore.Synthesis.Source.NestedCall
 
 open Solcore.Synthesis.Core.NestedCall (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-nested-call-v2"
+def emitterVersion : String := "solcore-source-nested-call-v3"
 def wrapperVersion : String := "solcore-word-nested-call-v1"
 def parentContractName : String := "SynthesizedCaller"
 def childContractName : String := "SynthesizedCallee"
@@ -1188,7 +1188,7 @@ structure EmittedContracts where
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mload", "mstore", "calldataload", "gas", "call",
       "returndatasize", "return_", "revert_", "invalid", "log1 as log1_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
@@ -1260,7 +1260,7 @@ namespace Solcore.Synthesis.Source.ForwardedCall
 open Solcore.Synthesis.Core.ForwardedCall (CheckedPlan)
 open Solcore.Synthesis.Source.NestedCall (EmittedContracts)
 
-def emitterVersion : String := "solcore-source-forwarded-value-v1"
+def emitterVersion : String := "solcore-source-forwarded-value-v2"
 def wrapperVersion : String := "solcore-word-forwarded-value-v1"
 def parentContractName : String := "SynthesizedForwarder"
 def childContractName : String := "SynthesizedRecipient"
@@ -1276,7 +1276,7 @@ def childRuntimePath : List String := ["SynthesizedRecipientDeploy", "Synthesize
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedContracts := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mload", "mstore", "calldataload", "gas", "call",
       "returndatasize", "return_", "revert_", "invalid", "callvalue as sc_callvalue"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
@@ -2252,7 +2252,7 @@ open Solcore.Synthesis.Core
 open Solcore.Synthesis.Core.ContractMethods (CheckedPlan resultSlot)
 open Solcore.Synthesis.Stateful.MethodsExecution (Method)
 
-def emitterVersion : String := "solcore-source-methods-v1"
+def emitterVersion : String := "solcore-source-methods-v2"
 def wrapperVersion : String := "solcore-word-methods-contract-v1"
 def contractName : String := "SynthesizedMethods"
 def deployPath : List String := ["SynthesizedMethodsDeploy"]
@@ -2306,7 +2306,7 @@ private def methodLines (position : Nat) (method : Method) : List String :=
 
 def emit (plan : CheckedPlan) (methods : List Method) : Except EmitError EmittedMethods := do
   let bodies := plan.steps.flatMap fun step => step.helpers ++ [step.entry]
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"] bodies, ""]
   for (step, position) in plan.steps.zipIdx do
     lines := lines ++ (← stepLines position step)

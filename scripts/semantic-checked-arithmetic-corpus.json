@@ -3,7 +3,7 @@
   "profile": "runtime-checked-arithmetic",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-checked-arithmetic-v1",
+  "emitterVersion": "solcore-source-checked-arithmetic-v2",
   "generatorVersion": "core-integers-v1",
   "profileVersion": "runtime-checked-arithmetic-v1/plan-seed-v1",
   "wrapperVersion": "solcore-checked-arithmetic-contract-v1",

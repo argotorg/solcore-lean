@@ -300,7 +300,7 @@ private def fixtureResults : List (Nat × Nat) := [(0, 474593), (1, 34199480), (
   (2 ^ 256 - 1, 115792089237316195423570985008687907853269984665640564039457584007913118515327)]
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "",
   "enum Sc_T0 {",
@@ -1689,7 +1689,7 @@ private def fixtureResults : List (Nat × Nat) := [(0, 580351), (1, 549501),
   (255, 3264495), (2 ^ 255, 580351), (2 ^ 256 - 1, 194799)]
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "",
   "enum Sc_T0 {",

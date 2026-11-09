@@ -3,7 +3,7 @@
   "profile": "runtime-trait-hierarchies",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-trait-hierarchies-v1",
+  "emitterVersion": "solcore-source-trait-hierarchies-v2",
   "generatorVersion": "core-trait-hierarchies-v1",
   "profileVersion": "runtime-trait-hierarchies-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-trait-hierarchies-contract-v1",

@@ -1702,7 +1702,8 @@ theorem InfixStmt.listLinePieces_separated (indent : Nat) : (statements : List I
 /-- The pieces of `SourceFile.linePieces`, with the generic functions before
 the ordinary ones and an infix method body. -/
 def GenericFile.linePieces (file : GenericFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   aliasImportLinePieces file.opcodeAliases ++ [[]] ++
@@ -2288,7 +2289,8 @@ theorem LoopStmt.listLinePieces_separated (indent : Nat) : (statements : List Lo
 
 /-- The pieces of `SourceFile.linePieces` around a loop method body. -/
 def LoopFile.linePieces (file : LoopFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   aliasImportLinePieces file.opcodeAliases ++ [[]] ++

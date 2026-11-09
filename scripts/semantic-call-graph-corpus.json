@@ -7,7 +7,7 @@
   "functionVersion": "core-word-function-dag-v1",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
   "callShapeVersion": "core-call-graph-shapes-v1",
-  "emitterVersion": "solcore-source-call-graphs-v1",
+  "emitterVersion": "solcore-source-call-graphs-v2",
   "wrapperVersion": "solcore-word-call-graphs-contract-v1",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",

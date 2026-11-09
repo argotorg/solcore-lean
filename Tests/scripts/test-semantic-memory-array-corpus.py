@@ -1332,7 +1332,7 @@ def emit(plan, profile):
     acts = [action for step in plan["steps"] for action in actions(step)]
     unchecked = any("write" in action and isinstance(action["write"]["form"], dict)
                     and action["write"]["form"]["compound"]["unchecked"] for action in acts)
-    imports = ["import * from std;", "import * from std.unsigned;"]
+    imports = ["pragma solcore;", "import * from std;", "import * from std.unsigned;"]
     imports += ["import * from std.signed;"] if kind.signed else []
     if unchecked:
         imports.append("import * from std.unchecked.signed;" if kind.signed else "import * from std.unchecked.unsigned;")

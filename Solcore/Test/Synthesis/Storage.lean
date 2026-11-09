@@ -645,7 +645,8 @@ def goldenPlans : List (String × Shape × List Method × Nat × Nat × List (Tr
 
 /-- The emitted contract of the first shape with its six field methods and
 `c = 5`, written out. -/
-def g1Source : String := "import * from std;
+def g1Source : String := "pragma solcore;
+import * from std;
 import * from std.dispatch;
 import * from std.Generic;
 import * from std.StorageGeneric;
@@ -813,7 +814,8 @@ contract SynthesizedAdtStorage {
 
 /-- The emitted contract of the second shape with its six keyed methods and
 `c = 5`, written out. -/
-def g2Source : String := "import * from std;
+def g2Source : String := "pragma solcore;
+import * from std;
 import * from std.dispatch;
 import * from std.Generic;
 import * from std.StorageGeneric;
@@ -1588,7 +1590,7 @@ private def admissionChecks : IO Unit := do
   | .error error => throw (IO.userError s!"KeyedStorage raw division was rejected: {reprStr error}")
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -1618,7 +1620,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedKeyedStorageDeploy"] &&
     source.runtimePath == ["SynthesizedKeyedStorageDeploy", "SynthesizedKeyedStorage"])
     "keyed wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.KeyedStorage.emitterVersion == "solcore-source-keyed-storage-v2" &&
+  ensure (Solcore.Synthesis.Source.KeyedStorage.emitterVersion == "solcore-source-keyed-storage-v3" &&
     Solcore.Synthesis.Source.KeyedStorage.wrapperVersion == "solcore-word-keyed-storage-contract-v1" &&
     Solcore.Synthesis.Source.KeyedStorage.selector == "0x7357f5d2" &&
     KeyedStorage.version == "core-keyed-storage-contract-v1" && KeyedStorage.counterSlot == 0)
@@ -2064,7 +2066,7 @@ private def executionChecks : IO Unit := do
   sequenceCheck (← checked [increment] (word 0)) inputs (fun _ => Word.zero) 0
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;",
@@ -2096,7 +2098,7 @@ private def formattingChecks : IO Unit := do
     "    let sc_v0: word = sc_fn0(sc_arg);", "    let sc_v1: word = 10;",
     "    let sc_v2: word = (sc_v0 + sc_v1);", "    return sc_v2;", "}"]))
     "storage wrapper ignored the arbitrary checked entry"
-  ensure (Storage.emitterVersion == "solcore-source-storage-v2" &&
+  ensure (Storage.emitterVersion == "solcore-source-storage-v3" &&
     Storage.wrapperVersion == "solcore-word-storage-contract-v1" &&
     Storage.selector == "0xa444f5e9" && StorageContract.version == "core-storage-contract-v1")
     "storage provenance changed"
@@ -2779,7 +2781,7 @@ private def admissionChecks : IO Unit := do
     ensure ((← emitted plan) == (← emitted plan)) "ledger emission is nondeterministic"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {caller, mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -2819,7 +2821,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "import {caller, mstore, revert_, div as sc_div, ").length == 2)
     "ledger emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.StorageLedger.emitterVersion == "solcore-source-sender-ledger-v1" &&
+  ensure (Solcore.Synthesis.Source.StorageLedger.emitterVersion == "solcore-source-sender-ledger-v2" &&
     Solcore.Synthesis.Source.StorageLedger.wrapperVersion == "solcore-word-sender-ledger-contract-v1" &&
     Solcore.Synthesis.Source.StorageLedger.selector == "0x15509d2b" &&
     StorageLedger.version == "core-sender-ledger-contract-v1") "ledger provenance changed"
@@ -3457,7 +3459,7 @@ private def admissionChecks : IO Unit := do
     ensure ((← emitted plan) == (← emitted plan)) "mapping emission is nondeterministic"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -3492,7 +3494,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "import {mstore, revert_, div as sc_div, ").length == 2)
     "mapping emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.StorageMapping.emitterVersion == "solcore-source-keccak-mapping-v1" &&
+  ensure (Solcore.Synthesis.Source.StorageMapping.emitterVersion == "solcore-source-keccak-mapping-v2" &&
     Solcore.Synthesis.Source.StorageMapping.wrapperVersion == "solcore-word-keccak-mapping-contract-v1" &&
     Solcore.Synthesis.Source.StorageMapping.selector == "0x24b912e5" &&
     StorageMapping.version == "core-keccak-mapping-contract-v1") "mapping provenance changed"
@@ -3942,7 +3944,7 @@ private def admissionChecks : IO Unit := do
   | .error error => throw (IO.userError s!"StorageRollback raw division was rejected: {reprStr error}")
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -3968,7 +3970,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedRollbackDeploy"] &&
     source.runtimePath == ["SynthesizedRollbackDeploy", "SynthesizedRollback"])
     "rollback wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.StorageRollback.emitterVersion == "solcore-source-storage-rollback-v2" &&
+  ensure (Solcore.Synthesis.Source.StorageRollback.emitterVersion == "solcore-source-storage-rollback-v3" &&
     Solcore.Synthesis.Source.StorageRollback.wrapperVersion == "solcore-word-storage-rollback-contract-v1" &&
     Solcore.Synthesis.Source.StorageRollback.selector == "0xa444f5e9" &&
     StorageRollback.version == "core-storage-rollback-contract-v1") "rollback provenance changed"

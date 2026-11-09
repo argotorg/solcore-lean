@@ -3,7 +3,7 @@
   "profile": "runtime-memory-arrays",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-memory-arrays-v1",
+  "emitterVersion": "solcore-source-memory-arrays-v2",
   "generatorVersion": "core-arrays-v1",
   "profileVersion": "runtime-memory-arrays-v1/plan-seed-v1",
   "wrapperVersion": "solcore-memory-arrays-contract-v1",

@@ -3,7 +3,7 @@
   "profile": "runtime-recursion",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-recursion-v1",
+  "emitterVersion": "solcore-source-recursion-v2",
   "wrapperVersion": "solcore-word-recursion-contract-v1",
   "profileVersion": "runtime-recursion-v1/bounded-depth-seed-v1",
   "functionVersion": "core-recursion-plan-v1",

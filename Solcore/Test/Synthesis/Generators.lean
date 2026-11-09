@@ -2572,7 +2572,7 @@ private def emitted (body : Wire.Expr) : IO EmittedProgram := do
   | .error error => throw (IO.userError s!"supported emitter fixture was rejected: {reprStr error}")
 
 private def scopedExpected : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "",
   "contract SynthesizedG0 {",
@@ -2596,7 +2596,7 @@ private def scopedExpected : String := String.intercalate "\n" [
   "}", ""]
 
 private def nestedExpected : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;", "",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
   "contract SynthesizedG0 {", "    function run() public returns (uint256) {",
   "        let sc_v0: word = 7;", "        let sc_v1: word = sc_v0;",
   "        let sc_v2: word = 9;", "        let sc_v3: word = sc_v2;",
@@ -2630,7 +2630,7 @@ def testSourceSynthesisEmitter : IO Unit := do
   let maximum ← emitted (.word Word.maximum)
   unless (maximum.source.splitOn (toString Word.maximum.val)).length == 2 do
     throw (IO.userError "source emission truncated a 256-bit Word literal")
-  unless emitterVersion == "solcore-source-g0-v1" && wrapperVersion == "solcore-word-contract-v1" do
+  unless emitterVersion == "solcore-source-g0-v2" && wrapperVersion == "solcore-word-contract-v1" do
     throw (IO.userError "emitter provenance version changed")
 
 end Tests.SourceSynthesisEmitter

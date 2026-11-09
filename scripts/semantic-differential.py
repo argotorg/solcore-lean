@@ -34,7 +34,6 @@ _bundle_spec = importlib.util.spec_from_file_location("semantic_source_bundle", 
 assert _bundle_spec and _bundle_spec.loader
 bundle_transport = importlib.util.module_from_spec(_bundle_spec)
 _bundle_spec.loader.exec_module(bundle_transport)
-compiler_source = bundle_transport.compiler_source
 CASE_SCHEMA = "solcore-lean.semantic-case.v1"
 INPUT_CASE_SCHEMA = "solcore-lean.semantic-input-case.v1"
 CALL_GRAPH_CASE_SCHEMA = "solcore-lean.semantic-call-graph-case.v1"
@@ -1782,7 +1781,7 @@ class CompileCache:
         if receipt is not None:
             receipt = {**bundle_transport.write(directory, case), "libraries": receipt["libraries"]}
         else:
-            source.write_text(compiler_source(case["source"]))
+            source.write_text(case["source"])
         first, failure, yul = len(report["processes"]), None, None
         try:
             export_sources(args, runner, directory, source, linked_backend, lambda: audit(directory))
@@ -1880,7 +1879,7 @@ def execute(args, report: dict) -> None:
         if args.replay and bundle_receipt["libraries"] != previous["sourceBundleReceipt"]["libraries"]:
             raise Finding("adapter-error", "replay", "pinned standard-library inventory or hashes changed")
     else:
-        source.write_text(compiler_source(case["source"]))
+        source.write_text(case["source"])
 
     def audit_bundle(directory=None):
         if bundle_receipt is not None:

@@ -95,9 +95,10 @@ structure Method where
   result : Expr
   deriving Repr
 
-/-- A source file importing `std` and `std.dispatch`, optionally importing
-`opcode as alias` pairs from `std.opcodes`, declaring free functions, and
-declaring one contract with one method. -/
+/-- A source file starting with `pragma solcore;`, importing `std` and
+`std.dispatch`, optionally importing `opcode as alias` pairs from
+`std.opcodes`, declaring free functions, and declaring one contract with one
+method. -/
 structure SourceFile where
   opcodeAliases : List (String × String)
   functions : List FunctionDecl

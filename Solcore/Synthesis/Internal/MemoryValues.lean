@@ -1504,7 +1504,7 @@ namespace Solcore.Synthesis.Source.MemoryValues
 
 open Solcore.Synthesis.Core.MemoryValues
 
-def emitterVersion : String := "solcore-source-memory-values-v1"
+def emitterVersion : String := "solcore-source-memory-values-v2"
 def wrapperVersion : String := "solcore-word-memory-values-contract-v1"
 def contractName : String := "SynthesizedMemoryValues"
 def methodName : String := "run"
@@ -1689,7 +1689,7 @@ def emit (plan : Plan) : EmittedProgram := Id.run do
         let (more, next) := loopLines names loop body
         lines := lines ++ more
         names := next
-  let source := ["import * from std;", "import * from std.dispatch;",
+  let source := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
       "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] ++
     (planHelpers plan).flatMap helperLines ++
     ["contract " ++ contractName ++ " {",

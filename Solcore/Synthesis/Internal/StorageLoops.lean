@@ -355,7 +355,7 @@ namespace Solcore.Synthesis.Source.KeccakLoop
 
 open Solcore.Synthesis.Core.KeccakLoop (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-keccak-loops-v1"
+def emitterVersion : String := "solcore-source-keccak-loops-v2"
 def wrapperVersion : String := "solcore-word-keccak-loops-contract-v1"
 def contractName : String := "SynthesizedKeccakLoops"
 def methodName : String := "run"
@@ -366,7 +366,7 @@ def runtimePath : List String := ["SynthesizedKeccakLoopsDeploy", "SynthesizedKe
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["mload", "mstore", "revert_", "log2 as sc_log2"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1077,7 +1077,7 @@ namespace Solcore.Synthesis.Source.StorageLoop
 
 open Solcore.Synthesis.Core.StorageLoop (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-storage-loops-v1"
+def emitterVersion : String := "solcore-source-storage-loops-v2"
 def wrapperVersion : String := "solcore-word-storage-loops-contract-v1"
 def contractName : String := "SynthesizedStorageLoops"
 def methodName : String := "run"
@@ -1088,7 +1088,7 @@ def runtimePath : List String := ["SynthesizedStorageLoopsDeploy", "SynthesizedS
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do

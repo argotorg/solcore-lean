@@ -3,7 +3,7 @@
   "profile": "runtime-halts",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-halt-v1",
+  "emitterVersion": "solcore-source-halt-v2",
   "generatorVersion": "core-halt-v1",
   "profileVersion": "runtime-halts-v1/plan-seed-v1",
   "wrapperVersion": "solcore-word-halt-contract-v1",

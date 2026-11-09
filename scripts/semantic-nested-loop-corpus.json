@@ -3,7 +3,7 @@
   "profile": "runtime-nested-loops",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-nested-loops-v1",
+  "emitterVersion": "solcore-source-nested-loops-v2",
   "wrapperVersion": "solcore-word-nested-loops-contract-v1",
   "profileVersion": "runtime-nested-loops-v1/bounded-while-seed-v1",
   "functionVersion": "core-nested-loop-plan-v1",

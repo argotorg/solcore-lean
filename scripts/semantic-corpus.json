@@ -2,7 +2,7 @@
   "schema": "solcore-lean.semantic-corpus-manifest.v1",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-g0-v1",
+  "emitterVersion": "solcore-source-g0-v2",
   "wrapperVersion": "solcore-word-contract-v1",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",

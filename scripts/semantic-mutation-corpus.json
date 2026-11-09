@@ -3,7 +3,7 @@
   "profile": "runtime-mutation",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-mutation-v1",
+  "emitterVersion": "solcore-source-mutation-v2",
   "wrapperVersion": "solcore-word-mutation-contract-v1",
   "profileVersion": "runtime-mutation-v1/template-seed-v1",
   "functionVersion": "core-local-mutation-dag-v1",

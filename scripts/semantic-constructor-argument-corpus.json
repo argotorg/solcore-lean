@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-constructor-arguments-v1",
+  "emitterVersion": "solcore-source-constructor-arguments-v2",
   "functionVersion": "core-constructor-argument-runtime-v1",
   "generationRecipeRequirements": {
     "templates": [

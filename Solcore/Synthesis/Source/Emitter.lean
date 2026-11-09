@@ -181,7 +181,7 @@ namespace Solcore.Synthesis.Source
 
 open Solcore.Synthesis.Core (CheckedWordProgram)
 
-def emitterVersion : String := "solcore-source-g0-v1"
+def emitterVersion : String := "solcore-source-g0-v2"
 def wrapperVersion : String := "solcore-word-contract-v1"
 
 /-- The G0 features `emit` renders, those of `ScalarRenderer`. -/
@@ -197,7 +197,7 @@ original Word as exactly 32 return bytes. Unsupported operations are errors,
 including operations in a branch that is known to be untaken. -/
 def emit (program : CheckedWordProgram) : Except EmitError EmittedProgram := do
   let body ← ScalarRenderer.render .word [] 8 0 program.program.body
-  let lines := ["import * from std;", "import * from std.dispatch;", "",
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract " ++ contractName ++ " {",
     "    function " ++ methodName ++ "() public returns (uint256) {"] ++ body.lines ++
     ["        return uint256(" ++ body.value ++ ");", "    }", "}"]

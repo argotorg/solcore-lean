@@ -541,8 +541,11 @@ def parameterTokens : List String → List Token
       [.ident parameter, .symbol ':', .ident "uint256", .symbol ','] ++
         parameterTokens (next :: rest)
 
+/-- A file's first tokens: the `pragma solcore;` declaration that the pinned compiler requires
+first in every file, then the imports of `std` and `std.dispatch`. -/
 def importTokens : List Token :=
-  [.ident "import", .symbol '*', .ident "from", .ident "std", .symbol ';',
+  [.ident "pragma", .ident "solcore", .symbol ';',
+    .ident "import", .symbol '*', .ident "from", .ident "std", .symbol ';',
     .ident "import", .symbol '*', .ident "from", .ident "std", .symbol '.', .ident "dispatch",
     .symbol ';']
 
@@ -1630,9 +1633,10 @@ end
 section
 -- leanmerge: from Solcore.Synthesis.Source.ScalarMeaning.Print
 /-! Concrete text of the source fragment, in the exact layout used by the
-source renderers and their wrappers: four-space indentation steps, one
-statement, case header or brace per line, a blank line after the imports and
-after every free function, and a trailing newline. -/
+source renderers and their wrappers: `pragma solcore;` on the first line,
+four-space indentation steps, one statement, case header or brace per line, a
+blank line after the imports and after every free function, and a trailing
+newline. -/
 set_option autoImplicit false
 
 namespace Solcore.Synthesis.Source.ScalarMeaning
@@ -1725,7 +1729,7 @@ def aliasImportLines : List (String × String) → List String
   | alias :: rest => [aliasImportLine (alias :: rest)]
 
 def SourceFile.lines (file : SourceFile) : List String :=
-  ["import * from std;", "import * from std.dispatch;"] ++
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
   aliasImportLines file.opcodeAliases ++ [""] ++
   file.functions.flatMap FunctionDecl.lines ++
   ["contract " ++ file.contract ++ " {",
@@ -2666,7 +2670,8 @@ theorem aliasImportLinePieces_separated (aliases : List (String × String))
         (Separated.cons_sym (by decide) (Separated.cons_space aliasesPart))) head_space
 
 def SourceFile.linePieces (file : SourceFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   aliasImportLinePieces file.opcodeAliases ++ [[]] ++
@@ -2727,8 +2732,12 @@ theorem SourceFile.linePieces_separated (file : SourceFile) (valid : file.Identi
   intro line mem
   simp only [SourceFile.linePieces, List.mem_append, List.mem_cons, List.not_mem_nil,
     or_false, List.mem_flatMap] at mem
-  rcases mem with ((((((same | same) | mem) | same) | ⟨function, functionMem, mem⟩) |
+  rcases mem with ((((((same | same | same) | mem) | same) | ⟨function, functionMem, mem⟩) |
     (same | same)) | mem) | (same | same | same)
+  · subst same
+    exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
+      (Separated.cons_word (keyword_valid (by decide)) (sym_valid (by decide))
+        (head_sym (by decide)))) head_space
   · subst same
     exact Separated.cons_word (keyword_valid (by decide)) (Separated.cons_space
       (Separated.cons_sym (by decide) (Separated.cons_space (Separated.cons_word

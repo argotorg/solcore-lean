@@ -76,7 +76,8 @@ private def fixture : Expr :=
       (.ternary .wordMulMod (.var 1) (.unary .wordNot (.var 0)) (word 0)))
 
 private def header : List String :=
-  ["import * from std;", "import * from std.dispatch;", "", "contract SynthesizedAssembly {",
+  ["pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
+    "contract SynthesizedAssembly {",
     "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);"]
 
@@ -651,7 +652,8 @@ private def fixture : IO CallGraphLoop.CheckedPlan := do
   return plan
 
 private def wrapper (yul : List String) : String :=
-  String.intercalate "\n" (["import * from std;", "import * from std.dispatch;", "",
+  String.intercalate "\n" (["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    "",
     "contract SynthesizedAssemblyLoops {", "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);", "        let sc_out: word = 0;", "        assembly {"] ++
     yul.map ("            " ++ ·) ++ ["        }", "        return uint256(sc_out);", "    }", "}"]) ++ "\n"
@@ -1015,7 +1017,7 @@ private def alignedResults : List Nat := [154, 155, 8995,
   58804204009954187257191307419725814043770319055814350164203297591420971384832]
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "",
   "contract SynthesizedAssemblyMemory {",
@@ -2614,7 +2616,7 @@ private def executionChecks : IO Unit := do
   | .error error => throw (IO.userError s!"loop raw division was rejected: {reprStr error}")
 
 private def expectedIncrement : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;", "",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;",
   "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -2657,7 +2659,7 @@ private def formattingChecks : IO Unit := do
   let mutable ← emitted (← checked (← step [mutableStep]) 7)
   ensure (contains mutable.source "function sc_fn0(sc_arg: word) returns (word) {\n    let sc_c0: word = sc_arg;" &&
     !contains mutable.source "sc_acc = sc_fn0") "private step allocation moved outside its function"
-  ensure (Loop.emitterVersion == "solcore-source-loops-v2" &&
+  ensure (Loop.emitterVersion == "solcore-source-loops-v3" &&
     Loop.wrapperVersion == "solcore-word-loops-contract-v1" &&
     Loop.selector == "0xa444f5e9" && BoundedLoop.version == "core-bounded-loop-plan-v1")
     "loop provenance changed"

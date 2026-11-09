@@ -3659,7 +3659,7 @@ def execute(args, report: dict) -> None:
     validate_case(case)
     case_path, source = args.output / "case.json", args.output / "case.sol"
     save(case_path, case)
-    source.write_text(common.compiler_source(case["source"]))
+    source.write_text(case["source"])
     report.update(caseSha256=common.file_digest(case_path), sourceSha256=common.file_digest(source),
         programSha256=common.digest(common.json_bytes(case["program"])), provenance=case["provenance"],
         replayOf=str(args.replay) if args.replay else None)

@@ -3,7 +3,7 @@
   "profile": "runtime-loops",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-loops-v2",
+  "emitterVersion": "solcore-source-loops-v3",
   "wrapperVersion": "solcore-word-loops-contract-v1",
   "profileVersion": "runtime-loops-v2/bounded-while-seed-v1",
   "functionVersion": "core-bounded-loop-plan-v1",

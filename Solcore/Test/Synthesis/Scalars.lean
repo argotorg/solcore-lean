@@ -459,7 +459,7 @@ private def formattingChecks : IO Unit := do
         ensure (contains source.source "let sc_scale: word = sc_constant_value | 1;" &&
           contains source.source "sc_step(sc_input) * sc_scale + sc_constant_value;")
           "scale staging lost its odd multiplier or result offset"
-  ensure (Solcore.Synthesis.Source.Comptime.emitterVersion == "solcore-source-comptime-v2" &&
+  ensure (Solcore.Synthesis.Source.Comptime.emitterVersion == "solcore-source-comptime-v3" &&
     Solcore.Synthesis.Source.Comptime.wrapperVersion == "solcore-word-comptime-contract-v1" &&
     Solcore.Synthesis.Source.Comptime.selector == "0xa444f5e9" &&
     Comptime.version == "core-comptime-word-plan-v1") "comptime provenance changed"
@@ -818,7 +818,7 @@ private def executionChecks : IO Unit := do
     | .ok _ => throw (IO.userError "unsupported graph operation was silently emitted")
 
 private def chainExpected : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;", "",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
   "    return sc_v1;", "}", "",
@@ -854,7 +854,7 @@ private def formattingChecks : IO Unit := do
     "functionCall", "local"]) "function features counted declaration wrappers or callee locals"
   ensure ((diamond.features.filter (· == "functionCall")).length == 4)
     "diamond feature inventory lost a helper dependency"
-  ensure (Function.emitterVersion == "solcore-source-functions-v1" &&
+  ensure (Function.emitterVersion == "solcore-source-functions-v2" &&
     Function.wrapperVersion == "solcore-word-functions-contract-v1" &&
     Function.selector == "0xa444f5e9" && wordFunctionDAGVersion == "core-word-function-dag-v1")
     "named-function provenance changed"
@@ -1245,7 +1245,7 @@ private def formattingChecks : IO Unit := do
           contains source.source "case inl(sc_payload)" && contains source.source "case inr(sc_payload)" &&
           contains source.source "sc_result = sc_payload + 1;")
           "sum generic instantiation lost its constructor-dependent result"
-  ensure (Solcore.Synthesis.Source.Generic.emitterVersion == "solcore-source-generics-v2" &&
+  ensure (Solcore.Synthesis.Source.Generic.emitterVersion == "solcore-source-generics-v3" &&
     Solcore.Synthesis.Source.Generic.wrapperVersion == "solcore-word-generics-contract-v1" &&
     Solcore.Synthesis.Source.Generic.selector == "0xa444f5e9" &&
     Generic.version == "core-generic-selection-plan-v1") "generic provenance changed"
@@ -1636,7 +1636,7 @@ private def executionChecks : IO Unit := do
 
 private def formattingChecks : IO Unit := do
   let identityExpected := String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;", "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract SynthesizedInput {",
     "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);",
@@ -1644,7 +1644,7 @@ private def formattingChecks : IO Unit := do
   ensure ((← emitted (← checked (.var 0))).source == identityExpected)
     "input emission no longer reads the runtime ABI parameter"
   let bindingExpected := String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;", "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
     "contract SynthesizedInput {",
     "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);",
@@ -1653,7 +1653,7 @@ private def formattingChecks : IO Unit := do
     "        return uint256(sc_v2);", "    }", "}", ""]
   ensure ((← emitted (← checked (.letE (word 7) (.binary .wordAdd (.var 0) (.var 1))))).source == bindingExpected)
     "local binding hid or renamed the runtime input"
-  ensure (Input.emitterVersion == "solcore-source-input-v1" &&
+  ensure (Input.emitterVersion == "solcore-source-input-v2" &&
     Input.wrapperVersion == "solcore-word-input-contract-v1" && Input.selector == "0xa444f5e9" &&
     wordFunctionVersion == "core-word-function-v1" && abstractionVersion == "word-literal-preorder-v1")
     "input-profile provenance changed"
@@ -1777,7 +1777,7 @@ private def shiftB : Plan := {
 
 
 private def arithmeticASource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_h0(sc_p: int8, sc_q: int8) returns (int8) {\n    unchecked {\n        return (sc_p * sc_q);\n    }\n}\n\nfunction sc_h1(sc_p: int8, sc_q: int8) returns (int8) {\n    return (sc_p / sc_q);\n}\n\nfunction sc_apply(sc_f: function (int8) returns (int8), sc_v: int8) returns (int8) {\n    return sc_f(sc_v);\n}\n\ncontract SynthesizedCheckedArithmetic {\n    function run(input: int8) public returns (int8) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: int8 = input;\n        let sc_a1: int8 = Typedef.abs(sc_signextend(0, (sc_x + 128)));\n        let sc_a2: int8 = Typedef.abs(sc_signextend(0, (sc_x + 127)));\n        let sc_acc: word = 0;\n        let sc_v0: int8 = (sc_a0 + 1);\n        let sc_v1: int8 = sc_h1(sc_a1, sc_a2);\n        let sc_v2: int8 = 0;\n        let sc_v3: int8 = 0;\n        let sc_v4: int8 = 0;\n        let sc_d0 = 1;\n        if (sc_x > 7) {\n            sc_d0 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        }\n        let sc_e0 = 0;\n        unchecked {\n            sc_v2 = (sc_a1 / (-1));\n            sc_v3 = (-sc_a1);\n            sc_v4 = sc_h0(sc_v0, sc_a2);\n            sc_e0 = (sc_d0 + 1);\n        }\n        let sc_d1 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        if ((sc_x & 1) == 0) {\n            sc_d1 = 0;\n        }\n        let sc_v5: int8 = sc_apply(lam (sc_l: int8) -> int8 {\n            unchecked {\n                return (sc_l - (-128));\n            }\n        }, sc_v2);\n        let sc_v6: int8 = sc_v3;\n        sc_v6 %= sc_a0;\n        let sc_e1 = (sc_d1 - 1);\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v5));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v6));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e1));\n        return Typedef.abs(sc_acc);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_h0(sc_p: int8, sc_q: int8) returns (int8) {\n    unchecked {\n        return (sc_p * sc_q);\n    }\n}\n\nfunction sc_h1(sc_p: int8, sc_q: int8) returns (int8) {\n    return (sc_p / sc_q);\n}\n\nfunction sc_apply(sc_f: function (int8) returns (int8), sc_v: int8) returns (int8) {\n    return sc_f(sc_v);\n}\n\ncontract SynthesizedCheckedArithmetic {\n    function run(input: int8) public returns (int8) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: int8 = input;\n        let sc_a1: int8 = Typedef.abs(sc_signextend(0, (sc_x + 128)));\n        let sc_a2: int8 = Typedef.abs(sc_signextend(0, (sc_x + 127)));\n        let sc_acc: word = 0;\n        let sc_v0: int8 = (sc_a0 + 1);\n        let sc_v1: int8 = sc_h1(sc_a1, sc_a2);\n        let sc_v2: int8 = 0;\n        let sc_v3: int8 = 0;\n        let sc_v4: int8 = 0;\n        let sc_d0 = 1;\n        if (sc_x > 7) {\n            sc_d0 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        }\n        let sc_e0 = 0;\n        unchecked {\n            sc_v2 = (sc_a1 / (-1));\n            sc_v3 = (-sc_a1);\n            sc_v4 = sc_h0(sc_v0, sc_a2);\n            sc_e0 = (sc_d0 + 1);\n        }\n        let sc_d1 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        if ((sc_x & 1) == 0) {\n            sc_d1 = 0;\n        }\n        let sc_v5: int8 = sc_apply(lam (sc_l: int8) -> int8 {\n            unchecked {\n                return (sc_l - (-128));\n            }\n        }, sc_v2);\n        let sc_v6: int8 = sc_v3;\n        sc_v6 %= sc_a0;\n        let sc_e1 = (sc_d1 - 1);\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v5));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v6));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e1));\n        return Typedef.abs(sc_acc);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`. -/
 private def arithmeticAResults : List String := [
@@ -1795,7 +1795,7 @@ private def arithmeticAResults : List String := [
     "0x6cc54a63"]
 
 private def arithmeticBSource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.unchecked.unsigned;\nimport * from std.dispatch;\n\nfunction sc_h0(sc_p: uint64, sc_q: uint64) returns (uint64) {\n    return (sc_p - sc_q);\n}\n\nfunction sc_apply(sc_f: function (uint64) returns (uint64), sc_v: uint64) returns (uint64) {\n    return sc_f(sc_v);\n}\n\ncontract SynthesizedCheckedArithmetic {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: uint64 = Typedef.abs((sc_x & 0xffffffffffffffff));\n        let sc_a1: uint64 = Typedef.abs(((sc_x + 1) & 0xffffffffffffffff));\n        let sc_a2: uint64 = Typedef.abs(((sc_x + 18446744073709551615) & 0xffffffffffffffff));\n        let sc_acc: word = 0;\n        let sc_d0 = 1;\n        if (sc_x == 255) {\n            sc_d0 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        }\n        let sc_v0: uint64 = sc_a0;\n        sc_v0 *= sc_a1;\n        let sc_e0 = (sc_d0 + 1);\n        let sc_v1: uint64 = 0;\n        let sc_v2: uint64 = 0;\n        let sc_v3: uint64 = 0;\n        unchecked {\n            sc_v1 = (0 - sc_a1);\n            sc_v2 = sc_h0(18446744073709551615, sc_v1);\n            sc_v3 = sc_apply(lam (sc_l: uint64) -> uint64 {\n                return (sc_l + sc_a0);\n            }, sc_v0);\n        }\n        let sc_v4: uint64 = (sc_v2 % sc_a2);\n        let sc_v5: uint64 = (-sc_v4);\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v5));\n        return uint256(sc_acc);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.unchecked.unsigned;\nimport * from std.dispatch;\n\nfunction sc_h0(sc_p: uint64, sc_q: uint64) returns (uint64) {\n    return (sc_p - sc_q);\n}\n\nfunction sc_apply(sc_f: function (uint64) returns (uint64), sc_v: uint64) returns (uint64) {\n    return sc_f(sc_v);\n}\n\ncontract SynthesizedCheckedArithmetic {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: uint64 = Typedef.abs((sc_x & 0xffffffffffffffff));\n        let sc_a1: uint64 = Typedef.abs(((sc_x + 1) & 0xffffffffffffffff));\n        let sc_a2: uint64 = Typedef.abs(((sc_x + 18446744073709551615) & 0xffffffffffffffff));\n        let sc_acc: word = 0;\n        let sc_d0 = 1;\n        if (sc_x == 255) {\n            sc_d0 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;\n        }\n        let sc_v0: uint64 = sc_a0;\n        sc_v0 *= sc_a1;\n        let sc_e0 = (sc_d0 + 1);\n        let sc_v1: uint64 = 0;\n        let sc_v2: uint64 = 0;\n        let sc_v3: uint64 = 0;\n        unchecked {\n            sc_v1 = (0 - sc_a1);\n            sc_v2 = sc_h0(18446744073709551615, sc_v1);\n            sc_v3 = sc_apply(lam (sc_l: uint64) -> uint64 {\n                return (sc_l + sc_a0);\n            }, sc_v0);\n        }\n        let sc_v4: uint64 = (sc_v2 % sc_a2);\n        let sc_v5: uint64 = (-sc_v4);\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_e0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v5));\n        return uint256(sc_acc);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`. -/
 private def arithmeticBResults : List String := [
@@ -1813,7 +1813,7 @@ private def arithmeticBResults : List String := [
     "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"]
 
 private def shiftASource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\ncontract SynthesizedShifts {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: int16 = Typedef.abs(sc_signextend(1, sc_x));\n        let sc_a1: int16 = Typedef.abs(sc_signextend(1, (sc_x + 32768)));\n        let sc_k0: word = sc_x;\n        let sc_k1: uint8 = Typedef.abs(((sc_x + 7) & 0xff));\n        let sc_acc: word = 0;\n        let sc_v0: int16 = (sc_a0 << sc_k1);\n        let sc_v1: int16 = (sc_a1 >> 300);\n        let sc_v2: int16 = 0;\n        let sc_v3: int16 = 0;\n        unchecked {\n            sc_v2 = sc_v0;\n            sc_v2 <<= sc_k0;\n            sc_v3 = ((-32768) >> sc_k1);\n        }\n        let sc_v4: int16 = sc_v1;\n        sc_v4 >>= 15;\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        return uint256(sc_acc);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\ncontract SynthesizedShifts {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: int16 = Typedef.abs(sc_signextend(1, sc_x));\n        let sc_a1: int16 = Typedef.abs(sc_signextend(1, (sc_x + 32768)));\n        let sc_k0: word = sc_x;\n        let sc_k1: uint8 = Typedef.abs(((sc_x + 7) & 0xff));\n        let sc_acc: word = 0;\n        let sc_v0: int16 = (sc_a0 << sc_k1);\n        let sc_v1: int16 = (sc_a1 >> 300);\n        let sc_v2: int16 = 0;\n        let sc_v3: int16 = 0;\n        unchecked {\n            sc_v2 = sc_v0;\n            sc_v2 <<= sc_k0;\n            sc_v3 = ((-32768) >> sc_k1);\n        }\n        let sc_v4: int16 = sc_v1;\n        sc_v4 >>= 15;\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v0));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v1));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v2));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v3));\n        sc_acc = ((sc_acc * 1099511628211) ^ Typedef.rep(sc_v4));\n        return uint256(sc_acc);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`. -/
 private def shiftAResults : List String := [
@@ -1831,7 +1831,7 @@ private def shiftAResults : List String := [
     "115792089237316195423570985008687907853269984665640564039457584006813618011725"]
 
 private def shiftBSource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\ncontract SynthesizedShifts {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: word = sc_x;\n        let sc_a1: word = (sc_x + 3);\n        let sc_k0: uint256 = Typedef.abs((sc_x + 255));\n        let sc_k1: uint16 = Typedef.abs(((sc_x + 256) & 0xffff));\n        let sc_k2: uint128 = Typedef.abs((sc_x & 0xffffffffffffffffffffffffffffffff));\n        let sc_acc: word = 0;\n        let sc_v0: word = (sc_a0 << sc_k0);\n        let sc_v1: word = (sc_a1 >> sc_k1);\n        let sc_v2: word = sc_v0;\n        sc_v2 >>= sc_k2;\n        let sc_v3: word = (115792089237316195423570985008687907853269984665640564039457584007913129639935 << 256);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v0);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v1);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v2);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v3);\n        return uint256(sc_acc);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\ncontract SynthesizedShifts {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_a0: word = sc_x;\n        let sc_a1: word = (sc_x + 3);\n        let sc_k0: uint256 = Typedef.abs((sc_x + 255));\n        let sc_k1: uint16 = Typedef.abs(((sc_x + 256) & 0xffff));\n        let sc_k2: uint128 = Typedef.abs((sc_x & 0xffffffffffffffffffffffffffffffff));\n        let sc_acc: word = 0;\n        let sc_v0: word = (sc_a0 << sc_k0);\n        let sc_v1: word = (sc_a1 >> sc_k1);\n        let sc_v2: word = sc_v0;\n        sc_v2 >>= sc_k2;\n        let sc_v3: word = (115792089237316195423570985008687907853269984665640564039457584007913129639935 << 256);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v0);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v1);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v2);\n        sc_acc = ((sc_acc * 1099511628211) ^ sc_v3);\n        return uint256(sc_acc);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-checked-arithmetic-corpus.py`. -/
 private def shiftBResults : List String := [
@@ -2542,7 +2542,7 @@ private def formattingChecks : IO Unit := do
   let left ← fileSource bundle "left.sol"
   let right ← fileSource bundle "right.sol"
   for file in bundle.files do
-    ensure (file.source.startsWith "import * from std;\n" && file.source.endsWith "\n")
+    ensure (file.source.startsWith "pragma solcore;\nimport * from std;\n" && file.source.endsWith "\n")
       "module lost its local standard-library evidence or terminal newline"
   for token in [" + ", " - ", " * ", " | ", " & ", " ^ ", "(~", "(!", " > ", " == ", "if ("] do
     ensure (contains common token) s!"common module dropped original constant operation {token}"
@@ -2583,7 +2583,7 @@ private def formattingChecks : IO Unit := do
     bundle.deployPath == ["SynthesizedModulesDeploy"] &&
     bundle.runtimePath == ["SynthesizedModulesDeploy", "SynthesizedModules"] &&
     Modules.version == "core-module-composition-plan-v1" &&
-    Solcore.Synthesis.Source.Modules.emitterVersion == "solcore-source-modules-v2" &&
+    Solcore.Synthesis.Source.Modules.emitterVersion == "solcore-source-modules-v3" &&
     Solcore.Synthesis.Source.Modules.wrapperVersion == "solcore-word-modules-contract-v1")
     "module provenance or contract metadata changed"
 
@@ -2740,7 +2740,7 @@ private def executionChecks : IO Unit := do
   | _ => throw (IO.userError "unsupported mutation arithmetic was silently emitted")
 
 private def snapshotExpected : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;", "",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_c0: word = sc_arg;",
   "    let sc_v1: word = sc_c0;",
@@ -2779,7 +2779,7 @@ private def formattingChecks : IO Unit := do
   let graph ← checked [snapshotBody]
   for feature in ["newCell", "loadCell", "storeCell", "functionCall"] do
     ensure (graph.features.contains feature) s!"missing mutation AST feature {feature}"
-  ensure (Mutation.emitterVersion == "solcore-source-mutation-v1" &&
+  ensure (Mutation.emitterVersion == "solcore-source-mutation-v2" &&
     Mutation.wrapperVersion == "solcore-word-mutation-contract-v1" &&
     Mutation.selector == "0xa444f5e9" && LocalMutation.version == "core-local-mutation-dag-v1")
     "mutation provenance changed"
@@ -3645,13 +3645,13 @@ private def formattingChecks : IO Unit := do
     "raw operation or local escaped its conditional branch"
   observe branch 11 3
   let identityExpected := String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;",
     "import { div as sc_div, mod as sc_mod, shl as sc_shl, shr as sc_shr, sar as sc_sar, sdiv as sc_sdiv, smod as sc_smod, sgt as sc_sgt, addmod as sc_addmod, mulmod as sc_mulmod, clz as sc_clz, byte as sc_byte, exp as sc_exp, signextend as sc_signextend } from std.opcodes;", "",
     "contract SynthesizedPrimitives {", "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);", "        return uint256(sc_input);", "    }", "}", ""]
   ensure ((← emitted (← checked (.var 0))).source == identityExpected)
     "primitive wrapper source changed its raw aliases or runtime ABI"
-  ensure (Primitive.emitterVersion == "solcore-source-primitives-v1" &&
+  ensure (Primitive.emitterVersion == "solcore-source-primitives-v2" &&
     Primitive.wrapperVersion == "solcore-word-primitives-contract-v1" && Primitive.selector == "0xa444f5e9")
     "primitive emitter version or selector changed"
 

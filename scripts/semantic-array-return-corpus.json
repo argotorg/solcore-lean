@@ -1,6 +1,6 @@
 {
   "coverageKind": "step-core-ast-features",
-  "emitterVersion": "solcore-source-array-returns-v1",
+  "emitterVersion": "solcore-source-array-returns-v2",
   "functionVersion": "core-array-return-contract-v1",
   "generationRecipeRequirements": {
     "templates": [

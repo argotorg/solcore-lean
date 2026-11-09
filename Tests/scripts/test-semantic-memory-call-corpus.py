@@ -685,7 +685,7 @@ def emitted_source(plan):
             used.add("sc_put8")
     enum = any(h["param"] == "enum" for h in helpers) or any(
         "data" in s and s["data"]["datum"] in ("enum0", "enum1") for s in plan["steps"])
-    source = (["import * from std;", "import * from std.dispatch;",
+    source = (["pragma solcore;", "import * from std;", "import * from std.dispatch;",
                "import { mload, mstore, mstore8, shr, mod } from std.opcodes;", ""] +
               [line for helper in HELPERS if helper in used for line in memory.HELPER_LINES[helper]] +
               (["enum Sc_E {", "    Sc_E0(memory<bytes>, word),", "    Sc_E1(word)", "}", ""] if enum else []) +

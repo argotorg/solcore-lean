@@ -3,7 +3,7 @@
   "profile": "runtime-closure-captures",
   "coverageKind": "core-ast-features",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-closure-captures-v1",
+  "emitterVersion": "solcore-source-closure-captures-v2",
   "generatorVersion": "core-closure-captures-v1",
   "profileVersion": "runtime-closure-captures-v1/plan-seed-v1",
   "wrapperVersion": "solcore-closure-captures-contract-v1",

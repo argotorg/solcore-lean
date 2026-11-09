@@ -8,7 +8,7 @@
   "generatorVersion": "core-primitives-v1/core-g0-v1/lcg64-v1",
   "baseGeneratorVersion": "core-g0-v1/lcg64-v1",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-primitives-v1",
+  "emitterVersion": "solcore-source-primitives-v2",
   "wrapperVersion": "solcore-word-primitives-contract-v1",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",

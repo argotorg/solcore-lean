@@ -8,7 +8,7 @@
  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
  "stepFunctionVersion": "core-aggregate-dag-v1",
  "stepTemplateVersion": "word-aggregate-templates-v1",
- "emitterVersion": "solcore-source-nested-array-v1",
+ "emitterVersion": "solcore-source-nested-array-v2",
  "wrapperVersion": "solcore-word-nested-array-contract-v1",
  "coverageKind": "step-core-ast-features",
  "requiredFeatures": [

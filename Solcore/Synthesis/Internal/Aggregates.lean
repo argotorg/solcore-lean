@@ -766,7 +766,7 @@ set_option autoImplicit false
 namespace Solcore.Synthesis.Source.AggregateCallGraph
 
 
-def emitterVersion : String := "solcore-source-aggregate-call-graphs-v1"
+def emitterVersion : String := "solcore-source-aggregate-call-graphs-v2"
 def wrapperVersion : String := "solcore-word-aggregate-call-graphs-contract-v1"
 def contractName : String := "SynthesizedAggregateCallGraphs"
 def methodName : String := "run"
@@ -781,7 +781,8 @@ def helperName (index : Nat) : String := "sc_fn" ++ toString index
 Local temporaries are fresh within each function and cannot shadow helper names. -/
 def emit (graph : Solcore.Synthesis.Core.Aggregates.CheckedDAG) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""]
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, ""]
   for (body, index) in graph.helpers.zipIdx do
     let rendered ← AggregateCallGraphRenderer.render names .word [.word "sc_arg"] 4 0 body
     let name := helperName index
@@ -1129,7 +1130,7 @@ namespace Solcore.Synthesis.Source.Aggregate
 
 open Solcore.Synthesis.Core.Aggregates (CheckedDAG)
 
-def emitterVersion : String := "solcore-source-aggregates-v2"
+def emitterVersion : String := "solcore-source-aggregates-v3"
 def wrapperVersion : String := "solcore-word-aggregates-contract-v1"
 
 /-- The G0 features `emit` renders in helpers: every operator and form. -/
@@ -1143,7 +1144,7 @@ def runtimePath : List String := ["SynthesizedAggregatesDeploy", "SynthesizedAgg
 
 def emit (graph : CheckedDAG) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
     AggregateRenderer.opcodeImports (graph.helpers ++ [graph.entry]) ++ [""]
   for (body, index) in graph.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body

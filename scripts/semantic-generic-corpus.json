@@ -3,7 +3,7 @@
   "profile": "runtime-generics",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-generics-v2",
+  "emitterVersion": "solcore-source-generics-v3",
   "wrapperVersion": "solcore-word-generics-contract-v1",
   "profileVersion": "runtime-generics-v2/select-seed-v1",
   "functionVersion": "core-generic-selection-plan-v1",

@@ -9,7 +9,7 @@
  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
  "stepFunctionVersion": "core-aggregate-dag-v1",
  "stepTemplateVersion": "word-aggregate-templates-v1",
- "emitterVersion": "solcore-source-event-log-v1",
+ "emitterVersion": "solcore-source-event-log-v2",
  "wrapperVersion": "solcore-word-event-log-contract-v1",
  "coverageKind": "step-core-ast-features",
  "requiredFeatures": [

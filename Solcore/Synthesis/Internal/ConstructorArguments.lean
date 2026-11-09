@@ -308,7 +308,7 @@ namespace Solcore.Synthesis.Source.ConstructorArguments
 open Solcore.Synthesis.Core.ConstructorArguments (CheckedPlan Parameters)
 open Solcore.Synthesis.Source.EnumArgument (enumName typeLines armLines)
 
-def emitterVersion : String := "solcore-source-constructor-arguments-v1"
+def emitterVersion : String := "solcore-source-constructor-arguments-v2"
 def wrapperVersion : String := "solcore-constructor-arguments-contract-v1"
 def contractName : String := "SynthesizedConstructorArguments"
 def methodName : String := "run"
@@ -358,7 +358,8 @@ def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
           (plan.step.helpers ++ [plan.step.entry]), ""] ++ typeLines shape
     | _ => [AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "mload", "revert_"]
           (plan.step.helpers ++ [plan.step.entry]), ""]
-  let mut lines := ["import * from std;", "import * from std.dispatch;"] ++ enumLines
+  let mut lines := ["pragma solcore;", "import * from std;",
+    "import * from std.dispatch;"] ++ enumLines
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
     let result ← AggregateRenderer.requireValue rendered

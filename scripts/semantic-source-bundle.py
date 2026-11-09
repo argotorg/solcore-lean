@@ -16,18 +16,10 @@ from urllib.parse import unquote, urlparse
 SCHEMA = "solcore-lean.source-bundle.v1"
 RECEIPT_SCHEMA = "solcore-lean.source-bundle-receipt.v1"
 FILES = ("case.sol", "common.sol", "left.sol", "right.sol")
-# The pinned compiler rejects a source file that does not begin with this declaration.
-PRAGMA = "pragma solcore;\n"
 
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def compiler_source(text: str) -> str:
-    """An emitted source as the Rust compiler reads it: the emitters' text after the mandatory
-    `pragma solcore;`, which declares the file as Solcore and has no other meaning."""
-    return text if text.startswith(PRAGMA) else PRAGMA + text
 
 
 def valid_hash(value) -> bool:
@@ -53,7 +45,7 @@ def validate(case: dict) -> dict[str, str]:
 
 def hashes(case: dict) -> dict[str, str]:
     """The hashes of the files as written for the compiler."""
-    return {name: digest(compiler_source(source).encode()) for name, source in validate(case).items()}
+    return {name: digest(source.encode()) for name, source in validate(case).items()}
 
 
 def audit_files(directory: Path, expected: dict[str, str]) -> None:
@@ -76,7 +68,7 @@ def write(directory: Path, case: dict) -> dict:
             raise ValueError("source bundle must be written into a fresh flat source root")
     for name, source in files.items():
         with (directory / name).open("xb") as target:
-            target.write(compiler_source(source).encode())
+            target.write(source.encode())
     expected = hashes(case)
     audit_files(directory, expected)
     return {"schema": RECEIPT_SCHEMA, "files": expected,

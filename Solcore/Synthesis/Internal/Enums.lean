@@ -1252,7 +1252,7 @@ namespace Solcore.Synthesis.Source.Enums
 
 open Solcore.Synthesis.Core.Enums
 
-def emitterVersion : String := "solcore-source-enums-v1"
+def emitterVersion : String := "solcore-source-enums-v2"
 def wrapperVersion : String := "solcore-word-enums-contract-v1"
 
 def contractName : String := "SynthesizedEnums"
@@ -1409,7 +1409,7 @@ def runLines (plan : Plan) : List String :=
     [indented 8 ("return uint256(" ++ combined ++ ");"), indented 4 "}", "}"]
 
 def emit (plan : Plan) : EmittedProgram :=
-  let lines := ["import * from std;", "import * from std.dispatch;", ""] ++
+  let lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] ++
     plan.decls.zipIdx.flatMap (fun (decl, index) => declLines plan.decls index decl) ++
     plan.views.zipIdx.flatMap (fun (view, index) =>
       viewLines plan.decls index view ++

@@ -3,7 +3,7 @@
   "profile": "runtime-aggregates",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-aggregates-v2",
+  "emitterVersion": "solcore-source-aggregates-v3",
   "wrapperVersion": "solcore-word-aggregates-contract-v1",
   "profileVersion": "runtime-aggregates-v2/template-seed-v1",
   "functionVersion": "core-aggregate-dag-v1",

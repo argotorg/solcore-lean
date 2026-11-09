@@ -630,7 +630,7 @@ private def admissionChecks : IO Unit := do
     "log-site simplification does not shrink the program"
 
 private def expectedBasic : String := String.intercalate "\n" [
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mload, mstore, revert_, log0 as sc_log0, log2 as sc_log2} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -673,7 +673,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)] [⟨1, 1, 0⟩])
   ensure ((divided.source.splitOn "import {sload, sstore, mload, mstore, revert_, log1 as sc_log1, div as sc_div, ").length == 2)
     "log emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.EventLog.emitterVersion == "solcore-source-event-log-v1" &&
+  ensure (Solcore.Synthesis.Source.EventLog.emitterVersion == "solcore-source-event-log-v2" &&
     Solcore.Synthesis.Source.EventLog.wrapperVersion == "solcore-word-event-log-contract-v1" &&
     Solcore.Synthesis.Source.EventLog.selector == "0x7357f5d2" &&
     EventLog.version == "core-event-log-contract-v1" && EventLog.framingVersion == "core-word-log-framing-v1")
@@ -1134,7 +1134,7 @@ private def fixtureBResults : List (Nat × String) := [
   (1001, "42975")]
 
 private def header : List String := [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "import { mload, mstore, mstore8, shr, mod } from std.opcodes;",
   ""]
@@ -1625,7 +1625,7 @@ private def haltFixtureB : Plan := {
     .site {form := .when, cond := {word := .xor 255, test := .eq 0}, payload := .halt .inline}]}
 
 private def haltHeader : List String := [
-  "import * from std;",
+  "pragma solcore;", "import * from std;",
   "import * from std.dispatch;",
   "import { mload, mstore, mstore8, shr, mod, invalid } from std.opcodes;",
   ""]

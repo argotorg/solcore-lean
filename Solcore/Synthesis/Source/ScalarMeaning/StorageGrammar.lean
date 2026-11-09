@@ -709,7 +709,8 @@ theorem storageImportPieces_separated (aliases : List (String × String))
     head_space
 
 def StorageFile.linePieces (file : StorageFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   [storageImportPieces file.opcodeAliases] ++ [[]] ++
@@ -1519,7 +1520,8 @@ theorem rollbackImportPieces_separated (aliases : List (String × String))
       (head_sym (by decide))))) head_space
 
 def RollbackFile.linePieces (file : RollbackFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   [rollbackImportPieces file.opcodeAliases] ++ [[]] ++
@@ -2079,7 +2081,8 @@ theorem KeyedStmt.listLinePieces_separated (indent : Nat) :
           (fun name found => valid name (by simp [KeyedStmt.listIdentifiers, found])) line mem
 
 def KeyedFile.linePieces (file : KeyedFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   [rollbackImportPieces file.opcodeAliases] ++ [[]] ++
@@ -3072,7 +3075,8 @@ theorem logImportPieces_separated (aliases : List (String × String))
       (head_sym (by decide))))) head_space
 
 def LogFile.linePieces (file : LogFile) : List (List Piece) :=
-  [[word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
+  [[word "pragma", space, word "solcore", sym ';'],
+    [word "import", space, sym '*', space, word "from", space, word "std", sym ';'],
     [word "import", space, sym '*', space, word "from", space, word "std", sym '.',
       word "dispatch", sym ';']] ++
   [logImportPieces file.opcodeAliases] ++ [[]] ++

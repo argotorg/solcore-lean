@@ -563,7 +563,7 @@ namespace Solcore.Synthesis.Source.KeyedStorage
 
 open Solcore.Synthesis.Core.KeyedStorage (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-keyed-storage-v2"
+def emitterVersion : String := "solcore-source-keyed-storage-v3"
 def wrapperVersion : String := "solcore-word-keyed-storage-contract-v1"
 def contractName : String := "SynthesizedKeyedStorage"
 def methodName : String := "run"
@@ -574,7 +574,7 @@ def runtimePath : List String := ["SynthesizedKeyedStorageDeploy", "SynthesizedK
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -629,7 +629,7 @@ namespace Solcore.Synthesis.Source.Storage
 
 open Solcore.Synthesis.Core.StorageContract (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-storage-v2"
+def emitterVersion : String := "solcore-source-storage-v3"
 def wrapperVersion : String := "solcore-word-storage-contract-v1"
 def contractName : String := "SynthesizedStorage"
 def methodName : String := "run"
@@ -640,7 +640,7 @@ def runtimePath : List String := ["SynthesizedStorageDeploy", "SynthesizedStorag
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
@@ -1688,7 +1688,7 @@ namespace Solcore.Synthesis.Source.StorageLedger
 
 open Solcore.Synthesis.Core.StorageLedger (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-sender-ledger-v1"
+def emitterVersion : String := "solcore-source-sender-ledger-v2"
 def wrapperVersion : String := "solcore-word-sender-ledger-contract-v1"
 def contractName : String := "SynthesizedLedger"
 def methodName : String := "run"
@@ -1699,7 +1699,7 @@ def runtimePath : List String := ["SynthesizedLedgerDeploy", "SynthesizedLedger"
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["caller", "mstore", "revert_"] (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
@@ -2536,7 +2536,7 @@ namespace Solcore.Synthesis.Source.StorageMapping
 
 open Solcore.Synthesis.Core.StorageMapping (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-keccak-mapping-v1"
+def emitterVersion : String := "solcore-source-keccak-mapping-v2"
 def wrapperVersion : String := "solcore-word-keccak-mapping-contract-v1"
 def contractName : String := "SynthesizedMapping"
 def methodName : String := "run"
@@ -2547,7 +2547,7 @@ def runtimePath : List String := ["SynthesizedMappingDeploy", "SynthesizedMappin
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["mstore", "revert_"] (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do
     let rendered ← AggregateRenderer.render names .word [.word "sc_arg"] 4 0 body
@@ -3048,7 +3048,7 @@ namespace Solcore.Synthesis.Source.StorageRollback
 
 open Solcore.Synthesis.Core.StorageRollback (CheckedPlan)
 
-def emitterVersion : String := "solcore-source-storage-rollback-v2"
+def emitterVersion : String := "solcore-source-storage-rollback-v3"
 def wrapperVersion : String := "solcore-word-storage-rollback-contract-v1"
 def contractName : String := "SynthesizedRollback"
 def methodName : String := "run"
@@ -3059,7 +3059,7 @@ def runtimePath : List String := ["SynthesizedRollbackDeploy", "SynthesizedRollb
 
 def emit (plan : CheckedPlan) : Except EmitError EmittedProgram := do
   let mut names : List String := []
-  let mut lines := ["import * from std;", "import * from std.dispatch;",
+  let mut lines := ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
     AggregateRenderer.opcodeImportWith ["sload", "sstore", "mstore", "revert_"]
       (plan.step.helpers ++ [plan.step.entry]), ""]
   for (body, index) in plan.step.helpers.zipIdx do

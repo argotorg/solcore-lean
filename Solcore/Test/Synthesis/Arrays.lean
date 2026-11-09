@@ -117,7 +117,7 @@ private def abiB : Plan := {
     .act (.observe (.element (.row 0 (.literal 1)) (.literal 2)))]}
 
 private def memoryASource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_sum(sc_v: int8[]) returns (int8) {\n    let sc_t: int8 = 0;\n    for (let sc_i: uint256 = 0; sc_i < sc_v.length; sc_i += 1) {\n        sc_t += sc_v[sc_i];\n    }\n    return sc_t;\n}\n\nfunction sc_get<c>(sc_c: c, sc_i: uint256) returns (int8) where (c, uint256): RValueIdxAccess<int8> {\n    return ridx(sc_c, sc_i);\n}\n\ncontract SynthesizedMemoryArrays {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: int8 = Typedef.abs(sc_signextend(0, sc_x));\n        let sc_v1: int8 = Typedef.abs(sc_signextend(0, (sc_x + 128)));\n        let sc_v2: int8 = Typedef.abs(sc_signextend(0, (sc_x + 127)));\n        let sc_k0: uint256 = uint256((sc_x & 3));\n        let sc_k1: uint256 = uint256((sc_x & 0x8000000000000000000000000000000000000000000000000000000000000007));\n        let sc_r: word = 0;\n        let sc_a0: int8[] = new int8[](sc_k0);\n        let sc_a1: int8[] = [sc_v0, sc_v1, (-128)];\n        let sc_a2: int8[] = sc_a1;\n        sc_a2[1] += sc_v0;\n        let sc_s0 = sc_a1[0:sc_k0];\n        sc_a1[0] = sc_v1;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_s0[uint256(0)]));\n        let sc_g0: int8[][] = new int8[][](sc_k1);\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_g0.length));\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_sum(sc_a2)));\n        for (let sc_i: uint256 = 0; sc_i < sc_a0.length; sc_i += 1) {\n            unchecked {\n                sc_a0[sc_i] *= sc_v0;\n            }\n            sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_get(sc_a1, sc_i)));\n        }\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_a1[1]));\n        return uint256(sc_r);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.unchecked.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_sum(sc_v: int8[]) returns (int8) {\n    let sc_t: int8 = 0;\n    for (let sc_i: uint256 = 0; sc_i < sc_v.length; sc_i += 1) {\n        sc_t += sc_v[sc_i];\n    }\n    return sc_t;\n}\n\nfunction sc_get<c>(sc_c: c, sc_i: uint256) returns (int8) where (c, uint256): RValueIdxAccess<int8> {\n    return ridx(sc_c, sc_i);\n}\n\ncontract SynthesizedMemoryArrays {\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: int8 = Typedef.abs(sc_signextend(0, sc_x));\n        let sc_v1: int8 = Typedef.abs(sc_signextend(0, (sc_x + 128)));\n        let sc_v2: int8 = Typedef.abs(sc_signextend(0, (sc_x + 127)));\n        let sc_k0: uint256 = uint256((sc_x & 3));\n        let sc_k1: uint256 = uint256((sc_x & 0x8000000000000000000000000000000000000000000000000000000000000007));\n        let sc_r: word = 0;\n        let sc_a0: int8[] = new int8[](sc_k0);\n        let sc_a1: int8[] = [sc_v0, sc_v1, (-128)];\n        let sc_a2: int8[] = sc_a1;\n        sc_a2[1] += sc_v0;\n        let sc_s0 = sc_a1[0:sc_k0];\n        sc_a1[0] = sc_v1;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_s0[uint256(0)]));\n        let sc_g0: int8[][] = new int8[][](sc_k1);\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_g0.length));\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_sum(sc_a2)));\n        for (let sc_i: uint256 = 0; sc_i < sc_a0.length; sc_i += 1) {\n            unchecked {\n                sc_a0[sc_i] *= sc_v0;\n            }\n            sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_get(sc_a1, sc_i)));\n        }\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_a1[1]));\n        return uint256(sc_r);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-array-corpus.py`. -/
 private def memoryAResults : List String := [
@@ -135,7 +135,7 @@ private def memoryAResults : List String := [
     "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"]
 
 private def memoryBSource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\nfunction sc_inc(sc_c: memref<uint256>, sc_w: uint256) {\n    CanStore.store(sc_c, (CanStore.load(sc_c) + sc_w));\n}\n\nfunction sc_mk(sc_p: uint256, sc_q: uint256) returns (uint256[]) {\n    return [sc_p, sc_q];\n}\n\ncontract SynthesizedMemoryArrays {\n    sc_st: uint256[];\n\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: uint256 = Typedef.abs(sc_x);\n        let sc_v1: uint256 = Typedef.abs((sc_x + 1));\n        let sc_k0: uint256 = uint256(((sc_x >> 8) & 3));\n        let sc_r: word = 0;\n        sc_st.push(sc_v0);\n        sc_st.push(sc_v1);\n        sc_st.push(7);\n        let sc_s0 = sc_st[1:];\n        sc_st.pop();\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_s0[sc_k0]));\n        sc_st.setLength(3);\n        sc_st[0] /= sc_v1;\n        let sc_a0: uint256[] = sc_mk(sc_v0, sc_v1);\n        let sc_g0: uint256[][] = [sc_a0, sc_a0];\n        sc_inc(lidx(sc_g0[sc_k0], 1), sc_v0);\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_a0[1]));\n        return uint256(sc_r);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\nfunction sc_inc(sc_c: memref<uint256>, sc_w: uint256) {\n    CanStore.store(sc_c, (CanStore.load(sc_c) + sc_w));\n}\n\nfunction sc_mk(sc_p: uint256, sc_q: uint256) returns (uint256[]) {\n    return [sc_p, sc_q];\n}\n\ncontract SynthesizedMemoryArrays {\n    sc_st: uint256[];\n\n    function run(input: uint256) public returns (uint256) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: uint256 = Typedef.abs(sc_x);\n        let sc_v1: uint256 = Typedef.abs((sc_x + 1));\n        let sc_k0: uint256 = uint256(((sc_x >> 8) & 3));\n        let sc_r: word = 0;\n        sc_st.push(sc_v0);\n        sc_st.push(sc_v1);\n        sc_st.push(7);\n        let sc_s0 = sc_st[1:];\n        sc_st.pop();\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_s0[sc_k0]));\n        sc_st.setLength(3);\n        sc_st[0] /= sc_v1;\n        let sc_a0: uint256[] = sc_mk(sc_v0, sc_v1);\n        let sc_g0: uint256[][] = [sc_a0, sc_a0];\n        sc_inc(lidx(sc_g0[sc_k0], 1), sc_v0);\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_a0[1]));\n        return uint256(sc_r);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-array-corpus.py`. -/
 private def memoryBResults : List String := [
@@ -153,7 +153,7 @@ private def memoryBResults : List String := [
     "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"]
 
 private def abiASource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\ncontract SynthesizedArrayAbi {\n    function run(sc_p0: calldata<uint16[]>, sc_p1: uint16[], input: uint256) public returns (uint16[]) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: uint16 = Typedef.abs((sc_x & 0xffff));\n        let sc_k0: uint256 = uint256(((sc_x >> 1) & 3));\n        let sc_r: word = 0;\n        let sc_s0 = sc_p0[:];\n        let sc_a0: uint16[] = toArray(sc_s0);\n        sc_p1[sc_k0] = sc_v0;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_p0[sc_k0]));\n        for (let sc_i: uint256 = 0; sc_i < sc_p0.length; sc_i += 1) {\n            sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_p0[sc_i]));\n        }\n        return sc_p1;\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.dispatch;\n\ncontract SynthesizedArrayAbi {\n    function run(sc_p0: calldata<uint16[]>, sc_p1: uint16[], input: uint256) public returns (uint16[]) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: uint16 = Typedef.abs((sc_x & 0xffff));\n        let sc_k0: uint256 = uint256(((sc_x >> 1) & 3));\n        let sc_r: word = 0;\n        let sc_s0 = sc_p0[:];\n        let sc_a0: uint16[] = toArray(sc_s0);\n        sc_p1[sc_k0] = sc_v0;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_p0[sc_k0]));\n        for (let sc_i: uint256 = 0; sc_i < sc_p0.length; sc_i += 1) {\n            sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_p0[sc_i]));\n        }\n        return sc_p1;\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-array-corpus.py`. -/
 private def abiAResults : List String := [
@@ -171,7 +171,7 @@ private def abiAResults : List String := [
     "0x6cc54a63"]
 
 private def abiBSource : String :=
-  "import * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_put(sc_c: memref<int8>, sc_w: int8) {\n    CanStore.store(sc_c, sc_w);\n}\n\nfunction sc_tail(sc_v: int8[], sc_s: uint256) returns (arraySlice<int8[]>) {\n    return sc_v[sc_s:];\n}\n\ncontract SynthesizedArrayAbi {\n    function run(sc_p0: int8[], input: uint256) public returns (int8[]) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: int8 = Typedef.abs(sc_x);\n        let sc_v1: int8 = Typedef.abs((sc_x + 128));\n        let sc_r: word = 0;\n        let sc_s0 = sc_tail(sc_p0, 1);\n        sc_put(lidx(sc_p0, 2), sc_v1);\n        let sc_g0: int8[][] = [[sc_v0, 7], [sc_v0]];\n        sc_g0[1] = sc_p0;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_g0[1][2]));\n        return toArray(sc_s0);\n    }\n}\n"
+  "pragma solcore;\nimport * from std;\nimport * from std.unsigned;\nimport * from std.signed;\nimport * from std.dispatch;\nimport { signextend as sc_signextend } from std.opcodes;\n\nfunction sc_put(sc_c: memref<int8>, sc_w: int8) {\n    CanStore.store(sc_c, sc_w);\n}\n\nfunction sc_tail(sc_v: int8[], sc_s: uint256) returns (arraySlice<int8[]>) {\n    return sc_v[sc_s:];\n}\n\ncontract SynthesizedArrayAbi {\n    function run(sc_p0: int8[], input: uint256) public returns (int8[]) {\n        let sc_x: word = Typedef.rep(input);\n        let sc_v0: int8 = Typedef.abs(sc_x);\n        let sc_v1: int8 = Typedef.abs((sc_x + 128));\n        let sc_r: word = 0;\n        let sc_s0 = sc_tail(sc_p0, 1);\n        sc_put(lidx(sc_p0, 2), sc_v1);\n        let sc_g0: int8[][] = [[sc_v0, 7], [sc_v0]];\n        sc_g0[1] = sc_p0;\n        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_g0[1][2]));\n        return toArray(sc_s0);\n    }\n}\n"
 
 /-- From the Python model of `Tests/scripts/test-semantic-memory-array-corpus.py`. -/
 private def abiBResults : List String := [
@@ -1735,7 +1735,7 @@ private def elementLines (index : Nat) : List String :=
     "            sstore(" ++ toString (index + 1) ++ ", sc_acc);", "        }"]
 
 private def expectedBasic : String := String.intercalate "\n" ([
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -1761,7 +1761,7 @@ private def formattingChecks : IO Unit := do
     source.deployPath == ["SynthesizedDynamicArrayDeploy"] &&
     source.runtimePath == ["SynthesizedDynamicArrayDeploy", "SynthesizedDynamicArray"])
     "array wrapper metadata changed"
-  ensure (Solcore.Synthesis.Source.DynamicArray.emitterVersion == "solcore-source-dynamic-array-v2" &&
+  ensure (Solcore.Synthesis.Source.DynamicArray.emitterVersion == "solcore-source-dynamic-array-v3" &&
     Solcore.Synthesis.Source.DynamicArray.wrapperVersion == "solcore-word-dynamic-array-contract-v1" &&
     Solcore.Synthesis.Source.DynamicArray.selector == "0x9a94c44b" &&
     DynamicArray.version == "core-dynamic-array-contract-v1" && DynamicArray.maxElements == 3)
@@ -2424,7 +2424,7 @@ private def expectedRow (row : Nat) : List String :=
     expectedCell row 0 ++ expectedCell row 1 ++ ["        }"]
 
 private def expectedBasic : String := String.intercalate "\n" ([
-  "import * from std;", "import * from std.dispatch;",
+  "pragma solcore;", "import * from std;", "import * from std.dispatch;",
   "import {sload, sstore, mstore, revert_} from std.opcodes;", "",
   "function sc_fn0(sc_arg: word) returns (word) {",
   "    let sc_v0: word = 1;", "    let sc_v1: word = (sc_arg + sc_v0);",
@@ -2457,7 +2457,7 @@ private def formattingChecks : IO Unit := do
   let divided ← emitted (← checked [.binary .wordDiv (.var 0) (word 1)])
   ensure ((divided.source.splitOn "import {sload, sstore, mstore, revert_, div as sc_div, ").length == 2)
     "nested-array emission lost the merged raw division alias"
-  ensure (Solcore.Synthesis.Source.NestedArray.emitterVersion == "solcore-source-nested-array-v1" &&
+  ensure (Solcore.Synthesis.Source.NestedArray.emitterVersion == "solcore-source-nested-array-v2" &&
     Solcore.Synthesis.Source.NestedArray.wrapperVersion == "solcore-word-nested-array-contract-v1" &&
     Solcore.Synthesis.Source.NestedArray.selector == "0x7095aff8" && NestedArray.version == "core-nested-array-contract-v1")
     "nested-array provenance changed"

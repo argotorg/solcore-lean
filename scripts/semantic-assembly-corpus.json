@@ -5,7 +5,7 @@
   "abstractionVersion": "word-literal-preorder-v1",
   "baseGeneratorVersion": "core-g0-v1/lcg64-v1",
   "boundaryVersion": "word-primitive-boundary-bank-v1",
-  "emitterVersion": "solcore-source-assembly-v1",
+  "emitterVersion": "solcore-source-assembly-v2",
   "functionProfileVersion": "runtime-primitives-v1/literal-seed-v1",
   "functionVersion": "core-word-function-v1",
   "generatorVersion": "core-primitives-v1/core-g0-v1/lcg64-v1",

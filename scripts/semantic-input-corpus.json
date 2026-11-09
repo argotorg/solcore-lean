@@ -6,7 +6,7 @@
   "functionVersion": "core-word-function-v1",
   "abstractionVersion": "word-literal-preorder-v1",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-input-v1",
+  "emitterVersion": "solcore-source-input-v2",
   "wrapperVersion": "solcore-word-input-contract-v1",
   "requiredFeatures": [
     "binary:Solcore.Core.Wire.BinaryOp.wordAdd",

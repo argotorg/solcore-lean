@@ -3,7 +3,7 @@
   "profile": "runtime-recursive-loops",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-recursive-loops-v1",
+  "emitterVersion": "solcore-source-recursive-loops-v2",
   "wrapperVersion": "solcore-word-recursive-loops-contract-v1",
   "profileVersion": "runtime-recursive-loops-v1/bounded-depth-loop-seed-v1",
   "functionVersion": "core-recursive-loop-plan-v1",

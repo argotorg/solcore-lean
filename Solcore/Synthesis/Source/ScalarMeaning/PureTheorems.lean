@@ -91,7 +91,7 @@ theorem emit_success {program : CheckedWordProgram} {emitted : EmittedProgram}
     (emitted_eq : emit program = .ok emitted) :
     ∃ body : ScalarRenderer.Rendered,
       ScalarRenderer.render .word [] 8 0 program.program.body = .ok body ∧
-      emitted.source = String.intercalate "\n" (["import * from std;",
+      emitted.source = String.intercalate "\n" (["pragma solcore;", "import * from std;",
         "import * from std.dispatch;", "", "contract " ++ contractName ++ " {",
         "    function " ++ methodName ++ "() public returns (uint256) {"] ++ body.lines ++
         ["        return uint256(" ++ body.value ++ ");", "    }", "}"]) ++ "\n" := by
@@ -109,7 +109,7 @@ theorem Input.emit_success {function : CheckedWordFunction} {emitted : EmittedPr
     (emitted_eq : Input.emit function = .ok emitted) :
     ∃ body : ScalarRenderer.Rendered,
       ScalarRenderer.render .word ["sc_input"] 8 0 function.body = .ok body ∧
-      emitted.source = String.intercalate "\n" (["import * from std;",
+      emitted.source = String.intercalate "\n" (["pragma solcore;", "import * from std;",
         "import * from std.dispatch;", "", "contract " ++ Input.contractName ++ " {",
         "    function " ++ Input.methodName ++ "(input: uint256) public returns (uint256) {",
         "        let sc_input: word = Typedef.rep(input);"] ++ body.lines ++
@@ -412,7 +412,8 @@ theorem Function.emit_success {graph : CheckedWordFunctionDAG} {emitted : Emitte
     (emitted_eq : Function.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : Rendered),
       helperLoop ScalarRenderer.renderWithFunctions graph.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;", ""] = .ok (names, lines) ∧
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+          ""] = .ok (names, lines) ∧
       ScalarRenderer.renderWithFunctions names .word ["sc_input"] 8 0 graph.entry = .ok entry ∧
       emitted.source = String.intercalate "\n" (lines ++
         ["contract " ++ Function.contractName ++ " {",
@@ -424,7 +425,7 @@ theorem Function.emit_success {graph : CheckedWordFunctionDAG} {emitted : Emitte
   rw [forIn_helperLoop (render := ScalarRenderer.renderWithFunctions) (fun _ _ _ _ => rfl)]
     at emitted_eq
   cases loop : helperLoop ScalarRenderer.renderWithFunctions graph.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;", ""] with
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq
@@ -931,7 +932,7 @@ theorem Primitive.emit_success {function : CheckedWordFunction} {emitted : Emitt
     (emitted_eq : Primitive.emit function = .ok emitted) :
     ∃ body : ScalarRenderer.Rendered,
       PrimitiveRenderer.render .word ["sc_input"] 8 0 function.body = .ok body ∧
-      emitted.source = String.intercalate "\n" (["import * from std;",
+      emitted.source = String.intercalate "\n" (["pragma solcore;", "import * from std;",
         "import * from std.dispatch;", Primitive.opcodeImport, "",
         "contract " ++ Primitive.contractName ++ " {",
         "    function " ++ Primitive.methodName ++ "(input: uint256) public returns (uint256) {",
@@ -1117,7 +1118,8 @@ theorem CallGraph.emit_success {graph : CheckedWordFunctionDAG} {emitted : Emitt
     (emitted_eq : CallGraph.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : Rendered),
       helperLoop CallGraphRenderer.renderWithFunctions graph.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] =
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+          Primitive.opcodeImport, ""] =
         .ok (names, lines) ∧
       CallGraphRenderer.renderWithFunctions names .word ["sc_input"] 8 0 graph.entry =
         .ok entry ∧
@@ -1132,7 +1134,8 @@ theorem CallGraph.emit_success {graph : CheckedWordFunctionDAG} {emitted : Emitt
   rw [forIn_helperLoop (render := CallGraphRenderer.renderWithFunctions) (fun _ _ _ _ => rfl)]
     at emitted_eq
   cases loop : helperLoop CallGraphRenderer.renderWithFunctions graph.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] with
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+      Primitive.opcodeImport, ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq
@@ -1476,7 +1479,8 @@ theorem forIn_mutationLoop
 theorem Mutation.emit_success {graph : CheckedDAG} {emitted : EmittedProgram}
     (emitted_eq : Mutation.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : MRendered) (result : String),
-      mutationLoop graph.helpers 0 [] ["import * from std;", "import * from std.dispatch;", ""] =
+      mutationLoop graph.helpers 0 [] ["pragma solcore;", "import * from std;",
+        "import * from std.dispatch;", ""] =
         .ok (names, lines) ∧
       MutationRenderer.render names .word [.word "sc_input"] 8 0 graph.entry = .ok entry ∧
       entry.value = some result ∧
@@ -1489,7 +1493,7 @@ theorem Mutation.emit_success {graph : CheckedDAG} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_mutationLoop (fun _ _ _ _ => rfl)] at emitted_eq
   cases loop : mutationLoop graph.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;", ""] with
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;", ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq
@@ -2032,7 +2036,7 @@ theorem Aggregate.emit_success {graph : CheckedDAG} {emitted : EmittedProgram}
     (emitted_eq : Aggregate.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : ARendered) (result : String),
       aggregateLoop graph.helpers 0 []
-        (["import * from std;", "import * from std.dispatch;"] ++
+        (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
           aliasImportLines (aggregateAliases (graph.helpers ++ [graph.entry])) ++ [""]) =
         .ok (names, lines) ∧
       AggregateRenderer.render names .word [.word "sc_input"] 8 0 graph.entry = .ok entry ∧
@@ -2046,7 +2050,7 @@ theorem Aggregate.emit_success {graph : CheckedDAG} {emitted : EmittedProgram}
   dsimp only at emitted_eq
   rw [forIn_aggregateLoop (fun _ _ _ _ => rfl), opcodeImports_eq] at emitted_eq
   cases loop : aggregateLoop graph.helpers 0 []
-    (["import * from std;", "import * from std.dispatch;"] ++
+    (["pragma solcore;", "import * from std;", "import * from std.dispatch;"] ++
       aliasImportLines (aggregateAliases (graph.helpers ++ [graph.entry])) ++ [""]) with
   | error error =>
       rw [loop] at emitted_eq
@@ -2442,7 +2446,8 @@ theorem AggregateCallGraph.emit_success {graph : CheckedDAG} {emitted : EmittedP
     (emitted_eq : AggregateCallGraph.emit graph = .ok emitted) :
     ∃ (names lines : List String) (entry : ScalarRenderer.Rendered),
       aggregateCallGraphLoop graph.helpers 0 []
-        ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] =
+        ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+          Primitive.opcodeImport, ""] =
         .ok (names, lines) ∧
       AggregateCallGraphRenderer.render names .word [.word "sc_input"] 8 0 graph.entry =
         .ok entry ∧
@@ -2456,7 +2461,8 @@ theorem AggregateCallGraph.emit_success {graph : CheckedDAG} {emitted : EmittedP
   dsimp only at emitted_eq
   rw [forIn_aggregateCallGraphLoop (fun _ _ _ _ => rfl)] at emitted_eq
   cases loop : aggregateCallGraphLoop graph.helpers 0 []
-    ["import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, ""] with
+    ["pragma solcore;", "import * from std;", "import * from std.dispatch;",
+      Primitive.opcodeImport, ""] with
   | error error =>
       rw [loop] at emitted_eq
       cases emitted_eq

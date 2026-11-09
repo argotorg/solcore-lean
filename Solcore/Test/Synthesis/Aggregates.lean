@@ -355,11 +355,12 @@ private def sourceChecks : IO Unit := do
     source.methodSignature == "run(uint256)" && source.deployPath == ["SynthesizedAggregateCallGraphsDeploy"] &&
     source.runtimePath == ["SynthesizedAggregateCallGraphsDeploy", "SynthesizedAggregateCallGraphs"])
     "aggregate call graph wrapper metadata changed"
-  ensure (AggregateCallGraph.emitterVersion == "solcore-source-aggregate-call-graphs-v1" &&
+  ensure (AggregateCallGraph.emitterVersion == "solcore-source-aggregate-call-graphs-v2" &&
     AggregateCallGraph.wrapperVersion == "solcore-word-aggregate-call-graphs-contract-v1" &&
     AggregateCallGraph.selector == "0xa444f5e9") "aggregate call graph versions or ABI selector changed"
   ensure (source.source == String.intercalate "\n" [
-    "import * from std;", "import * from std.dispatch;", Primitive.opcodeImport, "",
+    "pragma solcore;", "import * from std;", "import * from std.dispatch;",
+    Primitive.opcodeImport, "",
     "function sc_fn0(sc_arg: word) returns (word) {", "    return sc_arg;", "}", "",
     "contract SynthesizedAggregateCallGraphs {", "    function run(input: uint256) public returns (uint256) {",
     "        let sc_input: word = Typedef.rep(input);", "        let sc_v0: word = sc_input;",
@@ -1101,7 +1102,7 @@ private def formattingChecks : IO Unit := do
   let graph ← checked [aggregateCaseBody]
   for feature in ["pair", "first", "second", "inLeft", "inRight", "case", "functionCall"] do
     ensure (graph.features.contains feature) s!"missing aggregate AST feature {feature}"
-  ensure (Aggregate.emitterVersion == "solcore-source-aggregates-v2" &&
+  ensure (Aggregate.emitterVersion == "solcore-source-aggregates-v3" &&
     Aggregate.wrapperVersion == "solcore-word-aggregates-contract-v1" &&
     Aggregate.selector == "0xa444f5e9" && Aggregates.version == "core-aggregate-dag-v1")
     "aggregate provenance changed"
@@ -1606,7 +1607,7 @@ private def formattingChecks : IO Unit := do
           "            return sc_cap + sc_arg;", "        };", "        sc_cap = sc_cap + 2;"]) &&
           (source.source.splitOn " = lam (").length == 3)
           "independent source lost the second capture's distinct creation time"
-  ensure (Solcore.Synthesis.Source.Closure.emitterVersion == "solcore-source-closures-v2" &&
+  ensure (Solcore.Synthesis.Source.Closure.emitterVersion == "solcore-source-closures-v3" &&
     Solcore.Synthesis.Source.Closure.wrapperVersion == "solcore-word-closures-contract-v1" &&
     Solcore.Synthesis.Source.Closure.selector == "0xa444f5e9" &&
     Closure.version == "core-closure-capture-plan-v1") "closure provenance changed"

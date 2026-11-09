@@ -8,7 +8,7 @@
  "stepProfileVersion": "runtime-aggregates-v2/template-seed-v1",
  "stepFunctionVersion": "core-aggregate-dag-v1",
  "stepTemplateVersion": "word-aggregate-templates-v1",
- "emitterVersion": "solcore-source-sender-ledger-v1",
+ "emitterVersion": "solcore-source-sender-ledger-v2",
  "wrapperVersion": "solcore-word-sender-ledger-contract-v1",
  "coverageKind": "step-core-ast-features",
  "requiredFeatures": [

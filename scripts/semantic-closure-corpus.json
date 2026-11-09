@@ -3,7 +3,7 @@
   "profile": "runtime-closures",
   "coverageKind": "core-ast-features",
   "generatorVersion": "core-g0-v1/lcg64-v1",
-  "emitterVersion": "solcore-source-closures-v2",
+  "emitterVersion": "solcore-source-closures-v3",
   "wrapperVersion": "solcore-word-closures-contract-v1",
   "profileVersion": "runtime-closures-v2/capture-seed-v1",
   "functionVersion": "core-closure-capture-plan-v1",
