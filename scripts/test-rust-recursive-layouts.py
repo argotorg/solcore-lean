@@ -21,7 +21,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent.parent
-FIXTURES = ROOT / "tests/Fixtures/RustHullRecursive"
+FIXTURES = ROOT / "Tests/Fixtures/RustHullRecursive"
 REFUSAL = "recursive runtime values are not supported"
 # Upstream's layout fixtures that its tests mark `unsupported-recursive`; at
 # 2a745e12 these two were finite layouts that the checked export accepted.
