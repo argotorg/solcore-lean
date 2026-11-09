@@ -258,11 +258,18 @@ its namespace and name.
   its own file because lower Core lowering files mean `Core.Context` through `open Core`, and
   `Internal/Execution/Reads` sits below it because its proofs mean `Frontend.SourceInference.Context`.
   An import that reaches `Context` changes what the name means in those files.
-- **`private` is per file.** Some files declare private helpers with the same name and different text,
-  so merging them needs a rename: `Internal/Inference/ExpressionInduction` and `ExpressionDispatch`
-  (`recordExpressionWithExpected_success_nodesPrefix`), `Internal/Formation/NormalizedLambdas`
-  (`unify_fields`), `Internal/Privacy/SelectedReferences`, `SelectedCalls` and `SelectedInference`
-  (`unify_requirements`).
+- **`private` is per file.** Two files may each declare a private helper with the same namespace
+  and name, and a merge of the two makes them clash: drop one copy if the texts are the same, and
+  rename one if they differ. `scripts/refactor/leanmerge.py merge` refuses such a merge and, when
+  the texts match, names the copy to delete; `leanmerge.py clashes` estimates the clashes of each
+  directory beforehand.
+  - Identical copies are common, such as `recordExpressionWithExpected_success_nodesPrefix` in
+    `Internal/Inference/ExpressionInduction` and `ExpressionDispatch`.
+  - Different texts are mostly in `Internal/Execution` (`CallGraph`, `TemplateBacking`, `Reads`),
+    `Internal/Privacy` (`ProtectedFrames` against `SelectedCalls` and `Active`, and
+    `unify_requirements` in `SelectedReferences`, `SelectedCalls` and `SelectedInference`) and
+    `Internal/Formation` (`unify_fields` in `NormalizedMatches`, `NormalizedDeclarations`,
+    `NormalizedLambdas` and `NormalizedCalls`).
 - **One public theorem, two proofs.** `RecursiveLedgerInvariant.fresh` is proved in `ExpressionLedgers`
   and in `LedgerFamilies`, `SubtreePreserved.directChild` in `Selected/StatementReferences` and in
   `Selected/Children`. Lean refuses to declare a visible name again, so neither file of a pair may
@@ -276,10 +283,11 @@ its namespace and name.
   the whole library, before you commit.
 - **The compiled route sits above part of Core lowering.** `CompiledBodies`, `Internal/Compiled`,
   `Internal/Prepared` and `Staging/Internal/FaultCalls` import a few `CoreLowering/Internal` files
-  (`Selected/CatalogOrigins`, `Selected/MethodBodies`, and some of `Generalized` and `Callable`), so a
-  change there can break them.
-- **Front files hold proofs.** The front was not split into definitions and laws; `Graph`,
-  `Dynamic/Typing` and `Static` hold the most proofs.
+  (`Selected/CatalogOrigins`, `Selected/MethodBodies`, `RecursiveNamed/HeadersAndPrograms`, and some
+  of `Generalized` and `Callable`), so a change there can break them.
+- **Front files hold proofs.** The front was not split into definitions and laws. Apart from the
+  files of the main theorems, such as `Dynamic/Preservation`, `Staging/Erasure` and the soundness
+  files, `Dynamic/Control`, `Graph` and `Dynamic/Typing` hold the most proofs.
 
 ## Testing
 

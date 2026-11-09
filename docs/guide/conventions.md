@@ -69,7 +69,7 @@ see.
 - **`private` is per file.**
   - A private helper is visible only in its file, so a proof that unfolds a private definition must
     stay in that file.
-  - Two merged files cannot both declare a private helper of the same name.
+  - Two merged files cannot both declare a private helper with the same namespace and name.
 - **Matchers and equation lemmas.** Lean reuses a structurally equal matcher within a module.
   Moving a definition can therefore change the binder names in its equation lemmas (`.eq_1`,
   `.eq_def`), which proofs that rewrite with them may notice.
