@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
@@ -33,15 +33,15 @@ function visit(path) {
       const lines = readFileSync(child, "utf8").split("\n");
       lines.forEach((line, index) => {
         if (forbidden.test(line)) {
-          violations.push(`${child.slice(root.length + 1)}:${index + 1}: ${line.trim()}`);
+          violations.push(`${relative(root, child)}:${index + 1}: ${line.trim()}`);
         }
       });
     }
   }
 }
 
-for (const relative of kernelRoots) {
-  const path = join(root, relative);
+for (const kernelRoot of kernelRoots) {
+  const path = join(root, kernelRoot);
   try {
     if (statSync(path).isDirectory()) {
       visit(path);
@@ -50,7 +50,7 @@ for (const relative of kernelRoots) {
       lines.forEach((line, index) => {
         if (forbidden.test(line)) {
           violations.push(
-            `${path.slice(root.length + 1)}:${index + 1}: ${line.trim()}`,
+            `${relative(root, path)}:${index + 1}: ${line.trim()}`,
           );
         }
       });
