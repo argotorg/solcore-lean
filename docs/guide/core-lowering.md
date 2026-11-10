@@ -120,17 +120,23 @@ depends on the change.
     `BinaryProfile.fixedChecked` and the `checked` mode, and lower through
     `SourceCorePrimitive.checkedBinary`: Core's `wordToInteger` reads both words, the exact result
     is tested against the type's range, and the body fails with `Panic(0x11)` or converts the result
-    back with `integerToWord`. The compiler's `binaryLowering` chooses the mode from the left
-    operand's type and the operator, as the source semantics does. `~` on the narrower unsigned
-    types is Word's `~` and the mask from `SourceCorePrimitive.narrowBitNotMask?`.
+    back with `integerToWord`. Checked `/ %` take `BinaryProfile.fixedDivision` and the same mode.
+    Their body (`SourceCorePrimitive.divisionBody`) fails with `Panic(0x12)` on a zero divisor;
+    since Core's `integerDiv` and `integerMod` are Euclidean, it divides the magnitudes and restores
+    the sign (`truncatedDivision`) before the range test. The compiler's `binaryLowering` chooses
+    the mode from the left operand's type and the operator, as the source semantics does. `~` on
+    the narrower unsigned types is Word's `~` and the mask from
+    `SourceCorePrimitive.narrowBitNotMask?`.
   - Compound assignment carries an assignment profile,
     `operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`, restated in each
     file that needs it and in the receipts' `operatorType`. A new Word-only compound operator goes
     into `Syntax.ValueAssignOp.wordOnly`; `DataPlaceModifier.word_success` gains its case and
     `integer_success` refutes it. The place lowering chooses the modifier from the target's static
-    type (`SourceCoreDataPlaces.assignmentModifier`): checked `+= -= *=` at a fixed-width target
-    compute Word's operation, and `guard` tests the exact result against the type's range after
-    the setter (`Check.range`). The profile leaves those targets out, so they are compiled but not
+    type (`SourceCoreDataPlaces.assignmentModifier`): checked `+= -= *= /= %=` at a fixed-width
+    target compute Word's operation (`wordSdiv` and `wordSmod` for `/= %=` on the signed types),
+    and `guard` tests the exact result against the type's range after the setter (`Check.range`),
+    for `/= %=` after a zero test that fails with `Panic(0x12)`. The profile leaves those targets
+    out, so they are compiled but not
     covered by the meaning proofs; inside it, `assignmentModifier_plain` gives back
     `binaryOperator`'s modifier. The
     [design note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)
