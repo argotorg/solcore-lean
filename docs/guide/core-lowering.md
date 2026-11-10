@@ -114,6 +114,10 @@ depends on the change.
   - `PrimitiveExpressions.strict_binary_value` (`Foundations/PrimitiveExpressions`) gains a case per
     strict operator; the integer case of `CompatibleExpressionPrimitives.BinaryProfile` takes
     `IntegerStrictBinaryOperator`, so a Word-only operator never reaches the integer bodies.
+  - An operator whose meaning differs at a fixed-width integer type takes its own mode. The signed
+    orderings take `BinaryProfile.fixedSigned` and the `signed` mode, and lower through
+    `SourceCorePrimitive.signedBinary` to Core's `wordSgt`. The compiler's `binaryLowering` chooses
+    the mode from the left operand's type, as the source semantics does.
   - Compound assignment carries an assignment profile,
     `operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`, restated in each
     file that needs it and in the receipts' `operatorType`. A new Word-only compound operator goes

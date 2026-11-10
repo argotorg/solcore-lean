@@ -52,7 +52,7 @@ not the complement of success.
 | [Heap](../../Solcore/SourceSemantics/Dynamic/Heap.lean) | `Dynamic.Heap`, `Dynamic.Heap.Reads`, `Dynamic.Heap.Allocates`, `Dynamic.Heap.AllocatesCopy`, `Dynamic.EnvironmentCopies` |
 | [GeneralizedClosure](../../Solcore/SourceSemantics/Dynamic/GeneralizedClosure.lean), [Evidence](../../Solcore/SourceSemantics/Dynamic/Evidence.lean) | Generalized local closures (`Dynamic.GeneralizedClosure.instantiate`), evidence closure (`Dynamic.EvidenceCloses`) |
 | [Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean) | `Dynamic.ValueHasType`, `Dynamic.HeapWellTyped`, `Dynamic.EnvironmentAgrees`, with their allocation and copy lemmas |
-| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`. A new primitive operation goes here |
+| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`; `Dynamic.BinaryValueApplies`, which chooses between the primitive meaning and `Dynamic.FixedBinaryApplies` by the left operand's static type. A new primitive operation goes here |
 | [Place](../../Solcore/SourceSemantics/Dynamic/Place.lean) | `Dynamic.PlaceResolves`, `Dynamic.ProjectionsUpdate`, `Dynamic.PlaceAssignment` |
 | [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies` |
 | [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults`, and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
@@ -179,7 +179,11 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    of `IntegerStrictBinaryOperator`; `AssignmentValueApplies` in
    [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean); `WordBinaryOperator` and
    `AssignmentOperatorBinary` in [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean), so that a
-   wrong operand faults.
+   wrong operand faults. An operator whose meaning at a fixed-width integer type differs from Word's
+   on canonical words, as the signed orderings' does, also goes into `FixedBinaryApplies` at that
+   type and is excluded there by `BinaryWordMeaning`. The binary rules read the left operand's
+   static type (`operandType?`) and apply `BinaryValueApplies`, which takes one meaning or the
+   other.
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in `PrimitiveBinaryHasType.sourceTyping`,
    `BinaryPrimitiveApplies.preserves` and `AssignmentValueApplies.wordCompoundPreserves`, then the
    binary case of `preserveBinaryRec`.
