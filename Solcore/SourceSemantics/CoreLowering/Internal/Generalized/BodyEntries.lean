@@ -1269,7 +1269,7 @@ theorem lowered_read {scope : SourceCoreLocalCell.Scope} {context : SourceSemant
     generalize lowered.expression = nativeCode at literal
     cases literal with
     | unit form _ _ _ | bool _ form _ _ _ | word _ form _ _ _ _
-    | resolvedWord form _ | resolvedInteger form _ =>
+    | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ =>
       rw [site.form] at form
       cases form
   | group metadata form _ _ _ | pair metadata form _ _ _ _ _ =>

@@ -639,7 +639,7 @@ theorem source_success
       | integerLiteral _ construction =>
           cases construction with
           | word => exact ⟨rfl, .word _, rfl, rfl, .inRight .word⟩
-          | integer => cases metadata.target
+          | integer | fixed => cases metadata.target
   | unary operator metadata form child ih =>
       have raw := expression_evaluation_raw unique metadata.contains
         (by simp [form]) metadata.coercions evaluated

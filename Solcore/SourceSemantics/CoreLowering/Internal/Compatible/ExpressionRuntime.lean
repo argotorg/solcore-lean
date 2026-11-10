@@ -159,6 +159,71 @@ theorem integer {solved : List SolvedRequirement} {node : ExpressionNode}
               · cases selected
 
 
+/-- Fixed-width validation retains the same exact-row boundary, with the
+type's `Int` implementation and no premises. -/
+theorem fixed {solved : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {type : TypeSystem.FixedInteger} {validated : FixedIntegerLiteral}
+    (accepted : validateFixedIntegerLiteral solved node source resolution type = .ok validated) :
+    Selected solved resolution (.builtin (.intFixed type)) := by
+  have metadata := validateFixedIntegerLiteral_sound accepted
+  simp only [validateFixedIntegerLiteral, metadata.coercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  simp only [pure, Except.pure, bind, Except.bind] at accepted
+  split at accepted
+  · cases accepted
+  · rename_i value checked
+    change (if resolution.targetType != node.type then _ else _) = Except.ok value at checked
+    split at checked
+    · cases checked
+    · split at checked
+      · cases checked
+      · cases decoded : numericLiteralValue? source with
+        | none => simp only [decoded, bind, Except.bind] at checked; cases checked
+        | some number =>
+          simp only [decoded, pure, Except.pure, bind, Except.bind] at checked
+          split at checked
+          · cases checked
+          · simp only [metadata.targetType] at checked
+            change (do let row ← (_ : Except SourceCoreElaboration.Error SolvedRequirement); _) = Except.ok value at checked
+            simp only [bind, Except.bind] at checked
+            split at checked
+            · cases checked
+            · rename_i row selected
+              change (match solved.filter (fun row => decide (row.id = resolution.requirement)) with
+                | [] => _ | [row] => pure row | rest => _) = Except.ok row at selected
+              split at selected
+              · cases selected
+              · rename_i candidate singleton
+                cases selected
+                split at checked
+                · cases checked
+                · rename_i predicate
+                  split at checked
+                  · cases checked
+                  · rename_i goal
+                    split at checked
+                    · cases checked
+                    · rename_i actualGoal implementation premises evidence
+                      split at checked
+                      · cases checked
+                      · rename_i implementationEq
+                        split at checked
+                        · cases checked
+                        · rename_i empty
+                          have implementationSame : implementation = .builtin (.intFixed type) := by
+                            simpa [bne_iff_ne] using implementationEq
+                          have premisesEmpty : premises = [] := by
+                            simpa using empty
+                          have predicateSame : row.predicate = resolution.predicate := by
+                            simpa [bne_iff_ne] using predicate
+                          have goalSame : actualGoal = resolution.predicate := by
+                            simpa [evidence, PredicateEvidence.goal,
+                              bne_iff_ne] using goal
+                          refine ⟨row, singleton, predicateSame, ?_⟩
+                          simpa only [implementationSame, premisesEmpty, goalSame] using evidence
+              · cases selected
+
+
 namespace Selected
 variable {solved : List SolvedRequirement} {resolution : IntegerLiteralResolution}
   {implementation : ProgramImplId} {context : Context}
@@ -258,6 +323,26 @@ theorem integer_constructs {solved : List SolvedRequirement} {node : ExpressionN
     subst target
     exact .integer metadata.meaning evidence
 
+/-- A fixed-width literal constructs its word, which is canonical because the
+validator checked the type's range. -/
+theorem fixed_constructs {solved : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {type : TypeSystem.FixedInteger} {validated : FixedIntegerLiteral} {context : Context}
+    (accepted : validateFixedIntegerLiteral solved node source resolution type = .ok validated)
+    (sameLedger : context.solvedRequirements = solved)
+    (runtime : RuntimeRequirementLedgerValid context) :
+    Dynamic.ResolvedIntegerLiteralConstructs context source resolution (.word validated.value) := by
+  have metadata := validateFixedIntegerLiteral_sound accepted
+  have evidence := (fixed accepted).proves sameLedger runtime
+  rw [metadata.value]
+  have fits := metadata.fits
+  cases resolution with
+  | mk raw target requirement =>
+    have targetEq := metadata.targetType
+    dsimp only at targetEq
+    subst target
+    exact .fixed metadata.meaning fits evidence
+
 /-- The raw independent source form follows from actual Word acceptance.
 Its requirement and output-path lists are the original node's lists. -/
 theorem word_raw {solved : List SolvedRequirement} {node : ExpressionNode}
@@ -292,6 +377,22 @@ theorem integer_raw {solved : List SolvedRequirement} {node : ExpressionNode}
   rw [form, metadata.requirements, metadata.coercions]
   exact .integerLiteral rfl (integer_constructs accepted sameLedger runtime)
 
+/-- The raw source form of an accepted fixed-width literal. -/
+theorem fixed_raw {solved : List SolvedRequirement} {node : ExpressionNode}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {type : TypeSystem.FixedInteger} {validated : FixedIntegerLiteral} {context : Context}
+    (accepted : validateFixedIntegerLiteral solved node literal resolution type = .ok validated)
+    (form : node.form = .integerLiteral literal resolution)
+    (sameLedger : context.solvedRequirements = solved)
+    (runtime : RuntimeRequirementLedgerValid context)
+    (program : Program) (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource)
+    (environment : Dynamic.Environment) (heap : Dynamic.Heap) :
+    Dynamic.ExpressionFormEvaluates program context evidence source environment heap
+      node.form node.requirements node.coercions (.word validated.value) heap := by
+  have metadata := validateFixedIntegerLiteral_sound accepted
+  rw [form, metadata.requirements, metadata.coercions]
+  exact .integerLiteral rfl (fixed_constructs accepted sameLedger runtime)
+
 end Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
 end
 
@@ -306,12 +407,20 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntim
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CompatibleExpressionLiterals
 
+/-- The builtin `Int` implementation of the compiler's numeric branch at a
+literal's type: Integer's, a fixed-width integer type's, or Word's. -/
+def literalImplementation (type : TypeSystem.Ty) : BuiltinImplId :=
+  if type = .integer then .intInteger
+  else match type.fixedInteger? with
+    | some fixed => .intFixed fixed
+    | none => .intWord
+
 /-- The primitive implementation is fixed by the actual compiler's numeric
 target branch. Other atomic forms have no selected numeric evidence. -/
 def NumericSelected (solved : List SolvedRequirement) (node : ExpressionNode) : Prop :=
   ∀ literal resolution, node.form = .integerLiteral literal resolution →
     NumericLiteralEvidenceReceipts.Selected solved resolution
-      (.builtin (if node.type = .integer then .intInteger else .intWord))
+      (.builtin (literalImplementation node.type))
 
 /-- The ordinary literal metadata and the full actual numeric row receipt.
 Neither the complete runtime ledger nor a semantic execution law is a field. -/
@@ -352,14 +461,22 @@ private theorem selected_of_functions
       all_goals
         simp only [form] at accepted
         by_cases target : node.type = .integer
-        · simp only [target, ↓reduceIte] at accepted ⊢
+        · simp only [literalImplementation, target, ↓reduceIte] at accepted ⊢
           cases validated : SourceCoreElaboration.validateNativeIntegerLiteral context.solvedRequirements node literal resolution with
           | error error => simp [validated, Except.mapError] at accepted
           | ok output => exact NumericLiteralEvidenceReceipts.integer validated
-        · simp only [target, ↓reduceIte] at accepted ⊢
-          cases validated : SourceCoreElaboration.validateWordIntegerLiteral context.solvedRequirements node literal resolution with
-          | error error => simp [validated, Except.mapError] at accepted
-          | ok output => exact NumericLiteralEvidenceReceipts.word validated
+        · simp only [literalImplementation, target, ↓reduceIte] at accepted ⊢
+          cases fixedType : node.type.fixedInteger? with
+          | some type =>
+            simp only [fixedType] at accepted ⊢
+            cases validated : SourceCoreElaboration.validateFixedIntegerLiteral context.solvedRequirements node literal resolution type with
+            | error error => simp [validated, Except.mapError] at accepted
+            | ok output => exact NumericLiteralEvidenceReceipts.fixed validated
+          | none =>
+            simp only [fixedType] at accepted ⊢
+            cases validated : SourceCoreElaboration.validateWordIntegerLiteral context.solvedRequirements node literal resolution with
+            | error error => simp [validated, Except.mapError] at accepted
+            | ok output => exact NumericLiteralEvidenceReceipts.word validated
     · simp [owner, bind, Except.bind] at accepted
 
 /-- Successful actual function lowering supplies both old metadata and the

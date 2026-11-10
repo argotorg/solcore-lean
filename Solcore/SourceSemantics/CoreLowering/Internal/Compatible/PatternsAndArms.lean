@@ -1776,6 +1776,10 @@ private theorem literal_success {context : Context} {literal : Syntax.CoreLitera
       intro environment store expression selected
       exact .apply .lambda (selected.evaluates store)
         (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply])) (.inRight .unit))
+  | fixed _ _ _ =>
+    cases code with
+    | word target => cases target
+    | integer target => cases target
 
 def TreeSuccess (context : Context) (type : TypeSystem.Ty) (instructions : List MatchPatternInstruction)
     (pattern : Pattern) (rest : List MatchPatternInstruction) : Prop :=

@@ -3212,6 +3212,14 @@ theorem IntegerLiteralValid.applyParameters
           ProgramPredicate.applyParameters] using
           (StructuralSubstitution.RequirementProves.applyParameters contextValid
             evidence)
+  | @fixed type meaning targetEq evidence =>
+      refine .fixed (type := type) meaning ?_ ?_
+      · simp [applyIntegerLiteralResolution, targetEq, TypeSystem.Ty.fixed]
+      · simpa [applyIntegerLiteralResolution,
+          ProgramSignatures.builtinIntPredicate,
+          ProgramPredicate.applyParameters] using
+          (StructuralSubstitution.RequirementProves.applyParameters contextValid
+            evidence)
 
 theorem ReferenceHasRawType.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
@@ -9336,6 +9344,12 @@ theorem IntegerLiteralValid.applySubstitution
   | integer meaning targetEq evidence =>
       refine .integer meaning ?_ ?_
       · simp [targetEq]
+      · simpa [ProgramSignatures.builtinIntPredicate,
+          TypedTraitResolution.applySubstitution] using
+          (RequirementProves.applySubstitution contextValid evidence)
+  | @fixed type meaning targetEq evidence =>
+      refine .fixed (type := type) meaning ?_ ?_
+      · simp [targetEq, TypeSystem.Ty.fixed]
       · simpa [ProgramSignatures.builtinIntPredicate,
           TypedTraitResolution.applySubstitution] using
           (RequirementProves.applySubstitution contextValid evidence)

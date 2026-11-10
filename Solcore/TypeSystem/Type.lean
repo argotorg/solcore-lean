@@ -50,6 +50,9 @@ def bits : IntegerWidth → Nat
 
 def all : List IntegerWidth := [.w8, .w16, .w32, .w64, .w128, .w256]
 
+theorem bits_le (width : IntegerWidth) : width.bits ≤ 256 := by
+  cases width <;> decide
+
 end IntegerWidth
 
 /-- One of upstream's twelve integer types: `uintN` when `signed` is false and
@@ -86,6 +89,37 @@ def canonical (type : FixedInteger) (n : Nat) : Bool :=
 theorem canonical_zero (type : FixedInteger) : type.canonical 0 = true := by
   unfold canonical
   split <;> simp [Nat.two_pow_pos]
+
+/-- The greatest value of the type, which bounds a literal: `2^N - 1` for `uintN`
+and `2^(N-1) - 1` for `intN`. -/
+def maxNat (type : FixedInteger) : Nat :=
+  if type.signed then 2 ^ (type.width.bits - 1) - 1 else 2 ^ type.width.bits - 1
+
+theorem maxNat_lt (type : FixedInteger) : type.maxNat < 2 ^ 256 := by
+  have bits := type.width.bits_le
+  have full : 2 ^ type.width.bits ≤ 2 ^ 256 := Nat.pow_le_pow_right (by decide) bits
+  have half : 2 ^ (type.width.bits - 1) ≤ 2 ^ 256 := Nat.pow_le_pow_right (by decide) (by omega)
+  have fullPositive := Nat.two_pow_pos type.width.bits
+  have halfPositive := Nat.two_pow_pos (type.width.bits - 1)
+  unfold maxNat
+  split <;> omega
+
+/-- A literal no greater than the type's greatest value is canonical. -/
+theorem canonical_of_le_maxNat {type : FixedInteger} {n : Nat} (bounded : n ≤ type.maxNat) :
+    type.canonical n = true := by
+  have fullPositive := Nat.two_pow_pos type.width.bits
+  have halfPositive := Nat.two_pow_pos (type.width.bits - 1)
+  unfold maxNat at bounded
+  unfold canonical
+  split
+  · rename_i signed
+    rw [if_pos signed] at bounded
+    have below : n < 2 ^ (type.width.bits - 1) := by omega
+    simp [below]
+  · rename_i unsigned
+    rw [if_neg unsigned] at bounded
+    have below : n < 2 ^ type.width.bits := by omega
+    simp [below]
 
 /-- The twelve types, unsigned first. -/
 def all : List FixedInteger :=
@@ -161,6 +195,16 @@ def integer : Ty := .constructor (.builtin .integer)
 
 /-- One of the twelve fixed-width integer types. Its runtime type is `word`. -/
 def fixed (type : FixedInteger) : Ty := .constructor (.builtin (.fixed type))
+
+/-- The carriers of an integer literal: `word`, `integer` and the twelve
+fixed-width integer types. -/
+def IntegerLiteralCarrier (type : Ty) : Prop :=
+  type = .word ∨ type = .integer ∨ ∃ fixed, type = .fixed fixed
+
+/-- The fixed-width integer type a type is, if it is one of the twelve. -/
+def fixedInteger? : Ty → Option FixedInteger
+  | .constructor (.builtin (.fixed type)) => some type
+  | _ => none
 
 /-- Left-associated type application. -/
 def applyMany (head : Ty) (arguments : List Ty) : Ty :=

@@ -954,6 +954,10 @@ private theorem literal_success {compilation : Compilation} {context : Context}
       intro environment store expression selected
       exact .apply .lambda (selected.evaluates store)
         (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply])) (.inRight .unit))
+  | fixed _ _ _ =>
+    cases code with
+    | word target => cases target
+    | integer target => cases target
 
 /-- A successful source prefix can be consumed only over the same suffix as
 the compiler certificate. The binder bundle remains ordered and unmodified. -/

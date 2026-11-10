@@ -118,6 +118,8 @@ inductive ErrorReason where
       (expected actual : ProgramImplId)
   | integerLiteralPremiseCountMismatch
       (requirement : RequirementId) (expected actual : Nat)
+  /-- A literal greater than the greatest value of its fixed-width type. -/
+  | integerLiteralOutOfRange (type : TypeSystem.FixedInteger) (value : Nat)
   | builtinFunctionCalleeNotReference (function : BuiltinFunctionId)
   | builtinFunctionCalleeIdentityMismatch
       (expected actual : BuiltinFunctionId)
@@ -701,6 +703,34 @@ def validateNativeIntegerLiteral
     (fun target => if target = Ty.integer then pure ()
       else fail (.occurrence node.id.occurrence) (.unsupportedType target))
   pure { value := Int.ofNat validated.rawValue, consumedRequirements := validated.consumedRequirements }
+
+/-- A literal at one of the twelve fixed-width integer types: its exact
+builtin evidence and raw spelling were checked, and its value is at most the
+type's greatest value, so its word is canonical. -/
+structure FixedIntegerLiteral where
+  value : Core.Word
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+/-- Literals at the twelve types share the exact spelling, attachment and
+builtin evidence validator with Word and Integer literals, and the compiler
+checks the type's range again. This performs no evaluation. -/
+def validateFixedIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (type : TypeSystem.FixedInteger) :
+    Except Error FixedIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  let validated ← validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution (.builtin (.intFixed type))
+    (fun target => if target = Ty.fixed type then pure ()
+      else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+  if validated.rawValue ≤ type.maxNat then
+    pure { value := Core.Word.ofNatModulo validated.rawValue,
+           consumedRequirements := validated.consumedRequirements }
+  else
+    fail (.occurrence node.id.occurrence) (.integerLiteralOutOfRange type validated.rawValue)
 
 /-- Expression and pattern carriers share the same Word evidence validator. -/
 private def lowerIntegerLiteralResolutionWith {error : Type}
@@ -3966,6 +3996,108 @@ theorem validateNativeIntegerLiteral_sound
                             numericLiteralValue?_sound (rawEq ▸ decodedEq), rfl, rfl,
                             ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
             · simp [targetInteger, fail] at checked
+
+/-- The fixed-width validator establishes the same source metadata facts as the
+Word and Integer validators, the type's range, and the literal's word. -/
+structure FixedIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (type : TypeSystem.FixedInteger) (validated : FixedIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .fixed type
+  nodeType : node.type = .fixed type
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NumericLiteralDenotes source resolution.rawValue
+  fits : resolution.rawValue ≤ type.maxNat
+  value : validated.value = Core.Word.ofNatModulo resolution.rawValue
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate (.fixed type)
+
+private theorem builtinFixedPredicate_of_beq {predicate : ProgramPredicate}
+    {type : TypeSystem.FixedInteger}
+    (equal : (predicate == ProgramSignatures.builtinIntPredicate (.fixed type)) = true) :
+    predicate = ProgramSignatures.builtinIntPredicate (.fixed type) := by
+  cases predicate with
+  | mk trait subject arguments =>
+    cases trait with
+    | builtin builtin =>
+      cases builtin
+      change ((subject == .fixed type) && (arguments == [])) = true at equal
+      simp only [Bool.and_eq_true, beq_iff_eq] at equal
+      rcases equal with ⟨rfl, rfl⟩
+      rfl
+    | declaration id =>
+      change false = true at equal
+      contradiction
+
+theorem validateFixedIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {type : TypeSystem.FixedInteger} {validated : FixedIntegerLiteral}
+    (accepted : validateFixedIntegerLiteral solvedRequirements node source resolution type = .ok validated) :
+    FixedIntegerLiteralCertificate solvedRequirements node source resolution type validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateFixedIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateFixedIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin (.intFixed type))
+      (fun target => if target = Ty.fixed type then pure ()
+        else fail (.occurrence node.id.occurrence) (.unsupportedType target)) with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [pure, Pure.pure, Except.pure] at checked
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure] at accepted
+    by_cases inRange : rawValidated.rawValue ≤ type.maxNat
+    · simp only [inRange, ↓reduceIte, Except.ok.injEq] at accepted
+      subst validated
+      unfold validateIntegerLiteralResolutionWith at checked
+      split at checked
+      · simp [failWith] at checked
+      · rename_i target
+        split at checked
+        · simp [failWith] at checked
+        · rename_i requirements
+          cases decodedEq : numericLiteralValue? source with
+          | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+          | some decoded =>
+            simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+            split at checked
+            · simp [failWith] at checked
+            · rename_i raw
+              by_cases targetFixed : resolution.targetType = Ty.fixed type
+              · simp only [targetFixed, ↓reduceIte] at checked
+                cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                    solvedRequirements resolution.requirement with
+                | error err => simp [found] at checked
+                | ok solved =>
+                  simp only [found] at checked
+                  split at checked
+                  · simp [failWith] at checked
+                  · rename_i predicate
+                    split at checked
+                    · simp [failWith] at checked
+                    · split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · split at checked
+                          · simp [failWith] at checked
+                          · simp only [Except.ok.injEq] at checked
+                            subst rawValidated
+                            have targetEq : resolution.targetType = node.type := by simpa using target
+                            have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                            have rawEq : decoded = resolution.rawValue := by simpa using raw
+                            have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate (.fixed type) :=
+                              builtinFixedPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetFixed] using predicate)
+                            have solvedMember := exactIntegerLiteralRequirementWith_member found
+                            exact ⟨targetFixed, targetEq ▸ targetFixed, attached, emptyCoercions,
+                              numericLiteralValue?_sound (rawEq ▸ decodedEq), by simpa using inRange, rfl, rfl,
+                              ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+              · simp [targetFixed, fail] at checked
+    · simp [inRange, fail] at accepted
 
 end Solcore.Frontend.SourceCoreElaboration
 

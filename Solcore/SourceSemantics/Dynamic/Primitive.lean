@@ -156,6 +156,18 @@ inductive ResolvedIntegerLiteralConstructs (context : Context) :
       ResolvedIntegerLiteralConstructs context source
         { rawValue := raw, targetType := .integer, requirement := requirement }
         (.integer (Int.ofNat raw))
+  /-- A literal at a fixed-width integer type is its word; it is at most the
+  type's greatest value, so the word is canonical. -/
+  | fixed
+      {source : Syntax.CoreLiteralValue} {raw : Nat}
+      {requirement : RequirementId} {type : TypeSystem.FixedInteger}
+      (meaning : NumericLiteralDenotes source raw)
+      (fits : raw ≤ type.maxNat)
+      (evidence : RequirementProves context requirement
+        (ProgramSignatures.builtinIntPredicate (.fixed type))) :
+      ResolvedIntegerLiteralConstructs context source
+        { rawValue := raw, targetType := .fixed type, requirement := requirement }
+        (.word (Core.Word.ofNatModulo raw))
 
 namespace LiteralConstructs
 
@@ -181,6 +193,7 @@ theorem valid
   cases construction with
   | word meaning evidence => exact .word meaning rfl evidence
   | integer meaning evidence => exact .integer meaning rfl evidence
+  | fixed meaning _ evidence => exact .fixed meaning rfl evidence
 
 theorem functional
     {context : Context} {source : Syntax.CoreLiteralValue}

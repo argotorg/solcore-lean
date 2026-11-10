@@ -617,8 +617,8 @@ private theorem forged_invalid (owner : Resolved.DeclarationId) :
   cases valid with
   | implementation member identity _ _ =>
     simp only [signatures, ProgramSignatures.resolutionRules, ProgramSignatures.builtinResolutionRules,
-      List.append_nil, List.mem_cons, List.not_mem_nil, or_false] at member
-    rcases member with rfl | rfl <;> cases identity
+      List.append_nil, List.mem_append, List.mem_cons, List.mem_map, List.not_mem_nil, or_false] at member
+    rcases member with (rfl | rfl) | ⟨type, _, rfl⟩ <;> cases identity
 
 /-- Materialization checks goals and exact IDs, but deliberately does not
 rerun implementation selection. This accepted forged tree has no independent

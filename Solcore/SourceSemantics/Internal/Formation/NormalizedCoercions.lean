@@ -734,9 +734,10 @@ theorem integerLiteralProducer
       (ProgramSignatures.builtinIntPredicate (.variable origin.metavariable))) := by
   apply builtin_integer_predicate
   change TypeAdmissible semantic (finalized.substitution.apply (.variable origin.metavariable))
-  rcases resources.integer_literal_target_supported origin member with word | integer
+  rcases resources.integer_literal_target_supported origin member with word | integer | ⟨fixed, fixedEq⟩
   · rw [word]; exact .word scope.binders
   · rw [integer]; exact .integer scope.binders
+  · rw [fixedEq]; exact .fixed scope.binders _
 
 theorem integerPatternProducer
     (resources : FinalInferenceResources whole wholeReturn evidence roots finalized)

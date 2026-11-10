@@ -4056,8 +4056,8 @@ def run : IO Unit := do
   rejectedByInference "uint8 is not uint16" ["function bad(x: uint8) returns (uint16) { return x; }"]
   rejectedByInference "int8 is not uint8" ["function bad(x: int8) returns (uint8) { return x; }"]
   rejectedByInference "no `<<` on uint8 yet" ["function bad(x: uint8) returns (uint8) { return x << x; }"]
-  rejectedByInference "no literal at uint8 yet" ["function bad() returns (uint8) { return 5; }"]
-  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, and shifts and literals at them are not yet accepted"
+  rejectedByInference "a literal above uint8's range" ["function bad() returns (uint8) { return 256; }"]
+  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, shifts at them are not yet accepted, and a literal above a type's range is rejected"
 
 end Tests.SourceCoreFixedIntegerTypes
 end
@@ -4065,11 +4065,13 @@ end
 section
 /-! The operators on the twelve fixed-width integer types, through the public
 source API: `==`, `!=`, `& | ^`, `< > <= >=`, `~`, checked `+ - * / %` and
-their compound forms. The orderings compare signed on the signed types, `~`
-keeps the low `N` bits on the unsigned types below 256 bits, checked arithmetic
-panics with `Panic(0x11)` outside the type's range, and `/ %` panic with
-`Panic(0x12)` on a zero divisor and round toward zero, so the results stay
-canonical. Shifts, unchecked arithmetic and in-place `~` are still rejected. -/
+their compound forms, and literals at the twelve types. The orderings compare
+signed on the signed types, `~` keeps the low `N` bits on the unsigned types
+below 256 bits, checked arithmetic panics with `Panic(0x11)` outside the type's
+range, and `/ %` panic with `Panic(0x12)` on a zero divisor and round toward
+zero, so the results stay canonical. A literal takes the type its uses give it,
+and one above the type's greatest value is rejected. Shifts, unchecked
+arithmetic and in-place `~` are still rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4152,7 +4154,25 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function modAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r %= y; return r; }",
   "function divAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; r /= y; return r; }",
   "function modAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; r %= y; return r; }",
-  "function tableDiv8s(x: int8, y: int8) returns (int8) { let table: mapping(Word => int8); table[7] = x; table[7] /= y; return table[7]; }"
+  "function tableDiv8s(x: int8, y: int8) returns (int8) { let table: mapping(Word => int8); table[7] = x; table[7] /= y; return table[7]; }",
+  "function lit8u() returns (uint8) { return 255; }",
+  "function lit256u() returns (uint256) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935; }",
+  "function lit8s() returns (int8) { return 127; }",
+  "function lit256s() returns (int256) { return 57896044618658097711785492504343953926634992332820282019728792003956564819967; }",
+  "function zero8s() returns (int8) { return 0; }",
+  "function inc8u(x: uint8) returns (uint8) { return x + 1; }",
+  "function inc256s(x: int256) returns (int256) { return x + 1; }",
+  "function below8s(x: int8) returns (bool) { return x < 100; }",
+  "function isZero256u(x: uint256) returns (bool) { return x == 0; }",
+  "function doubleAssign8u(x: uint8) returns (uint8) { let r: uint8 = x; r *= 2; return r; }",
+  "function half8s(x: int8) returns (int8) { return x / 2; }",
+  "function tenthAssign256u(x: uint256) returns (uint256) { let r: uint256 = x; r %= 10; return r; }",
+  "function deferredDiv8u() returns (uint8) { let a = 6 / 2; let b: uint8 = a; return b; }",
+  "function deferredMod8s() returns (int8) { let a = 7 % 4; let b: int8 = a; return b; }",
+  "function tableLit8u() returns (uint8) { let table: mapping(uint8 => uint8); table[3] = 200; return table[3]; }",
+  "function tableLit8s(k: Word) returns (int8) { let table: mapping(Word => int8); table[k] = 127; return table[k]; }",
+  "function mask16u(x: uint16) returns (uint16) { return x & 255; }",
+  "function deferredAdd8u() returns (uint8) { let a = 200 + 100; let b: uint8 = a; return b; }"
 ]
 
 private def names : List String :=
@@ -4163,7 +4183,10 @@ private def names : List String :=
     "subAssign256u", "mulAssign256u", "addAssign8s", "subAssign8s", "mulAssign8s", "addAssign256s",
     "subAssign256s", "mulAssign256s", "andAssign8u", "orAssign8s", "xorAssign16u", "tableAdd8u", "absentAdd8u",
     "div8u", "mod8u", "div256u", "mod256u", "div8s", "mod8s", "div256s", "mod256s", "divAssign8u",
-    "modAssign8u", "divAssign8s", "modAssign8s", "divAssign256s", "modAssign256u", "tableDiv8s"]
+    "modAssign8u", "divAssign8s", "modAssign8s", "divAssign256s", "modAssign256u", "tableDiv8s", "lit8u",
+    "lit256u", "lit8s", "lit256s", "zero8s", "inc8u", "inc256s", "below8s", "isZero256u", "doubleAssign8u",
+    "half8s", "tenthAssign256u", "deferredDiv8u", "deferredMod8s", "tableLit8u", "tableLit8s", "mask16u",
+    "deferredAdd8u"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4226,6 +4249,19 @@ private def rejectedByInference (label : String) (lines : List String) : IO Unit
   match checkProgram (workspaceOf lines) with
   | .ok _ => throw (IO.userError s!"{label} was accepted")
   | .error [.inference _] => pure ()
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Inference rejects a literal above its fixed-width type's greatest value,
+and the diagnostic names the type and the literal's value. -/
+private def rejectedOutOfRange (label : String) (name : String) (value : Nat) (lines : List String) :
+    IO Unit := do
+  let type ← match TypeSystem.FixedInteger.ofName? name with
+    | some type => pure type | none => throw (IO.userError s!"{name} missing")
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .integerLiteralOutOfRange _ actual actualValue⟩] =>
+      require (decide (actual = TypeSystem.Ty.fixed type) && actualValue == value)
+        s!"{label} named {reprStr actual} and {actualValue}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
   | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
 
 def run : IO Unit := do
@@ -4311,7 +4347,18 @@ def run : IO Unit := do
     (61, [word (modulus - 128), word 2], word (modulus - 64)), (61, [word (modulus - 7), word 2], word (modulus - 3)),
     (62, [word (modulus - 7), word 2], word (modulus - 1)), (62, [word (modulus - 128), word (modulus - 1)], word 0),
     (63, [word (2 ^ 255), word 2], word (modulus - 2 ^ 254)), (64, [word (modulus - 1), word 10], word 5),
-    (65, [word (modulus - 6), word 3], word (modulus - 2))]
+    (65, [word (modulus - 6), word 3], word (modulus - 2)),
+    -- Literals at the twelve types: the range edges as their words, and literal operands.
+    (66, [], word 255), (67, [], word (modulus - 1)), (68, [], word 127), (69, [], word (2 ^ 255 - 1)),
+    (70, [], word 0), (71, [word 254], word 255), (72, [word (2 ^ 255 - 2)], word (2 ^ 255 - 1)),
+    (73, [word (modulus - 1)], boolean true), (73, [word 100], boolean false),
+    (74, [word 0], boolean true), (74, [word 1], boolean false),
+    (75, [word 127], word 254), (76, [word (modulus - 7)], word (modulus - 3)),
+    (77, [word (modulus - 1)], word 5),
+    -- A deferred operator takes the literal's later type.
+    (78, [], word 3), (79, [], word 3),
+    -- A literal key and element of a mapping.
+    (80, [], word 200), (81, [word 9], word 127), (82, [word 0x1234], word 0x34)]
   let panicCases : List (Nat × List Value) := [
     (24, [word 200, word 56]), (25, [word 3, word 5]), (26, [word 65536, word 65536]),
     (27, [word (modulus - 1), word 1]), (28, [word (2 ^ 128), word (2 ^ 128)]),
@@ -4332,7 +4379,9 @@ def run : IO Unit := do
     -- `MIN / -1` leaves the range; `MIN % -1` above does not.
     (55, [word (modulus - 128), word (modulus - 1)]), (57, [word (2 ^ 255), word (modulus - 1)]),
     (61, [word (modulus - 128), word (modulus - 1)]), (63, [word (2 ^ 255), word (modulus - 1)]),
-    (65, [word (modulus - 128), word (modulus - 1)])]
+    (65, [word (modulus - 128), word (modulus - 1)]),
+    -- Checked arithmetic with a literal operand, and a deferred `+` at `uint8` past its range.
+    (71, [word 255]), (72, [word (2 ^ 255 - 1)]), (75, [word 128]), (83, [])]
   -- A zero divisor panics with `Panic(0x12)`, `MIN / 0` too.
   let zeroCases : List (Nat × List Value) := [
     (51, [word 7, word 0]), (52, [word 7, word 0]), (53, [word 1, word 0]), (54, [word (modulus - 1), word 0]),
@@ -4362,7 +4411,16 @@ def run : IO Unit := do
     ["function bad(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r <<= y; return r; }"]
   rejectedByInference "in-place ~ on uint8 is not yet defined"
     ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, <<= and in-place ~ still rejected"
+  -- One past each type's greatest value is rejected, naming the type.
+  rejectedOutOfRange "256 at uint8" "uint8" 256 ["function bad() returns (uint8) { return 256; }"]
+  rejectedOutOfRange "2^256 at uint256" "uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
+    ["function bad() returns (uint256) { return 115792089237316195423570985008687907853269984665640564039457584007913129639936; }"]
+  rejectedOutOfRange "128 at int8" "int8" 128 ["function bad() returns (int8) { return 128; }"]
+  rejectedOutOfRange "2^255 at int256" "int256" 57896044618658097711785492504343953926634992332820282019728792003956564819968
+    ["function bad() returns (int256) { return 57896044618658097711785492504343953926634992332820282019728792003956564819968; }"]
+  rejectedOutOfRange "an operand of 256 at uint8" "uint8" 256
+    ["function bad(x: uint8) returns (uint8) { return x + 256; }"]
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, <<= and in-place ~ still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

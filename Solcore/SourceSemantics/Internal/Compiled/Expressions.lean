@@ -157,8 +157,7 @@ theorem expressionRetained_unary_operator_for
   have finalRequirements : resultState.requirements ⊆ resources.finalState.requirements := by
     rw [resources.requirements_eq]; exact requirementsSubset
   have targets : ∀ origin ∈ Detail.relevantIntegerLiterals operandState allocated.integerLiterals.length [operand],
-      resources.finalState.inference.substitution.apply (.variable origin.metavariable) = .word ∨
-      resources.finalState.inference.substitution.apply (.variable origin.metavariable) = .integer := by
+      (resources.finalState.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier := by
     intro origin member
     have present : origin ∈ operandState.integerLiterals := by
       unfold Detail.relevantIntegerLiterals at member
@@ -444,8 +443,7 @@ theorem expressionRetained_binary_operator_for
   have finalRequirements : resultState.requirements ⊆ resources.finalState.requirements := by
     rw [resources.requirements_eq]; exact requirementsSubset
   have targets : ∀ origin ∈ Detail.relevantIntegerLiterals rightState allocated.integerLiterals.length [left, right],
-      resources.finalState.inference.substitution.apply (.variable origin.metavariable) = .word ∨
-      resources.finalState.inference.substitution.apply (.variable origin.metavariable) = .integer := by
+      (resources.finalState.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier := by
     intro origin member
     have present : origin ∈ rightState.integerLiterals := (List.mem_filter.mp member).1
     simpa only [finalSubstitution] using resources.integer_literal_target_supported origin (rightLiterals present)

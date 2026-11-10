@@ -1926,10 +1926,7 @@ theorem ordinaryUnary_expressionTypingBase_under_ambient_bounded
       integerLiterals ⊆ resources.finalState.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ resources.finalState.integerLiterals →
-        resources.finalState.inference.substitution.apply
-          (.variable origin.metavariable) = .word ∨
-        resources.finalState.inference.substitution.apply
-          (.variable origin.metavariable) = .integer)
+        (resources.finalState.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends : finalized.substitution.SemanticallyExtends
       result.2.inference.substitution)
     (activeCatalog : SignatureCatalogWellFormed active.signatures)
@@ -2079,10 +2076,7 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       integerLiterals ⊆ resources.finalState.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ resources.finalState.integerLiterals →
-        resources.finalState.inference.substitution.apply
-          (.variable origin.metavariable) = .word ∨
-        resources.finalState.inference.substitution.apply
-          (.variable origin.metavariable) = .integer)
+        (resources.finalState.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends : finalized.substitution.SemanticallyExtends
       result.2.inference.substitution)
     (activeCatalog : SignatureCatalogWellFormed active.signatures)

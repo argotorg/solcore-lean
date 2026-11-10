@@ -1564,10 +1564,7 @@ theorem unaryOperatorInferenceCase_hasType_in_active
     (requirementsSubset : result.state.requirements ⊆ later.requirements)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (catalog : SignatureCatalogWellFormed active.signatures)
     (signaturesEq : active.signatures = inferenceContext.signatures)
     (operatorNames : OperatorNamesAt inferenceContext.signatures solved result.requirements
@@ -1634,7 +1631,7 @@ theorem unaryOperatorInferenceCase_hasType_in_active
         exact resolvedOperandEq
       have supported := integerLiteralTargetsSupported origin
         originMember
-      rcases supported with originWord | originInteger
+      rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
       · have operandWord : later.inference.substitution.apply operandType =
             .word := originTargetEq.symm.trans originWord
         have resultWord : later.inference.substitution.apply result.type =
@@ -1648,6 +1645,13 @@ theorem unaryOperatorInferenceCase_hasType_in_active
         simpa only [operatorEq, operandInteger, resultInteger,
           requirementsEq] using
             (UnaryOperatorHasType.integerBitNot (context := active))
+      · have operandFixed : later.inference.substitution.apply operandType =
+            .fixed fixed := originTargetEq.symm.trans originFixed
+        have resultFixed : later.inference.substitution.apply result.type =
+            .fixed fixed := resultTargetEq.trans operandFixed
+        simpa only [operatorEq, operandFixed, resultFixed, requirementsEq] using
+          (unaryFixedWord_hasType active .bitNot (.fixed fixed)
+            (by simp [Detail.fixedUnaryOperator, TypeSystem.Ty.fixed]))
   | @trait trait traitName methodName predicates dispatch selected profile
       corresponds =>
       obtain ⟨companions, predicateEq⟩ := operatorTraitPredicates_primary profile
@@ -1689,10 +1693,7 @@ theorem binaryOperatorInferenceCase_hasType_in_active
     (requirementsSubset : result.state.requirements ⊆ later.requirements)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (catalog : SignatureCatalogWellFormed active.signatures)
     (signaturesEq : active.signatures = inferenceContext.signatures)
     (operatorNames : OperatorNamesAt inferenceContext.signatures solved result.requirements
@@ -1809,7 +1810,7 @@ theorem binaryOperatorInferenceCase_hasType_in_active
                 finalOperandsEq.symm
         have supported := integerLiteralTargetsSupported origin
           originMember
-        rcases supported with originWord | originInteger
+        rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
         · have leftWord : later.inference.substitution.apply left = .word :=
             originOperandEq.symm.trans originWord
           have rightWord : later.inference.substitution.apply right = .word :=
@@ -1833,6 +1834,17 @@ theorem binaryOperatorInferenceCase_hasType_in_active
           have typing := binaryInteger_hasType active operator deferredFacts.1 notShift notUnchecked
           simpa only [leftInteger, rightInteger, resultInteger,
             requirementsEq] using typing
+        · have leftFixed : later.inference.substitution.apply left = .fixed fixed :=
+            originOperandEq.symm.trans originFixed
+          have rightFixed : later.inference.substitution.apply right = .fixed fixed :=
+            finalOperandsEq.symm.trans leftFixed
+          have resultFixed : later.inference.substitution.apply result.type =
+              if Detail.binaryResultIsBool operator then .bool
+              else .fixed fixed := by
+            rw [resultTypeEq, leftFixed]
+          have typing := binaryFixed_hasType_of_deferred active operator fixed deferredFacts.1 notShift
+            notUnchecked
+          simpa only [leftFixed, rightFixed, resultFixed, requirementsEq] using typing
       · have stagedFacts :
             Detail.binaryBuiltinType operator = .word ∧
               result.state.resolve (result.state.resolve left) = .integer := by
@@ -1946,10 +1958,7 @@ theorem inferUnaryOperator_recordExpressionWithExpected_typing_from_interfaces
       expectedType.VariablesBelow operandState.inference.next)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -2086,10 +2095,7 @@ theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
       expectedType.VariablesBelow operandState.inference.next)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)

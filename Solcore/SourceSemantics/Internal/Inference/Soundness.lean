@@ -16596,6 +16596,22 @@ theorem binaryInteger_hasType
   all_goals constructor
   all_goals constructor
 
+/-- The operators inference defers on an open literal operand are builtins on
+every fixed-width integer type, so a deferred operator whose literal operand
+ends at one of the twelve types has their typing there. -/
+theorem binaryFixed_hasType_of_deferred
+    (context : SourceSemantics.Context) (operator : Syntax.BinaryOp) (type : TypeSystem.FixedInteger)
+    (word_builtin : Detail.binaryBuiltinType operator = TypeSystem.Ty.word)
+    (not_shift : Detail.isShiftOperator operator = false)
+    (not_unchecked : Detail.isUncheckedOperator operator = false) :
+    BinaryOperatorHasType context operator (.fixed type) (.fixed type)
+      (if Detail.binaryResultIsBool operator then .bool else .fixed type) [] := by
+  apply binaryFixedWord_hasType
+  cases operator <;>
+    simp [Detail.binaryBuiltinType, Detail.isShiftOperator, Detail.isUncheckedOperator,
+      Detail.fixedBinaryOperator, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.fixed]
+      at word_builtin not_shift not_unchecked ⊢
+
 /-- Requirement allocation leaves the inference substitution, and therefore
 type resolution, unchanged. -/
 @[simp] theorem addRequirementsWithIds_resolve
@@ -18028,17 +18044,18 @@ theorem integerLiteralValid_of_evidence
     {source : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution}
     (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
-    (target_supported : resolution.targetType = .word ∨
-      resolution.targetType = .integer)
+    (target_supported : resolution.targetType.IntegerLiteralCarrier)
     (evidence : RequirementProves semanticContext resolution.requirement
       resolution.predicate) :
     IntegerLiteralValid semanticContext source resolution := by
   have meaning : Frontend.NumericLiteralDenotes source resolution.rawValue :=
     Frontend.numericLiteralValue?_sound decoded
-  rcases target_supported with target_eq | target_eq
+  rcases target_supported with target_eq | target_eq | ⟨fixed, target_eq⟩
   · exact .word meaning target_eq
       (by simpa [IntegerLiteralResolution.predicate] using evidence)
   · exact .integer meaning target_eq
+      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+  · exact .fixed meaning target_eq
       (by simpa [IntegerLiteralResolution.predicate] using evidence)
 
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
@@ -18053,10 +18070,7 @@ theorem integerLiteralValid_of_solved
     {resolution : IntegerLiteralResolution}
     (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
     (target_supported :
-      (resolution.applySubstitution state.inference.substitution).targetType =
-          .word ∨
-        (resolution.applySubstitution state.inference.substitution).targetType =
-          .integer)
+      (resolution.applySubstitution state.inference.substitution).targetType.IntegerLiteralCarrier)
     (requirement_mem :
       ({ id := resolution.requirement, predicate := resolution.predicate } :
         Requirement) ∈ state.requirements)
@@ -18144,10 +18158,7 @@ theorem unaryOperatorInferenceCase_hasType_afterFinalization_scoped
     (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (catalog : SignatureCatalogWellFormed sourceContext.signatures)
     (contextValid : FlexibleSubstitution.ContextSubstitutionValid
       later.inference.substitution closedVariables sourceContext active)
@@ -18220,7 +18231,7 @@ theorem unaryOperatorInferenceCase_hasType_afterFinalization_scoped
         exact resolvedOperandEq
       have supported := integerLiteralTargetsSupported origin
         (integerLiteralsSubset originMember)
-      rcases supported with originWord | originInteger
+      rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
       · have operandWord : later.inference.substitution.apply operandType =
             .word := originTargetEq.symm.trans originWord
         have resultWord : later.inference.substitution.apply result.type =
@@ -18234,6 +18245,13 @@ theorem unaryOperatorInferenceCase_hasType_afterFinalization_scoped
         simpa only [operatorEq, operandInteger, resultInteger,
           requirementsEq] using
             (UnaryOperatorHasType.integerBitNot (context := active))
+      · have operandFixed : later.inference.substitution.apply operandType =
+            .fixed fixed := originTargetEq.symm.trans originFixed
+        have resultFixed : later.inference.substitution.apply result.type =
+            .fixed fixed := resultTargetEq.trans operandFixed
+        simpa only [operatorEq, operandFixed, resultFixed, requirementsEq] using
+          (unaryFixedWord_hasType active .bitNot (.fixed fixed)
+            (by simp [Detail.fixedUnaryOperator, TypeSystem.Ty.fixed]))
   | @trait trait traitName methodName predicates dispatch selected profile
       corresponds =>
       apply UnaryOperatorHasType.trait dispatch
@@ -18318,10 +18336,7 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
     (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (catalog : SignatureCatalogWellFormed sourceContext.signatures)
     (contextValid : FlexibleSubstitution.ContextSubstitutionValid
       later.inference.substitution closedVariables sourceContext active)
@@ -18444,7 +18459,7 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
                 finalOperandsEq.symm
         have supported := integerLiteralTargetsSupported origin
           (integerLiteralsSubset originMember)
-        rcases supported with originWord | originInteger
+        rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
         · have leftWord : later.inference.substitution.apply left = .word :=
             originOperandEq.symm.trans originWord
           have rightWord : later.inference.substitution.apply right = .word :=
@@ -18468,6 +18483,17 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
           have typing := binaryInteger_hasType active operator deferredFacts.1 notShift notUnchecked
           simpa only [leftInteger, rightInteger, resultInteger,
             requirementsEq] using typing
+        · have leftFixed : later.inference.substitution.apply left = .fixed fixed :=
+            originOperandEq.symm.trans originFixed
+          have rightFixed : later.inference.substitution.apply right = .fixed fixed :=
+            finalOperandsEq.symm.trans leftFixed
+          have resultFixed : later.inference.substitution.apply result.type =
+              if Detail.binaryResultIsBool operator then .bool
+              else .fixed fixed := by
+            rw [resultTypeEq, leftFixed]
+          have typing := binaryFixed_hasType_of_deferred active operator fixed deferredFacts.1 notShift
+            notUnchecked
+          simpa only [leftFixed, rightFixed, resultFixed, requirementsEq] using typing
       · have stagedFacts :
             Detail.binaryBuiltinType operator = .word ∧
               result.state.resolve (result.state.resolve left) = .integer := by
@@ -23666,10 +23692,7 @@ theorem inferUnaryOperator_recordExpressionWithExpected_success_expressionTyping
     (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -23820,10 +23843,7 @@ theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypin
     (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
-        later.inference.substitution.apply
-            (.variable origin.metavariable) = .word ∨
-          later.inference.substitution.apply
-            (.variable origin.metavariable) = .integer)
+        (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -25504,8 +25524,7 @@ structure FinalInferenceResources
         result.substitution.apply (.variable origin.metavariable) = .integer
   integer_literal_target_supported : ∀ origin,
     origin ∈ state.integerLiterals →
-      result.substitution.apply (.variable origin.metavariable) = .word ∨
-        result.substitution.apply (.variable origin.metavariable) = .integer
+      (result.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier
   expression_type_formation_validated : ∀ {node : ExpressionNode},
     Node.expression node ∈ (state.toTypedSource roots).nodes →
       Frontend.InferenceTypeFormationValidated inferenceContext.signatures
@@ -25620,8 +25639,7 @@ theorem integerLiteralTargetSupported_of_subset
     {integerLiterals : List IntegerLiteralOrigin}
     (subset : integerLiterals ⊆ state.integerLiterals) :
     ∀ origin, origin ∈ integerLiterals →
-      result.substitution.apply (.variable origin.metavariable) = .word ∨
-        result.substitution.apply (.variable origin.metavariable) = .integer :=
+      (result.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier :=
   fun origin member =>
     resources.integer_literal_target_supported origin (subset member)
 
@@ -25914,9 +25932,7 @@ theorem integerLiteralValidAt
   have supported := resources.integer_literal_target_supported origin
     origin_member
   have closedSupported :
-      (resolution.applySubstitution result.substitution).targetType = .word ∨
-        (resolution.applySubstitution result.substitution).targetType =
-          .integer := by
+      (resolution.applySubstitution result.substitution).targetType.IntegerLiteralCarrier := by
     simpa [IntegerLiteralResolution.applySubstitution, resolution_target] using
       supported
   have evidence := resources.requirementProvesAt signatures_eq requirements_eq
@@ -26147,7 +26163,9 @@ theorem integerPatternValidAt
       IntegerLiteralResolution.predicate, resolution_target,
       resolution_requirement, ProgramSignatures.builtinIntPredicate,
       TypedTraitResolution.applySubstitution] using evidence
-  exact integerLiteralValid_of_evidence decoded closedSupported closedEvidence
+  exact integerLiteralValid_of_evidence decoded
+    (closedSupported.elim (fun word => .inl word) (fun integer => .inr (.inl integer)))
+    closedEvidence
 
 /-- Package the finalization-wide integer-pattern proof as reusable evidence
 at one covered source occurrence. -/

@@ -1810,6 +1810,8 @@ private def literalEvidenceIsBuiltin (function : CheckedFunction)
                   implementation == ProgramImplId.builtin .intWord
               | .constructor (.builtin .integer) =>
                   implementation == ProgramImplId.builtin .intInteger
+              | .constructor (.builtin (.fixed type)) =>
+                  implementation == ProgramImplId.builtin (.intFixed type)
               | _ => false
 
 private def validateLiteralResolution (function : CheckedFunction)

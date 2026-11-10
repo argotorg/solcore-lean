@@ -1,4 +1,5 @@
 import Solcore.Resolved.Identity
+import Solcore.TypeSystem.Type
 import Solcore.Syntax.Declaration
 import Solcore.Workspace
 import Solcore.Syntax.Unchecked
@@ -680,6 +681,8 @@ end ProgramTraitId
 inductive BuiltinImplId where
   | intInteger
   | intWord
+  /-- `Int<uintN>` or `Int<intN>`, for one of the twelve fixed-width types. -/
+  | intFixed (type : TypeSystem.FixedInteger)
   deriving Repr, BEq, DecidableEq
 
 /-- An implementation identity from either the compiler or source catalog. -/

@@ -409,10 +409,49 @@ def validateIntegerPatternTargets (state : State) :
       validateIntegerPatternTarget origin state
       validateIntegerPatternTargets state rest
 
+/-- Integer-literal carriers: the two primitive carriers and the twelve
+fixed-width integer types. Integer patterns keep `supportedIntegerTarget`. -/
+def supportedIntegerLiteralTarget : Ty → Bool
+  | .constructor (.builtin (.fixed _)) => true
+  | type => supportedIntegerTarget type
+
+/-- A literal's value fits its target: at a fixed-width integer type it is at
+most the type's greatest value, and the other carriers take every literal. -/
+def literalFitsTarget (type : Ty) (raw : Nat) : Bool :=
+  match type with
+  | .constructor (.builtin (.fixed fixed)) => decide (raw ≤ fixed.maxNat)
+  | _ => true
+
+/-- Every integer-literal node at one expression identity fits the target. -/
+def literalNodesFit (state : State) (expression : ExpressionId) (type : Ty) : Bool :=
+  state.nodes.all fun node =>
+    match node with
+    | .expression node =>
+        match node.form with
+        | .integerLiteral _ resolution =>
+            !(decide (node.id = expression)) || literalFitsTarget type resolution.rawValue
+        | _ => true
+    | .statement _ => true
+
+/-- The raw value of the integer-literal node at one expression identity, for
+diagnostics. -/
+def literalValueAt? (state : State) (expression : ExpressionId) : Option Nat :=
+  state.nodes.findSome? fun node =>
+    match node with
+    | .expression node =>
+        match node.form with
+        | .integerLiteral _ resolution =>
+            if node.id = expression then some resolution.rawValue else none
+        | _ => none
+    | .statement _ => none
+
 def validateIntegerLiteralTarget (origin : IntegerLiteralOrigin)
     (state : State) : Except Error Unit := do
   let type := state.resolve (.variable origin.metavariable)
-  if supportedIntegerTarget type then pure ()
+  if supportedIntegerLiteralTarget type then
+    if literalNodesFit state origin.expression type then pure ()
+    else throw (.integerLiteralOutOfRange origin.expression type
+      ((literalValueAt? state origin.expression).getD 0))
   else throw (.unsupportedIntegerLiteralTarget origin.expression type)
 
 def validateIntegerLiteralTargets (state : State) :

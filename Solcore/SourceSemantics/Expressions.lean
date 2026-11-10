@@ -170,8 +170,11 @@ Declarative numeric-literal meaning for resolved source occurrences.
 
 Literal spelling is related to its mathematical natural-number value by the
 existing proof-facing digit relation.  Selected integer targets are restricted
-to the two source domains implemented by the language semantics, and their
-stable evidence identity must prove the exact builtin `Int` predicate.
+to the source domains implemented by the language semantics, `word`, `integer`
+and the twelve fixed-width integer types. Their stable evidence identity must
+prove the exact builtin `Int` predicate. The range of a fixed-width type is not
+part of this static judgment: inference and the compiler reject a literal above
+the type's greatest value, and the dynamic construction requires the range.
 -/
 
 set_option autoImplicit false
@@ -201,6 +204,15 @@ inductive IntegerLiteralValid (context : Context) :
       (evidence : RequirementProves context resolution.requirement
         (ProgramSignatures.builtinIntPredicate resolution.targetType)) :
       IntegerLiteralValid context source resolution
+  /-- A literal at a fixed-width integer type. -/
+  | fixed
+      {source : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution} {type : TypeSystem.FixedInteger}
+      (meaning : NumericLiteralDenotes source resolution.rawValue)
+      (target_eq : resolution.targetType = .fixed type)
+      (evidence : RequirementProves context resolution.requirement
+        (ProgramSignatures.builtinIntPredicate resolution.targetType)) :
+      IntegerLiteralValid context source resolution
 
 namespace IntegerLiteralValid
 
@@ -210,16 +222,17 @@ theorem requirement_valid
     (valid : IntegerLiteralValid context source resolution) :
     RequirementValid context resolution.requirement := by
   cases valid with
-  | word _ _ evidence | integer _ _ evidence => exact ⟨_, evidence⟩
+  | word _ _ evidence | integer _ _ evidence | fixed _ _ evidence => exact ⟨_, evidence⟩
 
 theorem target_supported
     {context : Context} {source : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution}
     (valid : IntegerLiteralValid context source resolution) :
-    resolution.targetType = .word ∨ resolution.targetType = .integer := by
+    resolution.targetType.IntegerLiteralCarrier := by
   cases valid with
   | word _ target_eq _ => exact .inl target_eq
-  | integer _ target_eq _ => exact .inr target_eq
+  | integer _ target_eq _ => exact .inr (.inl target_eq)
+  | fixed _ target_eq _ => exact .inr (.inr ⟨_, target_eq⟩)
 
 /-- Every declaratively valid integer-literal resolution selects an
 admissible primitive target type. -/
@@ -236,6 +249,9 @@ theorem target_type_admissible
   | integer _ targetEq _ =>
       rw [targetEq]
       exact TypeAdmissible.integer binders
+  | fixed _ targetEq _ =>
+      rw [targetEq]
+      exact TypeAdmissible.fixed binders _
 
 /-- Literal validity is stable under lexical-context growth when the target
 retains the same signature catalog and solved requirement ledger. -/
@@ -256,6 +272,9 @@ theorem transportContext
         (evidence.transportContext signatures_eq solved_eq assumptions_mono)
   | integer meaning target_eq evidence =>
       exact .integer meaning target_eq
+        (evidence.transportContext signatures_eq solved_eq assumptions_mono)
+  | fixed meaning target_eq evidence =>
+      exact .fixed meaning target_eq
         (evidence.transportContext signatures_eq solved_eq assumptions_mono)
 
 end IntegerLiteralValid

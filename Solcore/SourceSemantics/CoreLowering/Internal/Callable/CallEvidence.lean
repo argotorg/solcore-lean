@@ -37,7 +37,7 @@ private instance : LawfulBEq ProgramTraitId where
 
 private instance : LawfulBEq BuiltinImplId where
   eq_of_beq := by intro a b same; cases a <;> cases b <;> simp_all [BEq.beq, instBEqBuiltinImplId.beq, BuiltinImplId.ctorIdx]
-  rfl := by intro a; cases a <;> rfl
+  rfl := by intro a; cases a <;> simp [BEq.beq, instBEqBuiltinImplId.beq]
 
 private instance : LawfulBEq ProgramImplId where
   eq_of_beq := by
@@ -53,7 +53,7 @@ private instance : LawfulBEq ProgramImplId where
       | declaration second => exact congrArg ProgramImplId.declaration (eq_of_beq (show (first == second) = true from same))
   rfl := by
     intro a; cases a with
-    | builtin id => cases id <;> rfl
+    | builtin id => exact (show (id == id) = true from beq_self_eq_true id)
     | declaration id => simp [BEq.beq, instBEqProgramImplId.beq]
 
 private instance : LawfulBEq ProgramPredicate where
@@ -753,8 +753,8 @@ private instance : LawfulBEq ProgramTraitId where
     | declaration id => simp [BEq.beq, instBEqProgramTraitId.beq]
 
 private instance : LawfulBEq BuiltinImplId where
-  eq_of_beq := by intro a b same; cases a <;> cases b <;> simp_all [BEq.beq, instBEqBuiltinImplId.beq, BuiltinImplId.ctorIdx]
-  rfl := by intro a; cases a <;> rfl
+  eq_of_beq := by intro a b same; cases a <;> cases b <;> simp_all [BEq.beq, instBEqBuiltinImplId.beq]
+  rfl := by intro a; cases a <;> simp [BEq.beq, instBEqBuiltinImplId.beq]
 
 private instance : LawfulBEq ProgramImplId where
   eq_of_beq := by
@@ -769,7 +769,7 @@ private instance : LawfulBEq ProgramImplId where
       | builtin second => cases same
       | declaration second => exact congrArg ProgramImplId.declaration (eq_of_beq (show (first == second) = true from same))
   rfl := by intro a; cases a with
-    | builtin id => cases id <;> rfl
+    | builtin id => exact (show (id == id) = true from beq_self_eq_true id)
     | declaration id => simp [BEq.beq, instBEqProgramImplId.beq]
 
 /-- All positions are authenticated, including later entries shadowed by the

@@ -728,9 +728,18 @@ def builtinIntIntegerRule : ProgramImplRule := {
   wherePredicates := []
 }
 
+/-- Primitive `Int<uintN>` and `Int<intN>` evidence for the twelve fixed-width
+integer types. -/
+def builtinIntFixedRule (type : TypeSystem.FixedInteger) : ProgramImplRule := {
+  id := .builtin (.intFixed type)
+  head := builtinIntPredicate (.fixed type)
+  wherePredicates := []
+}
+
 /-- Compiler-provided rules in stable resolution order. -/
 def builtinResolutionRules : List ProgramImplRule :=
-  [builtinIntWordRule, builtinIntIntegerRule]
+  [builtinIntWordRule, builtinIntIntegerRule] ++
+    TypeSystem.FixedInteger.all.map builtinIntFixedRule
 
 /-- The complete trait-resolution view.  Primitive rules precede source rules,
 while `implRules` itself remains the source-only catalog projection. -/

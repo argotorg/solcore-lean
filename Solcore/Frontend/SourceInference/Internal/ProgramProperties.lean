@@ -1101,18 +1101,90 @@ theorem validateIntegerPatternTargets_success_supported
           · exact validateIntegerPatternTarget_success_supported headResult
           · exact induction tailResult origin tailMember
 
-/-- Successful literal-target validation exposes exactly the two carriers
-implemented by source literal materialization. -/
+@[simp] theorem supportedIntegerLiteralTarget_eq_true_iff
+    (type : Ty) :
+    supportedIntegerLiteralTarget type = true ↔ type.IntegerLiteralCarrier := by
+  unfold Ty.IntegerLiteralCarrier
+  constructor
+  · intro supported
+    cases type with
+    | constructor constructor =>
+      cases constructor with
+      | builtin builtin =>
+        cases builtin with
+        | fixed fixed => exact .inr (.inr ⟨fixed, rfl⟩)
+        | _ =>
+          simp [supportedIntegerLiteralTarget, supportedIntegerTarget, Ty.word,
+            Ty.integer, Ty.fixed] at supported ⊢
+      | declaration declaration =>
+        simp [supportedIntegerLiteralTarget, supportedIntegerTarget] at supported
+    | _ => simp [supportedIntegerLiteralTarget, supportedIntegerTarget] at supported
+  · rintro (rfl | rfl | ⟨fixed, rfl⟩) <;> rfl
+
+/-- Successful literal-target validation exposes a carrier implemented by
+source literal materialization: `word`, `integer` or a fixed-width type. -/
 theorem validateIntegerLiteralTarget_success_supported
     {state : State} {origin : IntegerLiteralOrigin}
     (success : validateIntegerLiteralTarget origin state = .ok ()) :
-    state.resolve (.variable origin.metavariable) = .word ∨
-      state.resolve (.variable origin.metavariable) = .integer := by
+    (state.resolve (.variable origin.metavariable)).IntegerLiteralCarrier := by
   simp only [validateIntegerLiteralTarget] at success
-  by_cases supported : supportedIntegerTarget
+  by_cases supported : supportedIntegerLiteralTarget
       (state.resolve (.variable origin.metavariable)) = true
-  · exact (supportedIntegerTarget_eq_true_iff _).mp supported
+  · exact (supportedIntegerLiteralTarget_eq_true_iff _).mp supported
   · simp [supported] at success
+
+/-- Successful literal-target validation also checks that every literal node
+at the origin's expression fits the carrier. -/
+theorem validateIntegerLiteralTarget_success_fits
+    {state : State} {origin : IntegerLiteralOrigin}
+    (success : validateIntegerLiteralTarget origin state = .ok ()) :
+    literalNodesFit state origin.expression
+      (state.resolve (.variable origin.metavariable)) = true := by
+  simp only [validateIntegerLiteralTarget] at success
+  by_cases supported : supportedIntegerLiteralTarget
+      (state.resolve (.variable origin.metavariable)) = true
+  · by_cases fits : literalNodesFit state origin.expression
+        (state.resolve (.variable origin.metavariable)) = true
+    · exact fits
+    · simp [supported, fits] at success
+  · simp [supported] at success
+
+/-- A fitting expression identity bounds each of its literal nodes. -/
+theorem literalNodesFit_member {state : State} {expression : ExpressionId} {type : Ty}
+    (fits : literalNodesFit state expression type = true)
+    {node : ExpressionNode} {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (member : Node.expression node ∈ state.nodes) (identity : node.id = expression)
+    (form : node.form = .integerLiteral source resolution) :
+    literalFitsTarget type resolution.rawValue = true := by
+  have each := List.all_eq_true.mp fits _ member
+  simpa [form, identity] using each
+
+/-- Successful validation of the complete origin row fits every literal node at
+every retained integer-literal origin. -/
+theorem validateIntegerLiteralTargets_success_fits
+    {state : State} {origins : List IntegerLiteralOrigin}
+    (success : validateIntegerLiteralTargets state origins = .ok ()) :
+    ∀ origin, origin ∈ origins →
+      literalNodesFit state origin.expression
+        (state.resolve (.variable origin.metavariable)) = true := by
+  induction origins with
+  | nil =>
+      intro origin member
+      simp at member
+  | cons head tail induction =>
+      simp only [validateIntegerLiteralTargets, bind, Except.bind] at success
+      cases headResult : validateIntegerLiteralTarget head state with
+      | error error => simp [headResult] at success
+      | ok value =>
+          cases value
+          have tailResult :
+              validateIntegerLiteralTargets state tail = .ok () := by
+            simpa [headResult] using success
+          intro origin member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact validateIntegerLiteralTarget_success_fits headResult
+          · exact induction tailResult origin tailMember
 
 /-- Successful validation of the complete origin row supports every retained
 integer-literal target. -/
@@ -1120,8 +1192,7 @@ theorem validateIntegerLiteralTargets_success_supported
     {state : State} {origins : List IntegerLiteralOrigin}
     (success : validateIntegerLiteralTargets state origins = .ok ()) :
     ∀ origin, origin ∈ origins →
-      state.resolve (.variable origin.metavariable) = .word ∨
-        state.resolve (.variable origin.metavariable) = .integer := by
+      (state.resolve (.variable origin.metavariable)).IntegerLiteralCarrier := by
   induction origins with
   | nil =>
       intro origin member
@@ -2471,8 +2542,7 @@ theorem finalize_integerLiteralTarget_supported
     {roots : List NodeId} {result : Result}
     (success : finalize context type state roots = .ok result) :
     ∀ origin, origin ∈ state.integerLiterals →
-      result.substitution.apply (.variable origin.metavariable) = .word ∨
-        result.substitution.apply (.variable origin.metavariable) = .integer := by
+      (result.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier := by
   obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
       literalResult, _, literalValidation, _, _, resultEq⟩ :=
     finalize_success_witness success
@@ -2489,6 +2559,44 @@ theorem finalize_integerLiteralTarget_supported
     exact member
   simpa [State.resolve, TypeSystem.InferState.resolve] using
     supported origin finalMember
+
+/-- Finalization bounds every literal node of a retained integer-literal origin
+by its final carrier: at a fixed-width type it is at most the greatest value. -/
+theorem finalize_integerLiteral_fits
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∀ origin, origin ∈ state.integerLiterals →
+      ∀ {node : ExpressionNode} {source : Syntax.CoreLiteralValue}
+        {resolution : IntegerLiteralResolution},
+        Node.expression node ∈ state.nodes → node.id = origin.expression →
+        node.form = .integerLiteral source resolution →
+        literalFitsTarget (result.substitution.apply (.variable origin.metavariable))
+          resolution.rawValue = true := by
+  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
+      literalResult, _, literalValidation, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
+  have patternOrigins :=
+    defaultIntegerPatternTargets_integerLiterals patternResult
+  have finalOrigins :=
+    defaultIntegerLiteralTargets_integerLiterals literalResult
+  have patternNodes : patternState.nodes = state.nodes :=
+    congrArg TypedSource.nodes
+      (defaultIntegerPatternTargets_toTypedSource (roots := roots) patternResult)
+  have finalNodes : finalState.nodes = patternState.nodes :=
+    congrArg TypedSource.nodes
+      (defaultIntegerLiteralTargets_toTypedSource (roots := roots) literalResult)
+  have fits := validateIntegerLiteralTargets_success_fits literalValidation
+  subst result
+  intro origin member node source resolution nodeMember identity form
+  have finalMember : origin ∈ finalState.integerLiterals := by
+    rw [finalOrigins, patternOrigins]
+    exact member
+  have finalNode : Node.expression node ∈ finalState.nodes := by
+    rw [finalNodes, patternNodes]
+    exact nodeMember
+  simpa [State.resolve, TypeSystem.InferState.resolve] using
+    literalNodesFit_member (fits origin finalMember) finalNode identity form
 
 /-- Finalization may extend the inference substitution while defaulting
 numeric targets, but it cannot invalidate a type equality already established
@@ -2613,6 +2721,47 @@ theorem finalize_typedSource_inputComptime
       state.inputs.map (fun binder => binder.comptime) := by
   rw [finalize_typedSource success]
   simp [State.toTypedSource]
+
+/-- Every integer-literal node of the finalized source fits its closed carrier:
+at a fixed-width type it is at most the type's greatest value. -/
+theorem finalize_typedSource_integerLiteral_fits
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∀ {node : ExpressionNode} {source : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution},
+      Node.expression node ∈ result.typedSource.nodes →
+      node.form = .integerLiteral source resolution →
+      literalFitsTarget resolution.targetType resolution.rawValue = true := by
+  have ledger := finalize_integerLiteralLedgerCorrespondence success
+  have fits := finalize_integerLiteral_fits success
+  intro node source resolution member form
+  rw [finalize_typedSource success] at member
+  obtain ⟨original, originalMember, originalEq⟩ := List.mem_map.mp member
+  cases original with
+  | statement statementNode => cases originalEq
+  | expression originalNode =>
+    have nodeEq : originalNode.applySubstitution result.substitution = node := by
+      simpa [Node.applySubstitution] using originalEq
+    subst nodeEq
+    have originalState : Node.expression originalNode ∈ state.nodes := originalMember
+    cases originalForm : originalNode.form with
+    | integerLiteral originalSource originalResolution =>
+        have formEq : ExpressionForm.integerLiteral originalSource
+            (originalResolution.applySubstitution result.substitution) =
+              .integerLiteral source resolution := by
+          simpa [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution,
+            originalForm] using form
+        obtain ⟨sourceEq, resolutionEq⟩ := ExpressionForm.integerLiteral.inj formEq
+        subst sourceEq
+        subst resolutionEq
+        obtain ⟨_, origin, originMember, expressionEq, targetEq, _, _⟩ :=
+          ledger originalNode originalSource originalResolution originalState originalForm
+        have fitsOrigin := fits origin originMember originalState expressionEq.symm originalForm
+        simpa [IntegerLiteralResolution.applySubstitution, targetEq] using fitsOrigin
+    | _ =>
+        simp [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution,
+          originalForm] at form
 
 end Solcore.Frontend.SourceInference.Detail
 

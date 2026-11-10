@@ -559,12 +559,12 @@ private theorem literal_atomic {solved node type code} (literal : Literal solved
   | unit form _ _ _ => rw [form]; exact .unit
   | bool value form _ _ _ => rw [form]; exact .bool _ _
   | word value form _ _ _ _ => rw [form]; exact .word _
-  | resolvedWord form _ | resolvedInteger form _ => rw [form]; exact .integer _ _
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ => rw [form]; exact .integer _ _
 
 private theorem literal_coercions {solved node type code} (literal : Literal solved node type code) : node.coercions = [] := by
   cases literal with
   | unit _ _ _ empty | bool _ _ _ _ empty | word _ _ _ _ empty _ => exact empty
-  | resolvedWord _ metadata | resolvedInteger _ metadata => exact metadata.coercions
+  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata => exact metadata.coercions
 
 private theorem evaluation_raw
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -627,7 +627,7 @@ private theorem literal_form_unique {solved : List SolvedRequirement} {node : Ex
     rw [form] at first second
     cases first with | literal _ first =>
       cases second with | literal _ second => exact ⟨first.functional second, rfl⟩
-  | resolvedWord form _ | resolvedInteger form _ =>
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ =>
     rw [form] at first second
     cases first with | integerLiteral _ first =>
       cases second with | integerLiteral _ second => exact ⟨first.functional second, rfl⟩
@@ -643,7 +643,7 @@ private theorem literal_excludes_fault_with_evidence {solved : List SolvedRequir
     rw [form] at fault
     cases fault with | tuple _ failed => cases failed
   | bool value form _ _ _ | word value form _ _ _ _ => rw [form] at fault; cases fault
-  | resolvedWord form metadata | resolvedInteger form metadata =>
+  | resolvedWord form metadata | resolvedInteger form metadata | resolvedFixed form metadata =>
     rw [form] at fault
     cases fault with | integerRequirement _ unavailable =>
       exact (valid _ _ form).2 unavailable
@@ -655,7 +655,7 @@ private theorem literal_atomic_staged {solved node type code}
   | unit form _ _ _ => rw [form]; exact .unit
   | bool value form _ _ _ => rw [form]; exact .reference _ _
   | word value form _ _ _ _ => rw [form]; exact .literal _
-  | resolvedWord form _ | resolvedInteger form _ => rw [form]; exact .integerLiteral _ _
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ => rw [form]; exact .integerLiteral _ _
 
 /-- The actual atomic compiler forms cannot acquire a nested stage failure. -/
 private theorem no_stage

@@ -1795,7 +1795,7 @@ private theorem literal_word_type {solved : List SolvedRequirement} {node : Expr
   cases literal with
   | unit _ typed _ _ | bool _ _ typed _ _ => cases typed.symm.trans wordType
   | word => rfl
-  | resolvedWord => rfl
+  | resolvedWord | resolvedFixed => rfl
   | resolvedInteger _ metadata => cases metadata.nodeType.symm.trans wordType
 
 private theorem word_typed {solved : List SolvedRequirement} {node : ExpressionNode} {code : Expr}
@@ -1813,7 +1813,13 @@ private theorem word_typed {solved : List SolvedRequirement} {node : ExpressionN
     cases raw with | integerLiteral _ constructed =>
       cases constructed with
       | word => exact .word _
-      | integer => cases metadata.targetType
+      | integer | fixed => cases metadata.targetType
+  | resolvedFixed form metadata =>
+    rw [form] at raw
+    cases raw with | integerLiteral _ constructed =>
+      cases constructed with
+      | fixed => exact .word _
+      | word | integer => cases metadata.targetType
 
 private theorem word_outcome_unique {solved : List SolvedRequirement} {node : ExpressionNode} {code : Expr}
     (literal : CompatibleExpressionLiterals.Literal solved node .word code)
@@ -1846,7 +1852,7 @@ private theorem word_outcome_unique {solved : List SolvedRequirement} {node : Ex
         rw [form] at raw actual
         cases raw with | literal _ first =>
           cases actual with | literal _ second => exact ⟨congrArg _ (second.functional first), rfl⟩
-      | resolvedWord form _ =>
+      | resolvedWord form _ | resolvedFixed form _ =>
         rw [form] at raw actual
         cases raw with | integerLiteral _ first =>
           cases actual with | integerLiteral _ second => exact ⟨congrArg _ (second.functional first), rfl⟩
@@ -1868,7 +1874,7 @@ private theorem word_outcome_unique {solved : List SolvedRequirement} {node : Ex
         exact False.elim (nonlocal _ _ (sameNode _ other ▸ form))
     cases literal with
     | word _ form _ _ _ _ => rw [form] at rawFault; cases rawFault
-    | resolvedWord form _ =>
+    | resolvedWord form _ | resolvedFixed form _ =>
       rw [form] at rawFault
       cases rawFault with | integerRequirement _ unavailable => exact False.elim ((numeric _ _ form).2 unavailable)
 

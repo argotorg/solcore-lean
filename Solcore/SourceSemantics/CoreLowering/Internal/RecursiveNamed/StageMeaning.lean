@@ -252,7 +252,7 @@ private theorem literal_code {node : ExpressionNode} {type : Ty} {code : Expr}
   | unit => exact ⟨_, rfl, .unit⟩
   | bool value => exact ⟨_, rfl, .bool value⟩
   | word value => exact ⟨_, rfl, .word value⟩
-  | resolvedWord => exact ⟨_, rfl, .word _⟩
+  | resolvedWord | resolvedFixed => exact ⟨_, rfl, .word _⟩
   | resolvedInteger => exact ⟨_, rfl, .integer _⟩
 
 private theorem scalar_completion {scalar : Expr} (shape : ScalarCode scalar)
@@ -267,7 +267,7 @@ private theorem literal_uncoerced {node : ExpressionNode} {type : Ty} {code : Ex
     (literal : CompatibleExpressionLiterals.Literal solved node type code) : node.coercions = [] := by
   cases literal with
   | unit _ _ _ empty | bool _ _ _ _ empty | word _ _ _ _ empty _ => exact empty
-  | resolvedWord _ metadata | resolvedInteger _ metadata => exact metadata.coercions
+  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata => exact metadata.coercions
 
 include sameSource in
 theorem literal_reflects (sameLedger : context.solvedRequirements = solved)
@@ -1363,6 +1363,7 @@ theorem literal_of_certificate {id : ExpressionId} {code : SourceCoreBasic.Lower
   | word value form _ _ _ _ => rw [form]; exact .literal _
   | resolvedWord form _ => rw [form]; exact .integerLiteral _ _
   | resolvedInteger form _ => rw [form]; exact .integerLiteral _ _
+  | resolvedFixed form _ => rw [form]; exact .integerLiteral _ _
 
 /-- Unit is the only tuple in the atomic literal family. Pair support remains
 an ordered two-child tree, with a separate receipt for each occurrence. -/

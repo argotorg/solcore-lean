@@ -355,6 +355,7 @@ theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
         subst type
         exact .word meaning evidence
     | integer _ target _ => rw [node.target] at target; cases target
+    | fixed _ target _ => rw [node.target] at target; cases target
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound node.found)
   · rw [node.form]; exact .integerLiteral (by rw [node.requirements,node.coercions]; rfl) constructs
   · rw [node.coercions]; exact .nil
@@ -2358,6 +2359,7 @@ theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
         subst type
         exact .word meaning evidence
     | integer _ target _ => rw [node.target] at target; cases target
+    | fixed _ target _ => rw [node.target] at target; cases target
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound node.found)
   · rw [node.form]; exact .integerLiteral (by rw [node.requirements,node.coercions]; rfl) constructs
   · rw [node.coercions]; exact .nil

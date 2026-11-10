@@ -3336,13 +3336,15 @@ private def testBuiltinIntResolutionProfile : IO Unit := do
         s!"source Int catalog changed: {reprStr rules}")
   let some sourceImplementation := sourceRule.id.declaration?
     | throw (IO.userError "source Int rule lost its declaration identity")
+  -- Word's and Integer's rules, one for each of the twelve fixed-width types, then the source rule.
   assertTrue (decide (signatures.resolutionRules =
       [ProgramSignatures.builtinIntWordRule,
-        ProgramSignatures.builtinIntIntegerRule, sourceRule] ∧
+        ProgramSignatures.builtinIntIntegerRule] ++
+        TypeSystem.FixedInteger.all.map ProgramSignatures.builtinIntFixedRule ++ [sourceRule] ∧
       signatures.traits.length = 1 ∧
       signatures.implementations.length = 1 ∧
       signatures.implRules.length = 1 ∧
-      signatures.resolutionRules.length = 3))
+      signatures.resolutionRules.length = 15))
     "combined resolution rules lost builtin-first order or source-only counts"
   let builtinWord := ProgramSignatures.builtinIntPredicate .word
   let builtinInteger := ProgramSignatures.builtinIntPredicate .integer

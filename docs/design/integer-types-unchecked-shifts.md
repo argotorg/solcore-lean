@@ -820,6 +820,46 @@ chose to move checked `/ %` ahead of the literals.
   structural fault on the latest root still wins over either panic. Like 3d's
   targets they are compiled but outside the meaning proofs' profiles.
 
+### Row 1's literals: checked by inference and the compiler
+
+Made on 2026-11-10, during step 5.
+
+- **Typing.**
+  - A literal whose type resolves to one of the twelve types takes that type
+    (`Ty.IntegerLiteralCarrier`, `Detail.supportedIntegerLiteralTarget`).
+  - An open literal still defaults to `word`; step 7 changes that.
+  - Each type has builtin `Int` evidence (`BuiltinImplId.intFixed`,
+    `ProgramSignatures.builtinIntFixedRule`).
+  - An operator that waited on an open literal takes the literal's later
+    type and that type's rule (`binaryFixed_hasType_of_deferred`). So
+    `let a = 6 / 2; let b: uint8 = a;` divides at `uint8`. And
+    `let a = 200 + 100; let b: uint8 = a;` panics with `Panic(0x11)`,
+    since each operand fits but the sum does not.
+- **The range.** Two checks reject a literal above its type's greatest value
+  (`FixedInteger.maxNat`):
+  - Inference's finalization checks every literal node against its final type
+    (`Detail.literalFitsTarget`, `literalNodesFit`). Its diagnostic names the
+    type and the value (`Error.integerLiteralOutOfRange`), and
+    `finalize_typedSource_integerLiteral_fits` states the check.
+  - The compiler checks the range again (`validateFixedIntegerLiteral`,
+    `FixedIntegerLiteralCertificate.fits`).
+
+  The signed types get nonnegative literals only, until step 6 brings unary
+  minus.
+- **Semantics.**
+  - The static rule `IntegerLiteralValid.fixed` needs the type and the
+    evidence, not the range. The nested inference proofs carry the literal
+    origins but no literal node, and a range premise would need such a node at
+    about 200 sites.
+  - The construction `ResolvedIntegerLiteralConstructs.fixed` needs the
+    range, so the literal's word is canonical. Preservation uses it.
+- **Lowering.**
+  - At one of the twelve types (`Ty.fixedInteger?`), the compiler's numeric
+    branch emits the literal's word.
+  - The meaning proofs cover it with `Literal.resolvedFixed`,
+    `NumericLiteralEvidenceReceipts.fixed` and `literalImplementation`.
+  - Numeric patterns at the twelve types stay rejected.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -862,7 +902,9 @@ first planned after the literals and moved before them for this reason
    divisor and the range in the guard after the setter, outside the meaning
    proofs as step 3's compound targets are.
 5. **Literals.** A literal at one of the twelve types is range-checked at
-   compile time, with builtin `Int` evidence for each type.
+   compile time, with builtin `Int` evidence for each type
+   ([row 1's literals](#row-1s-literals-checked-by-inference-and-the-compiler)).
+   Open literals keep the `word` default.
 6. **Unary minus.** A negation out of range panics with `0x11`, and a unary
    `-` on a literal folds into the literal.
 7. **The `uint256` default.** Open literals default to `uint256`, and an open

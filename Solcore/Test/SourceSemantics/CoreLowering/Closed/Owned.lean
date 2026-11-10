@@ -3355,7 +3355,7 @@ private theorem boolean_literal_empty {solved : List SolvedRequirement} {node : 
   cases literal with
   | bool value actual type requirements coercions =>
     exact .bool value actual type requirements coercions
-  | unit actual _ _ _ | word _ actual _ _ _ _ | resolvedWord actual _ | resolvedInteger actual _ =>
+  | unit actual _ _ _ | word _ actual _ _ _ _ | resolvedWord actual _ | resolvedInteger actual _ | resolvedFixed actual _ =>
     rw [form] at actual
     cases actual
 

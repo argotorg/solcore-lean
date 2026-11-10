@@ -2791,10 +2791,16 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
             let validated ← (SourceCoreElaboration.validateNativeIntegerLiteral context.solvedRequirements
               node literal resolution).mapError SourceCoreBasic.Error.literalEvidence
             pure ⟨.integer, Core.LanguageResult.success (.integer validated.value)⟩
-          else
-            let validated ← (SourceCoreElaboration.validateWordIntegerLiteral context.solvedRequirements
-              node literal resolution).mapError SourceCoreBasic.Error.literalEvidence
-            pure ⟨.word, Core.LanguageResult.success (.word validated.value)⟩
+          else match node.type.fixedInteger? with
+            | some type =>
+                -- A literal at a fixed-width integer type is its canonical word.
+                let validated ← (SourceCoreElaboration.validateFixedIntegerLiteral context.solvedRequirements
+                  node literal resolution type).mapError SourceCoreBasic.Error.literalEvidence
+                pure ⟨.word, Core.LanguageResult.success (.word validated.value)⟩
+            | none =>
+                let validated ← (SourceCoreElaboration.validateWordIntegerLiteral context.solvedRequirements
+                  node literal resolution).mapError SourceCoreBasic.Error.literalEvidence
+                pure ⟨.word, Core.LanguageResult.success (.word validated.value)⟩
       | _ =>
           let (node, type) ← policy.readExpression source id
           let site := SourceCoreElaboration.ErrorSite.occurrence id.occurrence

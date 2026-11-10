@@ -1980,7 +1980,7 @@ private theorem literal_word_type {solved : List SolvedRequirement} {node : Expr
   cases literal with
   | unit _ typed _ _ | bool _ _ typed _ _ => cases typed.symm.trans wordType
   | word => rfl
-  | resolvedWord => rfl
+  | resolvedWord | resolvedFixed => rfl
   | resolvedInteger _ metadata => cases metadata.nodeType.symm.trans wordType
 
 private theorem word_typed {solved : List SolvedRequirement} {node : ExpressionNode} {code : Expr}
@@ -1998,7 +1998,13 @@ private theorem word_typed {solved : List SolvedRequirement} {node : ExpressionN
     cases raw with | integerLiteral _ constructed =>
       cases constructed with
       | word => exact .word _
-      | integer => cases metadata.targetType
+      | integer | fixed => cases metadata.targetType
+  | resolvedFixed form metadata =>
+    rw [form] at raw
+    cases raw with | integerLiteral _ constructed =>
+      cases constructed with
+      | fixed => exact .word _
+      | word | integer => cases metadata.targetType
 
 section Admitted
 universe u

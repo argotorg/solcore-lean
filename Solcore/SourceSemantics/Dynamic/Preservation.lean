@@ -100,6 +100,13 @@ theorem hasType
   cases construction with
   | word => exact .word _
   | integer => exact .integer _
+  | @fixed raw _ type _ fits _ =>
+      have small : raw < Core.wordModulus :=
+        Nat.lt_of_le_of_lt fits type.maxNat_lt
+      exact .fixed _ (by
+        show type.canonical (raw % Core.wordModulus) = true
+        rw [Nat.mod_eq_of_lt small]
+        exact TypeSystem.FixedInteger.canonical_of_le_maxNat fits)
 
 end ResolvedIntegerLiteralConstructs
 
