@@ -116,8 +116,13 @@ depends on the change.
     `IntegerStrictBinaryOperator`, so a Word-only operator never reaches the integer bodies.
   - An operator whose meaning differs at a fixed-width integer type takes its own mode. The signed
     orderings take `BinaryProfile.fixedSigned` and the `signed` mode, and lower through
-    `SourceCorePrimitive.signedBinary` to Core's `wordSgt`. The compiler's `binaryLowering` chooses
-    the mode from the left operand's type, as the source semantics does.
+    `SourceCorePrimitive.signedBinary` to Core's `wordSgt`. Checked `+ - *` take
+    `BinaryProfile.fixedChecked` and the `checked` mode, and lower through
+    `SourceCorePrimitive.checkedBinary`: Core's `wordToInteger` reads both words, the exact result
+    is tested against the type's range, and the body fails with `Panic(0x11)` or converts the result
+    back with `integerToWord`. The compiler's `binaryLowering` chooses the mode from the left
+    operand's type and the operator, as the source semantics does. `~` on the narrower unsigned
+    types is Word's `~` and the mask from `SourceCorePrimitive.narrowBitNotMask?`.
   - Compound assignment carries an assignment profile,
     `operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`, restated in each
     file that needs it and in the receipts' `operatorType`. A new Word-only compound operator goes
