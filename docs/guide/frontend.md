@@ -53,7 +53,7 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`SourceInference/Types`](../../Solcore/Frontend/SourceInference/Types.lean) | `State`, `Context`, `CheckedFunction`, `SolvedRequirement`, `Error` |
 | [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected` |
 | [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | The traversal `inferExprFuel`, `inferStatementFuel`, `inferStatementsFuel`, with the shift and unchecked branches |
-| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody`, `finalize` |
+| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody`, `finalize`, which rejects a literal above its fixed-width integer type's greatest value (`Detail.literalFitsTarget`) |
 | [`SourceInference`](../../Solcore/Frontend/SourceInference.lean) | The inference umbrella, which also imports five of its proof files |
 | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError` |
 | **Staging and specialization** | |
@@ -63,7 +63,7 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`ExecutableImplMethods`](../../Solcore/Frontend/ExecutableImplMethods.lean) | `ExecutableImplMethods.CheckedMethod` |
 | [`SourceCompilationPlan`](../../Solcore/Frontend/SourceCompilationPlan.lean) | `exactSpecialization`, `exactInstantiationKey`, `validateExecutablePlanEvidence` |
 | **Elaboration and lowering** | |
-| [`SourceCoreElaboration`](../../Solcore/Frontend/SourceCoreElaboration.lean) | Literal evidence, closed types, elaboration errors; Core operators for source operators |
+| [`SourceCoreElaboration`](../../Solcore/Frontend/SourceCoreElaboration.lean) | Literal evidence, with the range checked again at a fixed-width integer type (`validateFixedIntegerLiteral`), closed types, elaboration errors; Core operators for source operators |
 | [`SourceCore/Lowering`](../../Solcore/Frontend/SourceCore/Lowering.lean) | Scalars, locals, control, loops, assignments, calls and function values, by section: `SourceCorePrimitive`, `SourceCoreAssignments`, `SourceCoreSourceCells`, `SourceCoreFunctions` and others |
 | [`SourceCore/Data`](../../Solcore/Frontend/SourceCore/Data.lean) | `SourceCoreDataCatalog.Catalog`: closed data, equality and defaults |
 | [`SourceCore/DataExpressions`](../../Solcore/Frontend/SourceCore/DataExpressions.lean), [`DataPlaces`](../../Solcore/Frontend/SourceCore/DataPlaces.lean) | Data leaves, and places as Core getters and updaters (`SourceCoreDataPlaces.lower`) |

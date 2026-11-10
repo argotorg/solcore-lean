@@ -144,6 +144,12 @@ depends on the change.
   - The public-API tests go in [Foundations/Execution](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean);
     the `example` in `Tests.SourceCorePrimitiveExpressions` (`Foundations/Statements`) runs every
     `StrictBinaryOperator` through `PrimitiveExpressions.lowerExpression_preserves`.
+- **A new literal carrier** (29b5c6653, literals at the fixed-width integer types). The compiler's
+  numeric branch picks the validator from the literal's type and emits its value
+  (`validateFixedIntegerLiteral`). `CompatibleExpressionLiterals.Literal` gains a case built from the
+  validator's certificate (`resolvedFixed`, from `FixedIntegerLiteralCertificate`), and
+  `NumericLiteralEvidenceReceipts` gains its construction (`fixed_constructs`, `fixed_raw`). The
+  other files only add that case to their case splits over `Literal`.
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
