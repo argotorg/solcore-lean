@@ -639,7 +639,7 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
       (profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core)
       (child : Tree compiled rootFuel source sourceContext reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : CompatibleExpressionPrimitives.Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -700,12 +700,15 @@ private theorem function_not_scalar (parameter result : Core.Ty) :
     ¬ Scalar (CallableContract.functionType parameter result) := by
   simp [Scalar, CallableContract.functionType]
 
-theorem unary_input_scalar (operator : Syntax.UnaryOp) (type : Core.Ty) :
-    Scalar (CompatibleExpressionConditionals.selectedUnary operator type).operandType := by
-  unfold CompatibleExpressionConditionals.selectedUnary
+theorem unary_input_scalar (operator : Syntax.UnaryOp) (type : Core.Ty) (lookup : Option TypeSystem.Ty) :
+    Scalar (CompatibleExpressionConditionals.selectedUnary operator type lookup).operandType := by
+  unfold CompatibleExpressionConditionals.selectedUnary SourceCorePrimitive.unaryLowering
   split
-  · simp [Scalar, UnaryOp.operandType]
-  · cases operator <;> simp [Scalar, SourceCorePrimitive.unaryOperator, UnaryOp.operandType]
+  · simp [Scalar, SourceCorePrimitive.UnaryLowering.operandType]
+  · simp only [SourceCorePrimitive.UnaryLowering.operandType]
+    split
+    · simp [Scalar, UnaryOp.operandType]
+    · cases operator <;> simp [Scalar, SourceCorePrimitive.unaryOperator, UnaryOp.operandType]
 
 theorem binary_input_scalar (mode : CompatibleExpressionPrimitives.Mode) (operator : Syntax.BinaryOp) :
     Scalar (mode.operandType operator) := by
@@ -1010,9 +1013,10 @@ theorem of_policy {id : ExpressionId}
           CompatibleExpressionPrimitives.unary_source_types unique site.found form metadata.coercions metadata.requirements typed
         have childTree := ih childFound childTyped generated
         have scalar : CellAwareNamedExpressionScalarProjection.Scalar childCode.type :=
-          inputChecked ▸ CellAwareNamedExpressionScalarProjection.unary_input_scalar _ childCode.type
+          inputChecked ▸ CellAwareNamedExpressionScalarProjection.unary_input_scalar _ childCode.type _
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
         have chosen := CompatibleExpressionConditionals.unary_selected profile
-          (CellAwareNamedExpressionScalarProjection.projected childTree childFound scalar)
+          (CellAwareNamedExpressionScalarProjection.projected childTree childFound scalar) lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, native⟩ := childCode
         dsimp only at inputChecked childTree ⊢

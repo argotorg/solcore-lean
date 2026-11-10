@@ -154,7 +154,7 @@ theorem while_induction {program : Program}
     (motive_5 := fun _ _ _ _ _ _ _ _ _ => True)
     (motive_6 := fun _ _ _ _ _ _ _ _ _ _ _ => True)
     (motive_7 := fun _ _ _ _ _ _ _ _ _ _ => True)
-    (motive_8 := fun _ _ _ _ _ _ _ _ _ => True)
+    (motive_8 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)

@@ -2043,7 +2043,8 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
             leftHeap shape.negated.id (.bool true) after := by
           apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.negatedFound)
           · rw [shape.negatedForm,shape.negatedRequirements,shape.negatedCoercions]
-            exact .unary (owned := []) rfl rightTrace (.primitive (.logicalNot false))
+            exact .unary (owned := []) rfl rightTrace
+              (.primitive (.primitive (fun _ _ kind => by cases kind) (.logicalNot false)))
           · rw [shape.negatedCoercions]; exact .nil
         refine ⟨after,?_,leftAppend.trans rightAppend⟩
         apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.binaryFound)

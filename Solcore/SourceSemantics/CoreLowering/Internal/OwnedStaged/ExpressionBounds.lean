@@ -2394,7 +2394,7 @@ inductive UnaryTrace (program : Program) (size : Nat) (context : SourceSemantics
     Staging.Recursive.Outcome → Dynamic.Heap → Prop where
   | value {childSize input output after}
       (child : Staging.Recursive.Size.Expression program registry childSize invocation context environment before operand (.value input) after)
-      (applies : Dynamic.UnaryPrimitiveApplies operator input output)
+      (applies : Dynamic.UnaryValueApplies (Dynamic.operandType? invocation.source operand) operator input output)
       (childSizeSmaller : childSize < size) : UnaryTrace program size context registry invocation environment before operand operator (.value output) after
   | fault {childSize reason after}
       (child : Staging.Recursive.Size.Expression program registry childSize invocation context environment before operand (.fault reason) after)
@@ -2642,7 +2642,7 @@ inductive Head (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSo
       (profile : UnaryProfile operator operandType resultType core)
       (child : certificate scope operand ⟨core.operandType, childCode⟩) :
       Head checked source certificate scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -2713,26 +2713,26 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
         cases represented with
         | value payload =>
           rw [inputType] at payload
-          obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
+          obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
           have same := actualApplied.functional applied
           subst sourceResult
           refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, ⟨reached, related⟩⟩
-          · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
+          · rw [unary_rename]; exact unary_lower_success evaluated coreApplied
           · exact .value (outputType ▸ resultRep)
       | fault childTrace childSmaller =>
         obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, reached, related, _post⟩ :=
           ih _ (Nat.lt_of_lt_of_le childSmaller bounded) environments heaps locals agrees actualTyped initial admitted childTrace
         cases represented with
         | fault matched =>
-          exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
+          exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact unary_lower_failure evaluated,
             .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, reached, related⟩
       | invalid childTrace failed childSmaller =>
         obtain ⟨_, _, _, _, _, represented, _⟩ := ih _ (Nat.lt_of_lt_of_le childSmaller bounded) environments heaps locals agrees actualTyped initial admitted childTrace
         cases represented with
         | value payload =>
           rw [inputType] at payload
-          obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
-          exact False.elim (failed.excludes_application ⟨_, applied⟩)
+          obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
+          exact False.elim (failed.excludes_value applied)
     | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
       subst root
@@ -2934,7 +2934,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Na
         cases represented with
         | fault matched =>
           have failed := trace
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation.sound) complete
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_failure (lowering := core) childEvaluation.sound) complete
           exact ⟨_, _, after, finalMap, finalWorld, .unaryOperandFault occurrence failed, .fault matched,
             finalHeaps, maps, worlds, frame, heapMetadata, reached, related⟩
       | caseRight childEvaluation branch =>
@@ -2943,8 +2943,8 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Na
         cases represented with
         | value payload =>
           rw [inputType] at payload
-          obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_success childEvaluation.sound coreApplied) complete
+          obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_success childEvaluation.sound coreApplied) complete
           have childTrace := trace
           exact ⟨_, _, after, finalMap, finalWorld, .unary occurrence childTrace applied,
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, ⟨reached, related⟩⟩

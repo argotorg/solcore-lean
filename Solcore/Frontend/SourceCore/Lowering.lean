@@ -1254,6 +1254,70 @@ theorem signedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.
         (signedStrictBinaryBody_hasType _)
     | exact binary_hasType leftTyped rightTyped
 
+/-- `~` on the unsigned fixed-width integer types below 256 bits keeps the low
+`N` bits of Word's `~`: the mask it applies when the operand's static type is
+one of them. -/
+def narrowBitNotMask? : Option TypeSystem.Ty → Syntax.UnaryOp → Option Core.Word
+  | some (.constructor (.builtin (.fixed type))), .bitNot =>
+      if type.signed = false ∧ type.width ≠ .w256 then
+        some (Core.Word.ofNatModulo (2 ^ type.width.bits - 1))
+      else none
+  | _, _ => none
+
+/-- How a requirement-free unary node lowers: one Core operator, or Word's `~`
+followed by a mask. -/
+inductive UnaryLowering where
+  | core (operator : Core.UnaryOp)
+  | masked (mask : Core.Word)
+  deriving DecidableEq, Repr
+
+/-- The compiler's choice: the mask when there is one, Integer's `~` on an
+Integer operand, and the operator's Word or Boolean primitive otherwise. -/
+def unaryLowering (operator : Syntax.UnaryOp) (operand : Core.Ty) :
+    Option Core.Word → UnaryLowering
+  | some mask => .masked mask
+  | none => .core (if operator = .bitNot && operand = .integer then .integerNot else unaryOperator operator)
+
+namespace UnaryLowering
+
+def operandType : UnaryLowering → Core.Ty
+  | .core operator => operator.operandType
+  | .masked _ => .word
+
+def resultType : UnaryLowering → Core.Ty
+  | .core operator => operator.resultType
+  | .masked _ => .word
+
+/-- The body run on the operand's successful payload. -/
+def body : UnaryLowering → Core.Expr
+  | .core operator => .unary operator (.var 0)
+  | .masked mask => .binary .wordAnd (.unary .wordNot (.var 0)) (.word mask)
+
+def lower (lowering : UnaryLowering) (operand : Core.Expr) : Core.Expr :=
+  Core.LanguageResult.bind lowering.resultType operand (Core.LanguageResult.success lowering.body)
+
+/-- The raw result of the body on a payload. -/
+def apply : UnaryLowering → Core.Value → Option Core.Value
+  | .core operator, value => operator.apply value
+  | .masked mask, .word value => some (.word (value.bitNot.bitAnd mask))
+  | .masked _, _ => none
+
+theorem lower_core (operator : Core.UnaryOp) (operand : Core.Expr) :
+    (UnaryLowering.core operator).lower operand = Core.LocalPrimitiveResults.unary operator operand := rfl
+
+theorem lower_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {lowering : UnaryLowering} {operand : Core.Expr}
+    (typed : Core.HasType scope operand (Core.LanguageResult.resultType lowering.operandType) definitions) :
+    Core.HasType scope (lowering.lower operand) (Core.LanguageResult.resultType lowering.resultType)
+      definitions := by
+  cases lowering with
+  | core operator => exact Core.LocalPrimitiveResults.unary_hasType typed
+  | masked mask =>
+    exact Core.LanguageResult.bind_hasType (by constructor) typed
+      (Core.LanguageResult.success_hasType (.binary (.unary (.var rfl)) .word))
+
+end UnaryLowering
+
 /-- Conditional/group/tuple children use this same policy recursively, so an
 operator can occur at any expression position without losing read reasons. -/
 def lowerExpressionWithReasons : Nat → Context → TypedSource → Scope → ExpressionId →
@@ -2297,12 +2361,13 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 pure ⟨type, ← SourceCoreSourceCells.copyScope policy.sourceCells source scope (fun index => index) expression⟩
               else pure ⟨type, expression⟩
           | .unary operator operand =>
+              let mask := SourceCorePrimitive.narrowBitNotMask?
+                ((source.lookupExpression? operand).map (·.type)) operator
               let operand ← lowerExpressionWithPolicy policy lowerBody fuel context source scope operand reasonAt
-              let coreOperator := if operator = .bitNot && operand.type = .integer then
-                Core.UnaryOp.integerNot else SourceCorePrimitive.unaryOperator operator
-              SourceCoreBasic.ensureType site coreOperator.operandType operand.type
-              SourceCoreBasic.ensureType site coreOperator.resultType type
-              pure ⟨type, Core.LocalPrimitiveResults.unary coreOperator operand.expression⟩
+              let lowering := SourceCorePrimitive.unaryLowering operator operand.type mask
+              SourceCoreBasic.ensureType site lowering.operandType operand.type
+              SourceCoreBasic.ensureType site lowering.resultType type
+              pure ⟨type, lowering.lower operand.expression⟩
           | .binary left operator right =>
               let signed := SourceCorePrimitive.signedOrdering
                 ((source.lookupExpression? left).map (·.type)) operator

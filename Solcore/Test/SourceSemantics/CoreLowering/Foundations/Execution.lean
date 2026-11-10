@@ -4063,11 +4063,12 @@ end Tests.SourceCoreFixedIntegerTypes
 end
 
 section
-/-! The first operators on the twelve fixed-width integer types, through the
-public source API: `==` and `!=` on every type, and `< > <= >=` and `& | ^` on
-the unsigned types. On canonical words they are Word's operators, and the
-bitwise results stay canonical. Signed orderings and bitwise operators, `~` and
-the checked arithmetic come with the next steps and are still rejected. -/
+/-! The operators on the twelve fixed-width integer types, through the public
+source API: `==`, `!=`, `& | ^` and `< > <= >=` on every type, and `~`. The
+orderings compare signed on the signed types, and `~` keeps the low `N` bits on
+the unsigned types below 256 bits, so the results stay canonical. Checked
+arithmetic and the compound forms come with the next steps and are still
+rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4105,12 +4106,16 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function lt8s(x: int8, y: int8) returns (bool) { return x < y; }",
   "function ge16s(x: int16, y: int16) returns (bool) { return x >= y; }",
   "function gt256s(x: int256, y: int256) returns (bool) { return x > y; }",
-  "function le32s(x: int32, y: int32) returns (bool) { return x <= y; }"
+  "function le32s(x: int32, y: int32) returns (bool) { return x <= y; }",
+  "function not8u(x: uint8) returns (uint8) { return ~x; }",
+  "function not16u(x: uint16) returns (uint16) { return ~x; }",
+  "function not128u(x: uint128) returns (uint128) { return ~x; }"
 ]
 
 private def names : List String :=
   ["eq8", "ne16", "lt32", "le64", "gt128", "ge256", "and8", "or16", "xor32", "eqSigned", "mixed",
-    "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u", "lt8s", "ge16s", "gt256s", "le32s"]
+    "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u", "lt8s", "ge16s", "gt256s", "le32s",
+    "not8u", "not16u", "not128u"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4169,21 +4174,22 @@ def run : IO Unit := do
     (17, [word (modulus - 128), word 127], boolean true),
     (18, [word (modulus - 2), word (modulus - 3)], boolean true), (18, [word (modulus - 3), word (modulus - 2)], boolean false),
     (19, [word 0, word (modulus - 1)], boolean true), (19, [word (modulus - 1), word 0], boolean false),
-    (20, [word (modulus - 5), word (modulus - 5)], boolean true), (20, [word 5, word (modulus - 5)], boolean false)]
+    (20, [word (modulus - 5), word (modulus - 5)], boolean true), (20, [word 5, word (modulus - 5)], boolean false),
+    (21, [word 0], word 255), (21, [word 255], word 0), (21, [word 0x0F], word 0xF0),
+    (22, [word 0x1234], word 0xEDCB),
+    (23, [word 0], word (2 ^ 128 - 1)), (23, [word (2 ^ 128 - 1)], word 0)]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
       s!"{names[index]?} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
-  rejectedByInference "~ on a narrow unsigned type is not yet a builtin"
-    ["function bad(x: uint8) returns (uint8) { return ~x; }"]
   rejectedByInference "checked arithmetic is not yet a builtin"
     ["function bad(x: uint8, y: uint8) returns (uint8) { return x + y; }"]
   rejectedByInference "operands of different types"
     ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
   rejectedByInference "compound assignment is not yet defined"
     ["function bad(x: uint8, y: uint8) returns (uint8) { x &= y; return x; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ and < > <= >= on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ on signed ones and uint256, with canonical results, and ~ on narrower unsigned types, checked arithmetic, compound assignment and mixed operand types still rejected"
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= and ~ on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, with canonical results, and checked arithmetic, compound assignment and mixed operand types still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

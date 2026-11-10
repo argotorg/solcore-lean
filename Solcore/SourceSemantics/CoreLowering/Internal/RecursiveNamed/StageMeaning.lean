@@ -432,21 +432,21 @@ private theorem product_reflects [FunctionCalls.FaultTokens faults] (sameLedger 
     exact pair_reflects functions program stages invocation sameSource metadata form leftFound rightFound sourceType firstIH secondIH
 
 private theorem unary_branch {environment : Environment} {store finalStore : Store}
-    {core : UnaryOp} {input output value : Value} (applied : core.apply input = some output)
+    {core : SourceCorePrimitive.UnaryLowering} {input output value : Value} (applied : core.apply input = some output)
     (evaluated : Evaluates (input :: environment) store
-      (LanguageResult.success (.unary core (.var 0))) value finalStore) :
+      (LanguageResult.success core.body) value finalStore) :
     value = .inRight .word output ∧ finalStore = store := by
-  cases evaluated with
-  | inRight body =>
-    cases body with
-    | unary operand actualApplied =>
-      cases operand with
-      | var found =>
-        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
-        cases found
-        have same := Option.some.inj (applied.symm.trans actualApplied)
-        cases same
-        exact ⟨rfl, rfl⟩
+  have expected : Evaluates (input :: environment) store (LanguageResult.success core.body)
+      (.inRight .word output) store := by
+    cases core with
+    | core core => exact .inRight (.unary (.var rfl) applied)
+    | masked mask =>
+      cases input with
+      | word word =>
+        cases applied
+        exact .inRight (.binary (.unary (.var rfl) rfl) .word rfl)
+      | _ => cases applied
+  exact evaluation_deterministic evaluated expected
 
 private theorem bind_failed {environment : Environment} {store failedStore finalStore : Store}
     {code body : Expr} {input output : Ty} {reason : Word} {value : Value}
@@ -712,7 +712,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solved
     have same := Option.some.inj (metadata.found.symm.trans (sameSource ▸ found))
     subst root
     have owned := occurrence invocation metadata form sameSource
-    change Evaluates actual store ((LocalPrimitiveResults.unary _ _).rename ξ) value finalStore at evaluated
+    change Evaluates actual store ((SourceCorePrimitive.UnaryLowering.lower _ _).rename ξ) value finalStore at evaluated
     rw [unary_rename] at evaluated
     cases evaluated with
     | caseLeft childEvaluation branch =>
@@ -728,7 +728,9 @@ theorem reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solved
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
+        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ :=
+          profile.preserves (lookup := Dynamic.operandType? invocation.source operand) payload
+            (by rw [sameSource]; exact Dynamic.operandType?_of_found childFound inputType)
         obtain ⟨rfl, rfl⟩ := unary_branch coreApplied branch
         exact ⟨_, after, finalMap, finalWorld, .unary owned trace applied, .value (outputType ▸ resultRep),
           finalHeaps, maps, worlds, frame, heapMetadata⟩

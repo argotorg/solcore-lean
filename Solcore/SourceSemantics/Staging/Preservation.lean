@@ -312,7 +312,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
               obtain ⟨inputTyped, argumentsHeapTyped, operandExtends⟩ := expression_value wellFormed
                 runtime covers locals heap operandTyped operandTrace
               cases operatorTyped with
-              | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ => cases method
+              | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ | fixedNarrowBitNot _ => cases method
               | trait staticDispatch profile requirementsProve =>
                   have same := unary_dispatch_same staticDispatch dispatch
                   rcases same with ⟨rfl, rfl⟩

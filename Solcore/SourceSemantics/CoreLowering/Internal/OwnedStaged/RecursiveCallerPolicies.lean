@@ -946,7 +946,10 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
                 viewCompatibleReading, bind, Except.bind, formEq, Nat.min_self, argumentsSame]
           | @unary operator operand =>
               have child := children operand (by simp [formEq, ExpressionForm.references])
-              simp only [formEq, viewReading, child]
+              have operandLookup := expression_lookup edited avoids
+                (.expression reached found (by simp [formEq, ExpressionForm.references]) :
+                  Reaches source roots (.expression operand))
+              simp only [formEq, viewReading, child, operandLookup]
           | @binary left operator right =>
               have first := children left (by simp [formEq, ExpressionForm.references])
               have second := children right (by simp [formEq, ExpressionForm.references])

@@ -471,7 +471,7 @@ mutual
         (operand_evaluates : ExpressionEvaluates program context evidence source
           environment before operand input middle)
         (applies : UnaryOperationApplies program context evidence middle operator
-          owned input output after) :
+          (operandType? source operand) owned input output after) :
         ExpressionFormEvaluates program context evidence source environment before
           (.unary operator operand) requirements coercions output after
     | binaryShortCircuit
@@ -742,25 +742,27 @@ mutual
         SourcePlaceSnapshotUpdate program context evidence source modify environment
           before place updatedRoot after
 
-  /-- Primitive or evidence-selected unary operation. -/
+  /-- Primitive or evidence-selected unary operation. The operand's static type
+  (`operandType? source operand`) chooses a fixed-width integer type's meaning
+  where it differs from Word's. -/
   inductive UnaryOperationApplies (program : Program) :
       Context → EvidenceEnvironment → Heap → Syntax.UnaryOp →
-        List RequirementId → Value → Value → Heap → Prop where
+        Option TypeSystem.Ty → List RequirementId → Value → Value → Heap → Prop where
     | primitive
-        {context evidence heap operator input output}
-        (applies : UnaryPrimitiveApplies operator input output) :
-        UnaryOperationApplies program context evidence heap operator [] input
-          output heap
+        {context evidence heap operator operandType input output}
+        (applies : UnaryValueApplies operandType operator input output) :
+        UnaryOperationApplies program context evidence heap operator operandType []
+          input output heap
     | method
-        {context evidence before after operator input output requirements
+        {context evidence before after operator operandType input output requirements
           traitName methodName bodyInstance calleeEvidence}
         (dispatch : UnaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (invokes : BodyInvokes program bodyInstance calleeEvidence before [input]
           output after) :
-        UnaryOperationApplies program context evidence before operator requirements
-          input output after
+        UnaryOperationApplies program context evidence before operator operandType
+          requirements input output after
 
   /-- Primitive or evidence-selected strict binary operation. The operands'
   static type (`operandType? source left`) chooses a fixed-width integer type's
@@ -1661,12 +1663,12 @@ mutual
   theorem UnaryOperationApplies.initialization_extends {program : Program}
       {context : Context}
       {evidence : EvidenceEnvironment}
-      {operator : Syntax.UnaryOp}
+      {operator : Syntax.UnaryOp} {operandType : Option TypeSystem.Ty}
       {requirements : List RequirementId}
       {input output : Value}
       {before after : Heap}
       (trace : UnaryOperationApplies program
-        context evidence before operator requirements input output after) :
+        context evidence before operator operandType requirements input output after) :
       HeapInitializationExtend before after :=
     match trace with
     | .primitive _ => .refl _

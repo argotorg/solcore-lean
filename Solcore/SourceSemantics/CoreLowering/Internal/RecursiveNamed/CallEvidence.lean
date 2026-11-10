@@ -843,7 +843,7 @@ private theorem primitive_native {definitions : DataEnvironment} {source : Typed
     exact ⟨.product a.1 b.1, LocalSequence.pair_hasType a.1 b.1 a.2 b.2⟩
   | unary _ _ _ _ _ profile child =>
     have operand := typed _ _ child
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType operand.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType operand.2⟩
   | binary _ _ _ _ _ _ _ _ first second => exact binary_native (typed _ _ first).2 (typed _ _ second).2
   | conditional _ _ _ _ _ _ _ _ first second third =>
     have a := typed _ _ first

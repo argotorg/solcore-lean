@@ -618,6 +618,90 @@ theorem BinaryPrimitivePanics.excludes_value {operandType : Option TypeSystem.Ty
   | primitive _ applies => exact panics.excludes_application applies
   | fixed _ applies => cases panics <;> cases applies
 
+/-- The word that keeps the low `N` bits of a word, for a fixed-width integer
+type of `N` bits. -/
+def fixedLowMask (type : TypeSystem.FixedInteger) : Core.Word :=
+  Core.Word.ofNatModulo (2 ^ type.width.bits - 1)
+
+/-- Unary operators whose meaning on a fixed-width integer type differs from
+Word's on its canonical words. `~` on `uint8` … `uint128` keeps the low `N`
+bits of Word's `~`. -/
+inductive FixedUnaryApplies (type : TypeSystem.FixedInteger) :
+    Syntax.UnaryOp → Value → Value → Prop where
+  | narrowBitNot (unsigned : type.signed = false) (narrow : type.width ≠ .w256)
+      (operand : Core.Word) :
+      FixedUnaryApplies type .bitNot (.word operand)
+        (.word (operand.bitNot.bitAnd (fixedLowMask type)))
+
+namespace FixedUnaryApplies
+
+theorem functional {type : TypeSystem.FixedInteger} {operator : Syntax.UnaryOp}
+    {input first second : Value}
+    (firstApplication : FixedUnaryApplies type operator input first)
+    (secondApplication : FixedUnaryApplies type operator input second) :
+    first = second := by
+  cases firstApplication <;> cases secondApplication <;> rfl
+
+/-- The operator with a fixed-width meaning is `~` on the narrower unsigned
+types. -/
+theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.UnaryOp}
+    {input output : Value}
+    (applies : FixedUnaryApplies type operator input output) :
+    FixedNarrowBitNot type operator := by
+  cases applies with
+  | narrowBitNot unsigned narrow => exact .bitNot unsigned narrow
+
+end FixedUnaryApplies
+
+/-- Word's, Integer's or Boolean's primitive meaning of a unary operator applies
+unless the operand's static type is a fixed-width integer type on which the
+operator's meaning differs (`FixedUnaryApplies`). -/
+def UnaryWordMeaning (operandType : Option TypeSystem.Ty) (operator : Syntax.UnaryOp) : Prop :=
+  ∀ type, operandType = some (.fixed type) → ¬ FixedNarrowBitNot type operator
+
+/-- A unary operator applied to an evaluated operand whose static type is
+`operandType`: its primitive meaning, or the fixed-width meaning where that
+differs. The two cases exclude each other, so the result is unique. -/
+inductive UnaryValueApplies (operandType : Option TypeSystem.Ty) (operator : Syntax.UnaryOp)
+    (input output : Value) : Prop where
+  | primitive (plain : UnaryWordMeaning operandType operator)
+      (applies : UnaryPrimitiveApplies operator input output)
+  | fixed {type : TypeSystem.FixedInteger} (operand : operandType = some (.fixed type))
+      (applies : FixedUnaryApplies type operator input output)
+
+namespace UnaryValueApplies
+
+theorem functional {operandType : Option TypeSystem.Ty} {operator : Syntax.UnaryOp}
+    {input first second : Value}
+    (firstApplication : UnaryValueApplies operandType operator input first)
+    (secondApplication : UnaryValueApplies operandType operator input second) :
+    first = second := by
+  cases firstApplication with
+  | primitive plain applies =>
+    cases secondApplication with
+    | primitive _ other => exact applies.functional other
+    | fixed operand other => exact absurd other.kind (plain _ operand)
+  | fixed operand applies =>
+    cases secondApplication with
+    | primitive plain _ => exact absurd applies.kind (plain _ operand)
+    | fixed other otherApplies =>
+      rw [operand] at other
+      cases Option.some.inj other
+      exact applies.functional otherApplies
+
+/-- Word's meaning applies at any static type that is not a fixed-width
+integer type. -/
+theorem word_meaning_of_not_fixed {operandType : Option TypeSystem.Ty} {operator : Syntax.UnaryOp}
+    (notFixed : ∀ type, operandType ≠ some (.fixed type)) : UnaryWordMeaning operandType operator :=
+  fun type operand => absurd operand (notFixed type)
+
+/-- Word's meaning applies to `!`. -/
+theorem word_meaning_logicalNot (operandType : Option TypeSystem.Ty) :
+    UnaryWordMeaning operandType .logicalNot :=
+  fun _ _ kind => by cases kind
+
+end UnaryValueApplies
+
 /-- Application of one compiler-provided source function. -/
 inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop where
   | integerSub (left right : Int) :

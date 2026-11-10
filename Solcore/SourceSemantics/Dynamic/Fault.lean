@@ -936,6 +936,18 @@ theorem excludes_application
   cases invalid <;> cases applies <;>
     simp_all [BooleanValue, WordValue, IntegerValue]
 
+/-- An invalid operand excludes the operation at any static operand type. -/
+theorem excludes_value
+    {operandType : Option TypeSystem.Ty} {operator : Syntax.UnaryOp} {input output : Value}
+    (invalid : UnaryPrimitiveOperandInvalid operator input)
+    (applies : UnaryValueApplies operandType operator input output) : False := by
+  cases applies with
+  | primitive _ applies => exact invalid.excludes_application ⟨output, applies⟩
+  | fixed _ applies =>
+    cases applies
+    cases invalid with
+    | bitNot not_word _ => exact not_word trivial
+
 end UnaryPrimitiveOperandInvalid
 
 namespace BinaryPrimitiveOperandsInvalid

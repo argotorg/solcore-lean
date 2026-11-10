@@ -1722,9 +1722,10 @@ theorem word_add {a b : Core.Word} (occurrence : Occurrence scope id (.binary le
   exact ⟨trace, trace.value_plain⟩
 
 theorem integer_not {operand : ExpressionId} {a : Int} (occurrence : Occurrence scope id (.unary .bitNot operand))
-    (child : Expression program registry scope context environment before operand (.value (.integer a)) after) :
+    (child : Expression program registry scope context environment before operand (.value (.integer a)) after)
+    (notFixed : ∀ type, Dynamic.operandType? scope.source operand ≠ some (.fixed type)) :
     Expression program registry scope context environment before id (.value (.integer (~~~a))) after :=
-  .unary occurrence child (.integerBitNot a)
+  .unary occurrence child (.primitive (Dynamic.UnaryValueApplies.word_meaning_of_not_fixed notFixed) (.integerBitNot a))
 
 theorem left_stage_fault (occurrence : Occurrence scope id (.binary left operator right))
     (first : Expression program registry scope context environment before left (.fault (.stage origin call reason)) after) :

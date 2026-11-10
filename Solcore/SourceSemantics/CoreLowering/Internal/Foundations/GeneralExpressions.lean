@@ -840,7 +840,8 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
                 Core.LocalPrimitiveResults.unary_success coreEvaluation coreApplied⟩
               apply Dynamic.ExpressionEvaluates.intro metadata.contains
               · rw [form, metadata.requirements, metadata.coercions]
-                exact .unary (owned := []) rfl sourceEvaluation (.primitive sourceApplied)
+                exact .unary (owned := []) rfl sourceEvaluation
+                  (.primitive (.primitive (child.unary_word_meaning operator) sourceApplied))
               · rw [metadata.coercions]; exact .nil
   | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form total
       leftTree rightTree leftIH rightIH =>

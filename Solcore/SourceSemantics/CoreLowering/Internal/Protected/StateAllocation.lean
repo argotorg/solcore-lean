@@ -1745,25 +1745,25 @@ theorem Head.preserves [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
+        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         have same := actualApplied.functional applied
         subst sourceResult
         refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
-        · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
+        · rw [unary_rename]; exact unary_lower_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
       obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
         ih childFound environments heaps locals agrees actualTyped installedEntry (.fault childTrace)
       cases represented with
       | fault matched =>
-        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
+        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact unary_lower_failure evaluated,
           .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
     | invalid childTrace failed =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := ih childFound environments heaps locals agrees actualTyped installedEntry (.value childTrace)
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
+        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
   | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
@@ -1960,7 +1960,7 @@ theorem Head.reflects [FunctionCalls.FaultTokens faults]
       | fault matched =>
         cases trace with
         | fault failed =>
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_failure (lowering := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
             finalHeaps, maps, worlds, frame, heapMetadata⟩
     | caseRight childEvaluation branch =>
@@ -1969,8 +1969,8 @@ theorem Head.reflects [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
-        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_success childEvaluation coreApplied) complete
+        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
+        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_success childEvaluation coreApplied) complete
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),

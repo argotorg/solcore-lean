@@ -1982,7 +1982,7 @@ theorem tree_selected {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id :
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareScopeSourceOperatorLifting.unary bridge size
-      (lowered := ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩)
+      (lowered := ⟨core.resultType, core.lower childCode⟩)
       (childCode := ⟨core.operandType, childCode⟩)
       metadata form unique childFound (children := Point _ operand ⟨core.operandType, childCode⟩)
       ⟨rfl, rfl, rfl⟩ (fun childSize _smaller => ih childSize) ⟨rfl, rfl, rfl⟩

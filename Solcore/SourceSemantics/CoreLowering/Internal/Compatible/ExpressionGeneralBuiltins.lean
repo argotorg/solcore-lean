@@ -41,18 +41,27 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
   · simp [SourceCoreBasic.ensureType, same] at checked
 
 
-private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
-  if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
+private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : Option TypeSystem.Ty) :
+    SourceCorePrimitive.UnaryLowering :=
+  SourceCorePrimitive.unaryLowering operator operand (SourceCorePrimitive.narrowBitNotMask? lookup operator)
 private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
   | .word => .word
 
 private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
-    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type) :
-    selectedUnary operator type = core := by
-  cases profile <;> cases projected <;> rfl
+    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : SourceCorePrimitive.UnaryLowering} {type : Ty}
+    {lookup : Option TypeSystem.Ty}
+    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type)
+    (lookupEq : lookup = some operand) :
+    selectedUnary operator type lookup = core := by
+  subst lookupEq
+  cases profile <;> cases projected
+  all_goals first
+    | rfl
+    | (rename_i kind; cases kind <;> simp_all [selectedUnary, SourceCorePrimitive.unaryLowering,
+        SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
+        Dynamic.fixedLowMask])
 private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
@@ -80,11 +89,11 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
     (id : ExpressionId) (node : ExpressionNode) : SourceCoreBasic.LoweredExpr → Prop where
   | unary {operator operand child}
       (form : node.form = .unary operator operand)
-      (metadata : Metadata values.checked source id node (selectedUnary operator child.type).resultType)
+      (metadata : Metadata values.checked source id node (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope operand reasonAt = .ok child)
-      (operandType : (selectedUnary operator child.type).operandType = child.type) :
+      (operandType : (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).operandType = child.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedUnary operator child.type).resultType, LocalPrimitiveResults.unary (selectedUnary operator child.type) child.expression⟩
+        ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
       (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
@@ -327,7 +336,8 @@ theorem tree_of_functions_with_literals
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨childTree, childTreeSites⟩ := ih childFound childTyped generated
-        have chosen := unary_selected profile (childTree.projected childFound)
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+        have chosen := unary_selected profile (childTree.projected childFound) lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢
@@ -602,7 +612,7 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (profile : UnaryProfile operator operandType resultType core)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -1445,18 +1455,27 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
   · simp [SourceCoreBasic.ensureType, same] at checked
 
 
-private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
-  if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
+private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : Option TypeSystem.Ty) :
+    SourceCorePrimitive.UnaryLowering :=
+  SourceCorePrimitive.unaryLowering operator operand (SourceCorePrimitive.narrowBitNotMask? lookup operator)
 private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
   | .word => .word
 
 private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
-    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type) :
-    selectedUnary operator type = core := by
-  cases profile <;> cases projected <;> rfl
+    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : SourceCorePrimitive.UnaryLowering} {type : Ty}
+    {lookup : Option TypeSystem.Ty}
+    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type)
+    (lookupEq : lookup = some operand) :
+    selectedUnary operator type lookup = core := by
+  subst lookupEq
+  cases profile <;> cases projected
+  all_goals first
+    | rfl
+    | (rename_i kind; cases kind <;> simp_all [selectedUnary, SourceCorePrimitive.unaryLowering,
+        SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
+        Dynamic.fixedLowMask])
 private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
@@ -1484,11 +1503,11 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
     (id : ExpressionId) (node : ExpressionNode) : SourceCoreBasic.LoweredExpr → Prop where
   | unary {operator operand child}
       (form : node.form = .unary operator operand)
-      (metadata : Metadata values.checked source id node (selectedUnary operator child.type).resultType)
+      (metadata : Metadata values.checked source id node (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope operand reasonAt = .ok child)
-      (operandType : (selectedUnary operator child.type).operandType = child.type) :
+      (operandType : (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).operandType = child.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedUnary operator child.type).resultType, LocalPrimitiveResults.unary (selectedUnary operator child.type) child.expression⟩
+        ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
       (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
@@ -1812,7 +1831,8 @@ theorem tree_of_functions_with_literals
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨childTree, childTreeSites⟩ := ih childFound childTyped generated
-        have chosen := unary_selected profile (childTree.projected childFound)
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+        have chosen := unary_selected profile (childTree.projected childFound) lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢
@@ -2623,7 +2643,7 @@ theorem recursive_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -2643,7 +2663,7 @@ theorem general_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -2766,7 +2786,7 @@ theorem builtins_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -2964,7 +2984,7 @@ theorem primitives_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
 
 theorem conditionals_native
@@ -2976,7 +2996,7 @@ theorem conditionals_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -3018,7 +3038,7 @@ theorem recursive_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -3038,7 +3058,7 @@ theorem general_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩
@@ -3059,7 +3079,7 @@ theorem builtins_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩

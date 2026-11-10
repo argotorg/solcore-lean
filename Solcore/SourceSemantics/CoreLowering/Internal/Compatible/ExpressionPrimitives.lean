@@ -356,14 +356,21 @@ theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedIntege
       cases view
   | nil | cons | empty | entry | absent | present => trivial
 
-/-- Empty evidence admits exactly these scalar unary profiles. -/
-inductive UnaryProfile : Syntax.UnaryOp → TypeSystem.Ty → TypeSystem.Ty → UnaryOp → Prop where
-  | logicalNot : UnaryProfile .logicalNot .bool .bool .boolNot
-  | wordNot : UnaryProfile .bitNot .word .word .wordNot
-  | integerNot : UnaryProfile .bitNot .integer .integer .integerNot
+/-- Empty evidence admits exactly these scalar unary profiles, each with the
+compiler's lowering choice. -/
+inductive UnaryProfile : Syntax.UnaryOp → TypeSystem.Ty → TypeSystem.Ty →
+    SourceCorePrimitive.UnaryLowering → Prop where
+  | logicalNot : UnaryProfile .logicalNot .bool .bool (.core .boolNot)
+  | wordNot : UnaryProfile .bitNot .word .word (.core .wordNot)
+  | integerNot : UnaryProfile .bitNot .integer .integer (.core .integerNot)
   /-- `~` on the fixed-width integer types where it is Word's. -/
   | fixedNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
-      UnaryProfile .bitNot (.fixed type) (.fixed type) .wordNot
+      UnaryProfile .bitNot (.fixed type) (.fixed type) (.core .wordNot)
+  /-- `~` on the unsigned fixed-width integer types below 256 bits: Word's `~`,
+  then the mask that keeps the low `N` bits. -/
+  | fixedNarrowNot {operator : Syntax.UnaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedNarrowBitNot type operator) :
+      UnaryProfile operator (.fixed type) (.fixed type) (.masked (Dynamic.fixedLowMask type))
 
 theorem UnaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.UnaryOp}
     {operand result : TypeSystem.Ty} (typed : UnaryOperatorHasType context operator operand result []) :
@@ -373,27 +380,59 @@ theorem UnaryProfile.of_typing {context : SourceSemantics.Context} {operator : S
   | wordBitNot => exact ⟨_, .wordNot⟩
   | integerBitNot => exact ⟨_, .integerNot⟩
   | fixedBitNot kind => exact ⟨_, .fixedNot kind⟩
+  | fixedNarrowBitNot kind => exact ⟨_, .fixedNarrowNot kind⟩
   | trait _ profile evidence => cases profile; cases evidence
 
-theorem UnaryProfile.preserves {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp}
+/-- `~` is Word's on the types of `FixedWordBitNot`, so it is not the narrow one. -/
+theorem _root_.Solcore.SourceSemantics.FixedWordBitNot.not_narrow {type : TypeSystem.FixedInteger}
+    {operator : Syntax.UnaryOp} (kind : FixedWordBitNot type) : ¬ FixedNarrowBitNot type operator := by
+  intro narrowKind
+  cases narrowKind with
+  | bitNot unsigned narrow =>
+    cases kind with
+    | signed signed => rw [unsigned] at signed; cases signed
+    | full full => exact narrow full
+
+/-- The primitive meaning applies when the looked-up operand type is not one on
+which the operator has a fixed-width meaning. -/
+theorem unary_word_meaning {operator : Syntax.UnaryOp} {lookup : Option TypeSystem.Ty}
+    {operand : TypeSystem.Ty} (lookupEq : lookup = some operand)
+    (notNarrow : ∀ type, operand = .fixed type → ¬ FixedNarrowBitNot type operator) :
+    Dynamic.UnaryWordMeaning lookup operator := by
+  intro type operandEq
+  rw [lookupEq] at operandEq
+  exact notNarrow type (Option.some.inj operandEq)
+
+theorem UnaryProfile.preserves {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty}
+    {core : SourceCorePrimitive.UnaryLowering} {lookup : Option TypeSystem.Ty}
     (profile : UnaryProfile operator operand result core)
-    (represented : ValueRep checked registry functions mapping world operand source value core.operandType) :
+    (represented : ValueRep checked registry functions mapping world operand source value core.operandType)
+    (lookupEq : lookup = some operand) :
     ∃ sourceResult coreResult,
-      Dynamic.UnaryPrimitiveApplies operator source sourceResult ∧ core.apply value = some coreResult ∧
+      Dynamic.UnaryValueApplies lookup operator source sourceResult ∧ core.apply value = some coreResult ∧
       ValueRep checked registry functions mapping world result sourceResult coreResult core.resultType := by
   cases profile with
   | logicalNot =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
-    exact ⟨_, _, .logicalNot boolean, rfl, .bool _⟩
+    exact ⟨_, _, .primitive (fun _ _ kind => by cases kind) (.logicalNot boolean), rfl, .bool _⟩
   | wordNot =>
     obtain ⟨word, rfl, rfl⟩ := word_fields represented
-    exact ⟨_, _, .wordBitNot word, rfl, .word _⟩
+    exact ⟨_, _, .primitive (unary_word_meaning lookupEq (fun _ same => by cases same)) (.wordBitNot word),
+      rfl, .word _⟩
   | integerNot =>
     obtain ⟨integer, rfl, rfl⟩ := integer_fields represented
-    exact ⟨_, _, .integerBitNot integer, rfl, .integer _⟩
+    exact ⟨_, _, .primitive (unary_word_meaning lookupEq (fun _ same => by cases same))
+      (.integerBitNot integer), rfl, .integer _⟩
   | fixedNot kind =>
     obtain ⟨word, rfl, rfl, _, canonical⟩ := fixed_fields represented rfl
-    exact ⟨_, _, .wordBitNot word, rfl, .fixed _ (Dynamic.fixed_canonical_bitNot kind canonical)⟩
+    exact ⟨_, _, .primitive (unary_word_meaning lookupEq (fun _ same => by cases same; exact kind.not_narrow))
+      (.wordBitNot word), rfl, .fixed _ (Dynamic.fixed_canonical_bitNot kind canonical)⟩
+  | fixedNarrowNot kind =>
+    cases kind with
+    | bitNot unsigned narrow =>
+      obtain ⟨word, rfl, rfl, _, _⟩ := fixed_fields represented rfl
+      exact ⟨_, _, .fixed lookupEq (.narrowBitNot unsigned narrow word), rfl,
+        .fixed _ (Dynamic.fixed_canonical_narrowBitNot unsigned narrow word)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitives
 end
@@ -641,7 +680,8 @@ inductive UnaryTrace (program : Program) (context : SourceSemantics.Context)
     Dynamic.ExpressionOutcome → Dynamic.Heap → Prop where
   | value {input output after}
       (child : Dynamic.ExpressionEvaluates program context evidence source environment before operand input after)
-      (applies : Dynamic.UnaryPrimitiveApplies operator input output) : UnaryTrace program context evidence source environment before operand operator (.value output) after
+      (applies : Dynamic.UnaryValueApplies (Dynamic.operandType? source operand) operator input output) :
+      UnaryTrace program context evidence source environment before operand operator (.value output) after
   | fault {reason after}
       (child : Dynamic.ExpressionFaults program context evidence source environment before operand reason after) :
       UnaryTrace program context evidence source environment before operand operator (.fault reason) after
@@ -704,10 +744,11 @@ theorem unary_intro (metadata : Metadata checked source id node type)
     exact .unaryApply (owned := []) rfl child failed
 
 theorem unary_fault_excluded {input output : Dynamic.Value} {reason : Dynamic.SemanticFault}
-    (applied : Dynamic.UnaryPrimitiveApplies operator input output)
+    {lookup : Option TypeSystem.Ty}
+    (applied : Dynamic.UnaryValueApplies lookup operator input output)
     (fault : Dynamic.UnaryOperationFaults program context evidence before operator [] input reason after) : False := by
   cases fault with
-  | primitive invalid => exact invalid.excludes_application ⟨output, applied⟩
+  | primitive invalid => exact invalid.excludes_value applied
   | requirement failed => cases failed
   | method _ selected _ => cases selected
 
@@ -1224,7 +1265,7 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (profile : UnaryProfile operator operandType resultType core)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -1877,9 +1918,29 @@ private theorem pair_result {checked : SourceCoreCompatibleCatalog.Checked} {reg
         exact ⟨_, .values (.cons (.singleton _)), .value (.product left right)⟩
   | fault matched => exact ⟨_, .fault _, .fault matched⟩
 
-theorem unary_rename (operator : UnaryOp) (operand : Expr) (ξ : Renaming) :
-    (LocalPrimitiveResults.unary operator operand).rename ξ =
-      LocalPrimitiveResults.unary operator (operand.rename ξ) := rfl
+theorem unary_rename (lowering : SourceCorePrimitive.UnaryLowering) (operand : Expr) (ξ : Renaming) :
+    (lowering.lower operand).rename ξ = lowering.lower (operand.rename ξ) := by
+  cases lowering <;> rfl
+
+theorem unary_lower_success {environment : Environment} {before after : Store}
+    {lowering : SourceCorePrimitive.UnaryLowering} {operand : Expr} {value result : Value}
+    (evaluation : Evaluates environment before operand (.inRight .word value) after)
+    (applied : lowering.apply value = some result) :
+    Evaluates environment before (lowering.lower operand) (.inRight .word result) after := by
+  cases lowering with
+  | core operator => exact LocalPrimitiveResults.unary_success evaluation applied
+  | masked mask =>
+    cases value with
+    | word word =>
+      cases applied
+      exact LanguageResult.bind_success _ evaluation (.inRight (.binary (.unary (.var rfl) rfl) .word rfl))
+    | _ => cases applied
+
+theorem unary_lower_failure {environment : Environment} {before after : Store}
+    {lowering : SourceCorePrimitive.UnaryLowering} {operand : Expr} {reason : Word}
+    (evaluation : Evaluates environment before operand (.inLeft lowering.operandType (.word reason)) after) :
+    Evaluates environment before (lowering.lower operand) (.inLeft lowering.resultType (.word reason)) after :=
+  LanguageResult.bind_failure _ evaluation
 
 variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
   {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -1956,17 +2017,18 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
       | value payload =>
         rw [inputType] at payload
         obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
+          (Dynamic.operandType?_of_found childFound inputType)
         have same := actualApplied.functional applied
         subst sourceResult
         refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-        · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
+        · rw [unary_rename]; exact unary_lower_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
       obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees (.fault childTrace)
       cases represented with
       | fault matched =>
-        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
+        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact unary_lower_failure evaluated,
           .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
           ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
             (.unary (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) childTrace retained⟩
@@ -1976,6 +2038,7 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
       | value payload =>
         rw [inputType] at payload
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
+          (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
   | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
@@ -2133,7 +2196,7 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
       | fault matched =>
         cases trace with
         | fault failed =>
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_failure (lowering := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
             finalHeaps, maps, worlds, frame, heapMetadata,
             ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
@@ -2145,7 +2208,8 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
       | value payload =>
         rw [inputType] at payload
         obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
-        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_success childEvaluation coreApplied) complete
+          (Dynamic.operandType?_of_found childFound inputType)
+        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_success childEvaluation coreApplied) complete
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
@@ -2304,18 +2368,27 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
   · simp [SourceCoreBasic.ensureType, same] at checked
 
 
-private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
-  if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
+private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : Option TypeSystem.Ty) :
+    SourceCorePrimitive.UnaryLowering :=
+  SourceCorePrimitive.unaryLowering operator operand (SourceCorePrimitive.narrowBitNotMask? lookup operator)
 private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
   | .word => .word
 
 private theorem UnaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
-    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type) :
-    selectedUnary operator type = core := by
-  cases profile <;> cases projected <;> rfl
+    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : SourceCorePrimitive.UnaryLowering} {type : Ty}
+    {lookup : Option TypeSystem.Ty}
+    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type)
+    (lookupEq : lookup = some operand) :
+    selectedUnary operator type lookup = core := by
+  subst lookupEq
+  cases profile <;> cases projected
+  all_goals first
+    | rfl
+    | (rename_i kind; cases kind <;> simp_all [selectedUnary, SourceCorePrimitive.unaryLowering,
+        SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
+        Dynamic.fixedLowMask])
 private theorem BinaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
@@ -2342,11 +2415,11 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
     (id : ExpressionId) (node : ExpressionNode) : SourceCoreBasic.LoweredExpr → Prop where
   | unary {operator operand child}
       (form : node.form = .unary operator operand)
-      (metadata : Metadata values.checked source id node (selectedUnary operator child.type).resultType)
+      (metadata : Metadata values.checked source id node (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope operand reasonAt = .ok child)
-      (operandType : (selectedUnary operator child.type).operandType = child.type) :
+      (operandType : (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).operandType = child.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedUnary operator child.type).resultType, LocalPrimitiveResults.unary (selectedUnary operator child.type) child.expression⟩
+        ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
       (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
@@ -2501,7 +2574,8 @@ theorem tree_of_functions_with_literals
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨childTree, childTreeSites⟩ := ih childFound childTyped generated
-        have chosen := profile.selected (childTree.projected childFound)
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+        have chosen := profile.selected (childTree.projected childFound) lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢

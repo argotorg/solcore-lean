@@ -582,10 +582,16 @@ private theorem no_owned {owned : List RequirementId}
 private theorem unary_primitive
     {program : Program} {context : Context} {evidence : Dynamic.EvidenceEnvironment}
     {before after : Dynamic.Heap} {operator : Syntax.UnaryOp} {input output : Dynamic.Value}
-    (applied : Dynamic.UnaryOperationApplies program context evidence before operator [] input output after) :
+    {lookup : Option TypeSystem.Ty}
+    (applied : Dynamic.UnaryOperationApplies program context evidence before operator lookup [] input output
+      after)
+    (plain : Dynamic.UnaryWordMeaning lookup operator) :
     after = before ∧ Dynamic.UnaryPrimitiveApplies operator input output := by
   cases applied with
-  | primitive applies => exact ⟨rfl, applies⟩
+  | primitive applies =>
+    cases applies with
+    | primitive _ applies => exact ⟨rfl, applies⟩
+    | fixed operand applies => exact absurd applies.kind (plain _ operand)
   | method _ selected _ => cases selected
 
 private theorem binary_primitive
@@ -643,7 +649,7 @@ theorem source_success
           have ownedEmpty := no_owned layout
           subst_vars
           obtain ⟨rfl, staged, rfl, typed, core⟩ := ih childEvaluation
-          obtain ⟨rfl, primitiveApplied⟩ := unary_primitive applied
+          obtain ⟨rfl, primitiveApplied⟩ := unary_primitive applied (child.unary_word_meaning _)
           obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed
           exact ⟨rfl, result, Dynamic.UnaryPrimitiveApplies.functional primitiveApplied sourceApplied,
             resultTyped, Core.LocalPrimitiveResults.unary_success core coreApplied⟩

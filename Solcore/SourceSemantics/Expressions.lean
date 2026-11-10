@@ -359,6 +359,13 @@ inductive FixedWordBitNot (type : TypeSystem.FixedInteger) : Prop where
   | signed (signed : type.signed = true) : FixedWordBitNot type
   | full (full : type.width = .w256) : FixedWordBitNot type
 
+/-- `~` on the unsigned fixed-width integer types below 256 bits. It keeps the
+low `N` bits of Word's `~`, so its meaning differs from Word's, and the
+evaluation rules choose it from the operand's static type. -/
+inductive FixedNarrowBitNot (type : TypeSystem.FixedInteger) : Syntax.UnaryOp → Prop where
+  | bitNot (unsigned : type.signed = false) (narrow : type.width ≠ .w256) :
+      FixedNarrowBitNot type .bitNot
+
 /-- The source spelling-to-trait-method assignment for operator forms which
 remain operator nodes after resolution. -/
 inductive BinaryTraitDispatch : Syntax.BinaryOp → String → String → Prop where
@@ -422,6 +429,10 @@ inductive UnaryOperatorHasType (context : Context) :
   /-- `~` on the fixed-width integer types where it is Word's. -/
   | fixedBitNot {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
       UnaryOperatorHasType context .bitNot (.fixed type) (.fixed type) []
+  /-- `~` on the unsigned fixed-width integer types below 256 bits. -/
+  | fixedNarrowBitNot {operator : Syntax.UnaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedNarrowBitNot type operator) :
+      UnaryOperatorHasType context operator (.fixed type) (.fixed type) []
   | trait
       {operator : Syntax.UnaryOp}
       {traitName methodName : String}
@@ -490,7 +501,8 @@ theorem requirements_valid
     (typing : UnaryOperatorHasType context operator operand result requirements) :
     RequirementIdsValid context requirements := by
   cases typing with
-  | logicalNot | wordBitNot | integerBitNot | fixedBitNot => simp [RequirementIdsValid]
+  | logicalNot | wordBitNot | integerBitNot | fixedBitNot | fixedNarrowBitNot =>
+      simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
 end UnaryOperatorHasType

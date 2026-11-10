@@ -138,7 +138,7 @@ mutual
     | unary {childSize : Nat} {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
         (child : Expression program registry childSize scope context environment before operand (.value input) after)
-        (applies : UnaryPrimitiveApplies operator input output) :
+        (applies : UnaryValueApplies (operandType? scope.source operand) operator input output) :
         Expression program registry (stepSize [childSize]) scope context environment before id (.value output) after
     | unaryOperandFault {childSize : Nat} {scope context environment before after id operator operand failure}
         {requirements : List RequirementId}

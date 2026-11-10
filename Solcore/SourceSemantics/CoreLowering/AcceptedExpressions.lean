@@ -115,7 +115,7 @@ inductive Tree (checked : SourceCoreCompatibleCatalog.Checked) (readFuel : Nat)
       (profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core)
       (child : Tree checked readFuel solved source sourceContext reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree checked readFuel solved source sourceContext reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : CompatibleExpressionPrimitives.Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -256,7 +256,9 @@ theorem of_subset {id : ExpressionId}
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           CompatibleExpressionPrimitives.unary_source_types unique site.found form metadata.coercions metadata.requirements typed
         have childTree := ih childFound childTyped generated
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
         have chosen := CompatibleExpressionConditionals.unary_selected profile (projected childTree childFound)
+          lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, native⟩ := childCode
         dsimp only at inputChecked childTree ⊢

@@ -187,7 +187,7 @@ mutual
         (operand_evaluates : ExpressionEvaluates program size_operand_evaluates context evidence source
           environment before operand input middle)
         (applies : UnaryOperationApplies program size_applies context evidence middle operator
-          owned input output after) :
+          (operandType? source operand) owned input output after) :
         ExpressionFormEvaluates program (stepSize [size_operand_evaluates, size_applies]) context evidence source environment before
           (.unary operator operand) requirements coercions output after
     | binaryShortCircuit
@@ -469,24 +469,24 @@ mutual
           before place updatedRoot after
 
   inductive UnaryOperationApplies (program : Program) : Nat →
-      Context → EvidenceEnvironment → Heap → Syntax.UnaryOp →
+      Context → EvidenceEnvironment → Heap → Syntax.UnaryOp → Option TypeSystem.Ty →
         List RequirementId → Value → Value → Heap → Prop where
     | primitive
-        {context evidence heap operator input output}
-        (applies : UnaryPrimitiveApplies operator input output) :
-        UnaryOperationApplies program (stepSize []) context evidence heap operator [] input
-          output heap
+        {context evidence heap operator operandType input output}
+        (applies : UnaryValueApplies operandType operator input output) :
+        UnaryOperationApplies program (stepSize []) context evidence heap operator operandType []
+          input output heap
     | method
         {size_invokes : Nat}
-        {context evidence before after operator input output requirements
+        {context evidence before after operator operandType input output requirements
           traitName methodName bodyInstance calleeEvidence}
         (dispatch : UnaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (invokes : BodyInvokes program size_invokes bodyInstance calleeEvidence before [input]
           output after) :
-        UnaryOperationApplies program (stepSize [size_invokes]) context evidence before operator requirements
-          input output after
+        UnaryOperationApplies program (stepSize [size_invokes]) context evidence before operator operandType
+          requirements input output after
 
   inductive BinaryOperationApplies (program : Program) : Nat →
       Context → EvidenceEnvironment → Heap → Syntax.BinaryOp → Option TypeSystem.Ty →
@@ -1232,8 +1232,8 @@ theorem SourcePlaceSnapshotUpdate.sound {program : Program} {size : Nat} {a0 : C
     exact .intro (SourcePlaceResolves.sound resolve) write
 termination_by structural trace
 
-theorem UnaryOperationApplies.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
-    (trace : UnaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7) : Dynamic.UnaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7 := by
+theorem UnaryOperationApplies.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
+    (trace : UnaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7) : Dynamic.UnaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7 := by
   match trace with
   | .primitive applies =>
     exact .primitive applies
@@ -1557,8 +1557,8 @@ theorem SourcePlaceSnapshotUpdate.has_size {program : Program} {a0 : Context} {a
     exact ⟨_, .intro resolve write⟩
 termination_by structural trace
 
-theorem UnaryOperationApplies.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
-    (trace : Dynamic.UnaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7) : ∃ size, UnaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 := by
+theorem UnaryOperationApplies.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
+    (trace : Dynamic.UnaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7) : ∃ size, UnaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 := by
   match trace with
   | .primitive applies =>
     exact ⟨_, .primitive applies⟩
@@ -1966,16 +1966,16 @@ theorem SourcePlaceSnapshotUpdate.children_below {program : Program} {size : Nat
   | @intro size_resolve _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_resolve], rfl, fun _ member => child_lt_stepSize member⟩
 
-theorem UnaryOperationApplies.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
-    (trace : UnaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
+theorem UnaryOperationApplies.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
+    (trace : UnaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7) : 0 < size := by
   cases trace <;> exact stepSize_positive _
 
-theorem UnaryOperationApplies.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap} :
-    Dynamic.UnaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7 ↔ ∃ size, UnaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 :=
+theorem UnaryOperationApplies.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap} :
+    Dynamic.UnaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7 ↔ ∃ size, UnaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 :=
   ⟨UnaryOperationApplies.has_size, fun ⟨_, sized⟩ => sized.sound⟩
 
-theorem UnaryOperationApplies.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
-    (trace : UnaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7) :
+theorem UnaryOperationApplies.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.UnaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Heap}
+    (trace : UnaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7) :
     ∃ children : List Nat, size = stepSize children ∧ ∀ child ∈ children, child < size := by
   cases trace with
   | @primitive _ _ _ _ _ _ _ =>

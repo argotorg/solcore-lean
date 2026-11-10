@@ -684,6 +684,12 @@ operands' types are known.
   the primitive rules.
 - Compound assignment needs no lookup, because its form holds the target's
   type.
+- Preservation needs the looked-up type to be the operand's typed type where
+  the primitive result would leave the type's range: Word's `~` on a `uint8`
+  word, and the wrapping `+ - *`. The typing names the operand's node, and the
+  source's unique node occurrences make the lookup find it
+  (`Dynamic.operandType?_of_typing`). The signed orderings give a Boolean either
+  way, so the binary rules need this only from checked arithmetic on.
 
 ### Row 1's runtime types: the shape erases the twelve types
 

@@ -1386,6 +1386,7 @@ structure ComplementShape {fixture : Fixture} (row : Row fixture) where
   readForm : read.form = .reference binder.name (.local binder.id)
   readRequirements : read.requirements = []
   readCoercions : read.coercions = []
+  readType : read.type = .word
   unaryFound : row.row.function.typedBody.lookupExpression? unary.id = some unary
   unaryForm : unary.form = .unary .bitNot read.id
   unaryRequirements : unary.requirements = []
@@ -1416,6 +1417,7 @@ def observeComplement {fixture : Fixture} (row : Row fixture) : IO (ComplementSh
               let ⟨readForm⟩ ← observed (read.form = .reference binder.name (.local binder.id)) "primitive read form"
               let ⟨readRequirements⟩ ← observed (read.requirements = []) "primitive read requirements"
               let ⟨readCoercions⟩ ← observed (read.coercions = []) "primitive read coercions"
+              let ⟨readType⟩ ← observed (read.type = .word) "primitive read type"
               let ⟨unaryRequirements⟩ ← observed (unary.requirements = []) "primitive operator requirements"
               let ⟨unaryCoercions⟩ ← observed (unary.coercions = []) "primitive operator coercions"
               let ⟨result⟩ ← observed (row.row.function.inferredBodyType = .word) "primitive result"
@@ -1425,7 +1427,7 @@ def observeComplement {fixture : Fixture} (row : Row fixture) : IO (ComplementSh
               have statementIdEq := (lookupStatement?_sound found).2
               return ⟨binder, read, unary, statement, inputs, scheme,
                 by simpa only [statementIdEq] using roots,
-                by simpa only [readIdEq] using readFound, readForm, readRequirements, readCoercions,
+                by simpa only [readIdEq] using readFound, readForm, readRequirements, readCoercions, readType,
                 by simpa only [unaryIdEq] using unaryFound,
                 by simpa only [readIdEq] using unaryForm, unaryRequirements, unaryCoercions,
                 by simpa only [statementIdEq] using found,
@@ -1486,7 +1488,9 @@ theorem complement_plain
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound (source.symm ▸ shape.unaryFound))
     · rw [shape.unaryForm]
       exact .unary (owned := []) (by rw [shape.unaryRequirements, shape.unaryCoercions]; rfl)
-        read (.primitive (.wordBitNot value))
+        read (.primitive (.primitive (fun _ operandEq _ => by
+          rw [Dynamic.operandType?_of_found (source.symm ▸ shape.readFound) shape.readType] at operandEq
+          cases operandEq) (.wordBitNot value)))
     · rw [shape.unaryCoercions]; exact .nil
   have executed : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       header.context header.function.evidence header.function.source

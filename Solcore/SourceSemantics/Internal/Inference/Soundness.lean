@@ -16532,11 +16532,12 @@ theorem unaryFixedWord_hasType
         cases operator with
         | logicalNot => simp at accepted
         | bitNot =>
-          apply UnaryOperatorHasType.fixedBitNot
-          simp only [Detail.fixedUnaryOperator, Bool.or_eq_true, beq_iff_eq] at accepted
-          rcases accepted with signed | full
-          · exact .signed signed
-          · exact .full full
+          by_cases word : fixed.signed = true ∨ fixed.width = .w256
+          · rcases word with signed | full
+            · exact .fixedBitNot (.signed signed)
+            · exact .fixedBitNot (.full full)
+          · simp only [not_or, Bool.not_eq_true] at word
+            exact .fixedNarrowBitNot (.bitNot word.1 word.2)
       | _ => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted
     | declaration => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted
   | _ => cases operator <;> simp [Detail.fixedUnaryOperator] at accepted

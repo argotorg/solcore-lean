@@ -530,7 +530,8 @@ mutual
                 operand_evaluates with
               ⟨operand_typed, middle_typed, operand_extension⟩
             rcases preserveUnaryRec program_well_formed runtime
-                middle_typed operand_typed operator_type applies with
+                middle_typed operand_typed operator_type
+                (operandType?_of_typing runtime.graph.nodeOccurrencesUnique operand_type) applies with
               ⟨result_typed, after_typed, operation_extension⟩
             exact ⟨result_typed, after_typed,
               operand_extension.trans operation_extension⟩
@@ -1091,32 +1092,36 @@ mutual
       (program_well_formed : ProgramWellFormed program)
       {context : Context} {evidence : EvidenceEnvironment}
       {source : TypedSource} {before after : Heap}
-      {operator : Syntax.UnaryOp} {requirements : List RequirementId}
+      {operator : Syntax.UnaryOp} {lookup : Option Ty}
+      {requirements : List RequirementId}
       {input output : Value} {operandType resultType : Ty}
       (runtime : SourceRuntimeValid program context source)
       (before_typed : HeapWellTyped context before)
       (input_typed : ValueHasType context before input operandType)
       (typing : UnaryOperatorHasType context operator operandType resultType
         requirements)
+      (lookupEq : lookup = some operandType)
       (evaluation : UnaryOperationApplies program context evidence before operator
-        requirements input output after) :
+        lookup requirements input output after) :
       ValueHasType context after output resultType /\
         HeapWellTyped context after /\ HeapTypesExtend before after :=
     match evaluation with
     | .primitive applies => by
         cases typing with
         | logicalNot =>
-            exact ⟨applies.preserves .logicalNot input_typed, before_typed,
+            exact ⟨applies.preserves .logicalNot lookupEq input_typed, before_typed,
               .refl before⟩
         | wordBitNot =>
-            exact ⟨applies.preserves .wordBitNot input_typed, before_typed,
+            exact ⟨applies.preserves .wordBitNot lookupEq input_typed, before_typed,
               .refl before⟩
         | integerBitNot =>
-            exact ⟨applies.preserves .integerBitNot input_typed, before_typed,
+            exact ⟨applies.preserves .integerBitNot lookupEq input_typed, before_typed,
               .refl before⟩
         | fixedBitNot kind =>
-            exact ⟨applies.preserves (.fixedBitNot kind) input_typed, before_typed,
+            exact ⟨applies.preserves (.fixedBitNot kind) lookupEq input_typed, before_typed,
               .refl before⟩
+        | fixedNarrowBitNot kind =>
+            exact ⟨applies.preserves_narrow kind lookupEq, before_typed, .refl before⟩
         | trait dispatch profile requirements_prove =>
             cases requirements_prove
             cases profile
@@ -1126,6 +1131,7 @@ mutual
         | wordBitNot => cases selected
         | integerBitNot => cases selected
         | fixedBitNot kind => cases selected
+        | fixedNarrowBitNot kind => cases kind; cases selected
         | trait static_dispatch profile requirements_prove =>
             rcases unaryDispatch_functional static_dispatch dispatch with
               ⟨rfl, rfl⟩

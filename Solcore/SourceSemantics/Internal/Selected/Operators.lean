@@ -1517,6 +1517,7 @@ private theorem unary_primitive_substitution {context target : SourceSemantics.C
   | wordBitNot => exact .wordBitNot
   | integerBitNot => exact .integerBitNot
   | fixedBitNot kind => exact .fixedBitNot kind
+  | fixedNarrowBitNot kind => exact .fixedNarrowBitNot kind
   | trait dispatch profile evidence =>
     cases profile
     exact False.elim (emptyLedger_sequence_false empty evidence)

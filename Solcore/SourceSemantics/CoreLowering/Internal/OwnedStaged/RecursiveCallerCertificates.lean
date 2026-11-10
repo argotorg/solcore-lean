@@ -674,7 +674,7 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
       (profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core)
       (child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Certificate policy body compilation readFuel values source context reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -1710,7 +1710,8 @@ theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
           CompatibleExpressionPrimitives.unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨childTree, projected⟩ := ih childFound childTyped generated
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))
-        have chosen := CompatibleExpressionConditionals.unary_selected profile projected
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+        have chosen := CompatibleExpressionConditionals.unary_selected profile projected lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢
@@ -2050,7 +2051,8 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
             CompatibleExpressionPrimitives.unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
           obtain ⟨childTree, projected⟩ := ih childFound childTyped generated
             (closed admitted originalFound (by simp [form, ExpressionForm.references]))
-          have chosen := CompatibleExpressionConditionals.unary_selected profile projected
+          have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+          have chosen := CompatibleExpressionConditionals.unary_selected profile projected lookupEq
           rw [chosen] at metadata inputChecked ⊢
           obtain ⟨childType, childCode⟩ := compiled
           dsimp only at inputChecked childTree ⊢

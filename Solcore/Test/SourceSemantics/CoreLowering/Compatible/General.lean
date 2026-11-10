@@ -388,7 +388,7 @@ private theorem sourceTrace : Dynamic.ExpressionEvaluatesOutcome program context
   cases indexTrace with
   | value trace =>
     exact .value (.intro (lookupExpression?_sound (node := unaryNode) (by cbv))
-      (.unary (owned := []) rfl trace (.primitive (.logicalNot false))) .nil)
+      (.unary (owned := []) rfl trace (.primitive (.primitive (fun _ _ kind => by cases kind) (.logicalNot false)))) .nil)
 
 /-- A real accepted expression constructs its own comparator execution after
 source initialization, retaining an ambient closure that is not base-typable. -/

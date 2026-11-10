@@ -184,7 +184,7 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (profile : UnaryProfile operator operandType resultType core)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -453,18 +453,18 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
+        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         have same := actualApplied.functional applied
         subst sourceResult
         refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-        · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
+        · rw [unary_rename]; exact unary_lower_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
       obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees (.fault childTrace)
       cases represented with
       | fault matched =>
-        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
+        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact unary_lower_failure evaluated,
           .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
           ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
             (.unary (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) childTrace retained⟩
@@ -473,7 +473,7 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
+        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
   | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
@@ -681,7 +681,7 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
       | fault matched =>
         cases trace with
         | fault failed =>
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_failure (lowering := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
             finalHeaps, maps, worlds, frame, heapMetadata,
             ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
@@ -692,8 +692,8 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
-        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_success childEvaluation coreApplied) complete
+        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
+        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_success childEvaluation coreApplied) complete
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
@@ -905,18 +905,27 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
   · simp [SourceCoreBasic.ensureType, same] at checked
 
 
-def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
-  if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
+def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : Option TypeSystem.Ty) :
+    SourceCorePrimitive.UnaryLowering :=
+  SourceCorePrimitive.unaryLowering operator operand (SourceCorePrimitive.narrowBitNotMask? lookup operator)
 def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
   | .word => .word
 
 theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
-    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type) :
-    selectedUnary operator type = core := by
-  cases profile <;> cases projected <;> rfl
+    {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : SourceCorePrimitive.UnaryLowering} {type : Ty}
+    {lookup : Option TypeSystem.Ty}
+    (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type)
+    (lookupEq : lookup = some operand) :
+    selectedUnary operator type lookup = core := by
+  subst lookupEq
+  cases profile <;> cases projected
+  all_goals first
+    | rfl
+    | (rename_i kind; cases kind <;> simp_all [selectedUnary, SourceCorePrimitive.unaryLowering,
+        SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
+        Dynamic.fixedLowMask])
 theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
@@ -944,11 +953,11 @@ inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions
     (id : ExpressionId) (node : ExpressionNode) : SourceCoreBasic.LoweredExpr → Prop where
   | unary {operator operand child}
       (form : node.form = .unary operator operand)
-      (metadata : Metadata values.checked source id node (selectedUnary operator child.type).resultType)
+      (metadata : Metadata values.checked source id node (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope operand reasonAt = .ok child)
-      (operandType : (selectedUnary operator child.type).operandType = child.type) :
+      (operandType : (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).operandType = child.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedUnary operator child.type).resultType, LocalPrimitiveResults.unary (selectedUnary operator child.type) child.expression⟩
+        ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
       (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
@@ -1132,7 +1141,8 @@ theorem tree_of_functions_with_literals
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨childTree, childTreeSites⟩ := ih childFound childTyped generated
-        have chosen := unary_selected profile (childTree.projected childFound)
+        have lookupEq : _ = some childNode.type := congrArg (Option.map (·.type)) childFound
+        have chosen := unary_selected profile (childTree.projected childFound) lookupEq
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢

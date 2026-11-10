@@ -465,12 +465,13 @@ def fixedBinaryOperator (operator : Syntax.BinaryOp) : Ty → Bool
       | _ => false
   | _ => false
 
-/-- The unary operators on a fixed-width integer type whose builtin meaning is
-Word's on its canonical words: `~` on the signed types and on `uint256`. -/
+/-- The unary operators that are builtins on a fixed-width integer type: `~`.
+It is Word's `~` on the signed types and on `uint256`, and keeps the low `N`
+bits on the other unsigned types. -/
 def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
-  | .constructor (.builtin (.fixed fixed)) =>
+  | .constructor (.builtin (.fixed _)) =>
       match operator with
-      | .bitNot => fixed.signed || fixed.width == .w256
+      | .bitNot => true
       | .logicalNot => false
   | _ => false
 
@@ -481,7 +482,7 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
 
 /-- The builtin operand type of a binary operator at one operand type: the
 operand itself when it is a fixed-width integer type that takes the operator
-as a Word builtin (`fixedBinaryOperator`), and `binaryBuiltinType` otherwise. -/
+as a builtin (`fixedBinaryOperator`), and `binaryBuiltinType` otherwise. -/
 def binaryBuiltinTypeAt (operator : Syntax.BinaryOp) (operand : Ty) : Ty :=
   if fixedBinaryOperator operator operand then operand else binaryBuiltinType operator
 
@@ -554,8 +555,8 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
-  -- The twelve fixed-width integer types take the operators whose meaning is
-  -- Word's on canonical words (`fixedBinaryOperator`) as builtins.
+  -- The twelve fixed-width integer types take `==`, `!=`, `& | ^` and the
+  -- orderings as builtins (`fixedBinaryOperator`).
   if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand

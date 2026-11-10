@@ -372,6 +372,73 @@ theorem hasSourceTyping
 
 end UnaryPrimitiveApplies
 
+/-- `~` on the unsigned fixed-width integer types below 256 bits keeps the
+result canonical: the mask leaves only the low `N` bits. -/
+theorem fixed_canonical_narrowBitNot {type : TypeSystem.FixedInteger}
+    (unsigned : type.signed = false) (narrow : type.width ≠ .w256) (value : Core.Word) :
+    type.canonical (value.bitNot.bitAnd (fixedLowMask type)).val = true := by
+  rw [unsigned_canonical_iff unsigned, word_bitAnd_val]
+  have small : type.width.bits < 256 := by
+    cases width : type.width with
+    | w256 => exact absurd width narrow
+    | _ => decide
+  have maskVal : (fixedLowMask type).val = 2 ^ type.width.bits - 1 := by
+    unfold fixedLowMask Core.Word.ofNatModulo
+    simp only [Core.wordModulus]
+    apply Nat.mod_eq_of_lt
+    have : 2 ^ type.width.bits < 2 ^ 256 := Nat.pow_lt_pow_right (by decide) small
+    omega
+  rw [maskVal]
+  apply Nat.and_lt_two_pow
+  have : 0 < 2 ^ type.width.bits := Nat.two_pow_pos _
+  omega
+
+namespace UnaryValueApplies
+
+/-- The operation at the operand's static type keeps the operator's typing.
+The lookup must find the operand's typed node: at a fixed-width type, Word's
+`~` would leave a word outside the narrower unsigned types. -/
+theorem preserves
+    {context : Context} {heap : Heap} {operator : Syntax.UnaryOp}
+    {operand result : Value} {operandType resultType : Ty} {lookup : Option Ty}
+    (typing : PrimitiveUnaryHasType operator operandType resultType)
+    (lookupEq : lookup = some operandType)
+    (operand_typed : ValueHasType context heap operand operandType)
+    (application : UnaryValueApplies lookup operator operand result) :
+    ValueHasType context heap result resultType := by
+  cases application with
+  | primitive _ applies => exact applies.preserves typing operand_typed
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | narrowBitNot unsigned narrow =>
+      cases typing with
+      | fixedBitNot kind =>
+        cases kind with
+        | signed signed => rw [unsigned] at signed; cases signed
+        | full full => exact absurd full narrow
+
+/-- `~` on the unsigned fixed-width integer types below 256 bits keeps its
+result canonical. -/
+theorem preserves_narrow
+    {context : Context} {heap : Heap} {operator : Syntax.UnaryOp}
+    {operand result : Value} {type : TypeSystem.FixedInteger} {lookup : Option Ty}
+    (kind : FixedNarrowBitNot type operator)
+    (lookupEq : lookup = some (.fixed type))
+    (application : UnaryValueApplies lookup operator operand result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases application with
+  | primitive plain _ => exact absurd kind (plain type lookupEq)
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | narrowBitNot unsigned narrow value =>
+      exact .fixed _ (fixed_canonical_narrowBitNot unsigned narrow value)
+
+end UnaryValueApplies
+
 /-- The primitive, non-trait subset of binary source operator typing. -/
 inductive PrimitiveBinaryHasType :
     Syntax.BinaryOp -> Ty -> Ty -> Prop where
@@ -2231,16 +2298,27 @@ theorem MonoBindersExtend.bodyTypes_eq
   | cons scheme_eq _ _ induction =>
       simp [scheme_eq, TypeSystem.Scheme.mono, induction]
 
+/-- The operand type the evaluation rules look up is the operand's typed type,
+because node occurrences are unique. -/
+theorem operandType?_of_typing {source : TypedSource} {context : Context}
+    {id : ExpressionId} {type : Ty}
+    (unique : NodeOccurrencesUnique source)
+    (typing : ExpressionHasType source context id type) :
+    operandType? source id = some type := by
+  obtain ⟨node, contains, typeEq⟩ := typing.stored_type
+  exact operandType?_of_found (lookupExpression?_complete unique contains) typeEq
+
 /-- Local preservation interface for primitive or source-method unary
 application.  The whole-language induction supplies the method case. -/
 def UnaryOperationExecutionPreserves
     (program : Program) (context : Context) (evidence : EvidenceEnvironment) :
     Prop :=
-  forall before after operator requirements input output operandType resultType,
+  forall before after operator lookup requirements input output operandType resultType,
     HeapWellTyped context before ->
     ValueHasType context before input operandType ->
     UnaryOperatorHasType context operator operandType resultType requirements ->
-    UnaryOperationApplies program context evidence before operator requirements
+    lookup = some operandType ->
+    UnaryOperationApplies program context evidence before operator lookup requirements
       input output after ->
     ValueHasType context after output resultType /\
       HeapWellTyped context after /\ HeapTypesExtend before after
@@ -2516,8 +2594,9 @@ theorem preservesWith
           rcases expression_preserves _ _ _ _ _ evidence_covers
               environment_agrees before_typed operand_type operand_evaluates with
             ⟨operand_typed, middle_typed, operand_extension⟩
-          rcases unary_preserves _ _ _ _ _ _ _ _ middle_typed operand_typed
-              operator_type applies with
+          rcases unary_preserves _ _ _ _ _ _ _ _ _ middle_typed operand_typed
+              operator_type (operandType?_of_typing graph.nodeOccurrencesUnique operand_type)
+              applies with
             ⟨result_typed, after_typed, operation_extension⟩
           exact ⟨result_typed, after_typed,
             operand_extension.trans operation_extension⟩

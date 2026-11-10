@@ -685,7 +685,7 @@ inductive Head (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSo
       (profile : UnaryProfile operator operandType resultType core)
       (child : certificate scope operand ⟨core.operandType, childCode⟩) :
       Head checked source certificate scope id
-        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+        ⟨core.resultType, core.lower childCode⟩
   | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
       (metadata : Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
@@ -845,25 +845,25 @@ theorem Head.preserves_with_post [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
+        obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         have same := actualApplied.functional applied
         subst sourceResult
         refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-        · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
+        · rw [unary_rename]; exact unary_lower_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
       obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees actualTyped (.fault childTrace)
       cases represented with
       | fault matched =>
-        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
+        exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact unary_lower_failure evaluated,
           .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.unary contains form layout) childTrace (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | invalid childTrace failed =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := ih childFound environments heaps locals agrees actualTyped (.value childTrace)
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
+        obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
   | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
@@ -1090,7 +1090,7 @@ theorem Head.reflects_with_post [FunctionCalls.FaultTokens faults]
       | fault matched =>
         cases trace with
         | fault failed =>
-          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
+          obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_failure (lowering := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
             finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.unary contains form layout) failed (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | caseRight childEvaluation branch =>
@@ -1099,8 +1099,8 @@ theorem Head.reflects_with_post [FunctionCalls.FaultTokens faults]
       cases represented with
       | value payload =>
         rw [inputType] at payload
-        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload
-        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_success childEvaluation coreApplied) complete
+        obtain ⟨sourceResult, result, applied, coreApplied, resultRep⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
+        obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (unary_lower_success childEvaluation coreApplied) complete
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
@@ -1348,7 +1348,7 @@ theorem primitives_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
 
 include typed in
@@ -1361,7 +1361,7 @@ theorem conditionals_native
   | pair _ _ _ _ _ _ _ first second =>
     exact ⟨.product first.1 second.1, LocalSequence.pair_hasType first.1 second.1 first.2 second.2⟩
   | unary _ _ _ _ _ profile _ child =>
-    cases profile <;> exact ⟨by constructor, LocalPrimitiveResults.unary_hasType child.2⟩
+    cases profile <;> exact ⟨by constructor, SourceCorePrimitive.UnaryLowering.lower_hasType child.2⟩
   | binary _ _ _ _ _ _ _ _ _ _ first second => exact binary_native first.2 second.2
   | conditional _ _ _ _ _ _ _ _ _ _ _ condition yes no =>
     exact ⟨yes.1, LocalControl.choose_hasType yes.1 condition.2 yes.2 no.2⟩

@@ -347,6 +347,20 @@ theorem Tree.word_meaning {compilation : SourceCorePrimitive.Context} {source : 
   rw [sameType] at types
   cases types
 
+/-- The same for the unary operators. -/
+theorem Tree.unary_word_meaning {compilation : SourceCorePrimitive.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Core.Word}
+    {id : ExpressionId} {type : Core.Ty} {code : Core.Expr} {depth : Nat}
+    (tree : Tree compilation source scope reasonAt id type code depth) (operator : Syntax.UnaryOp) :
+    Dynamic.UnaryWordMeaning (Dynamic.operandType? source id) operator := by
+  intro fixedType operandEq
+  obtain ⟨node, metadata⟩ := tree.metadata
+  rw [Dynamic.operandType?, metadata.found] at operandEq
+  have sameType : node.type = .fixed fixedType := Option.some.inj operandEq
+  have types := metadata.types
+  rw [sameType] at types
+  cases types
+
 /-- Occurrence provenance follows the evaluated source path. In particular,
 right tuple elements require a successful left prefix, and conditional branches
 require the matching Boolean condition. -/
@@ -588,7 +602,8 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
                 Core.LocalPrimitiveResults.unary_success coreEvaluation coreApplied⟩
               apply Dynamic.ExpressionEvaluates.intro metadata.contains
               · rw [form, metadata.requirements, metadata.coercions]
-                exact .unary (owned := []) rfl sourceEvaluation (.primitive sourceApplied)
+                exact .unary (owned := []) rfl sourceEvaluation
+                  (.primitive (.primitive (child.unary_word_meaning operator) sourceApplied))
               · rw [metadata.coercions]; exact .nil
   | @binary id left right node leftCode rightCode leftDepth rightDepth operator metadata form total
       leftTree rightTree leftIH rightIH =>
