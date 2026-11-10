@@ -760,11 +760,13 @@ private theorem binary_evaluates
     (leftSource : Dynamic.ExpressionEvaluates program context evidence source environment heap left leftValue heap)
     (evaluateRight : Dynamic.EvaluatesRightOperand operator leftValue)
     (rightSource : Dynamic.ExpressionEvaluates program context evidence source environment heap right rightValue heap)
+    (plain : Dynamic.BinaryWordMeaning (Dynamic.operandType? source left) operator)
     (applied : Dynamic.BinaryPrimitiveApplies operator leftValue rightValue result) :
     Dynamic.ExpressionEvaluates program context evidence source environment heap id result heap := by
   apply Dynamic.ExpressionEvaluates.intro metadata.contains
   · rw [form, metadata.requirements, metadata.coercions]
-    exact .binaryEvaluateRight (owned := []) rfl leftSource evaluateRight rightSource (.primitive applied)
+    exact .binaryEvaluateRight (owned := []) rfl leftSource evaluateRight rightSource
+      (.primitive (.primitive plain applied))
   · rw [metadata.coercions]; exact .nil
 
 private theorem shortCircuit_evaluates
@@ -867,7 +869,8 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
                     | value rightSource =>
                         obtain ⟨rightWord, rfl⟩ := word_of_type rightValue (rightTyped.trans (strict_operand_word strict))
                         obtain ⟨result, resultTyped, applied, bodyEvaluation⟩ := strict_binary_value strict leftWord rightWord
-                        refine ⟨_, _, .value (binary_evaluates metadata form leftSource (.strict strict) rightSource applied),
+                        refine ⟨_, _, .value (binary_evaluates metadata form leftSource (.strict strict) rightSource
+                          (leftTree.word_meaning _) applied),
                           .value result resultTyped, ?_⟩
                         rw [binary_strict strict]
                         exact Core.LocalPrimitiveResults.binaryWith_success leftCore shifted (bodyEvaluation _ _)
@@ -890,7 +893,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
                           cases rightSource with
                           | value rightSource =>
                               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
-                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .andTrue rightSource
+                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .andTrue rightSource (leftTree.word_meaning _)
                                 (.logicalAnd true rightBoolean)), .value (.bool rightBoolean) rfl,
                                 Core.LocalPrimitiveResults.logicalAnd_right leftCore shifted⟩
                 · subst operator
@@ -911,7 +914,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
                           cases rightSource with
                           | value rightSource =>
                               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
-                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .orFalse rightSource
+                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .orFalse rightSource (leftTree.word_meaning _)
                                 (.logicalOr false rightBoolean)), .value (.bool rightBoolean) rfl,
                                 Core.LocalPrimitiveResults.logicalOr_right leftCore shifted⟩
   | group metadata form child inductionHypothesis =>

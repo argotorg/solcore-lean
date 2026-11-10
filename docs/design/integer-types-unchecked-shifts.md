@@ -736,7 +736,7 @@ types only once the operators have typing rules there.
 2. **The operators that are Word's on canonical words.** `==`, `!=` and
    `& | ^` on the twelve types, `< > <= >=` on the unsigned ones, and `~` on
    the signed ones and `uint256` are builtins without requirements
-   (`Detail.fixedWordOperator`, `Detail.fixedUnaryOperator`), with both
+   (`Detail.fixedBinaryOperator`, `Detail.fixedUnaryOperator`), with both
    operands of the same type. On canonical words they compute what Word's
    operators compute and keep the words canonical: `& | ^` keep a word below
    `2^N` or sign-extended from bit `N - 1`, and `~` keeps a sign-extended
@@ -748,7 +748,10 @@ types only once the operators have typing rules there.
    unsigned types**, chosen as above. Checked `+ - *` panic with `0x11`.
    Comparisons are signed for `intN`. `~` on `uintN` below 256 keeps the low
    `N` bits. Compound `+= -= *=` check the result at the guard, after the
-   setter.
+   setter. This step is committed in four parts: the binary lookup with the
+   signed comparisons, which lower to Core's `wordSgt`; the unary lookup with
+   `~`; checked `+ - *`, whose faults take the lookup too; and the compound
+   forms.
 4. **Literals.** A literal at one of the twelve types is range-checked at
    compile time, with builtin `Int` evidence for each type.
 5. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and

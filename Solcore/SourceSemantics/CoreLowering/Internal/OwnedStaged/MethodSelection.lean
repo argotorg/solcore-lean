@@ -1062,7 +1062,10 @@ theorem compiler_step_eq_of_hook (fuel : Nat) {id : ExpressionId} {node : Expres
           | @binary left operator right =>
               have first := children left (by simp [RuntimeChild, formEq, ExpressionForm.references])
               have second := children right (by simp [RuntimeChild, formEq, ExpressionForm.references])
-              simp only [formEq, viewReading, first, second]
+              have leftLookup := expression_lookup edited avoids
+                (.expression reached found (by simp [formEq, ExpressionForm.references]) :
+                  Reaches source roots (.expression left))
+              simp only [formEq, viewReading, first, second, leftLookup]
           | @index base key =>
               have first := children base (by simp [RuntimeChild, formEq, ExpressionForm.references])
               have second := children key (by simp [RuntimeChild, formEq, ExpressionForm.references])

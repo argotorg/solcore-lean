@@ -475,6 +475,9 @@ structure Metadata (source : TypedSource) (id : ExpressionId)
   types : TypeRepresents node.type type
   requirements : node.requirements = []
   coercions : node.coercions = []
+  /-- The executable lookup finds the node, as the evaluation rules read operand
+  types through it. -/
+  found : source.lookupExpression? id = some node
 
 theorem Metadata.read {source : TypedSource} {id : ExpressionId}
     {node : ExpressionNode} {type : Core.Ty}
@@ -836,7 +839,7 @@ theorem readExpression_certificate
                   projected, bind, Except.bind, pure, Pure.pure, Except.pure] at read
                 rcases read with ⟨rfl, rfl⟩
                 exact ⟨rfl, lookupExpression?_sound found, owned,
-                  typeRepresents_of_lowerType (projectType_ok projected), requirements, coercions⟩
+                  typeRepresents_of_lowerType (projectType_ok projected), requirements, coercions, found⟩
           · simp [SourceCoreBasic.readExpression, owned, found, requirements, coercions,
               bind, Except.bind, pure, Pure.pure, Except.pure] at read
         · simp [SourceCoreBasic.readExpression, owned, found, requirements,

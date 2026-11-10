@@ -213,7 +213,7 @@ mutual
         (right_evaluates : ExpressionEvaluates program size_right_evaluates context evidence source
           environment leftHeap right rightValue rightHeap)
         (applies : BinaryOperationApplies program size_applies context evidence rightHeap
-          operator owned leftValue rightValue result after) :
+          operator (operandType? source left) owned leftValue rightValue result after) :
         ExpressionFormEvaluates program (stepSize [size_left_evaluates, size_right_evaluates, size_applies]) context evidence source environment before
           (.binary left operator right) requirements coercions result after
     | conditionalTrue
@@ -489,24 +489,24 @@ mutual
           input output after
 
   inductive BinaryOperationApplies (program : Program) : Nat →
-      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp →
+      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp → Option TypeSystem.Ty →
         List RequirementId → Value → Value → Value → Heap → Prop where
     | primitive
-        {context evidence heap operator left right output}
-        (applies : BinaryPrimitiveApplies operator left right output) :
-        BinaryOperationApplies program (stepSize []) context evidence heap operator [] left right
-          output heap
+        {context evidence heap operator operandType left right output}
+        (applies : BinaryValueApplies operandType operator left right output) :
+        BinaryOperationApplies program (stepSize []) context evidence heap operator operandType []
+          left right output heap
     | method
         {size_invokes : Nat}
-        {context evidence before after operator left right output requirements
+        {context evidence before after operator operandType left right output requirements
           traitName methodName bodyInstance calleeEvidence}
         (dispatch : BinaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (invokes : BodyInvokes program size_invokes bodyInstance calleeEvidence before
           [left, right] output after) :
-        BinaryOperationApplies program (stepSize [size_invokes]) context evidence before operator requirements
-          left right output after
+        BinaryOperationApplies program (stepSize [size_invokes]) context evidence before operator operandType
+          requirements left right output after
 
   inductive CoercionStepExecutes (program : Program) : Nat →
       Context → EvidenceEnvironment → Heap → CoercionStep →
@@ -1241,8 +1241,8 @@ theorem UnaryOperationApplies.sound {program : Program} {size : Nat} {a0 : Conte
     exact .method dispatch selected (BodyInvokes.sound invokes)
 termination_by structural trace
 
-theorem BinaryOperationApplies.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
-    (trace : BinaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 a8) : Dynamic.BinaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7 a8 := by
+theorem BinaryOperationApplies.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
+    (trace : BinaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : Dynamic.BinaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7 a8 := by
   match trace with
   | .primitive applies =>
     exact .primitive applies
@@ -1567,8 +1567,8 @@ theorem UnaryOperationApplies.has_size {program : Program} {a0 : Context} {a1 : 
     exact ⟨_, .method dispatch selected invokes⟩
 termination_by structural trace
 
-theorem BinaryOperationApplies.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
-    (trace : Dynamic.BinaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7 a8) : ∃ size, BinaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 a8 := by
+theorem BinaryOperationApplies.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
+    (trace : Dynamic.BinaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : ∃ size, BinaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8 := by
   match trace with
   | .primitive applies =>
     exact ⟨_, .primitive applies⟩
@@ -1983,16 +1983,16 @@ theorem UnaryOperationApplies.children_below {program : Program} {size : Nat} {a
   | @method size_invokes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_invokes], rfl, fun _ member => child_lt_stepSize member⟩
 
-theorem BinaryOperationApplies.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
-    (trace : BinaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 a8) : 0 < size := by
+theorem BinaryOperationApplies.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
+    (trace : BinaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : 0 < size := by
   cases trace <;> exact stepSize_positive _
 
-theorem BinaryOperationApplies.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap} :
-    Dynamic.BinaryOperationApplies program a0 a1 a2 a3 a4 a5 a6 a7 a8 ↔ ∃ size, BinaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 a8 :=
+theorem BinaryOperationApplies.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap} :
+    Dynamic.BinaryOperationApplies program a0 a1 a2 a3 aT a4 a5 a6 a7 a8 ↔ ∃ size, BinaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8 :=
   ⟨BinaryOperationApplies.has_size, fun ⟨_, sized⟩ => sized.sound⟩
 
-theorem BinaryOperationApplies.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
-    (trace : BinaryOperationApplies program size a0 a1 a2 a3 a4 a5 a6 a7 a8) :
+theorem BinaryOperationApplies.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : Value} {a8 : Heap}
+    (trace : BinaryOperationApplies program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) :
     ∃ children : List Nat, size = stepSize children ∧ ∀ child ∈ children, child < size := by
   cases trace with
   | @primitive _ _ _ _ _ _ _ _ =>

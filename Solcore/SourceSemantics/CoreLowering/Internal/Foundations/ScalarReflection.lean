@@ -591,10 +591,16 @@ private theorem unary_primitive
 private theorem binary_primitive
     {program : Program} {context : Context} {evidence : Dynamic.EvidenceEnvironment}
     {before after : Dynamic.Heap} {operator : Syntax.BinaryOp} {left right output : Dynamic.Value}
-    (applied : Dynamic.BinaryOperationApplies program context evidence before operator [] left right output after) :
+    {lookup : Option TypeSystem.Ty}
+    (applied : Dynamic.BinaryOperationApplies program context evidence before operator lookup [] left right
+      output after)
+    (plain : Dynamic.BinaryWordMeaning lookup operator) :
     after = before ∧ Dynamic.BinaryPrimitiveApplies operator left right output := by
   cases applied with
-  | primitive applies => exact ⟨rfl, applies⟩
+  | primitive applies =>
+    cases applies with
+    | primitive _ applies => exact ⟨rfl, applies⟩
+    | fixed operand applies => exact absurd applies.kind (plain _ operand)
   | method _ selected _ => cases selected
 
 /-- Successful independent scalar primitive evaluations have exactly the
@@ -662,7 +668,7 @@ theorem source_success
           subst_vars
           obtain ⟨rfl, leftValue, rfl, leftTyped, leftCore⟩ := leftIH leftEvaluation
           obtain ⟨rfl, rightValue, rfl, rightTyped, rightCore⟩ := rightIH rightEvaluation
-          obtain ⟨rfl, primitiveApplied⟩ := binary_primitive applied
+          obtain ⟨rfl, primitiveApplied⟩ := binary_primitive applied (leftTree.word_meaning _)
           have shifted := (GeneralExpressions.Primitive.readOnly rightTree).evaluation_weakenAt_zero rightCore
             (SourceStagedValue.toCore leftValue)
           by_cases strict : Dynamic.StrictBinaryOperator operator

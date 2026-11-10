@@ -399,6 +399,9 @@ inductive PrimitiveBinaryHasType :
   | fixedBitwise {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : FixedWordBitwise type operator) :
       PrimitiveBinaryHasType operator (.fixed type) (.fixed type)
+  | fixedSignedComparison {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedSignedComparison type operator) :
+      PrimitiveBinaryHasType operator (.fixed type) .bool
   | booleanAnd : PrimitiveBinaryHasType .logicalAnd .bool .bool
   | booleanOr : PrimitiveBinaryHasType .logicalOr .bool .bool
 
@@ -417,6 +420,7 @@ theorem sourceTyping {context : Context} {operator : Syntax.BinaryOp}
   | integerComparison kind => exact .integerComparison kind
   | fixedComparison kind => exact .fixedComparison kind
   | fixedBitwise kind => exact .fixedBitwise kind
+  | fixedSignedComparison kind => exact .fixedSignedComparison kind
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
 
@@ -489,8 +493,37 @@ theorem preserves
   | booleanOr =>
       cases application
       exact .bool _
+  | fixedSignedComparison kind =>
+      cases kind <;> cases application <;> exact .bool _
 
 end BinaryPrimitiveApplies
+
+namespace BinaryValueApplies
+
+/-- The operation at the operands' static type keeps the primitive typing: the
+signed orderings, like every ordering, give a Boolean. -/
+theorem preserves
+    {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
+    {left right result : Value} {operandType resultType : Ty} {lookup : Option Ty}
+    (typing : PrimitiveBinaryHasType operator operandType resultType)
+    (left_typed : ValueHasType context heap left operandType)
+    (right_typed : ValueHasType context heap right operandType)
+    (application : BinaryValueApplies lookup operator left right result) :
+    ValueHasType context heap result resultType := by
+  cases application with
+  | primitive _ applies => exact applies.preserves typing left_typed right_typed
+  | fixed _ applies =>
+      have ordering := applies.kind
+      have output_bool : ∃ flag, result = .bool flag := by
+        cases applies <;> exact ⟨_, rfl⟩
+      obtain ⟨flag, rfl⟩ := output_bool
+      cases typing with
+      | wordComparison | integerComparison | fixedComparison | fixedSignedComparison => exact .bool _
+      | wordArithmetic kind | integerArithmetic kind | wordShift kind | wordUnchecked kind
+      | fixedBitwise kind => cases ordering <;> cases kind
+      | booleanAnd | booleanOr => cases ordering
+
+end BinaryValueApplies
 
 namespace ShortCircuits
 
@@ -2217,15 +2250,15 @@ application. -/
 def BinaryOperationExecutionPreserves
     (program : Program) (context : Context) (evidence : EvidenceEnvironment) :
     Prop :=
-  forall before after operator requirements left right output operandType
+  forall before after operator lookup requirements left right output operandType
       resultType,
     HeapWellTyped context before ->
     ValueHasType context before left operandType ->
     ValueHasType context before right operandType ->
     BinaryOperatorHasType context operator operandType operandType resultType
       requirements ->
-    BinaryOperationApplies program context evidence before operator requirements
-      left right output after ->
+    BinaryOperationApplies program context evidence before operator lookup
+      requirements left right output after ->
     ValueHasType context after output resultType /\
       HeapWellTyped context after /\ HeapTypesExtend before after
 
@@ -2511,7 +2544,7 @@ theorem preservesWith
               (environment_agrees.mono left_extension) left_heap_typed right_type
               right_evaluates with
             ⟨right_typed, right_heap_typed, right_extension⟩
-          rcases binary_preserves _ _ _ _ _ _ _ _ _ right_heap_typed
+          rcases binary_preserves _ _ _ _ _ _ _ _ _ _ right_heap_typed
               (left_typed.mono right_extension) right_typed operator_type applies with
             ⟨result_typed, after_typed, operation_extension⟩
           exact ⟨result_typed, after_typed,

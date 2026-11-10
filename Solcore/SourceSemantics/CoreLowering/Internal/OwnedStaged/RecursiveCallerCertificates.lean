@@ -1736,7 +1736,8 @@ theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))
         obtain ⟨secondTree, _projected⟩ := rightIH rightFound rightTyped secondGenerated
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))
-        have chosen := CompatibleExpressionConditionals.binary_selected profile projected
+        have lookupEq : _ = some leftNode.type := congrArg (Option.map (·.type)) leftFound
+        have chosen := CompatibleExpressionConditionals.binary_selected profile projected lookupEq
         rw [chosen] at metadata leftChecked rightChecked ⊢
         obtain ⟨firstType, leftCode⟩ := first
         obtain ⟨secondType, rightCode⟩ := second
@@ -2096,7 +2097,8 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
             (closed admitted originalFound (by simp [form, ExpressionForm.references]))
           obtain ⟨secondTree, _projected⟩ := rightIH rightFound rightTyped secondGenerated
             (closed admitted originalFound (by simp [form, ExpressionForm.references]))
-          have chosen := CompatibleExpressionConditionals.binary_selected profile projected
+          have lookupEq : _ = some leftNode.type := congrArg (Option.map (·.type)) leftFound
+          have chosen := CompatibleExpressionConditionals.binary_selected profile projected lookupEq
           rw [chosen] at metadata leftChecked rightChecked ⊢
           obtain ⟨firstType, leftCode⟩ := first
           obtain ⟨secondType, rightCode⟩ := second

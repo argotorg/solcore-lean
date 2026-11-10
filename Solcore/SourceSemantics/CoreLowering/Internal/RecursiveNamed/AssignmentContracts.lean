@@ -893,7 +893,7 @@ inductive BinaryTrace (program : Program) (size : Nat) (context : SourceSemantic
       (first : SourceExecutionSize.ExpressionEvaluates program firstSize context evidence source environment before left a middle)
       (continues : Dynamic.EvaluatesRightOperand operator a)
       (second : SourceExecutionSize.ExpressionEvaluates program secondSize context evidence source environment middle right b after)
-      (applies : Dynamic.BinaryPrimitiveApplies operator a b output)
+      (applies : Dynamic.BinaryValueApplies (Dynamic.operandType? source left) operator a b output)
       (firstSizeSmaller : firstSize < size)
       (secondSizeSmaller : secondSize < size) :
       BinaryTrace program size context evidence source environment before left right operator (.value output) after
@@ -998,6 +998,7 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | panicking panicking => cases panicking <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedComparison kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedBitwise kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedSigned kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -1392,7 +1393,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied (Dynamic.operandType?_of_found leftFound leftType)
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -1415,7 +1416,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          rcases profile.right_outcome leftPayload rightPayload continues first second with
+          rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
             ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
           · exact False.elim (binary_fault_excluded applied failed)
           · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
@@ -1621,7 +1622,7 @@ theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound (Dynamic.operandType?_of_found leftFound leftType) with
                 ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
               · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 cases trace with

@@ -2773,6 +2773,8 @@ private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result
   | fixedBitwise kind =>
     obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
     exact .fixed word canonical
+  | fixedSigned kind => cases kind <;>
+    (obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag)
   | logicalAnd | logicalOr =>
     obtain ⟨flag, rfl, _⟩ := bool_fields represented
     exact .bool flag
@@ -2908,7 +2910,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
+            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied (Dynamic.operandType?_of_found leftFound leftType)
             have same := actualApplied.functional applied
             subst sourceResult
             exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -2948,9 +2950,9 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            rcases profile.right_outcome leftPayload rightPayload continues first second with
+            rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
               ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
-            · exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            · exact False.elim (failed.excludes_value applied)
             · exact False.elim (failed.excludes_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
@@ -3112,7 +3114,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Na
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound (Dynamic.operandType?_of_found leftFound leftType) with
                 ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨_, panics, combined⟩
               · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 have secondTrace := trace

@@ -479,6 +479,7 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   | panicking panicking => cases circuit <;> cases panicking
   | fixedComparison kind => cases circuit <;> cases kind
   | fixedBitwise kind => cases circuit <;> cases kind
+  | fixedSigned kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -508,6 +509,7 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | panicking panicking => cases panicking <;> exact bind_failed child evaluated
   | fixedComparison kind => cases kind <;> exact bind_failed child evaluated
   | fixedBitwise kind => cases kind <;> exact bind_failed child evaluated
+  | fixedSigned kind => cases kind <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -529,7 +531,8 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
         cases condition
         exact evaluation_deterministic branch child
 
-private theorem tail_outcome (profile : BinaryProfile operator operand result mode)
+private theorem tail_outcome_primitive (profile : BinaryProfile operator operand result mode)
+    (notSigned : mode ≠ .signed)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
@@ -655,6 +658,42 @@ private theorem tail_outcome (profile : BinaryProfile operator operand result mo
         cases condition
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic branch child
         exact ⟨_, _, .logicalOr false b, .bool b, rfl, rfl⟩
+  | fixedSigned => exact absurd rfl notSigned
+
+private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryProfile operator operand result mode)
+    (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
+    (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
+    (continues : Dynamic.EvaluatesRightOperand operator a)
+    (child : Evaluates (x :: environment) before (right.weakenAt 0) (.inRight .word y) middle)
+    (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore)
+    (operandEq : lookup = some operand) :
+    (∃ output native, Dynamic.BinaryValueApplies lookup operator a b output ∧
+      ValueRep checked rawRegistry model mapping world result output native (mode.resultType operator) ∧
+      value = .inRight .word native ∧ finalStore = middle) ∨
+    (∃ code, Dynamic.BinaryPrimitivePanics operator a b code ∧
+      value = .inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code)) ∧ finalStore = middle) := by
+  by_cases signedMode : mode = .signed
+  · subst signedMode
+    cases profile with
+    | fixedSigned kind =>
+      refine .inl ?_
+      obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+      obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+      obtain ⟨output, native, applied, represented, pure⟩ := signed_body (functions := model)
+        (registry := rawRegistry) (mapping := mapping) (world := world) kind a b
+      have body : Evaluates (.word b :: .word a :: environment) middle
+          (LanguageResult.success (Mode.body .signed operator)) value finalStore := by
+        cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+      cases body with
+      | inRight actual =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
+        refine ⟨_, _, .fixed operandEq applied, ?_, rfl, rfl⟩
+        cases kind <;> exact represented
+  · rcases tail_outcome_primitive profile signedMode leftRep rightRep continues child evaluated with
+      ⟨output, native, applied, represented, valueEq, storeEq⟩ | panicked
+    · exact .inl ⟨output, native, .primitive (operandEq ▸ profile.word_meaning signedMode) applied, represented,
+        valueEq, storeEq⟩
+    · exact .inr panicked
 end Tail
 
 include sameSource uninitialized in
@@ -733,7 +772,9 @@ theorem reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solved
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := payload.extend (.refl registry) maps worlds
-            rcases tail_outcome profile leftPayload rightPayload continues rightEvaluation branch with
+            rcases tail_outcome (lookup := Dynamic.operandType? invocation.source left) profile leftPayload
+                rightPayload continues rightEvaluation branch
+                (by rw [sameSource]; exact Dynamic.operandType?_of_found leftFound leftType) with
               ⟨sourceResult, result, applied, resultRep, rfl, rfl⟩ | ⟨code, panics, rfl, rfl⟩
             · exact ⟨_, after, finalMap, finalWorld, .binary owned firstTrace continues secondTrace applied,
                 .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩

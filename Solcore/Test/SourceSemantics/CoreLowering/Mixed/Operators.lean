@@ -2048,7 +2048,8 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
         refine ⟨after,?_,leftAppend.trans rightAppend⟩
         apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound shape.binaryFound)
         · rw [shape.binaryForm,shape.binaryRequirements,shape.binaryCoercions]
-          exact .binaryEvaluateRight (owned := []) rfl leftTrace .andTrue negatedTrace (.primitive (.logicalAnd true true))
+          exact .binaryEvaluateRight (owned := []) rfl leftTrace .andTrue negatedTrace
+            (.primitive (.primitive (fun _ _ kind => by cases kind) (.logicalAnd true true)))
         · rw [shape.binaryCoercions]; exact .nil
     obtain ⟨after, binaryTrace, append⟩ := chosen
     have builtinTrace : Dynamic.ExpressionEvaluates program middle evidence source

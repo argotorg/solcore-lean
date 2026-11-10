@@ -953,6 +953,19 @@ theorem excludes_application
   | logical operator_class invalid_pair =>
       cases operator_class <;> cases applies <;> simp_all [BooleanPair]
 
+/-- Invalid operands exclude the operation at any static operand type. -/
+theorem excludes_value
+    {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp} {left right output : Value}
+    (invalid : BinaryPrimitiveOperandsInvalid operator left right)
+    (applies : BinaryValueApplies operandType operator left right output) : False := by
+  cases applies with
+  | primitive _ applies => exact invalid.excludes_application ⟨output, applies⟩
+  | fixed _ applies =>
+    cases applies <;> cases invalid with
+    | numeric _ invalid_pair => exact invalid_pair trivial
+    | word operator_class => cases operator_class
+    | logical operator_class => cases operator_class
+
 /-- A panicking pair is well shaped, so it is not an invalid one. -/
 theorem excludes_panic
     {operator : Syntax.BinaryOp} {left right : Value} {code : UInt8}

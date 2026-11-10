@@ -453,14 +453,15 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | .logicalAnd | .logicalOr => .bool
   | _ => .word
 
-/-- The operators on a fixed-width integer type whose builtin meaning is Word's
-on its canonical words: `==`, `!=` and `& | ^` on every type, and the orderings
-on the unsigned types. -/
-def fixedWordOperator (operator : Syntax.BinaryOp) : Ty → Bool
-  | .constructor (.builtin (.fixed fixed)) =>
+/-- The binary operators that are builtins on a fixed-width integer type, with
+both operands of that type: `==`, `!=`, `& | ^` and the orderings. On canonical
+words they are Word's, except the orderings on the signed types, which compare
+the integers the words stand for. -/
+def fixedBinaryOperator (operator : Syntax.BinaryOp) : Ty → Bool
+  | .constructor (.builtin (.fixed _)) =>
       match operator with
-      | .equal | .notEqual | .bitAnd | .bitXor | .bitOr => true
-      | .less | .greater | .lessEqual | .greaterEqual => !fixed.signed
+      | .equal | .notEqual | .bitAnd | .bitXor | .bitOr
+      | .less | .greater | .lessEqual | .greaterEqual => true
       | _ => false
   | _ => false
 
@@ -480,9 +481,9 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
 
 /-- The builtin operand type of a binary operator at one operand type: the
 operand itself when it is a fixed-width integer type that takes the operator
-as a Word builtin (`fixedWordOperator`), and `binaryBuiltinType` otherwise. -/
+as a Word builtin (`fixedBinaryOperator`), and `binaryBuiltinType` otherwise. -/
 def binaryBuiltinTypeAt (operator : Syntax.BinaryOp) (operand : Ty) : Ty :=
-  if fixedWordOperator operator operand then operand else binaryBuiltinType operator
+  if fixedBinaryOperator operator operand then operand else binaryBuiltinType operator
 
 /-- Select the exact trait method assigned to an operator spelling.  Program
 signature construction rejects duplicate method names, but keeping the
@@ -554,8 +555,8 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
   -- The twelve fixed-width integer types take the operators whose meaning is
-  -- Word's on canonical words (`fixedWordOperator`) as builtins.
-  if fixedWordOperator operator operand then
+  -- Word's on canonical words (`fixedBinaryOperator`) as builtins.
+  if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand
       requirements := []

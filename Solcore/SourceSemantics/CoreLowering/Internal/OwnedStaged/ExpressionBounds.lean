@@ -2437,7 +2437,7 @@ inductive BinaryTrace (program : Program) (size : Nat) (context : SourceSemantic
       (first : Staging.Recursive.Size.Expression program registry firstSize invocation context environment before left (.value a) middle)
       (continues : Dynamic.EvaluatesRightOperand operator a)
       (second : Staging.Recursive.Size.Expression program registry secondSize invocation context environment middle right (.value b) after)
-      (applies : Dynamic.BinaryPrimitiveApplies operator a b output)
+      (applies : Dynamic.BinaryValueApplies (Dynamic.operandType? invocation.source left) operator a b output)
       (firstSizeSmaller : firstSize < size)
       (secondSizeSmaller : secondSize < size) :
       BinaryTrace program size context registry invocation environment before left right operator (.value output) after
@@ -2797,7 +2797,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
+            obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied (Dynamic.operandType?_of_found leftFound leftType)
             have same := actualApplied.functional applied
             subst sourceResult
             exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -2837,9 +2837,9 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
           | value rightPayload =>
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-            rcases profile.right_outcome leftPayload rightPayload continues first second with
+            rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
               ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
-            · exact False.elim (failed.excludes_application ⟨_, applied⟩)
+            · exact False.elim (failed.excludes_value applied)
             · exact False.elim (failed.excludes_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
@@ -3002,7 +3002,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Na
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound with
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation.sound rightEvaluation.sound (Dynamic.operandType?_of_found leftFound leftType) with
                 ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨_, panics, combined⟩
               · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 have secondTrace := trace

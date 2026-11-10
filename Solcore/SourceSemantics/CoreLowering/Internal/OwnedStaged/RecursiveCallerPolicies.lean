@@ -950,7 +950,10 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
           | @binary left operator right =>
               have first := children left (by simp [formEq, ExpressionForm.references])
               have second := children right (by simp [formEq, ExpressionForm.references])
-              simp only [formEq, viewReading, first, second]
+              have leftLookup := expression_lookup edited avoids
+                (.expression reached found (by simp [formEq, ExpressionForm.references]) :
+                  Reaches source roots (.expression left))
+              simp only [formEq, viewReading, first, second, leftLookup]
           | @conditional condition yes no =>
               have test := children condition (by simp [formEq, ExpressionForm.references])
               have thenBranch := children yes (by simp [formEq, ExpressionForm.references])

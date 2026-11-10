@@ -2286,7 +2286,7 @@ private abbrev finishBinary (context : SourceInference.Context) (operator : Synt
     (operandType : Ty) (hasOpenLiteralOperand : Bool) (state : State) :
     Except SourceInference.Error Detail.OperatorInferenceResult :=
   let operand := state.resolve operandType
-  if Detail.fixedWordOperator operator operand then
+  if Detail.fixedBinaryOperator operator operand then
     pure {
       type := if Detail.binaryResultIsBool operator then .bool else operand
       requirements := []

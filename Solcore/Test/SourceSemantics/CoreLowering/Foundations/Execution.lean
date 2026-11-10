@@ -4101,12 +4101,16 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function xor256s(x: int256, y: int256) returns (int256) { return x ^ y; }",
   "function not8s(x: int8) returns (int8) { return ~x; }",
   "function not256s(x: int256) returns (int256) { return ~x; }",
-  "function not256u(x: uint256) returns (uint256) { return ~x; }"
+  "function not256u(x: uint256) returns (uint256) { return ~x; }",
+  "function lt8s(x: int8, y: int8) returns (bool) { return x < y; }",
+  "function ge16s(x: int16, y: int16) returns (bool) { return x >= y; }",
+  "function gt256s(x: int256, y: int256) returns (bool) { return x > y; }",
+  "function le32s(x: int32, y: int32) returns (bool) { return x <= y; }"
 ]
 
 private def names : List String :=
   ["eq8", "ne16", "lt32", "le64", "gt128", "ge256", "and8", "or16", "xor32", "eqSigned", "mixed",
-    "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u"]
+    "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u", "lt8s", "ge16s", "gt256s", "le32s"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4160,14 +4164,17 @@ def run : IO Unit := do
     (13, [word (modulus - 1), word 1], word (modulus - 2)),
     (14, [word 5], word (modulus - 6)), (14, [word (modulus - 128)], word 127),
     (15, [word 0], word (modulus - 1)),
-    (16, [word 0], word (modulus - 1)), (16, [word (modulus - 1)], word 0)]
+    (16, [word 0], word (modulus - 1)), (16, [word (modulus - 1)], word 0),
+    (17, [word (modulus - 1), word 1], boolean true), (17, [word 1, word (modulus - 1)], boolean false),
+    (17, [word (modulus - 128), word 127], boolean true),
+    (18, [word (modulus - 2), word (modulus - 3)], boolean true), (18, [word (modulus - 3), word (modulus - 2)], boolean false),
+    (19, [word 0, word (modulus - 1)], boolean true), (19, [word (modulus - 1), word 0], boolean false),
+    (20, [word (modulus - 5), word (modulus - 5)], boolean true), (20, [word 5, word (modulus - 5)], boolean false)]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
       s!"{names[index]?} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
-  rejectedByInference "signed ordering is not yet a builtin"
-    ["function bad(x: int8, y: int8) returns (bool) { return x < y; }"]
   rejectedByInference "~ on a narrow unsigned type is not yet a builtin"
     ["function bad(x: uint8) returns (uint8) { return ~x; }"]
   rejectedByInference "checked arithmetic is not yet a builtin"
@@ -4176,7 +4183,7 @@ def run : IO Unit := do
     ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
   rejectedByInference "compound assignment is not yet defined"
     ["function bad(x: uint8, y: uint8) returns (uint8) { x &= y; return x; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ on signed and unsigned fixed-width types, < > <= >= on unsigned ones and ~ on signed ones and uint256, with canonical results, and signed orderings, ~ on narrower unsigned types, checked arithmetic, compound assignment and mixed operand types still rejected"
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ and < > <= >= on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ on signed ones and uint256, with canonical results, and ~ on narrower unsigned types, checked arithmetic, compound assignment and mixed operand types still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

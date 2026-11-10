@@ -229,6 +229,7 @@ structure IntegerMetadata (compilation : SourceCorePrimitive.Context) (source : 
   meaning : NumericLiteralDenotes literal resolution.rawValue
   requirement : ∃ solved, solved ∈ compilation.solvedRequirements ∧
     solved.id = resolution.requirement ∧ solved.predicate = ProgramSignatures.builtinIntPredicate .word
+  found : source.lookupExpression? id = some node
 
 inductive Tree (compilation : SourceCorePrimitive.Context) (source : TypedSource)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Core.Word) :
@@ -302,6 +303,49 @@ theorem Tree.hasType {compilation : SourceCorePrimitive.Context} {source : Typed
       exact Core.LocalSequence.pair_hasType leftTree.cellPayload.wellFormed rightTree.cellPayload.wellFormed left right
   | conditional metadata _ _ _ _ condition thenBranch elseBranch =>
       exact Core.LocalControl.choose_hasType (metadata.types.wellFormed []) condition thenBranch elseBranch
+
+structure RootMetadata (source : TypedSource) (id : ExpressionId)
+    (node : ExpressionNode) (type : Core.Ty) : Prop where
+  contains : ContainsExpression source id node
+  owned : id.occurrence.owner = source.owner
+  types : TypeRepresents node.type type
+  coercions : node.coercions = []
+  found : source.lookupExpression? id = some node
+
+private theorem Metadata.root {source : TypedSource} {id : ExpressionId}
+    {node : ExpressionNode} {type : Core.Ty} (metadata : Metadata source id node type) :
+    RootMetadata source id node type :=
+  ⟨metadata.contains, metadata.owned, metadata.types, metadata.coercions, metadata.found⟩
+
+theorem Tree.metadata {compilation : SourceCorePrimitive.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Core.Word}
+    {id : ExpressionId} {type : Core.Ty} {code : Core.Expr} {depth : Nat}
+    (tree : Tree compilation source scope reasonAt id type code depth) :
+    ∃ node, RootMetadata source id node type := by
+  cases tree with
+  | control tree =>
+      obtain ⟨node, metadata⟩ := tree.metadata
+      exact ⟨node, Metadata.root metadata⟩
+  | integerLiteral metadata _ =>
+      exact ⟨_, metadata.contains, metadata.owned, metadata.type ▸ .word, metadata.coercions, metadata.found⟩
+  | unary _ metadata _ _ | binary _ metadata _ _ _ _
+  | group metadata _ _ | pair metadata _ _ _ | conditional metadata _ _ _ _ =>
+      exact ⟨_, Metadata.root metadata⟩
+
+/-- The operands of this lowering have Word, Boolean or product types, never a
+fixed-width integer type, so every operator keeps Word's meaning on them. -/
+theorem Tree.word_meaning {compilation : SourceCorePrimitive.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Core.Word}
+    {id : ExpressionId} {type : Core.Ty} {code : Core.Expr} {depth : Nat}
+    (tree : Tree compilation source scope reasonAt id type code depth) (operator : Syntax.BinaryOp) :
+    Dynamic.BinaryWordMeaning (Dynamic.operandType? source id) operator := by
+  intro fixedType operandEq
+  obtain ⟨node, metadata⟩ := tree.metadata
+  rw [Dynamic.operandType?, metadata.found] at operandEq
+  have sameType : node.type = .fixed fixedType := Option.some.inj operandEq
+  have types := metadata.types
+  rw [sameType] at types
+  cases types
 
 /-- Occurrence provenance follows the evaluated source path. In particular,
 right tuple elements require a successful left prefix, and conditional branches
@@ -463,11 +507,13 @@ private theorem binary_evaluates
     (leftSource : Dynamic.ExpressionEvaluates program context evidence source environment heap left leftValue heap)
     (evaluateRight : Dynamic.EvaluatesRightOperand operator leftValue)
     (rightSource : Dynamic.ExpressionEvaluates program context evidence source environment heap right rightValue heap)
+    (plain : Dynamic.BinaryWordMeaning (Dynamic.operandType? source left) operator)
     (applied : Dynamic.BinaryPrimitiveApplies operator leftValue rightValue result) :
     Dynamic.ExpressionEvaluates program context evidence source environment heap id result heap := by
   apply Dynamic.ExpressionEvaluates.intro metadata.contains
   · rw [form, metadata.requirements, metadata.coercions]
-    exact .binaryEvaluateRight (owned := []) rfl leftSource evaluateRight rightSource (.primitive applied)
+    exact .binaryEvaluateRight (owned := []) rfl leftSource evaluateRight rightSource
+      (.primitive (.primitive plain applied))
   · rw [metadata.coercions]; exact .nil
 
 private theorem shortCircuit_evaluates
@@ -573,7 +619,8 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
                     | value rightSource =>
                         obtain ⟨rightWord, rfl⟩ := word_of_type rightValue (rightTyped.trans (strict_operand_word strict))
                         obtain ⟨result, resultTyped, applied, bodyEvaluation⟩ := strict_binary_value strict leftWord rightWord
-                        refine ⟨_, _, .value (binary_evaluates metadata form leftSource (.strict strict) rightSource applied),
+                        refine ⟨_, _, .value (binary_evaluates metadata form leftSource (.strict strict) rightSource
+                          (leftTree.word_meaning _) applied),
                           .value result resultTyped, ?_⟩
                         rw [binary_strict strict]
                         exact Core.LocalPrimitiveResults.binaryWith_success leftCore shifted (bodyEvaluation _ _)
@@ -598,7 +645,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
                           cases rightSource with
                           | value rightSource =>
                               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
-                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .andTrue rightSource
+                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .andTrue rightSource (leftTree.word_meaning _)
                                 (.logicalAnd true rightBoolean)), .value (.bool rightBoolean) rfl,
                                 Core.LocalPrimitiveResults.logicalAnd_right leftCore shifted⟩
                 · subst operator
@@ -621,7 +668,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
                           cases rightSource with
                           | value rightSource =>
                               obtain ⟨rightBoolean, rfl⟩ := bool_of_type rightValue rightTyped
-                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .orFalse rightSource
+                              exact ⟨_, _, .value (binary_evaluates metadata form leftSource .orFalse rightSource (leftTree.word_meaning _)
                                 (.logicalOr false rightBoolean)), .value (.bool rightBoolean) rfl,
                                 Core.LocalPrimitiveResults.logicalOr_right leftCore shifted⟩
   | group metadata form child inductionHypothesis =>
@@ -768,7 +815,7 @@ private theorem integer_metadata_of_validation
       validated.value = Core.Word.ofNatModulo resolution.rawValue := by
   have certificate := SourceCoreElaboration.validateWordIntegerLiteral_sound accepted
   exact ⟨⟨lookupExpression?_sound found, owned, certificate.nodeType, certificate.targetType,
-    certificate.requirements, certificate.coercions, certificate.meaning, certificate.solved⟩, certificate.value⟩
+    certificate.requirements, certificate.coercions, certificate.meaning, certificate.solved, found⟩, certificate.value⟩
 
 /-- All successful branches of the actual primitive compiler produce a static
 tree. Child compilation is inspected recursively; no child meaning is assumed. -/
@@ -919,32 +966,6 @@ theorem tree_of_lowerExpression
 /-- Common metadata for ordinary and evidence-bearing integer nodes. Integer
 requirements are deliberately retained; this certificate does not claim that
 `SourceCoreBasic.readExpression` accepts those nodes. -/
-structure RootMetadata (source : TypedSource) (id : ExpressionId)
-    (node : ExpressionNode) (type : Core.Ty) : Prop where
-  contains : ContainsExpression source id node
-  owned : id.occurrence.owner = source.owner
-  types : TypeRepresents node.type type
-  coercions : node.coercions = []
-
-private theorem Metadata.root {source : TypedSource} {id : ExpressionId}
-    {node : ExpressionNode} {type : Core.Ty} (metadata : Metadata source id node type) :
-    RootMetadata source id node type :=
-  ⟨metadata.contains, metadata.owned, metadata.types, metadata.coercions⟩
-
-theorem Tree.metadata {compilation : SourceCorePrimitive.Context} {source : TypedSource}
-    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Core.Word}
-    {id : ExpressionId} {type : Core.Ty} {code : Core.Expr} {depth : Nat}
-    (tree : Tree compilation source scope reasonAt id type code depth) :
-    ∃ node, RootMetadata source id node type := by
-  cases tree with
-  | control tree =>
-      obtain ⟨node, metadata⟩ := tree.metadata
-      exact ⟨node, Metadata.root metadata⟩
-  | integerLiteral metadata _ =>
-      exact ⟨_, metadata.contains, metadata.owned, metadata.type ▸ .word, metadata.coercions⟩
-  | unary _ metadata _ _ | binary _ metadata _ _ _ _
-  | group metadata _ _ | pair metadata _ _ _ | conditional metadata _ _ _ _ =>
-      exact ⟨_, Metadata.root metadata⟩
 
 theorem lowerExpression_hasType
     {fuel : Nat} {compilation : SourceCorePrimitive.Context} {source : TypedSource}

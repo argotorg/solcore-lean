@@ -1826,7 +1826,7 @@ theorem Head.preserves [FunctionCalls.FaultTokens faults]
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied (Dynamic.operandType?_of_found leftFound leftType)
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -1847,7 +1847,7 @@ theorem Head.preserves [FunctionCalls.FaultTokens faults]
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          rcases profile.right_outcome leftPayload rightPayload continues first second with
+          rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
             ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
           · exact False.elim (binary_fault_excluded applied failed)
           · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
@@ -2027,7 +2027,7 @@ theorem Head.reflects [FunctionCalls.FaultTokens faults]
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation with
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation (Dynamic.operandType?_of_found leftFound leftType) with
                 ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
               · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 cases trace with

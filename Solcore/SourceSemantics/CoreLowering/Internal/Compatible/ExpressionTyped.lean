@@ -37,7 +37,10 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
 
 private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
   if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
-private def selectedMode (operand : Ty) : Mode := if operand = .integer then .integer else .word
+private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
+  | .integer => .integer
+  | .signed => .signed
+  | .word => .word
 
 private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
@@ -46,9 +49,17 @@ private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
   cases profile <;> cases projected <;> rfl
 private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
-    (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type) :
-    selectedMode type = mode := by
-  cases profile <;> cases projected <;> rfl
+    {lookup : Option TypeSystem.Ty}
+    (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
+    (lookupEq : lookup = some operand) :
+    selectedMode (SourceCorePrimitive.binaryLowering type (SourceCorePrimitive.signedOrdering lookup operator)) = mode := by
+  subst lookupEq
+  cases profile <;> cases projected
+  all_goals first
+    | rfl
+    | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
+        SourceCorePrimitive.signedOrdering, TypeSystem.Ty.fixed])
+    | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
   | unary (operator : Syntax.UnaryOp) (operand : ExpressionId) : Compound (.unary operator operand)
@@ -70,13 +81,13 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
         ⟨(selectedUnary operator child.type).resultType, LocalPrimitiveResults.unary (selectedUnary operator child.type) child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
-      (metadata : Metadata values.checked source id node ((selectedMode first.type).resultType operator))
+      (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
       (firstGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope left reasonAt = .ok first)
       (secondGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope right reasonAt = .ok second)
-      (leftType : (selectedMode first.type).operandType operator = first.type)
-      (rightType : (selectedMode first.type).operandType operator = second.type) :
+      (leftType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = first.type)
+      (rightType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = second.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedMode first.type).resultType operator, (selectedMode first.type).binary operator first.expression second.expression⟩
+        ⟨(selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator, (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).binary operator first.expression second.expression⟩
   | group {inner lowered}
       (form : node.form = .group inner) (metadata : Metadata values.checked source id node lowered.type)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope inner reasonAt = .ok lowered) :
@@ -311,7 +322,8 @@ theorem tree_of_functions
           binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         have firstTree := leftIH leftFound leftTyped firstGenerated
         have secondTree := rightIH rightFound rightTyped secondGenerated
-        have chosen := binary_selected profile (firstTree.projected leftFound)
+        have lookupEq : _ = some leftNode.type := congrArg (Option.map (·.type)) leftFound
+        have chosen := binary_selected profile (firstTree.projected leftFound) lookupEq
         rw [chosen] at metadata leftChecked rightChecked ⊢
         obtain ⟨firstType, leftCode⟩ := first
         obtain ⟨secondType, rightCode⟩ := second

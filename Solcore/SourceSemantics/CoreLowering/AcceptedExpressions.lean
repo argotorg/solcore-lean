@@ -282,7 +282,8 @@ theorem of_subset {id : ExpressionId}
           CompatibleExpressionPrimitives.binary_source_types unique site.found form metadata.coercions metadata.requirements typed
         have firstTree := firstIH leftFound leftTyped firstGenerated
         have secondTree := secondIH rightFound rightTyped secondGenerated
-        have chosen := CompatibleExpressionConditionals.binary_selected profile (projected firstTree leftFound)
+        have lookupEq : _ = some leftNode.type := congrArg (Option.map (·.type)) leftFound
+        have chosen := CompatibleExpressionConditionals.binary_selected profile (projected firstTree leftFound) lookupEq
         rw [chosen] at metadata leftChecked rightChecked ⊢
         obtain ⟨firstType, leftCode⟩ := first
         obtain ⟨secondType, rightCode⟩ := second

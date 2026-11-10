@@ -342,6 +342,16 @@ inductive FixedWordBitwise (type : TypeSystem.FixedInteger) : Syntax.BinaryOp â†
   | bitXor : FixedWordBitwise type .bitXor
   | bitOr : FixedWordBitwise type .bitOr
 
+/-- The orderings on a signed fixed-width integer type. They compare the
+integers the canonical words stand for, so their meaning differs from Word's
+unsigned orderings, and the evaluation rules choose it from the left operand's
+static type. -/
+inductive FixedSignedComparison (type : TypeSystem.FixedInteger) : Syntax.BinaryOp â†’ Prop where
+  | less (signed : type.signed = true) : FixedSignedComparison type .less
+  | greater (signed : type.signed = true) : FixedSignedComparison type .greater
+  | lessEqual (signed : type.signed = true) : FixedSignedComparison type .lessEqual
+  | greaterEqual (signed : type.signed = true) : FixedSignedComparison type .greaterEqual
+
 /-- The fixed-width integer types on which `~` is Word's: the signed ones, whose
 canonical words stay sign-extended, and `uint256`. On the other unsigned types
 `~` keeps only the low `N` bits. -/
@@ -452,6 +462,10 @@ inductive BinaryOperatorHasType (context : Context) :
   | fixedBitwise {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : FixedWordBitwise type operator) :
       BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
+  /-- The orderings on the signed fixed-width integer types. -/
+  | fixedSignedComparison {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedSignedComparison type operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) .bool []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -490,7 +504,8 @@ theorem requirements_valid
     RequirementIdsValid context requirements := by
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
-      integerComparison | fixedComparison | fixedBitwise | booleanAnd | booleanOr =>
+      integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | booleanAnd |
+      booleanOr =>
       simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 

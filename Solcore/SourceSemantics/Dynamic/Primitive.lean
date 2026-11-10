@@ -482,6 +482,142 @@ theorem functional
 
 end BinaryPrimitiveApplies
 
+/-- The integer a word stands for in two's complement: how the signed
+fixed-width integer types read their canonical words. -/
+def wordSigned (word : Core.Word) : Int :=
+  if word.val < 2 ^ 255 then word.val else (word.val : Int) - 2 ^ 256
+
+/-- Binary operators whose meaning on a fixed-width integer type differs from
+Word's on its canonical words. The orderings on the signed types compare the
+integers the words stand for. -/
+inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
+    Syntax.BinaryOp → Value → Value → Value → Prop where
+  | signedLess (signed : type.signed = true) (left right : Core.Word) :
+      FixedBinaryApplies type .less (.word left) (.word right)
+        (.bool (decide (wordSigned left < wordSigned right)))
+  | signedGreater (signed : type.signed = true) (left right : Core.Word) :
+      FixedBinaryApplies type .greater (.word left) (.word right)
+        (.bool (decide (wordSigned left > wordSigned right)))
+  | signedLessEqual (signed : type.signed = true) (left right : Core.Word) :
+      FixedBinaryApplies type .lessEqual (.word left) (.word right)
+        (.bool (decide (wordSigned left ≤ wordSigned right)))
+  | signedGreaterEqual (signed : type.signed = true) (left right : Core.Word) :
+      FixedBinaryApplies type .greaterEqual (.word left) (.word right)
+        (.bool (decide (wordSigned left ≥ wordSigned right)))
+
+namespace FixedBinaryApplies
+
+theorem functional {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right first second : Value}
+    (firstApplication : FixedBinaryApplies type operator left right first)
+    (secondApplication : FixedBinaryApplies type operator left right second) :
+    first = second := by
+  cases firstApplication <;> cases secondApplication <;> rfl
+
+/-- The operators with a fixed-width meaning are exactly the signed orderings. -/
+theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right output : Value}
+    (applies : FixedBinaryApplies type operator left right output) :
+    FixedSignedComparison type operator := by
+  cases applies with
+  | signedLess signed => exact .less signed
+  | signedGreater signed => exact .greater signed
+  | signedLessEqual signed => exact .lessEqual signed
+  | signedGreaterEqual signed => exact .greaterEqual signed
+
+theorem strict {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right output : Value}
+    (applies : FixedBinaryApplies type operator left right output) :
+    StrictBinaryOperator operator := by
+  cases applies <;> constructor
+
+end FixedBinaryApplies
+
+/-- The static type of an expression occurrence, as the evaluation rules read
+it from the typed source: the operand type that chooses an operator's meaning. -/
+def operandType? (source : TypedSource) (id : ExpressionId) : Option TypeSystem.Ty :=
+  (source.lookupExpression? id).map (·.type)
+
+theorem operandType?_of_found {source : TypedSource} {id : ExpressionId}
+    {node : ExpressionNode} {type : TypeSystem.Ty}
+    (found : source.lookupExpression? id = some node) (typeEq : node.type = type) :
+    operandType? source id = some type := by
+  simp [operandType?, found, typeEq]
+
+/-- Core's signed comparison is the comparison of the integers the words stand
+for in two's complement. -/
+theorem signedGt_eq_wordSigned (left right : Core.Word) :
+    left.signedGt right = decide (wordSigned left > wordSigned right) := by
+  have leftBound := left.isLt
+  have rightBound := right.isLt
+  simp only [Core.wordModulus] at leftBound rightBound
+  unfold Core.Word.signedGt wordSigned
+  by_cases leftSmall : left.val < 2 ^ 255 <;> by_cases rightSmall : right.val < 2 ^ 255 <;>
+    simp only [leftSmall, rightSmall, ↓reduceIte, gt_iff_lt, Fin.lt_def, decide_eq_decide] <;>
+    first
+      | omega
+      | (simp only [decide_eq_true_eq]; omega)
+      | (simp only [decide_eq_false_iff_not, not_lt]; omega)
+      | (rw [eq_comm, decide_eq_true_eq]; omega)
+      | (rw [eq_comm, decide_eq_false_iff_not]; omega)
+
+/-- Word's, Integer's or Boolean's primitive meaning of a binary operator
+applies unless the operands' static type is a fixed-width integer type on which
+the operator's meaning differs (`FixedBinaryApplies`). -/
+def BinaryWordMeaning (operandType : Option TypeSystem.Ty) (operator : Syntax.BinaryOp) : Prop :=
+  ∀ type, operandType = some (.fixed type) → ¬ FixedSignedComparison type operator
+
+/-- A strict binary operator applied to evaluated operands whose static type is
+`operandType`: its primitive meaning, or the fixed-width meaning where that
+differs. The two cases exclude each other, so the result is unique. -/
+inductive BinaryValueApplies (operandType : Option TypeSystem.Ty) (operator : Syntax.BinaryOp)
+    (left right output : Value) : Prop where
+  | primitive (plain : BinaryWordMeaning operandType operator)
+      (applies : BinaryPrimitiveApplies operator left right output)
+  | fixed {type : TypeSystem.FixedInteger} (operand : operandType = some (.fixed type))
+      (applies : FixedBinaryApplies type operator left right output)
+
+namespace BinaryValueApplies
+
+theorem functional {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp}
+    {left right first second : Value}
+    (firstApplication : BinaryValueApplies operandType operator left right first)
+    (secondApplication : BinaryValueApplies operandType operator left right second) :
+    first = second := by
+  cases firstApplication with
+  | primitive plain applies =>
+    cases secondApplication with
+    | primitive _ other => exact applies.functional other
+    | fixed operand other => exact absurd other.kind (plain _ operand)
+  | fixed operand applies =>
+    cases secondApplication with
+    | primitive plain _ => exact absurd applies.kind (plain _ operand)
+    | fixed other otherApplies =>
+      rw [operand] at other
+      cases Option.some.inj other
+      exact applies.functional otherApplies
+
+/-- Word's meaning applies at any static type that is not a fixed-width
+integer type. -/
+theorem word_meaning_of_not_fixed {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp}
+    (notFixed : ∀ type, operandType ≠ some (.fixed type)) : BinaryWordMeaning operandType operator :=
+  fun type operand => absurd operand (notFixed type)
+
+/-- Word's meaning applies to every operator that is not an ordering. -/
+theorem word_meaning_of_not_ordering {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp}
+    (notOrdering : ∀ type, ¬ FixedSignedComparison type operator) : BinaryWordMeaning operandType operator :=
+  fun type _ => notOrdering type
+
+end BinaryValueApplies
+
+theorem BinaryPrimitivePanics.excludes_value {operandType : Option TypeSystem.Ty}
+    {operator : Syntax.BinaryOp} {left right result : Value} {code : UInt8}
+    (panics : BinaryPrimitivePanics operator left right code)
+    (applies : BinaryValueApplies operandType operator left right result) : False := by
+  cases applies with
+  | primitive _ applies => exact panics.excludes_application applies
+  | fixed _ applies => cases panics <;> cases applies
+
 /-- Application of one compiler-provided source function. -/
 inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop where
   | integerSub (left right : Int) :

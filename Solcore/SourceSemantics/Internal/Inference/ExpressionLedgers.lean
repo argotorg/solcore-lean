@@ -952,7 +952,7 @@ private abbrev finishBinaryOperatorLedger
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error Detail.OperatorInferenceResult :=
   let operand := state.resolve left
-  if Detail.fixedWordOperator operator operand then
+  if Detail.fixedBinaryOperator operator operand then
     pure {
       type := if Detail.binaryResultIsBool operator then .bool else operand
       requirements := []

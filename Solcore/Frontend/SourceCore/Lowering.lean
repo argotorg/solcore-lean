@@ -1193,6 +1193,67 @@ theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Contex
         (strictBinaryBody_hasType _)
     | exact binaryPanicking_hasType leftTyped rightTyped rfl rfl
 
+/-- The orderings on the signed fixed-width integer types compare with `wordSgt`
+instead of `wordGt`, under the same payload order; every other operator keeps
+Word's body. -/
+def signedStrictBinaryBody : Syntax.BinaryOp → Core.Expr
+  | .greater => .binary .wordSgt (.var 1) (.var 0)
+  | .less => .binary .wordSgt (.var 0) (.var 1)
+  | .lessEqual => .unary .boolNot (.binary .wordSgt (.var 1) (.var 0))
+  | .greaterEqual => .unary .boolNot (.binary .wordSgt (.var 0) (.var 1))
+  | operator => strictBinaryBody operator
+
+/-- A signed ordering evaluates both operands, then compares them; every other
+operator lowers as Word's. -/
+def signedBinary (operator : Syntax.BinaryOp) (left right : Core.Expr) : Core.Expr :=
+  match operator with
+  | .less | .greater | .lessEqual | .greaterEqual =>
+      Core.LocalPrimitiveResults.binaryWith (binaryResultType operator) left right
+        (signedStrictBinaryBody operator)
+  | _ => binary operator left right
+
+/-- Whether a binary operator on operands of the given static type is an
+ordering on a signed fixed-width integer type, which compares signed. -/
+def signedOrdering : Option TypeSystem.Ty → Syntax.BinaryOp → Bool
+  | some (.constructor (.builtin (.fixed type))), .less
+  | some (.constructor (.builtin (.fixed type))), .greater
+  | some (.constructor (.builtin (.fixed type))), .lessEqual
+  | some (.constructor (.builtin (.fixed type))), .greaterEqual => type.signed
+  | _, _ => false
+
+/-- How a requirement-free binary node lowers: Integer's operations when its
+left operand is an Integer, the signed orderings on a signed fixed-width integer
+type, and Word's otherwise. -/
+inductive BinaryLowering where
+  | word
+  | integer
+  | signed
+  deriving DecidableEq, Repr
+
+def binaryLowering (operand : Core.Ty) (signed : Bool) : BinaryLowering :=
+  if operand = .integer then .integer else if signed then .signed else .word
+
+theorem signedStrictBinaryBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (operator : Syntax.BinaryOp) :
+    Core.HasType (binaryOperandType operator :: binaryOperandType operator :: scope)
+      (signedStrictBinaryBody operator) (binaryResultType operator) definitions := by
+  cases operator <;> first
+    | exact .binary (.var rfl) (.var rfl)
+    | exact .unary (.binary (.var rfl) (.var rfl))
+    | exact .ifE (.var rfl) (.var rfl) .bool
+    | exact .ifE (.var rfl) .bool (.var rfl)
+
+theorem signedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
+    (rightTyped : Core.HasType scope right (Core.LanguageResult.resultType (binaryOperandType operator)) definitions) :
+    Core.HasType scope (signedBinary operator left right)
+      (Core.LanguageResult.resultType (binaryResultType operator)) definitions := by
+  cases operator <;> first
+    | exact Core.LocalPrimitiveResults.binaryWith_hasType (by constructor) leftTyped rightTyped
+        (signedStrictBinaryBody_hasType _)
+    | exact binary_hasType leftTyped rightTyped
+
 /-- Conditional/group/tuple children use this same policy recursively, so an
 operator can occur at any expression position without losing read reasons. -/
 def lowerExpressionWithReasons : Nat → Context → TypedSource → Scope → ExpressionId →
@@ -2243,14 +2304,23 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
               SourceCoreBasic.ensureType site coreOperator.resultType type
               pure ⟨type, Core.LocalPrimitiveResults.unary coreOperator operand.expression⟩
           | .binary left operator right =>
+              let signed := SourceCorePrimitive.signedOrdering
+                ((source.lookupExpression? left).map (·.type)) operator
               let left ← lowerExpressionWithPolicy policy lowerBody fuel context source scope left reasonAt
               let right ← lowerExpressionWithPolicy policy lowerBody fuel context source scope right reasonAt
-              if left.type = .integer then
+              match SourceCorePrimitive.binaryLowering left.type signed with
+              | .integer =>
                 SourceCoreBasic.ensureType site (SourceCoreInteger.binaryOperandType operator) left.type
                 SourceCoreBasic.ensureType site (SourceCoreInteger.binaryOperandType operator) right.type
                 SourceCoreBasic.ensureType site (SourceCoreInteger.binaryResultType operator) type
                 pure ⟨type, SourceCoreInteger.binary operator left.expression right.expression⟩
-              else
+              | .signed =>
+                -- The orderings on the signed fixed-width integer types.
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) left.type
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type
+                pure ⟨type, SourceCorePrimitive.signedBinary operator left.expression right.expression⟩
+              | .word =>
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) left.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type

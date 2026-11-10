@@ -179,7 +179,7 @@ mutual
         (first : Expression program registry firstSize scope context environment before left (.value a) middle)
         (continues : EvaluatesRightOperand operator a)
         (second : Expression program registry secondSize scope context environment middle right (.value b) after)
-        (applies : BinaryPrimitiveApplies operator a b output) :
+        (applies : BinaryValueApplies (operandType? scope.source left) operator a b output) :
         Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id (.value output) after
     | binaryInvalid {firstSize secondSize : Nat} {scope context environment before middle after id left operator right a b}
         (occurrence : Occurrence scope id (.binary left operator right))

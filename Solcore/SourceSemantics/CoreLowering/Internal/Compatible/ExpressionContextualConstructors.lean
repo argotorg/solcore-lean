@@ -929,7 +929,7 @@ theorem Head.preserves_with_post [FunctionCalls.FaultTokens faults]
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied
+          obtain ⟨sourceResult, result, actualApplied, resultRep, combined⟩ := profile.right_success leftPayload rightPayload continues first second applied (Dynamic.operandType?_of_found leftFound leftType)
           have same := actualApplied.functional applied
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
@@ -950,7 +950,7 @@ theorem Head.preserves_with_post [FunctionCalls.FaultTokens faults]
         | value rightPayload =>
           rw [rightType] at rightPayload
           have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-          rcases profile.right_outcome leftPayload rightPayload continues first second with
+          rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
             ⟨_, _, applied, _, _⟩ | ⟨code, panics, combined⟩
           · exact False.elim (binary_fault_excluded applied failed)
           · obtain ⟨rfl, rfl⟩ := binary_fault_panic panics failed
@@ -1160,7 +1160,7 @@ theorem Head.reflects_with_post [FunctionCalls.FaultTokens faults]
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
-              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation with
+              rcases profile.right_outcome leftPayload rightPayload continues leftEvaluation rightEvaluation (Dynamic.operandType?_of_found leftFound leftType) with
                 ⟨sourceResult, result, applied, resultRep, combined⟩ | ⟨code, panics, combined⟩
               · obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 cases trace with
@@ -1319,6 +1319,7 @@ private theorem binary_native {definitions : DataEnvironment} {context : Core.Co
   · cases mode with
     | word => exact SourceCorePrimitive.binary_hasType first second
     | integer => exact SourceCoreInteger.binary_hasType first second
+    | signed => exact SourceCorePrimitive.signedBinary_hasType first second
 
 variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
   {context : SourceSemantics.Context} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}

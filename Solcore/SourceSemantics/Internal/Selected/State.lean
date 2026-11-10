@@ -1722,7 +1722,7 @@ private abbrev finishBinaryOperator (context : Frontend.SourceInference.Context)
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult :=
   let operand := state.resolve left
-  if fixedWordOperator operator operand then
+  if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand
       requirements := []

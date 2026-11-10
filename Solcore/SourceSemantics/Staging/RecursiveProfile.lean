@@ -594,7 +594,7 @@ mutual
         (first : Expression program registry scope context environment before left (.value a) middle)
         (continues : EvaluatesRightOperand operator a)
         (second : Expression program registry scope context environment middle right (.value b) after)
-        (applies : BinaryPrimitiveApplies operator a b output) :
+        (applies : BinaryValueApplies (operandType? scope.source left) operator a b output) :
         Expression program registry scope context environment before id (.value output) after
     | binaryInvalid {scope context environment before middle after id left operator right a b}
         (occurrence : Occurrence scope id (.binary left operator right))

@@ -2784,6 +2784,9 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
   | fixedBitwise kind =>
     rw [Mode.binary_strict .word kind.strict] at typed
     exact binary_children typed
+  | fixedSigned kind =>
+    rw [Mode.binary_strict .signed kind.strict] at typed
+    exact binary_children typed
   | panicking panicking =>
     -- Unchecked `/` and `%` bind both operands before the checked body.
     have shape : Mode.word.binary operator left right =

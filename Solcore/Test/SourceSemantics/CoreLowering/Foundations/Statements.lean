@@ -684,6 +684,7 @@ private theorem leftMetadata : BasicExpressions.Metadata source (id 0) leftNode 
   types := .word
   requirements := rfl
   coercions := rfl
+  found := rfl
 }
 private theorem rightMetadata : BasicExpressions.Metadata source (id 1) rightNode .bool := {
   contains := ⟨by simp [source], rfl⟩
@@ -691,6 +692,7 @@ private theorem rightMetadata : BasicExpressions.Metadata source (id 1) rightNod
   types := .bool
   requirements := rfl
   coercions := rfl
+  found := rfl
 }
 private theorem groupMetadata : BasicExpressions.Metadata source (id 2) groupNode .word := {
   contains := ⟨by simp [source], rfl⟩
@@ -698,6 +700,7 @@ private theorem groupMetadata : BasicExpressions.Metadata source (id 2) groupNod
   types := .word
   requirements := rfl
   coercions := rfl
+  found := rfl
 }
 private theorem pairMetadata : BasicExpressions.Metadata source (id 3) pairNode resultType := {
   contains := ⟨by simp [source], rfl⟩
@@ -705,6 +708,7 @@ private theorem pairMetadata : BasicExpressions.Metadata source (id 3) pairNode 
   types := .product .word .bool
   requirements := rfl
   coercions := rfl
+  found := rfl
 }
 private theorem rootMetadata : BasicExpressions.Metadata source (id 4) rootNode resultType := {
   contains := ⟨by simp [source], rfl⟩
@@ -712,6 +716,7 @@ private theorem rootMetadata : BasicExpressions.Metadata source (id 4) rootNode 
   types := .product .word .bool
   requirements := rfl
   coercions := rfl
+  found := rfl
 }
 
 private theorem tree : BasicExpressions.Tree source scope token (id 4) resultType code 4 :=

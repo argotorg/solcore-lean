@@ -495,7 +495,7 @@ mutual
         (right_evaluates : ExpressionEvaluates program context evidence source
           environment leftHeap right rightValue rightHeap)
         (applies : BinaryOperationApplies program context evidence rightHeap
-          operator owned leftValue rightValue result after) :
+          operator (operandType? source left) owned leftValue rightValue result after) :
         ExpressionFormEvaluates program context evidence source environment before
           (.binary left operator right) requirements coercions result after
     | conditionalTrue
@@ -762,25 +762,28 @@ mutual
         UnaryOperationApplies program context evidence before operator requirements
           input output after
 
-  /-- Primitive or evidence-selected strict binary operation. -/
+  /-- Primitive or evidence-selected strict binary operation. The operands'
+  static type (`operandType? source left`) chooses a fixed-width integer type's
+  meaning where it differs from Word's. -/
   inductive BinaryOperationApplies (program : Program) :
       Context → EvidenceEnvironment → Heap → Syntax.BinaryOp →
-        List RequirementId → Value → Value → Value → Heap → Prop where
+        Option TypeSystem.Ty → List RequirementId → Value → Value → Value → Heap →
+        Prop where
     | primitive
-        {context evidence heap operator left right output}
-        (applies : BinaryPrimitiveApplies operator left right output) :
-        BinaryOperationApplies program context evidence heap operator [] left right
-          output heap
+        {context evidence heap operator operandType left right output}
+        (applies : BinaryValueApplies operandType operator left right output) :
+        BinaryOperationApplies program context evidence heap operator operandType []
+          left right output heap
     | method
-        {context evidence before after operator left right output requirements
-          traitName methodName bodyInstance calleeEvidence}
+        {context evidence before after operator operandType left right output
+          requirements traitName methodName bodyInstance calleeEvidence}
         (dispatch : BinaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (invokes : BodyInvokes program bodyInstance calleeEvidence before
           [left, right] output after) :
-        BinaryOperationApplies program context evidence before operator requirements
-          left right output after
+        BinaryOperationApplies program context evidence before operator operandType
+          requirements left right output after
 
   /-- One evidence-checked coercion edge, either compiler-provided or backed by
   a selected source `coerce` method. -/
@@ -1672,12 +1675,12 @@ mutual
   theorem BinaryOperationApplies.initialization_extends {program : Program}
       {context : Context}
       {evidence : EvidenceEnvironment}
-      {operator : Syntax.BinaryOp}
+      {operator : Syntax.BinaryOp} {operandType : Option TypeSystem.Ty}
       {requirements : List RequirementId}
       {left right output : Value}
       {before after : Heap}
       (trace : BinaryOperationApplies program
-        context evidence before operator requirements left right output after) :
+        context evidence before operator operandType requirements left right output after) :
       HeapInitializationExtend before after :=
     match trace with
     | .primitive _ => .refl _

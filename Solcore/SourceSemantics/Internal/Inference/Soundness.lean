@@ -16480,11 +16480,11 @@ theorem binaryBuiltin_hasType
     | (constructor <;> constructor)
 
 /-- The operators that the twelve fixed-width integer types take as builtins
-(`Detail.fixedWordOperator`) have their builtin typing. -/
+(`Detail.fixedBinaryOperator`) have their builtin typing. -/
 theorem binaryFixedWord_hasType
     (context : SourceSemantics.Context) (operator : Syntax.BinaryOp)
     (operand : TypeSystem.Ty)
-    (accepted : Detail.fixedWordOperator operator operand = true) :
+    (accepted : Detail.fixedBinaryOperator operator operand = true) :
     BinaryOperatorHasType context operator operand operand
       (if Detail.binaryResultIsBool operator then .bool else operand) [] := by
   cases operand with
@@ -16493,14 +16493,28 @@ theorem binaryFixedWord_hasType
     | builtin builtin =>
       cases builtin with
       | fixed fixed =>
-        cases signed : fixed.signed <;> cases operator <;>
-          simp [Detail.fixedWordOperator, Detail.binaryResultIsBool, signed] at accepted ⊢
+        cases operator <;>
+          simp [Detail.fixedBinaryOperator, Detail.binaryResultIsBool] at accepted ⊢
         all_goals first
-          | exact .fixedComparison (type := fixed) (by constructor <;> assumption)
-          | exact .fixedBitwise (type := fixed) (by constructor <;> assumption)
-      | _ => simp [Detail.fixedWordOperator] at accepted
-    | declaration => simp [Detail.fixedWordOperator] at accepted
-  | _ => simp [Detail.fixedWordOperator] at accepted
+          | exact .fixedComparison .equal
+          | exact .fixedComparison .notEqual
+          | exact .fixedBitwise .bitAnd
+          | exact .fixedBitwise .bitXor
+          | exact .fixedBitwise .bitOr
+          | skip
+        all_goals cases signed : fixed.signed
+        all_goals first
+          | exact .fixedComparison (.less signed)
+          | exact .fixedComparison (.greater signed)
+          | exact .fixedComparison (.lessEqual signed)
+          | exact .fixedComparison (.greaterEqual signed)
+          | exact .fixedSignedComparison (.less signed)
+          | exact .fixedSignedComparison (.greater signed)
+          | exact .fixedSignedComparison (.lessEqual signed)
+          | exact .fixedSignedComparison (.greaterEqual signed)
+      | _ => simp [Detail.fixedBinaryOperator] at accepted
+    | declaration => simp [Detail.fixedBinaryOperator] at accepted
+  | _ => simp [Detail.fixedBinaryOperator] at accepted
 
 /-- `~` on the fixed-width integer types that inference takes as a builtin
 (`Detail.fixedUnaryOperator`) has its builtin typing. -/
@@ -16643,7 +16657,7 @@ private def finishBinaryOperator
     Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
       Detail.isOpenIntegerLiteralTarget initial integerLiterals right
   let operand := state.resolve left
-  if Detail.fixedWordOperator operator operand then
+  if Detail.fixedBinaryOperator operator operand then
     pure {
       type := if Detail.binaryResultIsBool operator then .bool else operand
       requirements := []
@@ -16712,7 +16726,7 @@ private theorem finishBinaryOperator_success_case
       operator left right integerLiterals result := by
   unfold finishBinaryOperator at success
   simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
-  by_cases fixed : Detail.fixedWordOperator operator (state.resolve left) = true
+  by_cases fixed : Detail.fixedBinaryOperator operator (state.resolve left) = true
   · rw [if_pos fixed] at success
     cases success
     exact .primitive (by
@@ -16814,7 +16828,7 @@ private theorem uncheckedBinaryOperator_success_case
       operator left right integerLiterals result := by
   unfold Detail.binaryOperatorTail at success
   simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
-  by_cases fixed : Detail.fixedWordOperator operator (state.resolve left) = true
+  by_cases fixed : Detail.fixedBinaryOperator operator (state.resolve left) = true
   · rw [if_pos fixed] at success
     cases success
     exact .primitive (by

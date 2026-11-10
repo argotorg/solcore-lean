@@ -1039,10 +1039,10 @@ theorem of_policy {id : ExpressionId}
         have firstTree := firstIH leftFound leftTyped firstGenerated
         have secondTree := secondIH rightFound rightTyped secondGenerated
         have scalar : CellAwareNamedExpressionScalarProjection.Scalar first.type :=
-          leftChecked ▸ CellAwareNamedExpressionScalarProjection.binary_input_scalar
-            (CompatibleExpressionConditionals.selectedMode first.type) _
+          leftChecked ▸ CellAwareNamedExpressionScalarProjection.binary_input_scalar _ _
+        have lookupEq : _ = some leftNode.type := congrArg (Option.map (·.type)) leftFound
         have chosen := CompatibleExpressionConditionals.binary_selected profile
-          (CellAwareNamedExpressionScalarProjection.projected firstTree leftFound scalar)
+          (CellAwareNamedExpressionScalarProjection.projected firstTree leftFound scalar) lookupEq
         rw [chosen] at metadata leftChecked rightChecked ⊢
         obtain ⟨firstType, leftCode⟩ := first
         obtain ⟨secondType, rightCode⟩ := second

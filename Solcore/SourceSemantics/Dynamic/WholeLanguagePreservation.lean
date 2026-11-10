@@ -1161,7 +1161,8 @@ mutual
       (program_well_formed : ProgramWellFormed program)
       {context : Context} {evidence : EvidenceEnvironment}
       {source : TypedSource} {before after : Heap}
-      {operator : Syntax.BinaryOp} {requirements : List RequirementId}
+      {operator : Syntax.BinaryOp} {lookup : Option TypeSystem.Ty}
+      {requirements : List RequirementId}
       {left right output : Value} {operandType resultType : Ty}
       (runtime : SourceRuntimeValid program context source)
       (before_typed : HeapWellTyped context before)
@@ -1170,11 +1171,26 @@ mutual
       (typing : BinaryOperatorHasType context operator operandType operandType
         resultType requirements)
       (evaluation : BinaryOperationApplies program context evidence before operator
-        requirements left right output after) :
+        lookup requirements left right output after) :
       ValueHasType context after output resultType /\
         HeapWellTyped context after /\ HeapTypesExtend before after :=
     match evaluation with
-    | .primitive applies => by
+    | .primitive (.fixed _ applies) => by
+        have output_bool : ∃ flag, output = .bool flag := by
+          cases applies <;> exact ⟨_, rfl⟩
+        obtain ⟨flag, rfl⟩ := output_bool
+        have ordering := applies.kind
+        cases typing with
+        | wordComparison | integerComparison | fixedComparison | fixedSignedComparison =>
+            exact ⟨.bool _, before_typed, .refl before⟩
+        | wordArithmetic kind | integerArithmetic kind | wordShift kind | wordUnchecked kind
+        | fixedBitwise kind =>
+            cases ordering <;> cases kind
+        | booleanAnd | booleanOr => cases ordering
+        | trait dispatch profile requirements_prove =>
+            cases requirements_prove
+            cases profile
+    | .primitive (.primitive _ applies) => by
         cases typing with
         | wordArithmetic kind =>
             exact ⟨applies.preserves (.wordArithmetic kind) left_typed right_typed,
@@ -1200,6 +1216,8 @@ mutual
         | fixedBitwise kind =>
             exact ⟨applies.preserves (.fixedBitwise kind) left_typed right_typed,
               before_typed, .refl before⟩
+        | fixedSignedComparison kind =>
+            cases kind <;> cases applies <;> exact ⟨.bool _, before_typed, .refl before⟩
         | booleanAnd =>
             exact ⟨applies.preserves .booleanAnd left_typed right_typed,
               before_typed, .refl before⟩
@@ -1219,6 +1237,7 @@ mutual
         | integerComparison kind => cases selected
         | fixedComparison kind => cases selected
         | fixedBitwise kind => cases selected
+        | fixedSignedComparison kind => cases selected
         | booleanAnd => cases selected
         | booleanOr => cases selected
         | trait static_dispatch profile requirements_prove =>
