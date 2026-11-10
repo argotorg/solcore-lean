@@ -361,6 +361,20 @@ inductive FixedCheckedArithmetic : Syntax.BinaryOp → Prop where
   | subtract : FixedCheckedArithmetic .subtract
   | multiply : FixedCheckedArithmetic .multiply
 
+/-- Checked `/` and `%` on the fixed-width integer types: the quotient rounded
+toward zero and the remainder with the dividend's sign, `Panic(0x12)` on a zero
+divisor, and `Panic(0x11)` when the quotient lies outside the type's range
+(`MIN / -1`). Their meaning differs from Word's, and the evaluation rules
+choose it from the left operand's static type. -/
+inductive FixedCheckedDivision : Syntax.BinaryOp → Prop where
+  | divide : FixedCheckedDivision .divide
+  | modulo : FixedCheckedDivision .modulo
+
+/-- Checked arithmetic and checked division are different operators. -/
+theorem FixedCheckedArithmetic.not_division {operator : Syntax.BinaryOp}
+    (arithmetic : FixedCheckedArithmetic operator) (division : FixedCheckedDivision operator) : False := by
+  cases arithmetic <;> cases division
+
 /-- The fixed-width integer types on which `~` is Word's: the signed ones, whose
 canonical words stay sign-extended, and `uint256`. On the other unsigned types
 `~` keeps only the low `N` bits. -/
@@ -490,6 +504,10 @@ inductive BinaryOperatorHasType (context : Context) :
   | fixedArithmetic {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : FixedCheckedArithmetic operator) :
       BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
+  /-- Checked `/ %` on the fixed-width integer types. -/
+  | fixedDivision {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedCheckedDivision operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -530,7 +548,7 @@ theorem requirements_valid
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
       integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic |
-      booleanAnd | booleanOr =>
+      fixedDivision | booleanAnd | booleanOr =>
       simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 
@@ -1168,11 +1186,13 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
 
 /-- The compound assignments on a fixed-width integer target: those whose
 binary operator is a builtin there, so compound assignment takes the target's
-type. `+= -= *=` are checked, and `&= |= ^=` are Word's. -/
+type. `+= -= *= /= %=` are checked, and `&= |= ^=` are Word's. -/
 inductive FixedCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | add : FixedCompoundAssignmentOperator .add
   | subtract : FixedCompoundAssignmentOperator .subtract
   | multiply : FixedCompoundAssignmentOperator .multiply
+  | divide : FixedCompoundAssignmentOperator .divide
+  | modulo : FixedCompoundAssignmentOperator .modulo
   | bitAnd : FixedCompoundAssignmentOperator .bitAnd
   | bitXor : FixedCompoundAssignmentOperator .bitXor
   | bitOr : FixedCompoundAssignmentOperator .bitOr
@@ -1182,6 +1202,8 @@ inductive FixedCheckedCompound : Syntax.ValueAssignOp → Prop where
   | add : FixedCheckedCompound .add
   | subtract : FixedCheckedCompound .subtract
   | multiply : FixedCheckedCompound .multiply
+  | divide : FixedCheckedCompound .divide
+  | modulo : FixedCheckedCompound .modulo
 
 /-- The operand type of a compound assignment: Word's operators at a Word
 target, or the fixed-width ones at a target of a fixed-width integer type. -/

@@ -2165,7 +2165,7 @@ theorem compoundOperandConstructor_cases (operator : Syntax.ValueAssignOp)
 /-- Successful value-assignment inference reconstructs the complete
 declarative assignment judgment.  Plain assignment retains the inferred place
 type; a compound operator is checked at `Word`, or at the target's fixed-width
-integer type for `+= -= *= &= |= ^=`. -/
+integer type for `+= -= *= /= %= &= |= ^=`. -/
 theorem inferAssignedValueFuel_success_sound
     {source : TypedSource} {outer : TypeSystem.Substitution}
     {target : SourceSemantics.Context}
@@ -16537,6 +16537,8 @@ theorem binaryFixedWord_hasType
           | exact .fixedArithmetic .add
           | exact .fixedArithmetic .subtract
           | exact .fixedArithmetic .multiply
+          | exact .fixedDivision .divide
+          | exact .fixedDivision .modulo
           | skip
         all_goals cases signed : fixed.signed
         all_goals first

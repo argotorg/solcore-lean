@@ -3448,6 +3448,7 @@ theorem BinaryOperatorHasType.applyParameters
   | fixedBitwise kind => exact .fixedBitwise kind
   | fixedSignedComparison kind => exact .fixedSignedComparison kind
   | fixedArithmetic kind => exact .fixedArithmetic kind
+  | fixedDivision kind => exact .fixedDivision kind
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>
@@ -6272,7 +6273,7 @@ theorem result_type_admissible
   | integerArithmetic => exact TypeAdmissible.integer binders
   | wordComparison | integerComparison | fixedComparison | fixedSignedComparison =>
       exact TypeAdmissible.bool binders
-  | fixedBitwise | fixedArithmetic => exact TypeAdmissible.fixed binders _
+  | fixedBitwise | fixedArithmetic | fixedDivision => exact TypeAdmissible.fixed binders _
   | booleanAnd | booleanOr => exact TypeAdmissible.bool binders
   | trait _ profile _ =>
       exact profile.return_types_admissible catalog binders operandAdmissible
@@ -11304,6 +11305,7 @@ theorem BinaryOperatorHasType.applySubstitution
   | fixedBitwise kind => exact .fixedBitwise kind
   | fixedSignedComparison kind => exact .fixedSignedComparison kind
   | fixedArithmetic kind => exact .fixedArithmetic kind
+  | fixedDivision kind => exact .fixedDivision kind
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>

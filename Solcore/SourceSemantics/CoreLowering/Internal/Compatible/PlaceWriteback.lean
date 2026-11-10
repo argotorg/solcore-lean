@@ -172,11 +172,16 @@ theorem inv_sized {environment : Environment} {before after : Store} {outputType
       result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
       after = before) ∨
     (∃ operation type binary, operator = some ⟨operation, .range type binary⟩ ∧
-      ((SourceCoreDataPlaces.RangePasses type binary environment right ∧ ∃ child, child ≤ size ∧
+      ((SourceCoreDataPlaces.DivisorPasses binary right ∧
+          SourceCoreDataPlaces.RangePasses type binary environment right ∧ ∃ child, child ≤ size ∧
           EvaluationSize child (updated :: changed :: right :: environment) before write result after) ∨
         ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
             right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+          SourceCoreDataPlaces.DivisorPasses binary right ∧
           result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+          after = before) ∨
+        (SourceCorePrimitive.checkedDivision binary = true ∧ right = .word Word.zero ∧
+          result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
           after = before))) := by
   rcases SourceCoreDataPlaces.guard_inv evaluated.sound with ⟨passes, _⟩ | panic | range
   · refine .inl ⟨passes, ?_⟩
@@ -209,17 +214,50 @@ theorem inv_sized {environment : Environment} {before after : Store} {outputType
   · exact .inr (.inl panic)
   · obtain ⟨operation, type, binary, rfl, _⟩ := range
     refine .inr (.inr ⟨operation, type, binary, rfl, ?_⟩)
-    cases evaluated with
-    | ifTrue condition failed =>
-      obtain ⟨sameStore, _, outside⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
-      subst sameStore
-      cases failed.sound with
-      | inLeft reason => cases reason; exact .inr ⟨outside rfl, rfl, rfl⟩
-    | ifFalse condition branch =>
-      obtain ⟨sameStore, passes, _⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
-      subst sameStore
-      refine .inl ⟨passes rfl, _, ?_, branch⟩
-      omega
+    have rangeSized : ∀ {inner : Nat}, inner ≤ size → SourceCoreDataPlaces.DivisorPasses binary right →
+        EvaluationSize inner (updated :: changed :: right :: environment) before
+          (.ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+            (LanguageResult.failure outputType
+              (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write) result after →
+        (SourceCoreDataPlaces.DivisorPasses binary right ∧
+          SourceCoreDataPlaces.RangePasses type binary environment right ∧ ∃ child, child ≤ size ∧
+          EvaluationSize child (updated :: changed :: right :: environment) before write result after) ∨
+        ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+            right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+          SourceCoreDataPlaces.DivisorPasses binary right ∧
+          result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+          after = before) := by
+      intro inner bound divisor evaluated
+      cases evaluated with
+      | ifTrue condition failed =>
+        obtain ⟨sameStore, _, outside⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
+        subst sameStore
+        cases failed.sound with
+        | inLeft reason => cases reason; exact .inr ⟨outside rfl, divisor, rfl, rfl⟩
+      | ifFalse condition branch =>
+        obtain ⟨sameStore, passes, _⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
+        subst sameStore
+        refine .inl ⟨divisor, passes rfl, _, ?_, branch⟩
+        omega
+    cases division : SourceCorePrimitive.checkedDivision binary
+    · rw [SourceCoreDataPlaces.guard_range_plain division] at evaluated
+      rcases rangeSized (Nat.le_refl _) (fun impossible => by rw [division] at impossible; cases impossible)
+          evaluated with passed | failed
+      · exact .inl passed
+      · exact .inr (.inl failed)
+    · rw [SourceCoreDataPlaces.guard_range_division division] at evaluated
+      cases evaluated with
+      | ifTrue condition failed =>
+        obtain ⟨zero, sameStore⟩ := SourceCoreDataPlaces.zeroTest_true condition.sound
+        subst sameStore
+        cases failed.sound with
+        | inLeft reason => cases reason; exact .inr (.inr ⟨rfl, zero, rfl, rfl⟩)
+      | ifFalse condition rest =>
+        obtain ⟨nonzero, sameStore⟩ := SourceCoreDataPlaces.zeroTest_false condition.sound
+        subst sameStore
+        rcases rangeSized (by omega) (fun _ => nonzero) rest with passed | failed
+        · exact .inl passed
+        · exact .inr (.inl failed)
 
 /-- With a Unit right-hand side no check fails, so a sized guard is its write. -/
 theorem inv_sized_unit {environment : Environment} {before after : Store} {outputType : Ty}
@@ -230,10 +268,11 @@ theorem inv_sized_unit {environment : Environment} {before after : Store} {outpu
     ∃ child, child ≤ size ∧
       EvaluationSize child (updated :: changed :: .unit :: environment) before write result after := by
   rcases inv_sized evaluated with ⟨_, written⟩ | ⟨_, _, impossible, _, _⟩ |
-      ⟨_, _, _, _, ⟨_, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
+      ⟨_, _, _, _, ⟨_, _, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩ | ⟨_, impossible, _⟩⟩
   · exact written
   · cases impossible
   · exact written
+  · cases impossible
   · cases impossible
 
 /-- A selected panicking modifier with a zero right-hand side fails at the check. -/
@@ -255,9 +294,12 @@ theorem rename_lift (outputType : Ty) (operator : Option SourceCoreDataPlaces.Mo
   · simp [SourceCoreDataPlaces.guard]
   · simp [SourceCoreDataPlaces.guard]
   · simp [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift]
-  · simp only [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift,
-      SourceCorePrimitive.checkedOutside, SourceCorePrimitive.fixedInteger]
-    cases type.signed <;> rfl
+  · cases binary <;>
+      simp only [SourceCoreDataPlaces.guard, SourceCorePrimitive.checkedDivision, Bool.false_eq_true,
+        ↓reduceIte, Expr.rename, LanguageResult.failure, Renaming.lift, SourceCorePrimitive.checkedOutside,
+        SourceCorePrimitive.checkedExact, SourceCorePrimitive.fixedInteger,
+        SourceCorePrimitive.truncatedDivision, SourceCorePrimitive.magnitude] <;>
+      cases type.signed <;> rfl
 
 end Solcore.SourceSemantics.CoreLowering.DataPlaceGuard
 end
@@ -1658,7 +1700,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
             | caseRight setterEvaluated tail =>
               rename_i setterStore setterType updatedValue
               rcases SourceCoreDataPlaces.guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩ |
-                  ⟨operation, type, binary, rfl, ⟨passes, tail⟩ | ⟨_, impossible, _⟩⟩
+                  ⟨operation, type, binary, rfl, ⟨divisor, passes, tail⟩ | ⟨_, _, impossible, _⟩ |
+                    ⟨_, _, impossible, _⟩⟩
               · cases tail with
                 | letE writeEvaluated terminal =>
                   rename_i writtenStore writtenValue
@@ -1683,7 +1726,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
                     intro next outputType value finalStore continuation
                     exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
                       (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
-                        (SourceCoreDataPlaces.guard_rangePasses passes (.letE writeEvaluated continuation)))))))
+                        (SourceCoreDataPlaces.guard_rangePasses divisor passes (.letE writeEvaluated continuation)))))))
+              · cases impossible
               · cases impossible
 
 /-- A universal expression IH supplies the continuation evaluation at the

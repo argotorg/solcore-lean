@@ -245,8 +245,8 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
       AssignmentValueApplies .uncheckedModulo (some left) right result
 
 /-- A value assignment at its target's static type: Word's, Integer's or plain
-assignment where the meaning is that, and checked `+= -= *=` at a fixed-width
-integer target, whose result is the exact one in the type's range. -/
+assignment where the meaning is that, and checked `+= -= *= /= %=` at a
+fixed-width integer target, whose result is the exact one in the type's range. -/
 inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
     Syntax.ValueAssignOp → Option Value → Value → Value → Prop where
   | primitive {operator : Syntax.ValueAssignOp} {current : Option Value} {right result : Value}
@@ -265,6 +265,14 @@ inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
       (target : targetType = .fixed type)
       (applies : FixedBinaryApplies type .multiply left right result) :
       CompoundAssignmentApplies targetType .multiply (some left) right result
+  | divide {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .divide left right result) :
+      CompoundAssignmentApplies targetType .divide (some left) right result
+  | modulo {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .modulo left right result) :
+      CompoundAssignmentApplies targetType .modulo (some left) right result
 
 namespace CompoundAssignmentApplies
 
@@ -277,8 +285,8 @@ theorem plain_of_profile {targetType : TypeSystem.Ty} {operator : Syntax.ValueAs
   · cases checked
   · cases target
 
-/-- Away from checked `+= -= *=` at a fixed-width integer target, the relation
-is `AssignmentValueApplies`. -/
+/-- Away from checked `+= -= *= /= %=` at a fixed-width integer target, the
+relation is `AssignmentValueApplies`. -/
 theorem eq_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
     (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator) :
     CompoundAssignmentApplies targetType operator = AssignmentValueApplies operator := by
@@ -291,6 +299,8 @@ theorem eq_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignO
     | add target _ => exact absurd .add (plain _ target)
     | subtract target _ => exact absurd .subtract (plain _ target)
     | multiply target _ => exact absurd .multiply (plain _ target)
+    | divide target _ => exact absurd .divide (plain _ target)
+    | modulo target _ => exact absurd .modulo (plain _ target)
   · exact .primitive plain
 
 end CompoundAssignmentApplies

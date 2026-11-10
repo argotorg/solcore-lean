@@ -1539,6 +1539,7 @@ private theorem binary_primitive_substitution {context target : SourceSemantics.
   | fixedBitwise kind => exact .fixedBitwise kind
   | fixedSignedComparison kind => exact .fixedSignedComparison kind
   | fixedArithmetic kind => exact .fixedArithmetic kind
+  | fixedDivision kind => exact .fixedDivision kind
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>

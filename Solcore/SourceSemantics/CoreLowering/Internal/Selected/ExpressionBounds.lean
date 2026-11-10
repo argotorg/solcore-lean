@@ -2775,7 +2775,7 @@ private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result
     exact .fixed word canonical
   | fixedSigned kind => cases kind <;>
     (obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag)
-  | fixedChecked kind =>
+  | fixedChecked kind | fixedDivision kind =>
     obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
     exact .fixed word canonical
   | logicalAnd | logicalOr =>

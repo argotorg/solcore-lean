@@ -299,9 +299,10 @@ def setter (prepared : Prepared) (keyType : Core.Ty) : Core.Expr :=
             (.first (.second (.var 1))) (.second (.second (.var 1)))))
 
 /-- What a compound modifier checks after the structural update: nothing, a
-zero right-hand side (`Panic(0x12)`), or the exact result of checked `+ - *`
-(`operator`) on the snapshot and the right-hand side against a fixed-width
-integer type's range (`Panic(0x11)`). -/
+zero right-hand side (`Panic(0x12)`), or the exact result of checked
+`+ - * / %` (`operator`) on the snapshot and the right-hand side against a
+fixed-width integer type's range (`Panic(0x11)`), which for `/ %` comes after
+the zero test. -/
 inductive Check where
   | total
   | divisor
@@ -322,18 +323,90 @@ def Modifier.total (operation : Core.BinaryOp) : Modifier := ⟨operation, .tota
 
 /-- The check of a modifier, after the structural update and before the write,
 under the updated root, the modified leaf, the right-hand side and the
-snapshot. A zero right-hand side fails with `Panic(0x12)`; checked arithmetic
-outside the type's range fails with `Panic(0x11)`. Either writes nothing. -/
+snapshot. A zero right-hand side fails with `Panic(0x12)`, for `/= %=` at a
+fixed-width integer type too; checked arithmetic outside the type's range fails
+with `Panic(0x11)`. Either writes nothing. -/
 def guard (outputType : Core.Ty) (operator : Option Modifier) (write : Core.Expr) : Core.Expr :=
   match operator with
   | some ⟨_, .divisor⟩ => .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
       (Core.LanguageResult.failure outputType
         (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) write
   | some ⟨_, .range type binary⟩ =>
+      if SourceCorePrimitive.checkedDivision binary then
+        .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+          (.ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+            (Core.LanguageResult.failure outputType
+              (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write)
+      else
+        .ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write
+  | _ => write
+
+/-- The range check of `+= -= *=`. -/
+theorem guard_range_plain {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} (plain : SourceCorePrimitive.checkedDivision binary = false) :
+    guard outputType (some ⟨operation, .range type binary⟩) write =
       .ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
         (Core.LanguageResult.failure outputType
-          (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write
-  | _ => write
+          (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write := by
+  simp [guard, plain]
+
+/-- The check of `/= %=`: the zero test, then the range check. -/
+theorem guard_range_division {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} (division : SourceCorePrimitive.checkedDivision binary = true) :
+    guard outputType (some ⟨operation, .range type binary⟩) write =
+      .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
+        (Core.LanguageResult.failure outputType
+          (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+        (.ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write) := by
+  simp [guard, division]
+
+/-- The zero test of checked `/= %=` passes: the right-hand side is a nonzero
+word, or the operator does not divide. -/
+def DivisorPasses (binary : Syntax.BinaryOp) (right : Core.Value) : Prop :=
+  SourceCorePrimitive.checkedDivision binary = true → ∃ word, right = .word word ∧ word ≠ Core.Word.zero
+
+/-- A zero test that came out `true` saw a zero word. -/
+theorem zeroTest_true {environment : Core.Environment} {store final : Core.Store}
+    {updated changed right : Core.Value}
+    (condition : Core.Evaluates (updated :: changed :: right :: environment) store
+      (.binary .wordEq (.var 2) (.word Core.Word.zero)) (.bool true) final) :
+    right = .word Core.Word.zero ∧ final = store := by
+  cases condition with
+  | binary left zero applied =>
+    cases left with
+    | var found =>
+      cases zero
+      simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+      subst found
+      cases right <;> simp [Core.BinaryOp.apply] at applied
+      rename_i word
+      have same : word = Core.Word.zero := by simpa using applied
+      subst same
+      exact ⟨rfl, rfl⟩
+
+/-- A zero test that came out `false` saw a nonzero word. -/
+theorem zeroTest_false {environment : Core.Environment} {store final : Core.Store}
+    {updated changed right : Core.Value}
+    (condition : Core.Evaluates (updated :: changed :: right :: environment) store
+      (.binary .wordEq (.var 2) (.word Core.Word.zero)) (.bool false) final) :
+    (∃ word, right = .word word ∧ word ≠ Core.Word.zero) ∧ final = store := by
+  cases condition with
+  | binary left zero applied =>
+    cases left with
+    | var found =>
+      cases zero
+      simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+      subst found
+      cases right <;> simp [Core.BinaryOp.apply] at applied
+      rename_i word
+      have different : word ≠ Core.Word.zero := by simpa using applied
+      exact ⟨⟨word, rfl, different⟩, rfl⟩
 
 /-- The right-hand sides that pass the check of a modifier without a range
 check (`guard_inRange` covers checked arithmetic). -/
@@ -366,11 +439,13 @@ theorem guard_passes {environment : Core.Environment} {before after : Core.Store
   | nonzero nonzero =>
     exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero])) written
 
-/-- Checked arithmetic in the type's range passes the range check. -/
+/-- Checked arithmetic in the type's range, by a nonzero divisor for `/ %`,
+passes the check. -/
 theorem guard_inRange {environment : Core.Environment} {before after : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
     {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value} {updated changed : Core.Value}
     {leftType : Core.Ty} {left right : Core.Word}
+    (divisor : DivisorPasses binary (.word right))
     (inRange : SourceCorePrimitive.checkedInRange type binary left right = true)
     (written : Core.Evaluates (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       before write result after) :
@@ -381,7 +456,14 @@ theorem guard_inRange {environment : Core.Environment} {before after : Core.Stor
       environment)
     (store := before) (left := 0) (right := 3) type binary rfl rfl
   rw [inRange] at outside
-  exact .ifFalse (.caseRight (.var rfl) outside) written
+  cases division : SourceCorePrimitive.checkedDivision binary
+  · rw [guard_range_plain division]
+    exact .ifFalse (.caseRight (.var rfl) outside) written
+  · rw [guard_range_division division]
+    obtain ⟨word, same, nonzero⟩ := divisor division
+    cases same
+    exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero]))
+      (.ifFalse (.caseRight (.var rfl) outside) written)
 
 theorem guard_panic {environment : Core.Environment} {store : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {write : Core.Expr} {updated changed : Core.Value} :
@@ -390,12 +472,13 @@ theorem guard_panic {environment : Core.Environment} {store : Core.Store}
       (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store :=
   .ifTrue (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply])) (.inLeft .word)
 
-/-- Checked arithmetic outside the type's range fails with `Panic(0x11)` and
-writes nothing. -/
+/-- Checked arithmetic outside the type's range, by a nonzero divisor for
+`/ %`, fails with `Panic(0x11)` and writes nothing. -/
 theorem guard_overflow {environment : Core.Environment} {store : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
     {binary : Syntax.BinaryOp} {write : Core.Expr} {updated changed : Core.Value} {leftType : Core.Ty}
     {left right : Core.Word}
+    (divisor : DivisorPasses binary (.word right))
     (outside : SourceCorePrimitive.checkedInRange type binary left right = false) :
     Core.Evaluates (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment) store
       (guard outputType (some ⟨operation, .range type binary⟩) write)
@@ -405,7 +488,26 @@ theorem guard_overflow {environment : Core.Environment} {store : Core.Store}
       environment)
     (store := store) (left := 0) (right := 3) type binary rfl rfl
   rw [outside] at test
-  exact .ifTrue (.caseRight (.var rfl) test) (.inLeft .word)
+  cases division : SourceCorePrimitive.checkedDivision binary
+  · rw [guard_range_plain division]
+    exact .ifTrue (.caseRight (.var rfl) test) (.inLeft .word)
+  · rw [guard_range_division division]
+    obtain ⟨word, same, nonzero⟩ := divisor division
+    cases same
+    exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero]))
+      (.ifTrue (.caseRight (.var rfl) test) (.inLeft .word))
+
+/-- Checked `/= %=` fail with `Panic(0x12)` on a zero right-hand side and write
+nothing. -/
+theorem guard_rangeZero {environment : Core.Environment} {store : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} {updated changed : Core.Value}
+    (division : SourceCorePrimitive.checkedDivision binary = true) :
+    Core.Evaluates (updated :: changed :: .word Core.Word.zero :: environment) store
+      (guard outputType (some ⟨operation, .range type binary⟩) write)
+      (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store := by
+  rw [guard_range_division division]
+  exact .ifTrue (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply])) (.inLeft .word)
 
 /-- The range check passes on the snapshot that follows the guard's three
 binders: the snapshot is absent, or the exact result lies in the type's range. -/
@@ -453,35 +555,73 @@ theorem range_condition_inv {environment : Core.Environment} {store final : Core
         · simpa using passed
         · simpa using failed
 
-/-- A completed range check either passed and wrote, on an absent snapshot or
-an exact result in the type's range, or failed with `Panic(0x11)` without
-changing the store. -/
+/-- A completed check of checked compound arithmetic either passed and wrote,
+by a nonzero divisor for `/ %` and on an absent snapshot or an exact result in
+the type's range, or failed without changing the store: with `Panic(0x11)`
+outside the range, or with `Panic(0x12)` on a zero divisor of `/ %`. -/
 theorem guard_range_inv {environment : Core.Environment} {before after : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
     {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value}
     {updated changed right : Core.Value}
     (evaluated : Core.Evaluates (updated :: changed :: right :: environment) before
       (guard outputType (some ⟨operation, .range type binary⟩) write) result after) :
-    (RangePasses type binary environment right ∧
+    (DivisorPasses binary right ∧ RangePasses type binary environment right ∧
       Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
     ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
         right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+      DivisorPasses binary right ∧
       result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+      after = before) ∨
+    (SourceCorePrimitive.checkedDivision binary = true ∧ right = .word Core.Word.zero ∧
+      result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
       after = before) := by
-  cases evaluated with
-  | ifTrue condition failed =>
-    obtain ⟨sameStore, _, outside⟩ := range_condition_inv condition
-    subst sameStore
-    cases failed with
-    | inLeft reason => cases reason; exact .inr ⟨outside rfl, rfl, rfl⟩
-  | ifFalse condition written =>
-    obtain ⟨sameStore, passes, _⟩ := range_condition_inv condition
-    subst sameStore
-    exact .inl ⟨passes rfl, written⟩
+  have range : DivisorPasses binary right →
+      Core.Evaluates (updated :: changed :: right :: environment) before
+        (.ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write) result after →
+      (DivisorPasses binary right ∧ RangePasses type binary environment right ∧
+        Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
+      ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+          right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+        DivisorPasses binary right ∧
+        result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+        after = before) := by
+    intro divisor evaluated
+    cases evaluated with
+    | ifTrue condition failed =>
+      obtain ⟨sameStore, _, outside⟩ := range_condition_inv condition
+      subst sameStore
+      cases failed with
+      | inLeft reason => cases reason; exact .inr ⟨outside rfl, divisor, rfl, rfl⟩
+    | ifFalse condition written =>
+      obtain ⟨sameStore, passes, _⟩ := range_condition_inv condition
+      subst sameStore
+      exact .inl ⟨divisor, passes rfl, written⟩
+  cases division : SourceCorePrimitive.checkedDivision binary
+  · rw [guard_range_plain division] at evaluated
+    rcases range (fun impossible => by rw [division] at impossible; cases impossible) evaluated with
+      passed | failed
+    · exact .inl passed
+    · exact .inr (.inl failed)
+  · rw [guard_range_division division] at evaluated
+    cases evaluated with
+    | ifTrue condition failed =>
+      obtain ⟨zero, sameStore⟩ := zeroTest_true condition
+      subst sameStore
+      cases failed with
+      | inLeft reason => cases reason; exact .inr (.inr ⟨rfl, zero, rfl, rfl⟩)
+    | ifFalse condition rest =>
+      obtain ⟨nonzero, sameStore⟩ := zeroTest_false condition
+      subst sameStore
+      rcases range (fun _ => nonzero) rest with passed | failed
+      · exact .inl passed
+      · exact .inr (.inl failed)
 
 theorem guard_rangePasses {environment : Core.Environment} {before after : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
     {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value} {updated changed right : Core.Value}
+    (divisor : DivisorPasses binary right)
     (passes : RangePasses type binary environment right)
     (written : Core.Evaluates (updated :: changed :: right :: environment) before write result after) :
     Core.Evaluates (updated :: changed :: right :: environment) before
@@ -490,8 +630,14 @@ theorem guard_rangePasses {environment : Core.Environment} {before after : Core.
   | nil => exact passes.elim
   | cons snapshot rest =>
     rcases passes with ⟨rightType, payload, rfl⟩ | ⟨leftType, left, rightWord, rfl, rfl, inRange⟩
-    · exact .ifFalse (.caseLeft (.var rfl) .bool) written
-    · exact guard_inRange inRange written
+    · cases division : SourceCorePrimitive.checkedDivision binary
+      · rw [guard_range_plain division]
+        exact .ifFalse (.caseLeft (.var rfl) .bool) written
+      · rw [guard_range_division division]
+        obtain ⟨word, rfl, nonzero⟩ := divisor division
+        exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero]))
+          (.ifFalse (.caseLeft (.var rfl) .bool) written)
+    · exact guard_inRange divisor inRange written
 
 /-- A completed check without a range check either passed and wrote, or
 panicked on a zero right-hand side without changing the store. A range check
@@ -507,11 +653,15 @@ theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
       result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
       after = before) ∨
     (∃ operation type binary, operator = some ⟨operation, .range type binary⟩ ∧
-      ((RangePasses type binary environment right ∧
+      ((DivisorPasses binary right ∧ RangePasses type binary environment right ∧
           Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
         ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
             right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+          DivisorPasses binary right ∧
           result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+          after = before) ∨
+        (SourceCorePrimitive.checkedDivision binary = true ∧ right = .word Core.Word.zero ∧
+          result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
           after = before))) := by
   match operator, evaluated with
   | none, evaluated => exact .inl ⟨.total (fun _ none => by cases none), evaluated⟩
@@ -557,10 +707,11 @@ theorem guard_unit_inv {environment : Core.Environment} {before after : Core.Sto
       (guard outputType operator write) result after) :
     Core.Evaluates (updated :: changed :: .unit :: environment) before write result after := by
   rcases guard_inv evaluated with ⟨_, written⟩ | ⟨_, _, impossible, _, _⟩ |
-      ⟨_, _, _, _, ⟨_, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
+      ⟨_, _, _, _, ⟨_, _, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩ | ⟨_, impossible, _⟩⟩
   · exact written
   · cases impossible
   · exact written
+  · cases impossible
   · cases impossible
 
 def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
@@ -583,7 +734,7 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .uncheckedDivide => some ⟨.wordDiv, .divisor⟩
   | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
 
-/-- The checked compound assignments at a target type: `+= -= *=` at a
+/-- The checked compound assignments at a target type: `+= -= *= /= %=` at a
 fixed-width integer type, with the type and the binary operator. The match
 tests the operator first, so every other operator reduces to `none` at any
 target. -/
@@ -593,23 +744,28 @@ def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
   | .add, .constructor (.builtin (.fixed type)) => some (type, .add)
   | .subtract, .constructor (.builtin (.fixed type)) => some (type, .subtract)
   | .multiply, .constructor (.builtin (.fixed type)) => some (type, .multiply)
+  | .divide, .constructor (.builtin (.fixed type)) => some (type, .divide)
+  | .modulo, .constructor (.builtin (.fixed type)) => some (type, .modulo)
   | _, _ => none
 
-/-- Word's operation for checked `+ - *`: in the type's range it is the exact
-result's word. -/
-def checkedWordOperation : Syntax.BinaryOp → Core.BinaryOp
+/-- Word's operation for checked `+ - * / %` at a fixed-width integer type: in
+the type's range, and by a nonzero divisor, it is the exact result's word.
+`/ %` are signed on the signed types. -/
+def checkedWordOperation (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Core.BinaryOp
   | .add => .wordAdd
   | .subtract => .wordSub
+  | .divide => if type.signed then .wordSdiv else .wordDiv
+  | .modulo => if type.signed then .wordSmod else .wordMod
   | _ => .wordMul
 
 /-- The modifier of a value assignment at its target's static type: checked
-`+= -= *=` at a fixed-width integer type compute Word's operation, and `guard`
-checks the exact result against the type's range; every other operator takes
-`binaryOperator`'s modifier. -/
+`+= -= *= /= %=` at a fixed-width integer type compute Word's operation, and
+`guard` tests a zero divisor of `/= %=` and checks the exact result against the
+type's range; every other operator takes `binaryOperator`'s modifier. -/
 def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
     Option Modifier :=
   match checkedCompound target operator with
-  | some (type, binary) => some ⟨checkedWordOperation binary, .range type binary⟩
+  | some (type, binary) => some ⟨checkedWordOperation type binary, .range type binary⟩
   | none => binaryOperator integer operator
 
 /-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/

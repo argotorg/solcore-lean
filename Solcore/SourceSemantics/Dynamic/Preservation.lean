@@ -582,6 +582,14 @@ theorem arithmetic_result {operator : Syntax.BinaryOp} {operand result : Ty}
   cases kind <;> cases typing <;>
     first | exact .inl ⟨rfl, rfl⟩ | exact .inr ⟨rfl, rfl⟩ | (rename_i other; cases other)
 
+/-- The primitive typings of `/ %` are Word's and Integer's. -/
+theorem division_result {operator : Syntax.BinaryOp} {operand result : Ty}
+    (typing : PrimitiveBinaryHasType operator operand result)
+    (kind : FixedCheckedDivision operator) :
+    (operand = .word ∧ result = .word) ∨ (operand = .integer ∧ result = .integer) := by
+  cases kind <;> cases typing <;>
+    first | exact .inl ⟨rfl, rfl⟩ | exact .inr ⟨rfl, rfl⟩ | (rename_i other; cases other)
+
 end PrimitiveBinaryHasType
 
 /-- `Word.ofIntModulo` of an integer in `[0, 2^256)` is that integer. -/
@@ -667,6 +675,10 @@ theorem preserves
           rcases typing.arithmetic_result kind with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
           · exact .word _
           · cases left_typed
+      | division kind =>
+          rcases typing.division_result kind with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+          · exact .word _
+          · cases left_typed
 
 /-- Checked `+ - *` keep their result canonical at the operands' static type. -/
 theorem preserves_checked
@@ -683,6 +695,25 @@ theorem preserves_checked
     cases Option.some.inj operandEq
     cases applies with
     | checked _ left right inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+    | division other => exact (kind.not_division other).elim
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+
+/-- Checked `/ %` keep their result canonical at the operands' static type. -/
+theorem preserves_division
+    {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
+    {left right result : Value} {type : TypeSystem.FixedInteger} {lookup : Option Ty}
+    (kind : FixedCheckedDivision operator)
+    (lookupEq : lookup = some (.fixed type))
+    (application : BinaryValueApplies lookup operator left right result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases application with
+  | primitive plain _ => exact absurd kind.own (plain type lookupEq)
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | division _ left right _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+    | checked other => exact (other.not_division kind).elim
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
 
 end BinaryValueApplies
@@ -856,6 +887,8 @@ theorem fixedBitwisePreserves
   | add => exact absurd .add plain
   | subtract => exact absurd .subtract plain
   | multiply => exact absurd .multiply plain
+  | divide => exact absurd .divide plain
+  | modulo => exact absurd .modulo plain
   | bitAnd =>
       cases applies with
       | bitAnd primitive =>
@@ -887,8 +920,8 @@ theorem equalPreserves
   | primitive _ applies => exact applies.equalPreserves right_typed
 
 /-- A compound assignment keeps its target's type: Word's operators at a Word
-target, Word's `&= |= ^=` on canonical words, and checked `+= -= *=`, whose
-result lies in the range of the target's fixed-width type. -/
+target, Word's `&= |= ^=` on canonical words, and checked `+= -= *= /= %=`,
+whose result lies in the range of the target's fixed-width type. -/
 theorem preserves
     {context : Context} {heap : Heap} {targetType leaf : Ty} {operator : Syntax.ValueAssignOp}
     {current : Option Value} {right result : Value}
@@ -903,7 +936,8 @@ theorem preserves
   | word kind =>
       cases applies with
       | primitive _ applies => exact applies.wordCompoundPreserves kind current_typed right_typed
-      | add target _ | subtract target _ | multiply target _ => cases target
+      | add target _ | subtract target _ | multiply target _ | divide target _ | modulo target _ =>
+          cases target
   | fixed kind =>
       cases applies with
       | primitive plain applies =>
@@ -912,6 +946,12 @@ theorem preserves
           cases target
           cases applies with
           | checked _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+          | division kind => cases kind
+      | divide target applies | modulo target applies =>
+          cases target
+          cases applies with
+          | division _ _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+          | checked kind => cases kind
 
 end CompoundAssignmentApplies
 

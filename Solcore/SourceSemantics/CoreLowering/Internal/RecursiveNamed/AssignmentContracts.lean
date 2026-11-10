@@ -107,7 +107,7 @@ theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Ex
   obtain ⟨_, _, fifthEval⟩ := fourthEval.bind_success modifiedEvaluated
   obtain ⟨_, _, sixthEval⟩ := fifthEval.bind_success setterEvaluated
   rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, _⟩ | ⟨_, _, zero, _, _⟩ |
-      ⟨_, _, _, rfl, ⟨rangePasses, _⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
+      ⟨_, _, _, rfl, ⟨_, rangePasses, _⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩ | ⟨_, impossible, _⟩⟩
   · exact passes
   · cases zero
   · -- A Unit right-hand side passes the range check only on an absent snapshot,
@@ -116,6 +116,7 @@ theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Ex
     · subst absent
       exact (modified_absent rfl modifiedEvaluated).elim
     · cases impossible
+  · cases impossible
   · cases impossible
 
 /-- One inversion for the actual emitted prefix. The six supplied phase
@@ -164,8 +165,8 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
           setterStore (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)) value finalStore := by
     rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, seventh, seventhBound, seventhEval⟩ |
         ⟨operation, selected, zero, _, _⟩ |
-        ⟨operation, type, binary, rfl, ⟨rangePasses, seventh, seventhBound, seventhEval⟩ |
-          ⟨⟨leftType, left, rightWord, head, rightEq, outside⟩, _, _⟩⟩
+        ⟨operation, type, binary, rfl, ⟨divisor, rangePasses, seventh, seventhBound, seventhEval⟩ |
+          ⟨⟨leftType, left, rightWord, head, rightEq, outside⟩, divisor, _, _⟩ | ⟨division, zero, _, _⟩⟩
     · exact ⟨fun written => SourceCoreDataPlaces.guard_passes passes written, seventh, seventhBound, seventhEval⟩
     · -- The terminal run meets the same check, which fails.
       subst selected zero
@@ -179,8 +180,8 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
                 (LanguageResult.bind_success _ modifiedEvaluated
                   (LanguageResult.bind_success _ setterEvaluated SourceCoreDataPlaces.guard_panic)))))
       cases (evaluation_deterministic terminal failed).1
-    · exact ⟨fun written => SourceCoreDataPlaces.guard_rangePasses rangePasses written, seventh, seventhBound,
-        seventhEval⟩
+    · exact ⟨fun written => SourceCoreDataPlaces.guard_rangePasses divisor rangePasses written, seventh,
+        seventhBound, seventhEval⟩
     · -- The terminal run meets the same range check, which fails.
       simp only [List.head?_cons, Option.some.injEq] at head
       subst head rightEq
@@ -192,7 +193,21 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
             (LanguageResult.bind_success _ snapshotEvaluated
               (LanguageResult.bind_success _ rightEvaluated
                 (LanguageResult.bind_success _ modifiedEvaluated
-                  (LanguageResult.bind_success _ setterEvaluated (SourceCoreDataPlaces.guard_overflow outside))))))
+                  (LanguageResult.bind_success _ setterEvaluated
+                    (SourceCoreDataPlaces.guard_overflow divisor outside))))))
+      cases (evaluation_deterministic terminal failed).1
+    · -- The terminal run meets the same zero test, which fails.
+      subst zero
+      have failed : Evaluates actual before
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid)
+          (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
+        .letE (referenceSelected.evaluates before)
+          (LanguageResult.bind_success _ keysEvaluated
+            (LanguageResult.bind_success _ snapshotEvaluated
+              (LanguageResult.bind_success _ rightEvaluated
+                (LanguageResult.bind_success _ modifiedEvaluated
+                  (LanguageResult.bind_success _ setterEvaluated
+                    (SourceCoreDataPlaces.guard_rangeZero division))))))
       cases (evaluation_deterministic terminal failed).1
   cases seventhEval with
   | @letE writeSize remainingSize _ _ writtenStore _ _ _ _ _ write remaining =>
@@ -1057,6 +1072,7 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | fixedBitwise kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedSigned kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedChecked kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedDivision kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

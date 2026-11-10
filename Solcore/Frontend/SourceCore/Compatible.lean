@@ -1196,12 +1196,12 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option SourceCore
   | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
 
 /-- The modifier of a value assignment at its target's static type, as
-`SourceCoreDataPlaces.assignmentModifier`: checked `+= -= *=` at a fixed-width
-integer type, `binaryOperator`'s otherwise. -/
+`SourceCoreDataPlaces.assignmentModifier`: checked `+= -= *= /= %=` at a
+fixed-width integer type, `binaryOperator`'s otherwise. -/
 def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
     Option SourceCoreDataPlaces.Modifier :=
   match SourceCoreDataPlaces.checkedCompound target operator with
-  | some (type, binary) => some ⟨SourceCoreDataPlaces.checkedWordOperation binary, .range type binary⟩
+  | some (type, binary) => some ⟨SourceCoreDataPlaces.checkedWordOperation type binary, .range type binary⟩
   | none => binaryOperator integer operator
 
 /-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/

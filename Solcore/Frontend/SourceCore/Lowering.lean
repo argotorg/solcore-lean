@@ -1222,11 +1222,13 @@ def signedOrdering : Option TypeSystem.Ty → Syntax.BinaryOp → Bool
   | _, _ => false
 
 /-- The fixed-width integer type at which a binary operator on operands of the
-given static type is checked arithmetic, if any. -/
+given static type is checked arithmetic, if any: `+ - * / %`. -/
 def checkedArithmetic : Option TypeSystem.Ty → Syntax.BinaryOp → Option TypeSystem.FixedInteger
   | some (.constructor (.builtin (.fixed type))), .add
   | some (.constructor (.builtin (.fixed type))), .subtract
-  | some (.constructor (.builtin (.fixed type))), .multiply => some type
+  | some (.constructor (.builtin (.fixed type))), .multiply
+  | some (.constructor (.builtin (.fixed type))), .divide
+  | some (.constructor (.builtin (.fixed type))), .modulo => some type
   | _, _ => none
 
 /-- How a requirement-free binary node lowers: Integer's operations when its
@@ -1274,14 +1276,56 @@ def checkedBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : 
         (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
         (Core.LanguageResult.success (.unary .integerToWord (.var 0)))))
 
-/-- Checked `+ - *` evaluate both operands, then run the checked body; every
-other operator lowers as Word's. -/
+/-- Whether a checked operator divides: `/` and `%`, which panic with
+`Panic(0x12)` on a zero divisor. -/
+def checkedDivision : Syntax.BinaryOp → Bool
+  | .divide | .modulo => true
+  | _ => false
+
+/-- The magnitude of a Core Integer. -/
+def magnitude (value : Core.Expr) : Core.Expr :=
+  .ifE (.binary .integerLt value (.integer 0)) (.binary .integerSub (.integer 0) value) value
+
+/-- Under a divisor and a dividend, both Core Integers, the quotient rounded
+toward zero (`/`) or the remainder with the dividend's sign (`%`): Core's
+Euclidean division of the magnitudes, then the sign. -/
+def truncatedDivision : Syntax.BinaryOp → Core.Expr
+  | .modulo =>
+      .letE (.binary .integerMod (magnitude (.var 1)) (magnitude (.var 0)))
+        (.ifE (.binary .integerLt (.var 2) (.integer 0)) (.binary .integerSub (.integer 0) (.var 0)) (.var 0))
+  | _ =>
+      .letE (.binary .integerDiv (magnitude (.var 1)) (magnitude (.var 0)))
+        (.ifE (.binary .integerLt (.var 2) (.integer 0))
+          (.ifE (.binary .integerLt (.var 1) (.integer 0)) (.var 0) (.binary .integerSub (.integer 0) (.var 0)))
+          (.ifE (.binary .integerLt (.var 1) (.integer 0)) (.binary .integerSub (.integer 0) (.var 0)) (.var 0)))
+
+/-- Checked `/ %` on a fixed-width integer type, under the right payload, the
+left payload and the outer scope: a zero divisor fails with `Panic(0x12)`;
+otherwise the exact quotient or remainder as a Core Integer, `Panic(0x11)`
+outside the type's range (only `MIN / -1` leaves it), and its word otherwise. -/
+def divisionBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : Core.Expr :=
+  .ifE (.binary .wordEq (.var 0) (.word Core.Word.zero))
+    (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+    (.letE (fixedInteger type.signed (.var 1))
+      (.letE (fixedInteger type.signed (.var 1))
+        (.letE (truncatedDivision operator)
+          (.ifE (.binary .integerLt (.var 0) (.integer type.min))
+            (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+            (.ifE (.binary .integerLt (.integer type.max) (.var 0))
+              (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+              (Core.LanguageResult.success (.unary .integerToWord (.var 0))))))))
+
+/-- Checked `+ - * / %` evaluate both operands, then run the checked body or the
+division body; every other operator lowers as Word's. -/
 def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Core.Expr) :
     Core.Expr :=
   match operator with
   | .add | .subtract | .multiply =>
       Core.LanguageResult.bind .word left
         (Core.LanguageResult.bind .word (right.weakenAt 0) (checkedBody type operator))
+  | .divide | .modulo =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (divisionBody type operator))
   | _ => binary operator left right
 
 theorem fixedInteger_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
@@ -1310,6 +1354,35 @@ theorem checkedBody_hasType {definitions : Core.DataEnvironment} {scope : Core.C
   cases operator <;>
     exact .letE (.binary (fixedInteger_hasType (.var rfl)) (fixedInteger_hasType (.var rfl))) rest
 
+theorem magnitude_hasType {definitions : Core.DataEnvironment} {scope : Core.Context} {value : Core.Expr}
+    (typed : Core.HasType scope value .integer definitions) :
+    Core.HasType scope (magnitude value) .integer definitions :=
+  .ifE (.binary typed .integer) (.binary .integer typed) typed
+
+theorem truncatedDivision_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (operator : Syntax.BinaryOp) :
+    Core.HasType (.integer :: .integer :: scope) (truncatedDivision operator) .integer definitions := by
+  unfold truncatedDivision
+  split
+  · exact .letE (.binary (magnitude_hasType (.var rfl)) (magnitude_hasType (.var rfl)))
+      (.ifE (.binary (.var rfl) .integer) (.binary .integer (.var rfl)) (.var rfl))
+  · exact .letE (.binary (magnitude_hasType (.var rfl)) (magnitude_hasType (.var rfl)))
+      (.ifE (.binary (.var rfl) .integer)
+        (.ifE (.binary (.var rfl) .integer) (.var rfl) (.binary .integer (.var rfl)))
+        (.ifE (.binary (.var rfl) .integer) (.binary .integer (.var rfl)) (.var rfl)))
+
+theorem divisionBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) :
+    Core.HasType (.word :: .word :: scope) (divisionBody type operator)
+      (Core.LanguageResult.resultType .word) definitions :=
+  .ifE (.binary (.var rfl) .word) (Core.LanguageResult.failure_hasType .word .word)
+    (.letE (fixedInteger_hasType (.var rfl))
+      (.letE (fixedInteger_hasType (.var rfl))
+        (.letE (truncatedDivision_hasType operator)
+          (.ifE (.binary (.var rfl) .integer) (Core.LanguageResult.failure_hasType .word .word)
+            (.ifE (.binary .integer (.var rfl)) (Core.LanguageResult.failure_hasType .word .word)
+              (Core.LanguageResult.success_hasType (.unary (.var rfl))))))))
+
 theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Core.Expr}
     (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
@@ -1327,8 +1400,20 @@ theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core
     apply Core.LanguageResult.bind_hasType .word
     · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
     · exact checkedBody_hasType type operator
+  have division : ∀ {operator : Syntax.BinaryOp},
+      Core.HasType scope left (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope right (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope (Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (divisionBody type operator)))
+        (Core.LanguageResult.resultType .word) definitions := by
+    intro operator leftWord rightWord
+    apply Core.LanguageResult.bind_hasType .word leftWord
+    apply Core.LanguageResult.bind_hasType .word
+    · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
+    · exact divisionBody_hasType type operator
   cases operator <;> first
     | exact checked leftTyped rightTyped
+    | exact division leftTyped rightTyped
     | exact binary_hasType leftTyped rightTyped
 
 /-- Renaming leaves the checked body alone: it reads only its two payloads. -/
@@ -1338,6 +1423,13 @@ theorem checkedBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.B
   unfold checkedBody fixedInteger
   cases type.signed <;> rfl
 
+/-- Renaming leaves the division body alone: it reads only its two payloads. -/
+theorem divisionBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (ξ : Core.Renaming) :
+    (divisionBody type operator).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) = divisionBody type operator := by
+  unfold divisionBody truncatedDivision magnitude fixedInteger
+  cases type.signed <;> cases operator <;> rfl
+
 theorem checkedBinary_left_failure {environment : Core.Environment}
     {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     {left right : Core.Expr} {reason : Core.Word}
@@ -1346,6 +1438,15 @@ theorem checkedBinary_left_failure {environment : Core.Environment}
     Core.Evaluates environment before (checkedBinary type operator left right)
       (.inLeft .word (.word reason)) after := by
   rcases checked with rfl | rfl | rfl <;> exact Core.LanguageResult.bind_failure _ evaluation
+
+theorem checkedBinary_left_failure_division {environment : Core.Environment}
+    {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {reason : Core.Word}
+    (division : operator = .divide ∨ operator = .modulo)
+    (evaluation : Core.Evaluates environment before left (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases division with rfl | rfl <;> exact Core.LanguageResult.bind_failure _ evaluation
 
 theorem checkedBinary_right_failure {environment : Core.Environment}
     {before middle after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
@@ -1359,20 +1460,50 @@ theorem checkedBinary_right_failure {environment : Core.Environment}
   rcases checked with rfl | rfl | rfl <;>
     exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
 
+theorem checkedBinary_right_failure_division {environment : Core.Environment}
+    {before middle after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {leftValue : Core.Value} {reason : Core.Word}
+    (division : operator = .divide ∨ operator = .modulo)
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases division with rfl | rfl <;>
+    exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
+
 /-- The Integer `fixedInteger` computes from a word: its value, or for a signed
 type its two's complement reading. -/
 def fixedIntegerValue (signed : Bool) (word : Core.Word) : Int :=
   if signed then (if word.val < 2 ^ 255 then (word.val : Int) else (word.val : Int) - 2 ^ 256)
   else (word.val : Int)
 
-/-- The exact result `checkedOperator` computes. -/
+/-- The exact quotient or remainder `truncatedDivision` computes. A zero
+divisor gives `0`, which the zero test of checked `/ %` excludes before. -/
+def divisionIntegerValue : Syntax.BinaryOp → Int → Int → Int
+  | .modulo, left, right => if right = 0 then 0 else left.tmod right
+  | _, left, right => left.tdiv right
+
+/-- The exact result `checkedExact` computes: `checkedOperator`'s for `+ - *`,
+`truncatedDivision`'s for `/ %`. -/
 def checkedIntegerValue : Syntax.BinaryOp → Int → Int → Int
   | .add, left, right => left + right
   | .subtract, left, right => left - right
+  | .divide, left, right => divisionIntegerValue .divide left right
+  | .modulo, left, right => divisionIntegerValue .modulo left right
   | _, left, right => left * right
 
-/-- Whether checked `+ - *` on two words of a fixed-width integer type give a
-result in the type's range. -/
+/-- The exact result of checked `+ - * / %` on the words at indices `left` and
+`right`, as a Core Integer. -/
+def checkedExact (signed : Bool) (operator : Syntax.BinaryOp) (left right : Nat) : Core.Expr :=
+  match operator with
+  | .divide | .modulo =>
+      .letE (fixedInteger signed (.var left))
+        (.letE (fixedInteger signed (.var (right + 1))) (truncatedDivision operator))
+  | _ => .binary (checkedOperator operator) (fixedInteger signed (.var left)) (fixedInteger signed (.var right))
+
+/-- Whether checked `+ - * / %` on two words of a fixed-width integer type give
+a result in the type's range. -/
 def checkedInRange (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
     (left right : Core.Word) : Bool :=
   decide (type.min ≤ checkedIntegerValue operator (fixedIntegerValue type.signed left)
@@ -1380,12 +1511,11 @@ def checkedInRange (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
     checkedIntegerValue operator (fixedIntegerValue type.signed left)
       (fixedIntegerValue type.signed right) ≤ type.max)
 
-/-- Whether checked `+ - *` on the words at indices `left` and `right` give a
-result outside the type's range, as a Core Bool. -/
+/-- Whether checked `+ - * / %` on the words at indices `left` and `right` give
+a result outside the type's range, as a Core Bool. -/
 def checkedOutside (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Nat) :
     Core.Expr :=
-  .letE (.binary (checkedOperator operator) (fixedInteger type.signed (.var left))
-      (fixedInteger type.signed (.var right)))
+  .letE (checkedExact type.signed operator left right)
     (.ifE (.binary .integerLt (.var 0) (.integer type.min)) (.bool true)
       (.binary .integerLt (.integer type.max) (.var 0)))
 
@@ -1407,10 +1537,139 @@ theorem fixedInteger_evaluates {environment : Core.Environment} {store : Core.St
         (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; omega))
           (.binary (.var rfl) .integer rfl))
 
-theorem checkedOperator_apply (operator : Syntax.BinaryOp) (left right : Int) :
+theorem checkedOperator_apply {operator : Syntax.BinaryOp} (notDivision : checkedDivision operator = false)
+    (left right : Int) :
     (checkedOperator operator).apply (.integer left) (.integer right) =
       some (.integer (checkedIntegerValue operator left right)) := by
-  cases operator <;> rfl
+  cases operator <;> first | rfl | simp [checkedDivision] at notDivision
+
+/-- The magnitude of an Integer, as `magnitude` computes it. -/
+theorem magnitude_evaluates {environment : Core.Environment} {store : Core.Store} {k : Nat} {value : Int}
+    (found : environment[k]? = some (.integer value)) :
+    Core.Evaluates environment store (magnitude (.var k)) (.integer (value.natAbs : Int)) store := by
+  unfold magnitude
+  by_cases negative : value < 0
+  · have magnitudeEq : ((value.natAbs : Nat) : Int) = 0 - value := by omega
+    rw [magnitudeEq]
+    exact .ifTrue (.binary (.var found) .integer (by simp [Core.BinaryOp.apply, negative]))
+      (.binary .integer (.var found) rfl)
+  · have magnitudeEq : ((value.natAbs : Nat) : Int) = value := by omega
+    rw [magnitudeEq]
+    exact .ifFalse (.binary (.var found) .integer (by simp [Core.BinaryOp.apply, negative])) (.var found)
+
+/-- Rounding toward zero is the quotient of the magnitudes, negated when the
+signs differ. -/
+theorem tdiv_signs (a b : Int) :
+    a.tdiv b = if a < 0 then
+        (if b < 0 then ((a.natAbs / b.natAbs : Nat) : Int) else 0 - ((a.natAbs / b.natAbs : Nat) : Int))
+      else (if b < 0 then 0 - ((a.natAbs / b.natAbs : Nat) : Int) else ((a.natAbs / b.natAbs : Nat) : Int)) := by
+  cases a <;> cases b <;> simp [Int.tdiv, Int.natAbs, Int.negSucc_lt_zero] <;> omega
+
+/-- The remainder with the dividend's sign is the remainder of the magnitudes,
+negated for a negative dividend. -/
+theorem tmod_signs (a b : Int) :
+    a.tmod b = if a < 0 then 0 - ((a.natAbs % b.natAbs : Nat) : Int) else ((a.natAbs % b.natAbs : Nat) : Int) := by
+  cases a <;> cases b <;> simp [Int.tmod, Int.natAbs, Int.negSucc_lt_zero] <;> omega
+
+theorem integer_divide_natAbs (a b : Int) :
+    Core.Integer.divide (a.natAbs : Int) (b.natAbs : Int) = ((a.natAbs / b.natAbs : Nat) : Int) := by
+  unfold Core.Integer.divide
+  split
+  · rename_i zero
+    have magnitudeZero : b.natAbs = 0 := by omega
+    simp [magnitudeZero]
+  · rfl
+
+theorem integer_modulo_natAbs (a b : Int) (nonzero : b ≠ 0) :
+    Core.Integer.modulo (a.natAbs : Int) (b.natAbs : Int) = ((a.natAbs % b.natAbs : Nat) : Int) := by
+  unfold Core.Integer.modulo
+  split
+  · omega
+  · rfl
+
+/-- `truncatedDivision` computes `divisionIntegerValue`. -/
+theorem truncatedDivision_evaluates {environment : Core.Environment} {store : Core.Store} {a b : Int}
+    (operator : Syntax.BinaryOp) :
+    Core.Evaluates (.integer b :: .integer a :: environment) store (truncatedDivision operator)
+      (.integer (divisionIntegerValue operator a b)) store := by
+  have magA := magnitude_evaluates (environment := .integer b :: .integer a :: environment) (store := store)
+    (k := 1) (value := a) rfl
+  have magB := magnitude_evaluates (environment := .integer b :: .integer a :: environment) (store := store)
+    (k := 0) (value := b) rfl
+  cases operator
+  case modulo =>
+    unfold truncatedDivision divisionIntegerValue
+    by_cases zero : b = 0
+    · subst zero
+      simp only [↓reduceIte]
+      have applied : Core.BinaryOp.apply .integerMod (.integer (a.natAbs : Int)) (.integer ((0 : Int).natAbs : Int)) =
+          some (.integer 0) := by simp [Core.BinaryOp.apply, Core.Integer.modulo]
+      by_cases negative : a < 0
+      · exact .letE (.binary magA magB applied)
+          (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negative]))
+            (.binary .integer (.var rfl) (by simp [Core.BinaryOp.apply])))
+      · exact .letE (.binary magA magB applied)
+          (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negative])) (.var rfl))
+    · simp only [zero, ↓reduceIte]
+      rw [tmod_signs]
+      have applied : Core.BinaryOp.apply .integerMod (.integer (a.natAbs : Int)) (.integer (b.natAbs : Int)) =
+          some (.integer ((a.natAbs % b.natAbs : Nat) : Int)) := by
+        simp [Core.BinaryOp.apply, integer_modulo_natAbs a b zero]
+      by_cases negative : a < 0
+      · simp only [negative, ↓reduceIte]
+        exact .letE (.binary magA magB applied)
+          (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negative]))
+            (.binary .integer (.var rfl) rfl))
+      · simp only [negative, ↓reduceIte]
+        exact .letE (.binary magA magB applied)
+          (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negative])) (.var rfl))
+  all_goals
+    unfold truncatedDivision divisionIntegerValue
+    simp only
+    rw [tdiv_signs]
+    have applied : Core.BinaryOp.apply .integerDiv (.integer (a.natAbs : Int)) (.integer (b.natAbs : Int)) =
+        some (.integer ((a.natAbs / b.natAbs : Nat) : Int)) := by
+      simp [Core.BinaryOp.apply, integer_divide_natAbs]
+    by_cases negativeA : a < 0 <;> by_cases negativeB : b < 0 <;> simp only [negativeA, negativeB, ↓reduceIte]
+    · exact .letE (.binary magA magB applied)
+        (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeA]))
+          (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeB])) (.var rfl)))
+    · exact .letE (.binary magA magB applied)
+        (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeA]))
+          (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeB]))
+            (.binary .integer (.var rfl) rfl)))
+    · exact .letE (.binary magA magB applied)
+        (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeA]))
+          (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeB]))
+            (.binary .integer (.var rfl) rfl)))
+    · exact .letE (.binary magA magB applied)
+        (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeA]))
+          (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply, negativeB])) (.var rfl)))
+
+/-- A nonzero divisor word reads as a nonzero Integer. -/
+theorem fixedIntegerValue_ne_zero {signed : Bool} {word : Core.Word} (nonzero : word ≠ Core.Word.zero) :
+    fixedIntegerValue signed word ≠ 0 := by
+  have bound := word.isLt
+  have positive : word.val ≠ 0 := fun zero => nonzero (Fin.ext (by simpa [Core.Word.zero] using zero))
+  unfold fixedIntegerValue
+  simp only [Core.wordModulus] at bound
+  cases signed
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    omega
+  · simp only [↓reduceIte]
+    split <;> omega
+
+/-- `checkedExact` computes `checkedIntegerValue` on the two words. -/
+theorem checkedExact_evaluates {environment : Core.Environment} {store : Core.Store}
+    {left right : Nat} {a b : Core.Word} (signed : Bool) (operator : Syntax.BinaryOp)
+    (leftFound : environment[left]? = some (.word a)) (rightFound : environment[right]? = some (.word b)) :
+    Core.Evaluates environment store (checkedExact signed operator left right)
+      (.integer (checkedIntegerValue operator (fixedIntegerValue signed a) (fixedIntegerValue signed b))) store := by
+  cases operator <;> first
+    | exact .letE (fixedInteger_evaluates signed leftFound)
+        (.letE (fixedInteger_evaluates signed (by simpa using rightFound)) (truncatedDivision_evaluates _))
+    | exact .binary (fixedInteger_evaluates signed leftFound) (fixedInteger_evaluates signed rightFound)
+        (checkedOperator_apply rfl _ _)
 
 /-- The range test is `true` exactly outside the type's range. -/
 theorem checkedOutside_evaluates {environment : Core.Environment} {store : Core.Store}
@@ -1422,11 +1681,9 @@ theorem checkedOutside_evaluates {environment : Core.Environment} {store : Core.
   generalize valueEq : checkedIntegerValue operator (fixedIntegerValue type.signed a)
     (fixedIntegerValue type.signed b) = value
   have evaluated : Core.Evaluates environment store
-      (.binary (checkedOperator operator) (fixedInteger type.signed (.var left))
-        (fixedInteger type.signed (.var right))) (.integer value) store := by
+      (checkedExact type.signed operator left right) (.integer value) store := by
     rw [← valueEq]
-    exact .binary (fixedInteger_evaluates _ leftFound) (fixedInteger_evaluates _ rightFound)
-      (checkedOperator_apply _ _ _)
+    exact checkedExact_evaluates type.signed operator leftFound rightFound
   by_cases low : value < type.min
   · have result : (!decide (type.min ≤ value ∧ value ≤ type.max)) = true := by
       simp only [Bool.not_eq_true', decide_eq_false_iff_not]
@@ -1472,6 +1729,25 @@ theorem fixedInteger_inv {environment : Core.Environment} {store after : Core.St
         cases operand with
         | var found => exact ⟨word, found⟩
 
+/-- The exact result evaluates only on two words. -/
+theorem checkedExact_inv {environment : Core.Environment} {store after : Core.Store} {value : Core.Value}
+    {signed : Bool} {operator : Syntax.BinaryOp} {left right : Nat}
+    (evaluated : Core.Evaluates environment store (checkedExact signed operator left right) value after) :
+    ∃ a b, environment[left]? = some (.word a) ∧ environment[right]? = some (.word b) := by
+  cases operator <;> first
+    | (cases evaluated with
+        | letE first rest =>
+          cases rest with
+          | letE second _ =>
+            obtain ⟨a, foundA⟩ := fixedInteger_inv first
+            obtain ⟨b, foundB⟩ := fixedInteger_inv second
+            exact ⟨a, b, foundA, by simpa using foundB⟩)
+    | (cases evaluated with
+        | binary first second _ =>
+          obtain ⟨a, foundA⟩ := fixedInteger_inv first
+          obtain ⟨b, foundB⟩ := fixedInteger_inv second
+          exact ⟨a, b, foundA, foundB⟩)
+
 /-- The range test evaluates only on two words, to `checkedOutside_evaluates`'s
 value, without effects. -/
 theorem checkedOutside_inv {environment : Core.Environment} {store after : Core.Store} {value : Core.Value}
@@ -1482,12 +1758,7 @@ theorem checkedOutside_inv {environment : Core.Environment} {store after : Core.
   have operands : ∃ a b, environment[left]? = some (.word a) ∧ environment[right]? = some (.word b) := by
     unfold checkedOutside at evaluated
     cases evaluated with
-    | letE bound _ =>
-      cases bound with
-      | binary first second _ =>
-        obtain ⟨a, foundA⟩ := fixedInteger_inv first
-        obtain ⟨b, foundB⟩ := fixedInteger_inv second
-        exact ⟨a, b, foundA, foundB⟩
+    | letE bound _ => exact checkedExact_inv bound
   obtain ⟨a, b, foundA, foundB⟩ := operands
   obtain ⟨same, sameStore⟩ :=
     Core.evaluation_deterministic evaluated (checkedOutside_evaluates (store := store) type operator foundA foundB)

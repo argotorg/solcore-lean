@@ -736,9 +736,9 @@ inductive AssignmentOperandsPanic (targetType : TypeSystem.Ty) :
 
 namespace AssignmentOperandsPanic
 
-/-- Away from checked `+= -= *=` at a fixed-width integer target, a compound
-assignment panics only by its primitive operation: an unchecked `/=` or `%=` by
-zero. -/
+/-- Away from checked `+= -= *= /= %=` at a fixed-width integer target, a
+compound assignment panics only by its primitive operation: an unchecked `/=` or
+`%=` by zero. -/
 theorem primitive_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
     {current : Option Value} {right : Value} {code : UInt8}
     (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator)
@@ -757,6 +757,11 @@ theorem primitive_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.Value
         · exact absurd .add (plain _ rfl)
         · exact absurd .subtract (plain _ rfl)
         · exact absurd .multiply (plain _ rfl)
+      | divisionByZero kind | divisionOverflow kind =>
+        cases Option.some.inj operand
+        cases kind <;> cases corresponds
+        · exact absurd .divide (plain _ rfl)
+        · exact absurd .modulo (plain _ rfl)
 
 /-- The primitive panics are panics at every target type. -/
 theorem of_primitive {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
@@ -1036,7 +1041,7 @@ theorem excludes_value_panic
   | primitive panics => exact invalid.excludes_panic panics
   | fixed _ panics =>
     cases panics with
-    | overflow kind =>
+    | overflow kind | divisionByZero kind | divisionOverflow kind =>
       cases invalid with
       | numeric _ invalid_pair => exact invalid_pair trivial
       | word _ invalid_pair => exact invalid_pair trivial

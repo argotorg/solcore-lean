@@ -517,6 +517,10 @@ inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty �
   | fixedChecked {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedCheckedArithmetic operator) :
       BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
+  /-- Checked `/ %` on a fixed-width integer type. -/
+  | fixedDivision {operator} {type : TypeSystem.FixedInteger}
+      (kind : FixedCheckedDivision operator) :
+      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
 
 theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
     {operand result : TypeSystem.Ty} (typed : BinaryOperatorHasType context operator operand operand result []) :
@@ -535,6 +539,7 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   | fixedBitwise kind => exact ⟨_, .fixedBitwise kind⟩
   | fixedSignedComparison kind => exact ⟨_, .fixedSigned kind⟩
   | fixedArithmetic kind => exact ⟨_, .fixedChecked kind⟩
+  | fixedDivision kind => exact ⟨_, .fixedDivision kind⟩
   | trait _ profile evidence => cases profile; cases evidence
 
 /-- Outside the checked mode, a strict operator lowers through `binaryWith`. -/
@@ -1422,6 +1427,7 @@ def Mode.continuation (mode : Mode) (operator : Syntax.BinaryOp) : Expr :=
   | .checked _, .uncheckedDivide | .checked _, .uncheckedModulo => SourceCorePrimitive.panickingBody operator
   | .checked type, .add | .checked type, .subtract | .checked type, .multiply =>
       SourceCorePrimitive.checkedBody type operator
+  | .checked type, .divide | .checked type, .modulo => SourceCorePrimitive.divisionBody type operator
   | _, _ => LanguageResult.success (mode.body operator)
 
 def Mode.tail (mode : Mode) (operator : Syntax.BinaryOp) (right : Expr) : Expr :=
@@ -1440,6 +1446,7 @@ theorem Mode.binary_rename (mode : Mode) (operator : Syntax.BinaryOp) (left righ
   cases mode <;> cases operator <;>
     simp [Mode.binary, SourceCorePrimitive.binary, SourceCorePrimitive.signedBinary,
       SourceCorePrimitive.checkedBinary, SourceCorePrimitive.checkedBody_rename,
+      SourceCorePrimitive.divisionBody_rename,
       SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary,
       LocalPrimitiveResults.binaryWith, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr,
       LocalControl.choose, LanguageResult.bind, LanguageResult.success, LanguageResult.failure, Expr.rename,
@@ -1497,6 +1504,10 @@ theorem signed_body {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp
 
 theorem _root_.Solcore.SourceSemantics.FixedCheckedArithmetic.strict {operator : Syntax.BinaryOp}
     (kind : FixedCheckedArithmetic operator) : Dynamic.StrictBinaryOperator operator := by
+  cases kind <;> constructor
+
+theorem _root_.Solcore.SourceSemantics.FixedCheckedDivision.strict {operator : Syntax.BinaryOp}
+    (kind : FixedCheckedDivision operator) : Dynamic.StrictBinaryOperator operator := by
   cases kind <;> constructor
 
 /-- A canonical word of a fixed-width integer type, read as the Integer it stands
@@ -1557,6 +1568,75 @@ theorem checked_body_panic {environment : Environment} {store : Store}
       (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega))
         (.ifTrue (.binary .integer (.var rfl) (by simp [BinaryOp.apply]; omega)) (.inLeft .word)))
 
+/-- A nonzero divisor word reads as a nonzero integer of its type. -/
+theorem fixedValue_ne_zero {type : TypeSystem.FixedInteger} {word : Word} (nonzero : word ≠ Word.zero) :
+    Dynamic.fixedValue type word ≠ 0 := by
+  have same : Dynamic.fixedValue type word = SourceCorePrimitive.fixedIntegerValue type.signed word := by
+    unfold Dynamic.fixedValue Dynamic.wordSigned SourceCorePrimitive.fixedIntegerValue
+    rfl
+  rw [same]
+  exact SourceCorePrimitive.fixedIntegerValue_ne_zero nonzero
+
+/-- By a nonzero divisor, the division body computes the source semantics'
+quotient and remainder. -/
+theorem division_value {operator : Syntax.BinaryOp} (kind : FixedCheckedDivision operator) {a b : Int}
+    (nonzero : b ≠ 0) :
+    SourceCorePrimitive.divisionIntegerValue operator a b = Dynamic.divisionResult operator a b := by
+  cases kind
+  · rfl
+  · simp [SourceCorePrimitive.divisionIntegerValue, Dynamic.divisionResult, nonzero]
+
+/-- A zero divisor fails with `Panic(0x12)`. -/
+theorem division_body_zero {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left : Word} :
+    Evaluates (.word Word.zero :: .word left :: environment) store (SourceCorePrimitive.divisionBody type operator)
+      (.inLeft .word (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store :=
+  .ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inLeft .word)
+
+/-- By a nonzero divisor, in the type's range, the division body gives the
+result's word. -/
+theorem division_body_success {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Word}
+    (kind : FixedCheckedDivision operator) (nonzero : right ≠ Word.zero)
+    (inRange : Dynamic.FixedInRange type
+      (Dynamic.divisionResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))) :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.divisionBody type operator)
+      (.inRight .word (.word (Word.ofIntModulo
+        (Dynamic.divisionResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))))) store := by
+  rw [← division_value kind (fixedValue_ne_zero nonzero)] at inRange ⊢
+  exact .ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, nonzero]))
+    (.letE (fixed_integer type rfl)
+      (.letE (fixed_integer type rfl)
+        (.letE (SourceCorePrimitive.truncatedDivision_evaluates operator)
+          (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; exact inRange.1))
+            (.ifFalse (.binary .integer (.var rfl) (by simp [BinaryOp.apply]; exact inRange.2))
+              (.inRight (.unary (.var rfl) rfl)))))))
+
+/-- By a nonzero divisor, outside the type's range, the division body fails
+with `Panic(0x11)`. -/
+theorem division_body_overflow {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Word}
+    (kind : FixedCheckedDivision operator) (nonzero : right ≠ Word.zero)
+    (outside : ¬ Dynamic.FixedInRange type
+      (Dynamic.divisionResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))) :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.divisionBody type operator)
+      (.inLeft .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) store := by
+  rw [← division_value kind (fixedValue_ne_zero nonzero)] at outside
+  unfold Dynamic.FixedInRange at outside
+  by_cases low : SourceCorePrimitive.divisionIntegerValue operator (Dynamic.fixedValue type left)
+      (Dynamic.fixedValue type right) < type.min
+  · exact .ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, nonzero]))
+      (.letE (fixed_integer type rfl)
+        (.letE (fixed_integer type rfl)
+          (.letE (SourceCorePrimitive.truncatedDivision_evaluates operator)
+            (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; exact low)) (.inLeft .word)))))
+  · exact .ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, nonzero]))
+      (.letE (fixed_integer type rfl)
+        (.letE (fixed_integer type rfl)
+          (.letE (SourceCorePrimitive.truncatedDivision_evaluates operator)
+            (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega))
+              (.ifTrue (.binary .integer (.var rfl) (by simp [BinaryOp.apply]; omega)) (.inLeft .word))))))
+
 /-- Outside the signed and checked modes, Word's (Integer's, Boolean's) meaning
 applies at the profile's operand type. -/
 theorem BinaryProfile.word_meaning (profile : BinaryProfile operator operand result mode)
@@ -1570,7 +1650,7 @@ theorem BinaryProfile.word_meaning (profile : BinaryProfile operator operand res
     cases kind <;> cases own <;> simp_all
   | fixedBitwise kind => cases kind <;> cases own
   | fixedSigned => exact notSigned rfl
-  | fixedChecked => simp [Mode.checkedType?] at notChecked
+  | fixedChecked | fixedDivision => simp [Mode.checkedType?] at notChecked
 
 
 theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand result mode)
@@ -1584,6 +1664,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
   | fixedBitwise kind => exact .inr (.strict kind.strict)
   | fixedSigned kind => exact .inr (.strict kind.strict)
   | fixedChecked kind => exact .inr (.strict kind.strict)
+  | fixedDivision kind => exact .inr (.strict kind.strict)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -1607,6 +1688,7 @@ theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand resul
   | fixedBitwise kind => cases invalid <;> cases kind
   | fixedSigned kind => cases invalid <;> cases kind
   | fixedChecked kind => cases invalid <;> cases kind
+  | fixedDivision kind => cases invalid <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases invalid with | logicalAnd invalid => exact invalid trivial
@@ -1626,6 +1708,8 @@ theorem Mode.left_failure {environment : Environment} {before after : Store} {le
     | exact SourceCorePrimitive.checkedBinary_left_failure (.inl rfl) evaluated
     | exact SourceCorePrimitive.checkedBinary_left_failure (.inr (.inl rfl)) evaluated
     | exact SourceCorePrimitive.checkedBinary_left_failure (.inr (.inr rfl)) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure_division (.inl rfl) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure_division (.inr rfl) evaluated
 
 theorem BinaryProfile.short {environment : Environment} {before after : Store} {left right : Expr} {output : Dynamic.Value}
     (profile : BinaryProfile operator operand result mode)
@@ -1642,6 +1726,7 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
   | fixedBitwise kind => cases circuit <;> cases kind
   | fixedSigned kind => cases circuit <;> cases kind
   | fixedChecked kind => cases circuit <;> cases kind
+  | fixedDivision kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -1673,6 +1758,10 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
     · exact SourceCorePrimitive.checkedBinary_right_failure (.inl rfl) first second
     · exact SourceCorePrimitive.checkedBinary_right_failure (.inr (.inl rfl)) first second
     · exact SourceCorePrimitive.checkedBinary_right_failure (.inr (.inr rfl)) first second
+  | fixedDivision kind =>
+    cases kind
+    · exact SourceCorePrimitive.checkedBinary_right_failure_division (.inl rfl) first second
+    · exact SourceCorePrimitive.checkedBinary_right_failure_division (.inr rfl) first second
   | panicking panicking =>
     cases panicking <;> exact SourceCorePrimitive.binaryPanicking_right_failure first second
   | logicalAnd =>
@@ -1791,7 +1880,7 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     | strict strict | panicking strict => cases strict
     | orFalse => exact ⟨_, _, .logicalOr false b, .bool b, LocalPrimitiveResults.logicalOr_right first second⟩
   | fixedSigned => exact absurd rfl notSigned
-  | fixedChecked => simp [Mode.checkedType?] at notChecked
+  | fixedChecked | fixedDivision => simp [Mode.checkedType?] at notChecked
 
 /-- Checked `+ - *` after both operands: the result's word in the type's range,
 `Panic(0x11)` outside it. -/
@@ -1821,6 +1910,41 @@ theorem checked_outcome {environment : Environment} {before middle after : Store
       LanguageResult.bind_success _ first (LanguageResult.bind_success _ second (checked_body_success kind inRange))⟩
   · exact .inr ⟨_, .fixed operandEq (.overflow kind a b inRange),
       LanguageResult.bind_success _ first (LanguageResult.bind_success _ second (checked_body_panic kind inRange))⟩
+
+/-- Checked `/ %` after both operands: `Panic(0x12)` by a zero divisor, the
+result's word in the type's range, `Panic(0x11)` outside it. -/
+theorem division_outcome {environment : Environment} {before middle after : Store} {left right : Expr}
+    {type : TypeSystem.FixedInteger} {lookup : Option TypeSystem.Ty} {a b : Word}
+    (kind : FixedCheckedDivision operator) (operandEq : lookup = some (.fixed type))
+    (first : Evaluates environment before left (.inRight .word (.word a)) middle)
+    (second : Evaluates (.word a :: environment) middle (right.weakenAt 0) (.inRight .word (.word b)) after) :
+    (∃ sourceResult coreResult, Dynamic.BinaryValueApplies lookup operator (.word a) (.word b) sourceResult ∧
+      ValueRep checked registry functions mapping world (.fixed type) sourceResult coreResult
+        ((Mode.checked type).resultType operator) ∧
+      Evaluates environment before ((Mode.checked type).binary operator left right) (.inRight .word coreResult)
+        after) ∨
+    (∃ code, Dynamic.BinaryValuePanics lookup operator (.word a) (.word b) code ∧
+      Evaluates environment before ((Mode.checked type).binary operator left right)
+        (.inLeft ((Mode.checked type).resultType operator) (.word (SourceCorePanics.reason code))) after) := by
+  have resultEq : (Mode.checked type).resultType operator = .word := by cases kind <;> rfl
+  have binaryEq : (Mode.checked type).binary operator left right =
+      LanguageResult.bind .word left
+        (LanguageResult.bind .word (right.weakenAt 0) (SourceCorePrimitive.divisionBody type operator)) := by
+    cases kind <;> rfl
+  rw [resultEq, binaryEq]
+  by_cases zero : b = Word.zero
+  · subst zero
+    exact .inr ⟨_, .fixed operandEq (.divisionByZero kind a),
+      LanguageResult.bind_success _ first (LanguageResult.bind_success _ second division_body_zero)⟩
+  · by_cases inRange : Dynamic.FixedInRange type
+        (Dynamic.divisionResult operator (Dynamic.fixedValue type a) (Dynamic.fixedValue type b))
+    · exact .inl ⟨_, _, .fixed operandEq (.division kind a b zero inRange),
+        .fixed _ (Dynamic.fixed_canonical_ofInt inRange.1 inRange.2),
+        LanguageResult.bind_success _ first
+          (LanguageResult.bind_success _ second (division_body_success kind zero inRange))⟩
+    · exact .inr ⟨_, .fixed operandEq (.divisionOverflow kind a b zero inRange),
+        LanguageResult.bind_success _ first
+          (LanguageResult.bind_success _ second (division_body_overflow kind zero inRange))⟩
 
 /-- After both operands, the operation at the operands' static type `lookup`
 either applies or, for unchecked `/` and `%` with a zero divisor, panics. -/
@@ -1862,6 +1986,10 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
         obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
         obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
         exact checked_outcome kind operandEq first second
+      | fixedDivision kind =>
+        obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+        exact division_outcome kind operandEq first second
     | none =>
       rcases profile.right_outcome_primitive signedMode checkedMode leftRep rightRep continues first second with
         ⟨sourceResult, coreResult, applied, represented, evaluated⟩ | ⟨code, panicked, evaluated⟩
@@ -1923,6 +2051,7 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   | fixedBitwise kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedSigned kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedChecked kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | fixedDivision kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

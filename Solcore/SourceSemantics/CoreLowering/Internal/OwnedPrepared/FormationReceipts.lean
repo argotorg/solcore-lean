@@ -2798,6 +2798,17 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
     | caseE first failure remaining =>
       cases remaining with
       | caseE second failure returned => exact ⟨⟨_, first⟩, ⟨_, remove_front second⟩⟩
+  | @fixedDivision _ type kind =>
+    -- Checked `/ %` bind both operands before the division body.
+    have shape : (Mode.checked type).binary operator left right =
+        LanguageResult.bind .word left
+          (LanguageResult.bind .word (right.weakenAt 0) (SourceCorePrimitive.divisionBody type operator)) := by
+      cases kind <;> rfl
+    rw [shape] at typed
+    cases typed with
+    | caseE first failure remaining =>
+      cases remaining with
+      | caseE second failure returned => exact ⟨⟨_, first⟩, ⟨_, remove_front second⟩⟩
   | panicking panicking =>
     -- Unchecked `/` and `%` bind both operands before the checked body.
     have shape : Mode.word.binary operator left right =

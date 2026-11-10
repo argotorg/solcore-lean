@@ -455,15 +455,15 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
 
 /-- The binary operators that are builtins on a fixed-width integer type, with
 both operands of that type: `==`, `!=`, `& | ^`, the orderings and checked
-`+ - *`. On canonical words they are Word's, except the orderings on the signed
-types, which compare the integers the words stand for, and the checked
-arithmetic, which panics outside the type's range. -/
+`+ - * / %`. On canonical words they are Word's, except the orderings on the
+signed types, which compare the integers the words stand for, and the checked
+arithmetic, which panics outside the type's range or on a zero divisor. -/
 def fixedBinaryOperator (operator : Syntax.BinaryOp) : Ty → Bool
   | .constructor (.builtin (.fixed _)) =>
       match operator with
       | .equal | .notEqual | .bitAnd | .bitXor | .bitOr
       | .less | .greater | .lessEqual | .greaterEqual
-      | .add | .subtract | .multiply => true
+      | .add | .subtract | .multiply | .divide | .modulo => true
       | _ => false
   | _ => false
 
@@ -484,13 +484,14 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
 
 /-- The type constructor of a compound assignment's operand type at a target
 type. Compound assignment takes the target's type where its binary operator is
-a builtin there: `+= -= *=` (checked) and `&= |= ^=` (Word's on canonical
+a builtin there: `+= -= *= /= %=` (checked) and `&= |= ^=` (Word's on canonical
 words) at a fixed-width integer type. Elsewhere the compound operators are
 Word's. -/
 def compoundOperandConstructor (operator : Syntax.ValueAssignOp) : Ty → TypeSystem.TypeConstructorId
   | .constructor (.builtin (.fixed type)) =>
       match operator with
-      | .add | .subtract | .multiply | .bitAnd | .bitXor | .bitOr => .builtin (.fixed type)
+      | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr =>
+          .builtin (.fixed type)
       | _ => .builtin .word
   | _ => .builtin .word
 
@@ -586,7 +587,7 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
   -- The twelve fixed-width integer types take `==`, `!=`, `& | ^`, the
-  -- orderings and checked `+ - *` as builtins (`fixedBinaryOperator`).
+  -- orderings and checked `+ - * / %` as builtins (`fixedBinaryOperator`).
   if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand

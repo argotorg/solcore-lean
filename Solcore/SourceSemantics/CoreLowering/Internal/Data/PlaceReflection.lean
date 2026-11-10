@@ -2037,7 +2037,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
             | caseRight setterEvaluated tail =>
               rename_i setterStore setterType updatedValue
               rcases guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩ |
-                  ⟨operation, type, binary, rfl, ⟨passes, tail⟩ | ⟨_, impossible, _⟩⟩
+                  ⟨operation, type, binary, rfl, ⟨divisor, passes, tail⟩ | ⟨_, _, impossible, _⟩ |
+                    ⟨_, _, impossible, _⟩⟩
               · cases tail with
                 | letE writeEvaluated terminal =>
                   rename_i writtenStore writtenValue
@@ -2062,7 +2063,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
                     intro next outputType value finalStore continuation
                     exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
                       (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
-                        (guard_rangePasses passes (.letE writeEvaluated continuation)))))))
+                        (guard_rangePasses divisor passes (.letE writeEvaluated continuation)))))))
+              · cases impossible
               · cases impossible
 
 /-- A universal expression IH supplies the continuation evaluation at the

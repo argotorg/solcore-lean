@@ -140,17 +140,20 @@ private theorem assignment_operator_types (integer : Bool) (operator : Syntax.Va
   all_goals cases selected
   all_goals rfl
 
-/-- The checked modifier's operation is Word's `+ - *`, whose right operand
-and result are both Word, as every other compound operator's are. -/
+/-- The checked modifier's operation is Word's `+ - * / %` (signed `/ %` on the
+signed types), whose right operand and result are both Word, as every other
+compound operator's are. -/
 private theorem assignment_modifier_types (target : TypeSystem.Ty) (integer : Bool)
     (operator : Syntax.ValueAssignOp) {op : Frontend.SourceCoreDataPlaces.Modifier}
     (selected : assignmentModifier target integer operator = some op) :
     op.operation.rightType = op.operation.resultType := by
   unfold assignmentModifier at selected
   split at selected
-  · rename_i binary _
+  · rename_i type binary _
     cases selected
-    cases binary <;> rfl
+    cases binary <;> first
+      | rfl
+      | (simp only [Frontend.SourceCoreDataPlaces.checkedWordOperation]; split <;> rfl)
   · exact assignment_operator_types integer operator selected
 
 /-- A real present RHS is used by the modifier. The setter's literal

@@ -908,13 +908,20 @@ private theorem guard_typed {context : Core.Context} {outputType result : Ty}
     {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {write : Expr} {definitions : DataEnvironment}
     (typed : HasType context (Frontend.SourceCoreDataPlaces.guard outputType operator write) result definitions) :
     HasType context write result definitions := by
-  rcases operator with _ | ⟨operation, _ | _ | _⟩
+  rcases operator with _ | ⟨operation, _ | _ | ⟨type, binary⟩⟩
   · exact typed
   · exact typed
   · cases typed with
     | ifE _ _ written => exact written
-  · cases typed with
-    | ifE _ _ written => exact written
+  · cases division : SourceCorePrimitive.checkedDivision binary
+    · rw [SourceCoreDataPlaces.guard_range_plain division] at typed
+      cases typed with
+      | ifE _ _ written => exact written
+    · rw [SourceCoreDataPlaces.guard_range_division division] at typed
+      cases typed with
+      | ifE _ _ rest =>
+        cases rest with
+        | ifE _ _ written => exact written
 
 theorem execute_continuation {prepared : SourceCoreCompatibleDataPlaces.Prepared}
     {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}

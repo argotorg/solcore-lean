@@ -733,7 +733,7 @@ Made on 2026-11-10, during step 3d.
   (checked) and `&= |= ^=` (Word's on canonical words) at the twelve types. So
   `&= |= ^=` come with this step. The other compound forms stay Word's until
   their binary operators are builtins at the twelve types: `/=` and `%=` with
-  step 5, the shifts and the unchecked forms with step 7. In-place `~` stays
+  step 4, the shifts and the unchecked forms with step 8. In-place `~` stays
   Word's.
 - **Semantics.** The value-assignment rules apply `CompoundAssignmentApplies`
   at the target's static type: `AssignmentValueApplies` where the meaning is
@@ -776,13 +776,59 @@ Made on 2026-11-10, during step 3d.
   - for `&= |= ^=`, the canonical words of the representation
     (`ValueRep.fixed`) in the modifier's result.
 
+### Row 1's division: before the literals
+
+Made on 2026-11-10, when step 4 (then the literals) began. The integrator
+chose to move checked `/ %` ahead of the literals.
+
+- **Why the order changed.** An operator whose operand is an open literal is
+  deferred and takes the literal's type. In a program without the `Div` and
+  `Mod` traits, `let a = 6 / 2; let b: uint8 = a;` defers `/`, and the second
+  `let` gives it `uint8`. With literals at the twelve types and no
+  fixed-width rule for `/`, inference would accept the program, and its
+  soundness could not be proved for that node. The compilation plan rejected
+  such a node, so nothing would have been miscompiled. Every other operator
+  that can be deferred already had its rule; shifts and unchecked operators
+  never defer.
+- **The alternative.** Rejecting a deferred `/ %` whose type ends fixed would
+  have kept the order. It needs the operator's own node after finalization in
+  the nested soundness proofs, which carry none, and the `/ %` step would have
+  removed it again.
+- **Semantics.** By a nonzero divisor, `/` gives the quotient rounded toward
+  zero (`Int.tdiv`) and `%` the remainder with the dividend's sign
+  (`Int.tmod`), as `Dynamic.divisionResult`, when the result lies in the type's
+  range (`FixedBinaryApplies.division`). A zero divisor panics with
+  `Panic(0x12)` (`FixedBinaryPanics.divisionByZero`), and a result outside the
+  range with `Panic(0x11)` (`divisionOverflow`). Only `MIN / -1` on a signed
+  type leaves the range; `MIN % -1` is 0. The typing is
+  `BinaryOperatorHasType.fixedDivision` (`FixedCheckedDivision`).
+- **Lowering.** Core's `integerDiv` and `integerMod` are Euclidean, as the `/`
+  and `%` of Lean's `Int` are. So the division body
+  (`SourceCorePrimitive.divisionBody`) tests the divisor word against zero
+  first, reads both words as Core Integers (`fixedInteger`), divides their
+  magnitudes with Core's operations and restores the sign
+  (`truncatedDivision`), then checks the type's range and converts back, as
+  checked `+ - *` do. The compiler's choice is `checkedArithmetic`, now with
+  `/ %`, so they share the checked mode (`Mode.checked`,
+  `BinaryProfile.fixedDivision`) inside the meaning proofs.
+- **Compound `/= %=`.** They take the target's type and are checked
+  (`FixedCheckedCompound`). The modifier's operation is Word's `wordDiv` and
+  `wordMod`, or `wordSdiv` and `wordSmod` on the signed types
+  (`checkedWordOperation`); by a nonzero divisor, in range, that is the exact
+  result's word. For `/ %` the guard's range check tests the divisor against
+  zero first (`DivisorPasses`, `guard_rangeZero`), after the setter, so a
+  structural fault on the latest root still wins over either panic. Like 3d's
+  targets they are compiled but outside the meaning proofs' profiles.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
 integrated on its own. The operators come before the literals. An operator
 whose operand is an open literal waits for the literal's type and takes it
 (`let a = 1 + 2; let b: uint8 = a;`), so a literal can reach one of the twelve
-types only once the operators have typing rules there.
+types only once the operators have typing rules there. Checked `/ %` were
+first planned after the literals and moved before them for this reason
+([row 1's division](#row-1s-division-before-the-literals)).
 
 1. **Types.** The twelve types are builtins (`BuiltinType.fixed`), resolved
    before declared types. Their values are canonical words
@@ -810,14 +856,18 @@ types only once the operators have typing rules there.
    signed comparisons, which lower to Core's `wordSgt`; the unary lookup with
    `~`; checked `+ - *`, whose faults take the lookup too; and the compound
    forms.
-4. **Literals.** A literal at one of the twelve types is range-checked at
+4. **Checked `/ %` and `/= %=`.** A zero divisor panics with `0x12`, and
+   `MIN / −1` panics with `0x11`, while `MIN % −1` is 0. Quotients round
+   toward zero, and remainders take the dividend's sign. `/= %=` test the
+   divisor and the range in the guard after the setter, outside the meaning
+   proofs as step 3's compound targets are.
+5. **Literals.** A literal at one of the twelve types is range-checked at
    compile time, with builtin `Int` evidence for each type.
-5. **Checked `/ %` and unary minus.** A zero divisor panics with `0x12`, and
-   `MIN / −1` and a negation out of range panic with `0x11`. Quotients round
-   toward zero. A unary `-` on a literal folds into the literal.
-6. **The `uint256` default.** Open literals default to `uint256`, and an open
+6. **Unary minus.** A negation out of range panics with `0x11`, and a unary
+   `-` on a literal folds into the literal.
+7. **The `uint256` default.** Open literals default to `uint256`, and an open
    literal in no operator, comparison or requirement is rejected as
    ambiguous. The existing tests that relied on the `word` default change in
    this step.
-7. **Unchecked operators and shifts on the twelve types**, and ports of the
+8. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.
