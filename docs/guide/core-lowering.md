@@ -127,7 +127,14 @@ depends on the change.
     `operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`, restated in each
     file that needs it and in the receipts' `operatorType`. A new Word-only compound operator goes
     into `Syntax.ValueAssignOp.wordOnly`; `DataPlaceModifier.word_success` gains its case and
-    `integer_success` refutes it.
+    `integer_success` refutes it. The place lowering chooses the modifier from the target's static
+    type (`SourceCoreDataPlaces.assignmentModifier`): checked `+= -= *=` at a fixed-width target
+    compute Word's operation, and `guard` tests the exact result against the type's range after
+    the setter (`Check.range`). The profile leaves those targets out, so they are compiled but not
+    covered by the meaning proofs; inside it, `assignmentModifier_plain` gives back
+    `binaryOperator`'s modifier. The
+    [design note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)
+    says what bringing them in takes.
   - The public-API tests go in [Foundations/Execution](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean);
     the `example` in `Tests.SourceCorePrimitiveExpressions` (`Foundations/Statements`) runs every
     `StrictBinaryOperator` through `PrimitiveExpressions.lowerExpression_preserves`.

@@ -35,7 +35,7 @@ declarations go.
 | [WellFormed](../../Solcore/SourceSemantics/WellFormed.lean), [Graph](../../Solcore/SourceSemantics/Graph.lean) | The occurrence graph: `OccurrenceGraphWellFormed`, `ContainsExpression`, `Reachable`, `OccurrenceGraphClosed` |
 | [Ownership](../../Solcore/SourceSemantics/Ownership.lean), [Instantiation](../../Solcore/SourceSemantics/Instantiation.lean) | `LocalIdentityOwnership`, `RequirementOwnership`; `ExactSubstitution`, `SchemeInstantiates`, `StructuralSubstitution.applyScheme` |
 | [Traits](../../Solcore/SourceSemantics/Traits.lean), [Typing](../../Solcore/SourceSemantics/Typing.lean), [Requirements](../../Solcore/SourceSemantics/Requirements.lean) | Trait evidence (`EvidenceValid`), reference typing (`ReferenceHasRawType`), requirements and coercions (`RequirementValid`, `CoercionPathValid`) |
-| [Expressions](../../Solcore/SourceSemantics/Expressions.lean) | The construct rules: literals, operators (`BinaryOperatorHasType`, its operator classes, `BinaryTraitDispatch`), calls, patterns, places and assignments (`WordCompoundAssignmentOperator`). A new operator's typing goes here |
+| [Expressions](../../Solcore/SourceSemantics/Expressions.lean) | The construct rules: literals, operators (`BinaryOperatorHasType`, its operator classes, `BinaryTraitDispatch`), calls, patterns, places and assignments (`WordCompoundAssignmentOperator`, and `FixedCompoundAssignmentOperator` at the fixed-width integer types). A new operator's typing goes here |
 | [Control](../../Solcore/SourceSemantics/Control.lean) | `ControlContext`, `ControlSummary`, `BodyFacts` |
 | [Static](../../Solcore/SourceSemantics/Static.lean) | `ExpressionHasType`, `ExpressionFormHasRawType`, `StatementHasType`, `StatementsHaveType`, `BodyHasType`, `MatchExhaustive`. A new expression or statement form gets its typing rule here |
 | [StaticValidation](../../Solcore/SourceSemantics/StaticValidation.lean) | An executable scope validator and its correctness, `validateTypesWellScopedWith` |
@@ -54,7 +54,7 @@ not the complement of success.
 | [Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean) | `Dynamic.ValueHasType`, `Dynamic.HeapWellTyped`, `Dynamic.EnvironmentAgrees`, with their allocation and copy lemmas |
 | [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`; `Dynamic.BinaryValueApplies` and `Dynamic.UnaryValueApplies`, which choose between the primitive meaning and `Dynamic.FixedBinaryApplies` or `Dynamic.FixedUnaryApplies` by the operand's static type; `Dynamic.BinaryValuePanics`, the primitive panics with the fixed-width overflow (`Dynamic.FixedBinaryPanics`). A new primitive operation goes here |
 | [Place](../../Solcore/SourceSemantics/Dynamic/Place.lean) | `Dynamic.PlaceResolves`, `Dynamic.ProjectionsUpdate`, `Dynamic.PlaceAssignment` |
-| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies` |
+| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies`, which `Dynamic.CompoundAssignmentApplies` applies at the target's static type |
 | [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults`, and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
 | [Control](../../Solcore/SourceSemantics/Dynamic/Control.lean), [Preservation](../../Solcore/SourceSemantics/Dynamic/Preservation.lean) | Control outcomes against static summaries (`TypingControlShape`); the statement `Dynamic.WholeLanguagePreservation`, `Dynamic.SourceRuntimeValid`, and the cases that need no recursion, such as `Dynamic.BinaryPrimitiveApplies.preserves` |
 | [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean) | One mutual block of private cases (`preserveFormRec`, `preserveBinaryRec`, `preserveStatementRec`, …) and `ProgramWellFormed.wholeLanguagePreservation` |
@@ -173,7 +173,8 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
 1. **Typing**, in [Expressions](../../Solcore/SourceSemantics/Expressions.lean): an operator class
    (`ShiftBinaryOperator`, `UncheckedBinaryOperator`), a `BinaryOperatorHasType` constructor
    (`wordShift`, `wordUnchecked`), a `BinaryTraitDispatch` row if the operator dispatches to a trait,
-   and `WordCompoundAssignmentOperator` for the compound form.
+   and `WordCompoundAssignmentOperator` for the compound form, or `FixedCompoundAssignmentOperator`
+   where the compound form takes a fixed-width target's type.
 2. **Evaluation and faults**: `BinaryPrimitiveApplies` and `StrictBinaryOperator` in
    [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean), leaving a Word-only operator out
    of `IntegerStrictBinaryOperator`; `AssignmentValueApplies` in
@@ -185,10 +186,14 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    its panic, if it has one, goes into `FixedBinaryPanics`. The binary rules read the left
    operand's static type (`operandType?`) and apply `BinaryValueApplies`, which takes one meaning or
    the other, and their fault rules apply `BinaryValuePanics` the same way. A unary operator has the
-   same three: `FixedUnaryApplies`, `UnaryWordMeaning` and `UnaryValueApplies`.
+   same three: `FixedUnaryApplies`, `UnaryWordMeaning` and `UnaryValueApplies`. Compound assignment
+   reads the target's static type: `CompoundAssignmentApplies` takes `FixedBinaryApplies` for checked
+   `+= -= *=` at a fixed-width target and `AssignmentValueApplies` elsewhere, and
+   `AssignmentOperandsPanic` applies `BinaryValuePanics` at that type.
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in `PrimitiveBinaryHasType.sourceTyping`,
-   `BinaryPrimitiveApplies.preserves` and `AssignmentValueApplies.wordCompoundPreserves`, then the
-   binary case of `preserveBinaryRec`. Where Word's result would leave a fixed-width type's range,
+   `BinaryPrimitiveApplies.preserves` and `AssignmentValueApplies.wordCompoundPreserves`, which
+   `CompoundAssignmentApplies.preserves` extends to fixed-width targets, then the binary case of
+   `preserveBinaryRec`. Where Word's result would leave a fixed-width type's range,
    as for checked `+ - *` and for `~` on the narrower unsigned types, the proof needs the looked-up
    type to be the operand's typed type (`BinaryValueApplies.preserves_checked`,
    `UnaryValueApplies.preserves_narrow`); `Dynamic.operandType?_of_typing` gives it from the

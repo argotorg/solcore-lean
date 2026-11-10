@@ -101,7 +101,7 @@ The proofs are in three `Internal/` directories. A new lemma goes in the file of
 | [`SourceCore/Internal/CallableOutputs`](../../Solcore/Frontend/SourceCore/Internal/CallableOutputs.lean) | Reverse values, heap exports and the public output codec |
 | [`SourceCore/Internal/DirectLinking`](../../Solcore/Frontend/SourceCore/Internal/DirectLinking.lean) | Closed direct-call linking, and `SourceCoreDirectLinking.validatePlan` |
 | [`SourceCore/Internal/Entries`](../../Solcore/Frontend/SourceCore/Internal/Entries.lean) | Prepared entries, public values, the assignment policy |
-| [`SourceCore/Internal/FaultSites`](../../Solcore/Frontend/SourceCore/Internal/FaultSites.lean) | Source diagnostics for Core language failures |
+| [`SourceCore/Internal/FaultSites`](../../Solcore/Frontend/SourceCore/Internal/FaultSites.lean) | Source diagnostics for Core language failures; an assignment's operands have a site at a Word, Integer or fixed-width integer target (`SourceCoreAssignmentFaultSites.operandTarget`) |
 
 ### Rust Hull
 
