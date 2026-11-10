@@ -1585,7 +1585,8 @@ theorem Tree.preserves [FunctionCalls.FaultTokens faults] {mode : Bool} {scope :
       cases same
       obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, observed, continuation⟩ :=
         ProtectedAssignmentStatements.Head.preserves_prefix functions extension program evidence transport preservation faithful observations
-          head projected environments heaps locals agrees actualTyped installed assigned
+          head projected environments heaps locals agrees actualTyped installed
+          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
       obtain ⟨same, value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata⟩ :=
         ih (environments.extend maps worlds) middleHeaps (locals.mono metadata)
           (DataPlaceChildExpressions.prefix_agrees agrees slots) typed observed tail
@@ -1744,7 +1745,8 @@ theorem Tree.reflects [FunctionCalls.FaultTokens faults] {mode : Bool} {scope : 
           (DataPlaceChildExpressions.prefix_agrees agrees slots) typed observed
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
       exact ⟨outcome, after, finalMap, finalWorld,
-        prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignValue (lookupStatement?_sound found) form trace) tail,
+        prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
+          (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) tail,
         represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentTails

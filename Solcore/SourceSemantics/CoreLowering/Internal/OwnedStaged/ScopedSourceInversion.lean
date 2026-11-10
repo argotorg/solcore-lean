@@ -120,12 +120,12 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
       Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       Size.ForItems program registry tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
@@ -1377,7 +1377,7 @@ inductive Result (program : Program) (registry : Registry) (mode : Bool) (invoca
       (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
       (child : Size.Expression program registry childSize invocation context environment targetHeap rhs (.value right) middle)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
         middle target updated written)
       (next : Size.StatementsIn program registry mode tailSize invocation context environment written rest finalContext outcome after) :
       Result program registry mode invocation context environment before assignment operator rhs rest
@@ -1948,12 +1948,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       Size.StatementsIn program registry mode tailSize invocation context environment written rest finalContext outcome after) := by
   have shape {other : StatementNode} (present : ContainsStatement invocation.source id other) :

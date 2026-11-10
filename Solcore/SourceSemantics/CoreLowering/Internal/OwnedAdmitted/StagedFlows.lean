@@ -2891,7 +2891,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 /-- Plain `=` has no compound operation to panic. -/
 theorem equal_no_panic {previous : Option Dynamic.Value} {right : Dynamic.Value} {code : UInt8}
-    (panics : Dynamic.AssignmentOperandsPanic .equal previous right code) : False := by
+    {targetType : TypeSystem.Ty} (panics : Dynamic.AssignmentOperandsPanic targetType .equal previous right code) : False := by
   cases panics with
   | compound corresponds _ => cases corresponds
 
@@ -3091,7 +3091,9 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-            .assignBare (lookupStatement?_sound found) form snapshot childTrace write trace, represented,
+            .assignBare (lookupStatement?_sound found) form snapshot childTrace
+              ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ write)
+              trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | block found form inner remaining innerIH remainingIH => cases atStatements; exact False.elim (shape.not_block found form)

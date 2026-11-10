@@ -593,7 +593,8 @@ private theorem assigned_inv (unique : NodeOccurrencesUnique source) (found : so
     (form : node.form = .assignValue assignment operator expression)
     (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
     ∃ updatedRoot, Dynamic.SourcePlaceAssignment program context evidence source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target expression updatedRoot after ∧
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target expression
+        updatedRoot after ∧
       finalContext = context ∧ outcome = .fallthrough environment := by
   cases head with
   | assignValue contains formEq executes =>

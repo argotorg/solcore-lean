@@ -140,17 +140,30 @@ private theorem assignment_operator_types (integer : Bool) (operator : Syntax.Va
   all_goals cases selected
   all_goals rfl
 
+/-- The checked modifier's operation is Word's `+ - *`, whose right operand
+and result are both Word, as every other compound operator's are. -/
+private theorem assignment_modifier_types (target : TypeSystem.Ty) (integer : Bool)
+    (operator : Syntax.ValueAssignOp) {op : Frontend.SourceCoreDataPlaces.Modifier}
+    (selected : assignmentModifier target integer operator = some op) :
+    op.operation.rightType = op.operation.resultType := by
+  unfold assignmentModifier at selected
+  split at selected
+  · rename_i binary _
+    cases selected
+    cases binary <;> rfl
+  · exact assignment_operator_types integer operator selected
+
 /-- A real present RHS is used by the modifier. The setter's literal
 replacement annotation fixes its payload type; every actual compound
 assignment operator has the same right operand and result type. The original
 RHS failure binder fixes Word independently. No RHS typing is supplied. -/
-theorem execute_present_rhs {prepared : Prepared} {reference rhs next : Expr}
+theorem execute_present_rhs_of {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
-    {operator : Syntax.ValueAssignOp} {invalid : Word}
+    {modifier : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
     {definitions : DataEnvironment} {context : Core.Context}
+    (ordinary : ∀ op, modifier = some op → op.operation.rightType = op.operation.resultType)
     (typed : HasType context
-      (execute prepared reference keys rhs next output
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid) result definitions) :
+      (execute prepared reference keys rhs next output modifier false invalid) result definitions) :
     HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions := by
   unfold execute LanguageResult.bind at typed
   cases typed with
@@ -194,9 +207,7 @@ theorem execute_present_rhs {prepared : Prepared} {reference rhs next : Expr}
                                                                       simp only [List.getElem?_cons_zero,
                                                                         Option.some.injEq] at replacedAt
                                                                       subst_vars
-                                                                      have same := modifier_slot
-                                                                        (fun op accepted => assignment_operator_types _ _ accepted)
-                                                                        modifiedTyped
+                                                                      have same := modifier_slot ordinary modifiedTyped
                                                                       subst_vars
                                                                       apply remove_front
                                                                       apply remove_front
@@ -204,6 +215,27 @@ theorem execute_present_rhs {prepared : Prepared} {reference rhs next : Expr}
                                                                       simpa only [shift, List.range,
                                                                         List.range.loop, List.foldl,
                                                                         LanguageResult.resultType] using right
+
+theorem execute_present_rhs {prepared : Prepared} {reference rhs next : Expr}
+    {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
+    {operator : Syntax.ValueAssignOp} {invalid : Word}
+    {definitions : DataEnvironment} {context : Core.Context}
+    (typed : HasType context
+      (execute prepared reference keys rhs next output
+        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid) result definitions) :
+    HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions :=
+  execute_present_rhs_of (fun _ accepted => assignment_operator_types _ _ accepted) typed
+
+/-- The same at the modifier the place lowering chooses from the target's type. -/
+theorem execute_present_rhs_assignment {prepared : Prepared} {reference rhs next : Expr}
+    {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
+    {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp} {invalid : Word}
+    {definitions : DataEnvironment} {context : Core.Context}
+    (typed : HasType context
+      (execute prepared reference keys rhs next output
+        (assignmentModifier target (prepared.route.leafType = .integer) operator) false invalid) result definitions) :
+    HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions :=
+  execute_present_rhs_of (fun _ accepted => assignment_modifier_types _ _ _ accepted) typed
 
 /-- Actual ordered keys feed their local native witnesses to the static
 certificate factory. The factory is requested only for these same compiler
@@ -303,6 +335,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
   by_cases bare : assignment.target.projections = []
   · obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot,
         _layout, generated, _sameType, _profile, codeEq⟩ := CompatibleBareAssignment.of_lower bare accepted
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
     have rhsNative := execute_present_rhs (prepared := prepared) (reference := .var index)
       (keys := SourceCoreCalls.packArguments []) (rhs := value.expression) (next := next)
       (output := output) (result := result) (operator := operator) (codeEq ▸ typed)
@@ -321,7 +354,8 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         have rhsNative := execute_present_rhs (prepared := prepared) (reference := .var index)
           (keys := SourceCoreCalls.packArguments codes) (rhs := right.expression) (next := next)
           (output := output) (result := result) (operator := operator)
-          (by simpa only [routeEq, Option.isNone_some] using typed)
+          (by simpa only [routeEq, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte,
+            assignmentModifier_plain (checkedCompound_of_profile profile)] using typed)
         obtain ⟨node, found, certified⟩ := extract rhs right (by simp) rhsGenerated ⟨_, rhsNative⟩
         obtain ⟨_rhsRaw, ⟨packedResult, packedNative⟩⟩ := execute_children typed
         obtain ⟨sourceTypes, tree, keyTypes⟩ :=
@@ -354,7 +388,8 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl, ?_⟩
+          found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          by simp [Head.emit, routeEq, placeModifier, assignmentModifier_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))
@@ -1600,7 +1635,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
       refine ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidUnary, layout, ordinary,
         by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, leafView ▸ profile⟩,
-        by simp [Head.emit, routeEq], rfl, ?_⟩
+        by simp [Head.emit, routeEq, placeModifier], rfl, ?_⟩
       exact ⟨rfl, route, described, preparedBy⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors
@@ -3483,7 +3518,8 @@ theorem tree
         right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
         rightView := by simpa only [rhsType] using _rawView
         rightType := _sameType
-        profile := .inl rfl }
+        profile := .inl rfl
+        targetPlain := CompatiblePlaceModifier.plain_of_profile (.inl rfl) }
       have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
       rw [emittedOriginal]
       exact .assign found form originalHead

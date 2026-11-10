@@ -480,12 +480,24 @@ def Table.diagnostics (table : Table) : List (Core.Word × SourceCoreFaultSites.
 def Table.diagnostic? (table : Table) (reason : Core.Word) : Option SourceCoreFaultSites.Diagnostic :=
   (table.sites.find? fun site => decide (site.reason = reason)).map Site.diagnostic
 
+/-- The assignment targets whose operands have a diagnostic site: Word,
+Integer and the twelve fixed-width integer types. -/
+def operandTarget : TypeSystem.Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin .integer) => true
+  | .constructor (.builtin (.fixed _)) => true
+  | _ => false
+
+theorem operandTarget_of_scalar {type : TypeSystem.Ty} (scalar : type = .word ∨ type = .integer) :
+    operandTarget type = true := by
+  rcases scalar with rfl | rfl <;> rfl
+
 def add (owner : Resolved.DeclarationId) (firstReason : Nat) (sites : List Site)
     (location : SourceCoreElaboration.ErrorSite) (span : Syntax.SourceSpan)
     (assignment : AssignmentResolution) (kind : Kind) : Except Error (List Site) := do
   if assignment.target.root.owner ≠ owner then
     throw (.ownerMismatch owner assignment.target.root.owner)
-  if assignment.target.type ≠ .word ∧ assignment.target.type ≠ .integer then return sites
+  if operandTarget assignment.target.type = false then return sites
   if sites.any (fun site => decide
       (site.site = location ∧ site.binder = assignment.target.root ∧ site.kind = kind)) then
     return sites
@@ -599,7 +611,7 @@ private theorem add_range {owner : Resolved.DeclarationId} {first : Nat} {sites 
     (accepted : add owner first sites location span assignment kind = .ok result) :
     RangeInventory first result := by
   by_cases owned : assignment.target.root.owner = owner
-  · by_cases unsupported : assignment.target.type ≠ .word ∧ assignment.target.type ≠ .integer
+  · by_cases unsupported : operandTarget assignment.target.type = false
     · simp [add, owned, unsupported] at accepted
       subst result
       exact inventory

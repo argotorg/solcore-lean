@@ -333,21 +333,29 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
           (operatorKind : WordCompoundAssignmentOperator operator)
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type
+                (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel inferenceContext value (some .word)
-                  fittedState
+                Detail.inferExprFuel fuel inferenceContext value
+                  (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue, finalState)) =
                 .ok (assignment, inferredValue, final)) :
           SourceAssignmentHasType (source.applySubstitution outer) target
             (assignment.applySubstitution outer) operator inferredValue.id := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type
+            (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have resolvedOperand : fittedState.resolve place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
+              (Detail.unify_resolve_eq unifyResult).trans (by rfl)
+            have expectedEq : (Detail.compoundOperandType operator (fittedState.resolve place.type)) = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
+              rw [resolvedOperand]
+              exact congrArg Ty.constructor (Detail.compoundOperandConstructor_idem _ _)
+            rw [expectedEq] at tailSuccess
             have fitProgress := Detail.unify_inferenceProgress
               placeProperties.2.1.solved placeProperties.2.2
               (Ty.variablesBelow_constructor _ _) unifyResult
@@ -355,7 +363,7 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
               placeProperties.2.1 placeProperties.2.2
               (Ty.variablesBelow_constructor _ _) unifyResult
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some .word) fittedState with
+                value (some (Detail.compoundOperandType operator (placeState.resolve place.type))) fittedState with
             | error error =>
                 simp [valueResult] at tailSuccess
             | ok valuePair =>
@@ -381,42 +389,51 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
                     fittedState.inference.substitution :=
                   Substitution.SemanticallyExtends.trans outerExtension
                     valueProperties.1.substitution_extends
-                have resolvedWord : fittedState.resolve place.type = .word :=
-                  (Detail.unify_resolve_eq unifyResult).trans (by rfl)
-                have placeWordEq : outer.apply place.type = .word := by
+                have placeWordEq : outer.apply place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
                   calc
                     outer.apply place.type =
                         outer.apply (fittedState.resolve place.type) := by
                       simpa [Frontend.SourceInference.State.resolve,
                         TypeSystem.InferState.resolve] using
                           (outerFitted place.type).symm
-                    _ = outer.apply .word := congrArg outer.apply resolvedWord
-                    _ = .word := rfl
+                    _ = outer.apply (Detail.compoundOperandType operator (placeState.resolve place.type)) := congrArg outer.apply resolvedOperand
+                    _ = (Detail.compoundOperandType operator (placeState.resolve place.type)) := rfl
                 have storedWordEq :
-                    outer.apply (finalState.resolve place.type) = .word := by
+                    outer.apply (finalState.resolve place.type) = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
                   calc
                     outer.apply (finalState.resolve place.type) =
                         outer.apply place.type := by
                       simpa [Frontend.SourceInference.State.resolve,
                         TypeSystem.InferState.resolve] using
                           outerExtension place.type
-                    _ = .word := placeWordEq
+                    _ = (Detail.compoundOperandType operator (placeState.resolve place.type)) := placeWordEq
                 have placeWord : SourcePlaceHasType
                     (source.applySubstitution outer) target
                     (({ place with type := finalState.resolve place.type } :
-                      PlaceResolution).applySubstitution outer) .word := by
+                      PlaceResolution).applySubstitution outer) (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
                   rw [← storedWordEq]
                   exact placeTyped
-                have valueWordEq : outer.apply inferred.type = .word := by
-                  simpa using
-                    (Detail.inferExprFuel_expected_type_apply_eq valueResult
-                      outerExtension)
+                have valueWordEq : outer.apply inferred.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
+                  Detail.inferExprFuel_expected_type_apply_eq valueResult outerExtension
                 have valueWord : ExpressionHasType
                     (source.applySubstitution outer) target inferred.id
-                    .word := by
+                    (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
                   rw [← valueWordEq]
                   exact valueTyped
-                exact .wordCompound operatorKind placeWord valueWord rfl
+                rcases compoundOperandConstructor_cases operator (placeState.resolve place.type) with
+                  word | ⟨type, fixed, kind⟩
+                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .word := by
+                    show Ty.constructor _ = _
+                    rw [word]
+                    rfl
+                  rw [typeEq] at placeWord valueWord
+                  exact .wordCompound operatorKind placeWord valueWord rfl
+                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .fixed type := by
+                    show Ty.constructor _ = _
+                    rw [fixed]
+                    rfl
+                  rw [typeEq] at placeWord valueWord
+                  exact .fixedCompound kind placeWord valueWord rfl
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -1115,9 +1132,9 @@ theorem inferAssignedValueFuel_success_place_state_provenance
       have finishNonEqual
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                Detail.inferExprFuel fuel inferenceContext value (some (Detail.compoundOperandType operator (fittedState.resolve place.type)))
                   fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
@@ -1133,13 +1150,13 @@ theorem inferAssignedValueFuel_success_place_state_provenance
             actualState.integerLiterals ⊆ final.integerLiterals ∧
             actualState.integerPatterns ⊆ final.integerPatterns ∧
             actualState.requirements ⊆ final.requirements := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some .word) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error =>
                 simp [valueResult] at tailSuccess
             | ok valuePair =>
@@ -1445,9 +1462,9 @@ theorem inferAssignedValueFuel_success_value_provenance
       have finishNonEqual
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                Detail.inferExprFuel fuel inferenceContext value (some (Detail.compoundOperandType operator (fittedState.resolve place.type)))
                   fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
@@ -1462,13 +1479,13 @@ theorem inferAssignedValueFuel_success_value_provenance
             valueInitial.integerLiterals ⊆ final.integerLiterals ∧
             valueInitial.integerPatterns ⊆ final.integerPatterns ∧
             valueInitial.requirements ⊆ final.requirements := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some .word) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error =>
                 simp [valueResult] at tailSuccess
             | ok valuePair =>
@@ -1484,7 +1501,8 @@ theorem inferAssignedValueFuel_success_value_provenance
                 have fittedBelow : fittedState.NodesBelowNextOccurrence :=
                   (Detail.unify_occurrenceBoundExtends
                     unifyResult).nodesBelowNextOccurrence placeBelow
-                exact ⟨.word, fittedState, valueResult, fittedBelow,
+                exact ⟨Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState,
+                  valueResult, fittedBelow,
                   inferExprFuel_success_typingSourceExtends valueResult
                     fittedBelow roots,
                   Detail.inferExprFuel_integerLiterals_subset valueResult,

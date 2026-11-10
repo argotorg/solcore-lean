@@ -183,7 +183,9 @@ theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibl
       cases represented with
       | updated root changed updatedRep =>
         rcases DataPlaceGuard.inv_sized remaining with ⟨passes, child, bound, remaining⟩ |
-          ⟨operation, selected, zero, resultEq, storeEq⟩
+          ⟨operation, selected, zero, resultEq, storeEq⟩ | ⟨_, _, _, ranged, _⟩
+        rotate_left 2
+        · exact absurd ranged SourceCoreCompatibleDataPlaces.binaryOperator_not_range
         · rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, _⟩
           · cases remaining with
             | letE writeEvaluated continuation =>
@@ -223,9 +225,9 @@ theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibl
             | nonzero nonzero => exact (nonzero rfl).elim
           · -- The latest root is traversable, so the source panics on its operands.
             obtain ⟨_, read⟩ := changed.readable
-            have panicked : Dynamic.AssignmentOperandsPanic operator target.selected right.right
+            have panicked : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right.right
                 SourceCorePanics.divisionByZero := by
-              rw [resolution.selectedEq]; exact panicked
+              rw [resolution.selectedEq]; exact panicked target.valueType
             subst resultEq storeEq
             let reached := transport.extend rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
             have phaseRelated := transport.related rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
@@ -1030,7 +1032,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
     (initialValue : Dynamic.RootInitialValue cell initial)
     (pathRead : Dynamic.ProjectionsRead initial sourceTarget.projections currentSelected)
-    (panics : Dynamic.AssignmentOperandsPanic operator sourceTarget.selected right code)
+    (panicPlain : ∀ type, sourceTarget.valueType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : Dynamic.AssignmentOperandsPanic sourceTarget.valueType operator sourceTarget.selected right code)
     (next : Expr) (outputType : Ty) (invalidOperand : Word) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
@@ -1069,11 +1072,11 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     rw [resolution.selectedEq] at panics
     -- The panic fixes a panicking modifier, a zero divisor and its code.
     obtain ⟨operation, selected, zero, sameCode⟩ : ∃ operation,
-        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ ∧
+        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightValue = .word Word.zero ∧ code = SourceCorePanics.divisionByZero := by
       rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
-      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics other⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies panicPlain panics applied).elim
+      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics (other _)⟩
     subst zero sameCode
     have present : ∃ sourceRoot, initial = some sourceRoot := by
       cases initial with
@@ -1162,6 +1165,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -1236,8 +1240,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   | panic resolve evaluate currentRead _ initialValue pathRead panics =>
     obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata⟩ :=
       CompatibleRenamedPlacePanic.preserves layout ordinary registryExtension meaning faithful observations rhsGenerated found rhsView rhsCoreType
-        operatorProfile environments heaps locals agrees actualTyped slot rootTyped resolve evaluate currentRead initialValue pathRead panics
-        (next.rename ξ) outputType invalid
+        operatorProfile environments heaps locals agrees actualTyped slot rootTyped resolve evaluate currentRead initialValue pathRead
+        (CompatiblePlaceModifier.resolved_plain targetPlain resolve) panics (next.rename ξ) outputType invalid
     exact ⟨_, finalStore, finalMap, finalWorld, evaluated, FunctionCalls.FaultTokens.panic _, finalHeaps, maps, worlds, frame, metadata⟩
   | structuralUpdate resolve evaluate currentRead sameType initialValue fault =>
     obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata⟩ :=
@@ -1335,7 +1339,7 @@ theorem preserves_prefix
             ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, outcome, modified⟩
           · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
           · rcases outcome with generatedApply | ⟨_, _, _, panics⟩
-            case inr => exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
+            case inr => exact (CompatiblePlaceModifier.outcome_excludes_applies panics applied).elim
             have same := DataPlaceModifier.assignment_functional generatedApply applied
             subst replacement
             have passes := CompatiblePlaceModifier.passes_of_applies observations profile rightRep applied
@@ -1389,6 +1393,7 @@ theorem preserves_fault_reachable
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1442,7 +1447,7 @@ theorem preserves_fault_reachable
           invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata⟩
       · rcases outcome with applied | ⟨_, _, _, panics⟩
         · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-        · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
+        · exact (DataPlaceModifier.panic_excludes_invalid (panics .word) invalidOperands).elim
   | panic resolve evaluated _ _ _ _ panics =>
     obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve
     obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ :=
@@ -1457,11 +1462,12 @@ theorem preserves_fault_reachable
           ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, outcome, modified⟩
       · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
       · rcases outcome with applied | ⟨operation, selected, zero, other⟩
-        · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
+        · exact (CompatiblePlaceModifier.panic_excludes_applies
+          (CompatiblePlaceModifier.resolved_plain targetPlain resolve) panics applied).elim
         · -- The setter runs and the check fails before the write.
-          have sameCode := CompatiblePlaceModifier.panic_functional panics other
+          have sameCode := CompatiblePlaceModifier.panic_functional panics (other _)
           subst sameCode zero
-          have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ := by
+          have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
             simpa only [layout.sameType] using selected
           have nativeModified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value
               (.word Word.zero) actual) rhsStore
@@ -1492,6 +1498,7 @@ theorem preserves_fault
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1512,7 +1519,7 @@ theorem preserves_fault
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  exact preserves_fault_reachable layout bare extension meaning observations generated found rhsView rhsCore profile
+  exact preserves_fault_reachable layout bare extension meaning observations generated found rhsView rhsCore profile targetPlain
     environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid
     (AssignmentOperandDiagnostics.of_unconditional invalidToken)
 
@@ -1564,6 +1571,8 @@ structure Head (readFuel : Nat) (values : ValuesContext) (source : TypedSource)
   rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
   rightType : lowered.type = prepared.route.leafType
   profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
+  /-- The target is not a checked compound assignment's fixed-width target. -/
+  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator
 
 namespace Head
 variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource}
@@ -1678,11 +1687,12 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
   by_cases bare : assignment.target.projections = []
   · obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
       CompatibleBareAssignment.of_lower bare accepted
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
     obtain ⟨node, found, tree, _⟩ := extract rhs lowered generated
     have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
       .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-      by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq⟩
+      by simpa only [rawType] using rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq⟩
     rcases profile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
     · exact .inr (.inl (rawView.trans word))
@@ -1690,9 +1700,11 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
       _, found, tree, rawView, sameType, codeEq⟩ :=
       CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare extract accepted typed
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
     have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
-      .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_⟩, codeEq⟩
+      .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_,
+      CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq⟩
     rw [rawType] at rawView
     rcases profile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
@@ -2346,7 +2358,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource}
 
 include extension valid unique uninitialized missing faithful observations environments heaps locals agrees actualTyped in
 theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -2357,7 +2369,8 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.V
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   have meaning : TypedGenericExpressionMeaning.Preserves (payloadModel values.checked registry functions) program context evidence source
       (CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt) faults := CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
@@ -2382,14 +2395,15 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   have meaning : TypedGenericExpressionMeaning.Preserves (payloadModel values.checked registry functions) program context evidence source
       (CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt) faults := CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     exact CompatibleBareAssignment.preserves_fault layout empty extension meaning observations right found rightView rightType profile
-      environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
+      targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
   | projected layout ordinary =>
     exact CompatibleRenamedPlaceFaults.preserves layout ordinary extension meaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped slot writable trace next output invalid
+      errors.missing errors.uninitialized right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid
 
 include extension valid unique uninitialized missing faithful observations environments heaps locals agrees actualTyped in
 theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
@@ -2402,7 +2416,8 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -2413,7 +2428,8 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
       (CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt) faults := CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
   have reflection : TypedGenericExpressionMeaning.Reflects (payloadModel values.checked registry functions) program context evidence source
       (CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt) faults := CompatibleExpressionTyped.reflects functions extension program evidence valid uninitialized missing
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     have result := CompatibleBareAssignment.reflects layout empty extension reflection observations right found rightView rightType profile

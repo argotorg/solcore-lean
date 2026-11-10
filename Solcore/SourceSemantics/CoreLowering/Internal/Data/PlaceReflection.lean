@@ -71,7 +71,7 @@ theorem word_rep {catalog : SourceCoreDataCatalog.Catalog} {signatures : Program
 
 /-- Only unchecked `/=` and `%=` select a panicking modifier. -/
 theorem binaryOperator_panics {integer : Bool} {operator : Syntax.ValueAssignOp} {operation : BinaryOp}
-    (selected : binaryOperator integer operator = some ⟨operation, true⟩) : operator.mayPanic = true := by
+    (selected : binaryOperator integer operator = some ⟨operation, .divisor⟩) : operator.mayPanic = true := by
   cases operator <;> first | rfl | simp [binaryOperator, Modifier.total] at selected
 
 /-- An applied source operation passes the check of its modifier. -/
@@ -99,16 +99,25 @@ theorem passes_of_applies {catalog : SourceCoreDataCatalog.Catalog} {signatures 
       first | (subst selected; rfl) | simp [Syntax.ValueAssignOp.mayPanic] at panics
 
 /-- A panicking compound assignment has no invalid operands. -/
-theorem panic_excludes_invalid {operator : Syntax.ValueAssignOp}
+theorem panic_excludes_invalid {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
     {snapshot : Option Dynamic.Value} {right : Dynamic.Value} {code : UInt8}
-    (panics : Dynamic.AssignmentOperandsPanic operator snapshot right code) :
+    (panics : Dynamic.AssignmentOperandsPanic targetType operator snapshot right code) :
     ¬ Dynamic.AssignmentOperandsInvalid operator snapshot right := by
   intro invalid
   cases panics with
   | compound corresponds panics =>
     cases invalid with
     | compound other invalid =>
-      cases corresponds <;> cases other <;> exact invalid.excludes_panic panics
+      cases corresponds <;> cases other <;> exact invalid.excludes_value_panic panics
+
+/-- Checked arithmetic at a fixed-width target is excluded where the compiler's
+choice is not the checked modifier. -/
+theorem plain_of_checkedCompound {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (none : SourceCoreDataPlaces.checkedCompound target operator = none) :
+    ∀ type, target = .fixed type → ¬ FixedCheckedCompound operator := by
+  intro type same checked
+  subst same
+  cases checked <;> cases none
 
 theorem assignment_functional {operator : Syntax.ValueAssignOp}
     {snapshot : Option Dynamic.Value} {right first second : Dynamic.Value}
@@ -256,8 +265,9 @@ theorem initialized_panic {catalog : SourceCoreDataCatalog.Catalog} {signatures 
     (rightSelected : Selects environment rhs (.word Word.zero)) (store : Store) (invalid : Word) :
     ∃ changed value operation,
       ValueRep catalog signatures functions mapping world .word changed value type ∧
-      binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧
-      Dynamic.AssignmentOperandsPanic operator (some left) (.word Word.zero) SourceCorePanics.divisionByZero ∧
+      binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧
+      (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator (some left) (.word Word.zero)
+        SourceCorePanics.divisionByZero) ∧
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
         (.inRight .word value) store ∧
       ¬ Dynamic.AssignmentOperandsInvalid operator (some left) (.word Word.zero) := by
@@ -265,15 +275,17 @@ theorem initialized_panic {catalog : SourceCoreDataCatalog.Catalog} {signatures 
   | word left =>
     cases operator with
     | uncheckedDivide =>
-      have panicked : Dynamic.AssignmentOperandsPanic .uncheckedDivide (some (.word left)) (.word Word.zero)
-          SourceCorePanics.divisionByZero := .compound .uncheckedDivide (.wordUncheckedDivide left)
+      have panicked : ∀ targetType, Dynamic.AssignmentOperandsPanic targetType .uncheckedDivide (some (.word left))
+          (.word Word.zero) SourceCorePanics.divisionByZero :=
+        fun _ => .compound .uncheckedDivide (.primitive (.wordUncheckedDivide left))
       exact ⟨_, _, _, .word (left.udiv Word.zero), rfl, panicked,
-        binary_modified rfl snapshotSelected rightSelected store invalid, panic_excludes_invalid panicked⟩
+        binary_modified rfl snapshotSelected rightSelected store invalid, panic_excludes_invalid (panicked .word)⟩
     | uncheckedModulo =>
-      have panicked : Dynamic.AssignmentOperandsPanic .uncheckedModulo (some (.word left)) (.word Word.zero)
-          SourceCorePanics.divisionByZero := .compound .uncheckedModulo (.wordUncheckedModulo left)
+      have panicked : ∀ targetType, Dynamic.AssignmentOperandsPanic targetType .uncheckedModulo (some (.word left))
+          (.word Word.zero) SourceCorePanics.divisionByZero :=
+        fun _ => .compound .uncheckedModulo (.primitive (.wordUncheckedModulo left))
       exact ⟨_, _, _, .word (left.umod Word.zero), rfl, panicked,
-        binary_modified rfl snapshotSelected rightSelected store invalid, panic_excludes_invalid panicked⟩
+        binary_modified rfl snapshotSelected rightSelected store invalid, panic_excludes_invalid (panicked .word)⟩
     | _ => simp [Syntax.ValueAssignOp.mayPanic] at panics
   | constructed nominal => simp [SourceCoreDataCatalog.nominalParts, TypeSystem.Ty.word] at nominal
 
@@ -880,8 +892,9 @@ inductive ResultRep (catalog : SourceCoreDataCatalog.Catalog) (signatures : Prog
   the source panics on these operands once the latest root is traversed. -/
   | panicking {changed : Dynamic.Value} {value : Value} {operation : BinaryOp}
       (zero : right = .word Word.zero)
-      (selected : binaryOperator (type = .integer) operator = some ⟨operation, true⟩)
-      (panics : Dynamic.AssignmentOperandsPanic operator snapshot right SourceCorePanics.divisionByZero)
+      (selected : binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩)
+      (panics : ∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator snapshot right
+        SourceCorePanics.divisionByZero)
       (related : ValueRep catalog signatures functions mapping world sourceType changed value type) :
       ResultRep catalog signatures functions mapping world sourceType type operator snapshot right invalid (.inRight .word value)
 
@@ -1661,7 +1674,10 @@ theorem reflects_ready {checked : SourceCoreDataCatalog.Checked} {signatures : P
         obtain ⟨futureWorld, administrative, represented, extension, helperHeaps, _, helperFrame, _⟩ := reflectSetter setterEvaluated
         cases represented with
         | @updated initial updated _ root changed updatedRep =>
-          rcases SourceCoreDataPlaces.guard_inv remaining with ⟨_, remaining⟩ | ⟨operation, selected, zero, _, _⟩
+          rcases SourceCoreDataPlaces.guard_inv remaining with ⟨_, remaining⟩ | ⟨operation, selected, zero, _, _⟩ |
+              ⟨_, _, _, ranged, _⟩
+          rotate_left 2
+          · exact absurd ranged SourceCoreDataPlaces.binaryOperator_not_range
           · cases remaining with
             | letE writeEvaluated continuation =>
               obtain ⟨after, resultEq, sourceWritten, finalHeaps, writeFrame, metadata, _⟩ :=
@@ -1731,13 +1747,17 @@ theorem reflects_ready {checked : SourceCoreDataCatalog.Checked} {signatures : P
             at rightRep
           obtain ⟨_, sourceWord, coreWord⟩ := DataPlaceModifier.word_rep rightRep
           cases sourceWord
-          rcases SourceCoreDataPlaces.guard_inv remaining with ⟨passes, _⟩ | ⟨_, _, _, resultEq, storeEq⟩
+          rcases SourceCoreDataPlaces.guard_inv remaining with ⟨passes, _⟩ | ⟨_, _, _, resultEq, storeEq⟩ |
+              ⟨_, _, _, ranged, _⟩
+          rotate_left 2
+          · exact absurd ranged SourceCoreDataPlaces.binaryOperator_not_range
           · rw [selected, coreWord] at passes
             cases passes with
             | total total => cases total _ rfl
             | nonzero nonzero => exact (nonzero rfl).elim
           · subst resultEq storeEq
-            exact .fault (.panic sourceTrace right.sourceTrace currentRead cellType root read panicked) rfl
+            exact .fault (.panic sourceTrace right.sourceTrace currentRead cellType root read
+                (panicked target.valueType)) rfl
               (FunctionCalls.FaultTokens.panic _) helperHeaps (resolution.maps.trans right.maps)
               ((resolution.worlds.trans right.worlds).trans extension)
               ((resolution.frame.trans right.frame).trans helperFrame) (resolution.metadata.trans right.metadata)
@@ -2016,7 +2036,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
             | caseLeft _ impossible => cases impossible
             | caseRight setterEvaluated tail =>
               rename_i setterStore setterType updatedValue
-              rcases guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩
+              rcases guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩ |
+                  ⟨operation, type, binary, rfl, ⟨passes, tail⟩ | ⟨_, impossible, _⟩⟩
               · cases tail with
                 | letE writeEvaluated terminal =>
                   rename_i writtenStore writtenValue
@@ -2029,6 +2050,19 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
                     exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
                       (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
                         (guard_passes passes (.letE writeEvaluated continuation)))))))
+              · cases impossible
+              · cases tail with
+                | letE writeEvaluated terminal =>
+                  rename_i writtenStore writtenValue
+                  simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] at terminal
+                  cases terminal with
+                  | inRight unitEvaluated =>
+                    cases unitEvaluated
+                    refine ⟨[writtenValue, updatedValue, modifiedValue, rightValue, snapshotValue, keyValue, referenceValue], rfl, ?_⟩
+                    intro next outputType value finalStore continuation
+                    exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
+                      (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
+                        (guard_rangePasses passes (.letE writeEvaluated continuation)))))))
               · cases impossible
 
 /-- A universal expression IH supplies the continuation evaluation at the

@@ -298,34 +298,57 @@ def setter (prepared : Prepared) (keyType : Core.Ty) : Core.Expr :=
           (update prepared steps prepared.route.rootType (.var 0)
             (.first (.second (.var 1))) (.second (.second (.var 1)))))
 
+/-- What a compound modifier checks after the structural update: nothing, a
+zero right-hand side (`Panic(0x12)`), or the exact result of checked `+ - *`
+(`operator`) on the snapshot and the right-hand side against a fixed-width
+integer type's range (`Panic(0x11)`). -/
+inductive Check where
+  | total
+  | divisor
+  | range (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+  deriving Repr, DecidableEq
+
 /-- A compound modifier: its total Core operation on the old leaf and the
-right-hand side, and whether a zero right-hand side panics with `Panic(0x12)`.
-The panic is checked by `guard`, after the structural update, because the
-source semantics traverses the latest root before it applies the operation. -/
+right-hand side, and its check. The check is made by `guard`, after the
+structural update, because the source semantics traverses the latest root
+before it applies the operation. -/
 structure Modifier where
   operation : Core.BinaryOp
-  panics : Bool
+  check : Check
   deriving Repr, DecidableEq
 
 /-- A modifier that never panics. -/
-def Modifier.total (operation : Core.BinaryOp) : Modifier := ⟨operation, false⟩
+def Modifier.total (operation : Core.BinaryOp) : Modifier := ⟨operation, .total⟩
 
-/-- The check of a panicking modifier, after the structural update and before
-the write, under the updated root, the modified leaf and the right-hand side.
-A zero right-hand side fails with `Panic(0x12)` and writes nothing. -/
+/-- The check of a modifier, after the structural update and before the write,
+under the updated root, the modified leaf, the right-hand side and the
+snapshot. A zero right-hand side fails with `Panic(0x12)`; checked arithmetic
+outside the type's range fails with `Panic(0x11)`. Either writes nothing. -/
 def guard (outputType : Core.Ty) (operator : Option Modifier) (write : Core.Expr) : Core.Expr :=
   match operator with
-  | some ⟨_, true⟩ => .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
+  | some ⟨_, .divisor⟩ => .ifE (.binary .wordEq (.var 2) (.word Core.Word.zero))
       (Core.LanguageResult.failure outputType
         (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) write
+  | some ⟨_, .range type binary⟩ =>
+      .ifE (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3))
+        (Core.LanguageResult.failure outputType
+          (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) write
   | _ => write
 
-/-- The right-hand sides that pass a modifier's check. -/
+/-- The right-hand sides that pass the check of a modifier without a range
+check (`guard_inRange` covers checked arithmetic). -/
 inductive Passes : Option Modifier → Core.Value → Prop where
   | total {operator : Option Modifier} {right : Core.Value}
-      (total : ∀ modifier, operator = some modifier → modifier.panics = false) : Passes operator right
+      (total : ∀ modifier, operator = some modifier → modifier.check = .total) : Passes operator right
   | nonzero {operation : Core.BinaryOp} {right : Core.Word}
-      (nonzero : right ≠ Core.Word.zero) : Passes (some ⟨operation, true⟩) (.word right)
+      (nonzero : right ≠ Core.Word.zero) : Passes (some ⟨operation, .divisor⟩) (.word right)
+
+/-- A range check is not among the passing modifiers of `Passes`. -/
+theorem Passes.not_range {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {right : Core.Value}
+    (passes : Passes (some ⟨operation, .range type binary⟩) right) : False := by
+  cases passes with
+  | total total => cases total _ rfl
 
 theorem guard_passes {environment : Core.Environment} {before after : Core.Store}
     {outputType : Core.Ty} {operator : Option Modifier} {write : Core.Expr} {result : Core.Value}
@@ -337,20 +360,142 @@ theorem guard_passes {environment : Core.Environment} {before after : Core.Store
   | total total =>
     match operator, total with
     | none, _ => exact written
-    | some ⟨_, false⟩, _ => exact written
-    | some ⟨_, true⟩, total => cases total _ rfl
+    | some ⟨_, .total⟩, _ => exact written
+    | some ⟨_, .divisor⟩, total => cases total _ rfl
+    | some ⟨_, .range _ _⟩, total => cases total _ rfl
   | nonzero nonzero =>
     exact .ifFalse (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply, nonzero])) written
+
+/-- Checked arithmetic in the type's range passes the range check. -/
+theorem guard_inRange {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value} {updated changed : Core.Value}
+    {leftType : Core.Ty} {left right : Core.Word}
+    (inRange : SourceCorePrimitive.checkedInRange type binary left right = true)
+    (written : Core.Evaluates (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+      before write result after) :
+    Core.Evaluates (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment) before
+      (guard outputType (some ⟨operation, .range type binary⟩) write) result after := by
+  have outside := SourceCorePrimitive.checkedOutside_evaluates
+    (environment := .word left :: updated :: changed :: .word right :: .inRight leftType (.word left) ::
+      environment)
+    (store := before) (left := 0) (right := 3) type binary rfl rfl
+  rw [inRange] at outside
+  exact .ifFalse (.caseRight (.var rfl) outside) written
 
 theorem guard_panic {environment : Core.Environment} {store : Core.Store}
     {outputType : Core.Ty} {operation : Core.BinaryOp} {write : Core.Expr} {updated changed : Core.Value} :
     Core.Evaluates (updated :: changed :: .word Core.Word.zero :: environment) store
-      (guard outputType (some ⟨operation, true⟩) write)
+      (guard outputType (some ⟨operation, .divisor⟩) write)
       (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store :=
   .ifTrue (.binary (.var rfl) .word (by simp [Core.BinaryOp.apply])) (.inLeft .word)
 
-/-- A completed check either passed and wrote, or panicked on a zero
-right-hand side without changing the store. -/
+/-- Checked arithmetic outside the type's range fails with `Panic(0x11)` and
+writes nothing. -/
+theorem guard_overflow {environment : Core.Environment} {store : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} {updated changed : Core.Value} {leftType : Core.Ty}
+    {left right : Core.Word}
+    (outside : SourceCorePrimitive.checkedInRange type binary left right = false) :
+    Core.Evaluates (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment) store
+      (guard outputType (some ⟨operation, .range type binary⟩) write)
+      (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) store := by
+  have test := SourceCorePrimitive.checkedOutside_evaluates
+    (environment := .word left :: updated :: changed :: .word right :: .inRight leftType (.word left) ::
+      environment)
+    (store := store) (left := 0) (right := 3) type binary rfl rfl
+  rw [outside] at test
+  exact .ifTrue (.caseRight (.var rfl) test) (.inLeft .word)
+
+/-- The range check passes on the snapshot that follows the guard's three
+binders: the snapshot is absent, or the exact result lies in the type's range. -/
+def RangePasses (type : TypeSystem.FixedInteger) (binary : Syntax.BinaryOp) :
+    Core.Environment → Core.Value → Prop
+  | [], _ => False
+  | snapshot :: _, right => (∃ rightType payload, snapshot = .inLeft rightType payload) ∨
+      ∃ leftType left rightWord, snapshot = .inRight leftType (.word left) ∧ right = .word rightWord ∧
+        SourceCorePrimitive.checkedInRange type binary left rightWord = true
+
+/-- A completed range test leaves the store, and is `false` only when the
+range check passes. -/
+theorem range_condition_inv {environment : Core.Environment} {store final : Core.Store}
+    {value : Core.Value} {type : TypeSystem.FixedInteger} {binary : Syntax.BinaryOp}
+    {updated changed right : Core.Value}
+    (condition : Core.Evaluates (updated :: changed :: right :: environment) store
+      (.caseE (.var 3) (.bool false) (SourceCorePrimitive.checkedOutside type binary 0 3)) value final) :
+    final = store ∧ (value = .bool false → RangePasses type binary environment right) ∧
+      (value = .bool true → ∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+        right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) := by
+  cases environment with
+  | nil =>
+    exfalso
+    cases condition with
+    | caseLeft scrutinee _ | caseRight scrutinee _ =>
+      cases scrutinee with
+      | var found => simp at found
+  | cons snapshot rest =>
+    cases condition with
+    | caseLeft scrutinee branch =>
+      cases scrutinee with
+      | var found =>
+        simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+        cases branch
+        exact ⟨rfl, fun _ => .inl ⟨_, _, found⟩, fun impossible => by cases impossible⟩
+    | caseRight scrutinee branch =>
+      cases scrutinee with
+      | var found =>
+        simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at found
+        obtain ⟨a, b, foundA, foundB, sameValue, sameStore⟩ := SourceCorePrimitive.checkedOutside_inv branch
+        simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq] at foundA foundB
+        subst foundA sameValue
+        refine ⟨sameStore, fun passed => .inr ⟨_, a, b, found, foundB, ?_⟩,
+          fun failed => ⟨_, a, b, by rw [found]; rfl, foundB, ?_⟩⟩
+        · simpa using passed
+        · simpa using failed
+
+/-- A completed range check either passed and wrote, on an absent snapshot or
+an exact result in the type's range, or failed with `Panic(0x11)` without
+changing the store. -/
+theorem guard_range_inv {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value}
+    {updated changed right : Core.Value}
+    (evaluated : Core.Evaluates (updated :: changed :: right :: environment) before
+      (guard outputType (some ⟨operation, .range type binary⟩) write) result after) :
+    (RangePasses type binary environment right ∧
+      Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
+    ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+        right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+      result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+      after = before) := by
+  cases evaluated with
+  | ifTrue condition failed =>
+    obtain ⟨sameStore, _, outside⟩ := range_condition_inv condition
+    subst sameStore
+    cases failed with
+    | inLeft reason => cases reason; exact .inr ⟨outside rfl, rfl, rfl⟩
+  | ifFalse condition written =>
+    obtain ⟨sameStore, passes, _⟩ := range_condition_inv condition
+    subst sameStore
+    exact .inl ⟨passes rfl, written⟩
+
+theorem guard_rangePasses {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operation : Core.BinaryOp} {type : TypeSystem.FixedInteger}
+    {binary : Syntax.BinaryOp} {write : Core.Expr} {result : Core.Value} {updated changed right : Core.Value}
+    (passes : RangePasses type binary environment right)
+    (written : Core.Evaluates (updated :: changed :: right :: environment) before write result after) :
+    Core.Evaluates (updated :: changed :: right :: environment) before
+      (guard outputType (some ⟨operation, .range type binary⟩) write) result after := by
+  cases environment with
+  | nil => exact passes.elim
+  | cons snapshot rest =>
+    rcases passes with ⟨rightType, payload, rfl⟩ | ⟨leftType, left, rightWord, rfl, rfl, inRange⟩
+    · exact .ifFalse (.caseLeft (.var rfl) .bool) written
+    · exact guard_inRange inRange written
+
+/-- A completed check without a range check either passed and wrote, or
+panicked on a zero right-hand side without changing the store. A range check
+is the last case, and `guard_range_inv` inverts it. -/
 theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
     {outputType : Core.Ty} {operator : Option Modifier} {write : Core.Expr} {result : Core.Value}
     {updated changed right : Core.Value}
@@ -358,14 +503,23 @@ theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
       (guard outputType operator write) result after) :
     (Passes operator right ∧
       Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
-    (∃ operation, operator = some ⟨operation, true⟩ ∧ right = .word Core.Word.zero ∧
+    (∃ operation, operator = some ⟨operation, .divisor⟩ ∧ right = .word Core.Word.zero ∧
       result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
-      after = before) := by
+      after = before) ∨
+    (∃ operation type binary, operator = some ⟨operation, .range type binary⟩ ∧
+      ((RangePasses type binary environment right ∧
+          Core.Evaluates (updated :: changed :: right :: environment) before write result after) ∨
+        ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+            right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+          result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+          after = before))) := by
   match operator, evaluated with
   | none, evaluated => exact .inl ⟨.total (fun _ none => by cases none), evaluated⟩
-  | some ⟨operation, false⟩, evaluated =>
+  | some ⟨operation, .total⟩, evaluated =>
     exact .inl ⟨.total (fun _ same => by cases same; rfl), evaluated⟩
-  | some ⟨operation, true⟩, evaluated =>
+  | some ⟨operation, .range type binary⟩, evaluated =>
+    exact .inr (.inr ⟨operation, type, binary, rfl, guard_range_inv evaluated⟩)
+  | some ⟨operation, .divisor⟩, evaluated =>
     cases evaluated with
     | ifTrue condition failed =>
       cases condition with
@@ -380,7 +534,7 @@ theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
           have same : word = Core.Word.zero := by simpa using applied
           subst same
           cases failed with
-          | inLeft reason => cases reason; exact .inr ⟨operation, rfl, rfl, rfl, rfl⟩
+          | inLeft reason => cases reason; exact .inr (.inl ⟨operation, rfl, rfl, rfl, rfl⟩)
     | ifFalse condition written =>
       cases condition with
       | binary left zero applied =>
@@ -393,6 +547,21 @@ theorem guard_inv {environment : Core.Environment} {before after : Core.Store}
           rename_i word
           have different : word ≠ Core.Word.zero := by simpa using applied
           exact .inl ⟨.nonzero different, written⟩
+
+/-- With a Unit right-hand side, as in-place `~` has, no check fails: the
+guard is its write. -/
+theorem guard_unit_inv {environment : Core.Environment} {before after : Core.Store}
+    {outputType : Core.Ty} {operator : Option Modifier} {write : Core.Expr} {result : Core.Value}
+    {updated changed : Core.Value}
+    (evaluated : Core.Evaluates (updated :: changed :: .unit :: environment) before
+      (guard outputType operator write) result after) :
+    Core.Evaluates (updated :: changed :: .unit :: environment) before write result after := by
+  rcases guard_inv evaluated with ⟨_, written⟩ | ⟨_, _, impossible, _, _⟩ |
+      ⟨_, _, _, _, ⟨_, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
+  · exact written
+  · cases impossible
+  · exact written
+  · cases impossible
 
 def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .equal => none
@@ -411,8 +580,64 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .uncheckedAdd => some (.total .wordAdd)
   | .uncheckedSubtract => some (.total .wordSub)
   | .uncheckedMultiply => some (.total .wordMul)
-  | .uncheckedDivide => some ⟨.wordDiv, true⟩
-  | .uncheckedModulo => some ⟨.wordMod, true⟩
+  | .uncheckedDivide => some ⟨.wordDiv, .divisor⟩
+  | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
+
+/-- The checked compound assignments at a target type: `+= -= *=` at a
+fixed-width integer type, with the type and the binary operator. The match
+tests the operator first, so every other operator reduces to `none` at any
+target. -/
+def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
+    Option (TypeSystem.FixedInteger × Syntax.BinaryOp) :=
+  match operator, target with
+  | .add, .constructor (.builtin (.fixed type)) => some (type, .add)
+  | .subtract, .constructor (.builtin (.fixed type)) => some (type, .subtract)
+  | .multiply, .constructor (.builtin (.fixed type)) => some (type, .multiply)
+  | _, _ => none
+
+/-- Word's operation for checked `+ - *`: in the type's range it is the exact
+result's word. -/
+def checkedWordOperation : Syntax.BinaryOp → Core.BinaryOp
+  | .add => .wordAdd
+  | .subtract => .wordSub
+  | _ => .wordMul
+
+/-- The modifier of a value assignment at its target's static type: checked
+`+= -= *=` at a fixed-width integer type compute Word's operation, and `guard`
+checks the exact result against the type's range; every other operator takes
+`binaryOperator`'s modifier. -/
+def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
+    Option Modifier :=
+  match checkedCompound target operator with
+  | some (type, binary) => some ⟨checkedWordOperation binary, .range type binary⟩
+  | none => binaryOperator integer operator
+
+/-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/
+theorem assignmentModifier_plain {target : TypeSystem.Ty} {integer : Bool} {operator : Syntax.ValueAssignOp}
+    (plain : checkedCompound target operator = none) :
+    assignmentModifier target integer operator = binaryOperator integer operator := by
+  simp [assignmentModifier, plain]
+
+/-- A Word target has no checked compound assignment. -/
+theorem checkedCompound_word (operator : Syntax.ValueAssignOp) : checkedCompound .word operator = none := by
+  cases operator <;> rfl
+
+/-- Plain assignment is never checked. -/
+theorem checkedCompound_equal (target : TypeSystem.Ty) : checkedCompound target .equal = none := by
+  unfold checkedCompound
+  split <;> simp_all
+
+/-- `binaryOperator` never selects the range check. -/
+theorem binaryOperator_not_range {integer : Bool} {operator : Syntax.ValueAssignOp} {operation : Core.BinaryOp}
+    {type : TypeSystem.FixedInteger} {binary : Syntax.BinaryOp} :
+    binaryOperator integer operator ≠ some ⟨operation, .range type binary⟩ := by
+  cases operator <;> simp [binaryOperator, Modifier.total]
+
+/-- The modifier the place lowering emits: in-place `~` keeps
+`binaryOperator`'s, and a value assignment takes `assignmentModifier`'s. -/
+def placeModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) (bitNot : Bool) :
+    Option Modifier :=
+  if bitNot then binaryOperator integer operator else assignmentModifier target integer operator
 
 def modified (type : Core.Ty) (operator : Option Modifier) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
@@ -467,7 +692,7 @@ def lower (checked : Checked) (signatures : ProgramSignatures) (expression : Exp
         SourceCoreBasic.ensureType site route.leafType value.type
         pure value.expression
   pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) rhs next outputType
-    (binaryOperator (route.leafType = .integer) operator) bitNot invalidOperand)
+    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand)
 
 end Solcore.Frontend.SourceCoreDataPlaces
 end

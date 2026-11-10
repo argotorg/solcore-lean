@@ -841,7 +841,79 @@ theorem wordCompoundPreserves
               exact primitive.preserves (.wordUnchecked .uncheckedModulo) left_typed
                 right_typed
 
+/-- `&= |= ^=` on a fixed-width integer target are Word's operations on
+canonical words, which keep them canonical. -/
+theorem fixedBitwisePreserves
+    {context : Context} {heap : Heap} {operator : Syntax.ValueAssignOp}
+    {current : Option Value} {right result : Value} {type : TypeSystem.FixedInteger}
+    (kind : FixedCompoundAssignmentOperator operator)
+    (plain : ¬ FixedCheckedCompound operator)
+    (current_typed : OptionalValueHasType context heap current (.fixed type))
+    (right_typed : ValueHasType context heap right (.fixed type))
+    (applies : AssignmentValueApplies operator current right result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases kind with
+  | add => exact absurd .add plain
+  | subtract => exact absurd .subtract plain
+  | multiply => exact absurd .multiply plain
+  | bitAnd =>
+      cases applies with
+      | bitAnd primitive =>
+          cases current_typed with
+          | some left_typed => exact primitive.preserves (.fixedBitwise .bitAnd) left_typed right_typed
+  | bitXor =>
+      cases applies with
+      | bitXor primitive =>
+          cases current_typed with
+          | some left_typed => exact primitive.preserves (.fixedBitwise .bitXor) left_typed right_typed
+  | bitOr =>
+      cases applies with
+      | bitOr primitive =>
+          cases current_typed with
+          | some left_typed => exact primitive.preserves (.fixedBitwise .bitOr) left_typed right_typed
+
 end AssignmentValueApplies
+
+namespace CompoundAssignmentApplies
+
+/-- Plain assignment at any target type returns its right-hand value. -/
+theorem equalPreserves
+    {context : Context} {heap : Heap} {targetType : Ty} {current : Option Value}
+    {right result : Value} {type : Ty}
+    (right_typed : ValueHasType context heap right type)
+    (applies : CompoundAssignmentApplies targetType .equal current right result) :
+    ValueHasType context heap result type := by
+  cases applies with
+  | primitive _ applies => exact applies.equalPreserves right_typed
+
+/-- A compound assignment keeps its target's type: Word's operators at a Word
+target, Word's `&= |= ^=` on canonical words, and checked `+= -= *=`, whose
+result lies in the range of the target's fixed-width type. -/
+theorem preserves
+    {context : Context} {heap : Heap} {targetType leaf : Ty} {operator : Syntax.ValueAssignOp}
+    {current : Option Value} {right result : Value}
+    (kind : CompoundAssignmentTyping operator leaf)
+    (targetEq : targetType = leaf)
+    (current_typed : OptionalValueHasType context heap current leaf)
+    (right_typed : ValueHasType context heap right leaf)
+    (applies : CompoundAssignmentApplies targetType operator current right result) :
+    ValueHasType context heap result leaf := by
+  subst targetEq
+  cases kind with
+  | word kind =>
+      cases applies with
+      | primitive _ applies => exact applies.wordCompoundPreserves kind current_typed right_typed
+      | add target _ | subtract target _ | multiply target _ => cases target
+  | fixed kind =>
+      cases applies with
+      | primitive plain applies =>
+          exact applies.fixedBitwisePreserves kind (plain _ rfl) current_typed right_typed
+      | add target applies | subtract target applies | multiply target applies =>
+          cases target
+          cases applies with
+          | checked _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+
+end CompoundAssignmentApplies
 
 namespace BitNotSnapshot
 
@@ -2234,6 +2306,67 @@ end SourcePlaceResolves
 
 namespace SourcePlaceAssignment
 
+/-- A compound assignment at its operand type keeps the heap typed. -/
+private theorem compound_preserves
+    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
+    {source : TypedSource} {environment : Environment}
+    {before after : Heap} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {right : ExpressionId}
+    {updatedRoot : Value} {leaf : Ty}
+    (expression_preserves :
+      ExpressionExecutionPreserves program context evidence source environment)
+    (evidence_covers : evidence.Covers context)
+    (environment_agrees :
+      EnvironmentAgrees before context.locals environment)
+    (before_typed : HeapWellTyped context before)
+    (kind : CompoundAssignmentTyping operator leaf)
+    (target_type : SourcePlaceHasType source context assignment.target leaf)
+    (value_type : ExpressionHasType source context right leaf)
+    (execution : SourcePlaceAssignment program context evidence source
+      (CompoundAssignmentApplies assignment.target.type operator) environment before
+      assignment.target right updatedRoot after) :
+    HeapWellTyped context after /\ HeapTypesExtend before after := by
+  have targetEq : assignment.target.type = leaf := by
+    cases target_type with
+    | intro _ _ stored_type_eq => exact stored_type_eq
+  cases execution with
+  | @intro _ _ _ _ _ _ targetHeap rhsHeap _ _ target _ rightValue _
+      resolve evaluate_right write =>
+      rcases resolve.preserves expression_preserves evidence_covers
+          environment_agrees before_typed target_type with
+        ⟨rootType, target_typed, target_heap_typed, target_extension⟩
+      rcases expression_preserves _ _ _ _ _ evidence_covers
+          (environment_agrees.mono target_extension) target_heap_typed
+          value_type evaluate_right with
+        ⟨right_typed, rhs_heap_typed, rhs_extension⟩
+      have target_rhs_typed := target_typed.mono rhs_extension
+      cases write with
+      | intro current_read root_type_eq initial_value update heap_write =>
+          rename_i currentCell initial
+          have initial_typed :=
+            initial_value.preserves (rhs_heap_typed _ current_read.member)
+          have initial_root_typed :
+              OptionalValueHasType context rhsHeap initial rootType := by
+            rw [← target_rhs_typed.root_type, ← root_type_eq]
+            exact initial_typed
+          have modify_typed : LeafModificationPreservesType context rhsHeap
+              (fun _ updated =>
+                CompoundAssignmentApplies assignment.target.type operator target.selected
+                  rightValue updated) leaf := by
+            intro current updated current_typed applies
+            exact applies.preserves kind targetEq target_rhs_typed.selected right_typed
+          have updated_typed := update.preserves
+            target_rhs_typed.projections initial_root_typed modify_typed
+          have updated_cell_typed :
+              ValueHasType context rhsHeap updatedRoot currentCell.type := by
+            rw [root_type_eq, target_rhs_typed.root_type]
+            exact updated_typed
+          have final_typed := rhs_heap_typed.write current_read
+            (.some updated_cell_typed) heap_write
+          exact ⟨final_typed,
+            (target_extension.trans rhs_extension).trans
+              (HeapTypesExtend.of_write heap_write)⟩
+
 theorem preserves
     {program : Program} {context : Context} {evidence : EvidenceEnvironment}
     {source : TypedSource} {environment : Environment}
@@ -2248,8 +2381,8 @@ theorem preserves
     (before_typed : HeapWellTyped context before)
     (typing : SourceAssignmentHasType source context assignment operator right)
     (execution : SourcePlaceAssignment program context evidence source
-      (AssignmentValueApplies operator) environment before assignment.target
-      right updatedRoot after) :
+      (CompoundAssignmentApplies assignment.target.type operator) environment before
+      assignment.target right updatedRoot after) :
     HeapWellTyped context after /\ HeapTypesExtend before after := by
   cases typing with
   | @equal _ _ _ type target_type value_type requirements_eq =>
@@ -2275,8 +2408,8 @@ theorem preserves
                 exact initial_typed
               have modify_typed : LeafModificationPreservesType context rhsHeap
                   (fun _ updated =>
-                    AssignmentValueApplies .equal target.selected rightValue
-                      updated) type := by
+                    CompoundAssignmentApplies assignment.target.type .equal target.selected
+                      rightValue updated) type := by
                 intro current updated current_typed applies
                 exact applies.equalPreserves right_typed
               have updated_typed := update.preserves
@@ -2290,45 +2423,12 @@ theorem preserves
               exact ⟨final_typed,
                 (target_extension.trans rhs_extension).trans
                   (HeapTypesExtend.of_write heap_write)⟩
-  | wordCompound kind target_type value_type requirements_eq =>
-      cases execution with
-      | @intro _ _ _ _ _ _ targetHeap rhsHeap _ _ target _ rightValue _
-          resolve evaluate_right write =>
-          rcases resolve.preserves expression_preserves evidence_covers
-              environment_agrees before_typed target_type with
-            ⟨rootType, target_typed, target_heap_typed, target_extension⟩
-          rcases expression_preserves _ _ _ _ _ evidence_covers
-              (environment_agrees.mono target_extension) target_heap_typed
-              value_type evaluate_right with
-            ⟨right_typed, rhs_heap_typed, rhs_extension⟩
-          have target_rhs_typed := target_typed.mono rhs_extension
-          cases write with
-          | intro current_read root_type_eq initial_value update heap_write =>
-              rename_i currentCell initial
-              have initial_typed :=
-                initial_value.preserves (rhs_heap_typed _ current_read.member)
-              have initial_root_typed :
-                  OptionalValueHasType context rhsHeap initial rootType := by
-                rw [← target_rhs_typed.root_type, ← root_type_eq]
-                exact initial_typed
-              have modify_typed : LeafModificationPreservesType context rhsHeap
-                  (fun _ updated =>
-                    AssignmentValueApplies operator target.selected rightValue
-                      updated) .word := by
-                intro current updated current_typed applies
-                exact applies.wordCompoundPreserves kind
-                  target_rhs_typed.selected right_typed
-              have updated_typed := update.preserves
-                target_rhs_typed.projections initial_root_typed modify_typed
-              have updated_cell_typed :
-                  ValueHasType context rhsHeap updatedRoot currentCell.type := by
-                rw [root_type_eq, target_rhs_typed.root_type]
-                exact updated_typed
-              have final_typed := rhs_heap_typed.write current_read
-                (.some updated_cell_typed) heap_write
-              exact ⟨final_typed,
-                (target_extension.trans rhs_extension).trans
-                  (HeapTypesExtend.of_write heap_write)⟩
+  | wordCompound kind target_type value_type _ =>
+      exact compound_preserves expression_preserves evidence_covers environment_agrees
+        before_typed (.word kind) target_type value_type execution
+  | fixedCompound kind target_type value_type _ =>
+      exact compound_preserves expression_preserves evidence_covers environment_agrees
+        before_typed (.fixed kind) target_type value_type execution
 
 end SourcePlaceAssignment
 

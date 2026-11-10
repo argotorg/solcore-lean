@@ -705,7 +705,7 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .assignValue assignment operator rhs)
         (assignment_executes : SourcePlaceAssignment program size_assignment_executes context evidence source
-          (AssignmentValueApplies operator) environment before assignment.target rhs
+          (CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs
           updatedRoot after) :
         StatementExecutes program (stepSize [size_assignment_executes]) context evidence source environment before id
           context (.fallthrough environment) after
@@ -980,7 +980,7 @@ mutual
         {context evidence source environment before after assignment operator rhs
           updatedRoot}
         (execute : SourcePlaceAssignment program size_execute context evidence source
-          (AssignmentValueApplies operator) environment before assignment.target rhs
+          (CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs
           updatedRoot after) :
         ForItemExecutes program (stepSize [size_execute]) context evidence source environment before
           (.assignValue assignment operator rhs) context environment after
@@ -3435,7 +3435,7 @@ mutual
         (root_type_eq : currentCell.type = target.rootType)
         (initial_value : RootInitialValue currentCell initial)
         (path_read : ProjectionsRead initial target.projections currentSelected)
-        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        (panics : AssignmentOperandsPanic target.valueType operator target.selected right code) :
         SourcePlaceAssignmentFaults program (stepSize [size_resolve, size_evaluate]) context evidence source environment
           before place operator rhs (.panic code) rhsHeap
     | structuralUpdate

@@ -757,7 +757,7 @@ theorem ordinary_call (certified : SelectedCompilationNamedSourceTyping.Certifie
     apply Dynamic.SourcePlaceAssignment.intro resolve
     · exact read next shape.localRead armContext armEnvironment (boundHeap previous next) ⟨3⟩ .head
         (.intro (.tail (.tail (.tail .head))))
-    · exact .intro (.intro .head) rfl .initialized (.leaf (.equal _ _)) (.intro (.intro .head) .head)
+    · exact .intro (.intro .head) rfl .initialized (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) (.intro (.intro .head) .head)
   have matched : Dynamic.StatementExecutes (Program.ofChecked compiled.sourceProgram)
       header.context header.function.evidence function.typedBody environment (inputHeap previous next)
       shape.matchNode.id header.context (.fallthrough environment) (sourceHeap next) := by

@@ -277,7 +277,7 @@ inductive WriteFault (operator : Syntax.ValueAssignOp) (target : ResolvedPlace)
       (rootType : currentCell.type = target.rootType)
       (initialValue : RootInitialValue currentCell initial)
       (pathRead : ProjectionsRead initial target.projections currentSelected)
-      (panics : AssignmentOperandsPanic operator target.selected right code) :
+      (panics : AssignmentOperandsPanic target.valueType operator target.selected right code) :
       WriteFault operator target right heap (.panic code)
   | structural {currentCell initial reason}
       (currentRead : Heap.Reads heap target.location currentCell)
@@ -982,7 +982,7 @@ mutual
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
           middle target updated written)
         (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
@@ -1034,7 +1034,7 @@ mutual
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry scope context environment before rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
           middle target updated written)
         (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
@@ -1067,7 +1067,7 @@ mutual
         (rootType : currentCell.type = target.rootType)
         (initialValue : RootInitialValue currentCell initial)
         (pathRead : ProjectionsRead initial target.projections currentSelected)
-        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        (panics : AssignmentOperandsPanic target.valueType operator target.selected right code) :
         StatementsIn program registry mode scope context environment before (id :: rest) context
           (.fault (.semantic (.panic code))) after
     | assignBareUnbound {mode scope context environment heap id rest node assignment operator rhs}
@@ -1284,7 +1284,7 @@ mutual
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
           middle target updated written)
         (next : ForItems program registry scope context environment written rest finalContext outcome after) :
         ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
@@ -1323,7 +1323,7 @@ mutual
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry scope context environment before rhs (.value value) middle)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
           middle target updated written)
         (next : ForItems program registry scope context environment written rest finalContext outcome after) :
         ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
@@ -1350,7 +1350,7 @@ mutual
         (rootType : currentCell.type = target.rootType)
         (initialValue : RootInitialValue currentCell initial)
         (pathRead : ProjectionsRead initial target.projections currentSelected)
-        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        (panics : AssignmentOperandsPanic target.valueType operator target.selected right code) :
         ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.panic code))) after
     | unbound {scope context environment heap assignment operator rhs rest}

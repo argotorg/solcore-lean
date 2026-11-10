@@ -793,6 +793,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell}
@@ -807,7 +808,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
     (initialValue : Dynamic.RootInitialValue cell initial)
     (pathRead : Dynamic.ProjectionsRead initial sourceTarget.projections currentSelected)
-    (panics : Dynamic.AssignmentOperandsPanic operator sourceTarget.selected right code)
+    (panics : Dynamic.AssignmentOperandsPanic sourceTarget.valueType operator sourceTarget.selected right code)
     (next : Expr) (outputType : Ty) (invalidOperand : Word) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
@@ -841,11 +842,12 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     rw [resolution.selectedEq] at panics
     -- The panic fixes a panicking modifier, a zero divisor and its code.
     obtain ⟨operation, selected, zero, sameCode⟩ : ∃ operation,
-        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ ∧
+        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightValue = .word Word.zero ∧ code = SourceCorePanics.divisionByZero := by
       rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
-      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics other⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies
+          (CompatiblePlaceModifier.resolved_plain targetPlain resolve) panics applied).elim
+      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics (other _)⟩
     subst zero sameCode
     have present : ∃ sourceRoot, initial = some sourceRoot := by
       cases initial with
@@ -933,6 +935,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -1003,7 +1006,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   | panic resolve evaluate currentRead _ initialValue pathRead panics =>
     obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata⟩ :=
       CompatibleTypedPlacePanic.preserves layout registryExtension meaning faithful observations rhsGenerated found rhsView rhsCoreType
-        operatorProfile environments heaps locals slot rootTyped resolve evaluate currentRead initialValue pathRead panics
+        operatorProfile targetPlain environments heaps locals slot rootTyped resolve evaluate currentRead initialValue pathRead panics
         next outputType invalid
     exact ⟨_, finalStore, finalMap, finalWorld, evaluated, FunctionCalls.FaultTokens.panic _, finalHeaps, maps, worlds, frame, metadata⟩
   | structuralUpdate resolve evaluate currentRead sameType initialValue fault =>

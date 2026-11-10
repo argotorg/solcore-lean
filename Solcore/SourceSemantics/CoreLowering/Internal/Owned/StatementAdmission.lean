@@ -182,6 +182,7 @@ theorem after_assignment {initial reached : ProtectedStateTransition.Index}
     (covers : evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees initial.heap context.locals environment)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
+    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (trace : Dynamic.SourcePlaceAssignment program context evidence source
       (Dynamic.AssignmentValueApplies operator) environment initial.heap assignment.target rhs updated reached.heap)
     (frame : AdministrativePreserved initial.mapping initial.store reached.mapping reached.store) :
@@ -190,7 +191,10 @@ theorem after_assignment {initial reached : ProtectedStateTransition.Index}
     intro before after id value type covers locals heapTyped typed evaluated
     exact wellFormed.wholeLanguagePreservation.expression context evidence source environment
       before after id value type runtime covers locals heapTyped typed evaluated
-  have preserved := trace.preserves expressionPreserves covers locals admitted.heap typed
+  have typedTrace : Dynamic.SourcePlaceAssignment program context evidence source
+      (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment initial.heap assignment.target rhs
+      updated reached.heap := (Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace
+  have preserved := typedTrace.preserves expressionPreserves covers locals admitted.heap typed
   exact ⟨preserved.1,
     StableRows.after_administrative (bridge.pool first) (bridge.pool last) admitted.rows frame⟩
 
@@ -206,11 +210,12 @@ theorem after_assignment_sized {initial reached : ProtectedStateTransition.Index
     (covers : evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees initial.heap context.locals environment)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
+    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source
       (Dynamic.AssignmentValueApplies operator) environment initial.heap assignment.target rhs updated reached.heap)
     (frame : AdministrativePreserved initial.mapping initial.store reached.mapping reached.store) :
     Admission bridge context last :=
-  after_assignment bridge context first last admitted wellFormed runtime covers locals typed trace.sound frame
+  after_assignment bridge context first last admitted wellFormed runtime covers locals typed targetPlain trace.sound frame
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentAdmission
 end
@@ -525,7 +530,8 @@ theorem heap_after_assignment
     (rightTyped : Dynamic.ValueHasType context middle right node.type)
     (rhsMetadata : Dynamic.HeapTypesExtend getter middle)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right
+        replacement)
       middle target updated after) :
     Dynamic.HeapWellTyped context after := by
   cases typed with
@@ -547,7 +553,18 @@ theorem heap_after_assignment
       obtain ⟨root, savedTyped⟩ := SelectedPreservation.projected_target_typed unique locals
         getterHeap getterMetadata targetTyped row keyValues snapshot
       have rightSource := storedType ▸ rightTyped
-      exact (SelectedPreservation.projected_write_compound kind savedTyped
+      exact (SelectedPreservation.projected_write_compound (.word kind) targetTyped.type_eq savedTyped
+        ⟨rightSource, heapTyped, rhsMetadata⟩ write).1
+
+  | fixedCompound kind targetTyped rhsTyped _ =>
+      obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
+      have sameNode : actual = node := Option.some.inj
+        ((lookupExpression?_complete unique contains).symm.trans found)
+      subst actual
+      obtain ⟨root, savedTyped⟩ := SelectedPreservation.projected_target_typed unique locals
+        getterHeap getterMetadata targetTyped row keyValues snapshot
+      have rightSource := storedType ▸ rightTyped
+      exact (SelectedPreservation.projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped
         ⟨rightSource, heapTyped, rhsMetadata⟩ write).1
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStagedProjectedAssignmentAdmission

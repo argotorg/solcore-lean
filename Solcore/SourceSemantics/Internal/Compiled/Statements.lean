@@ -163,7 +163,9 @@ theorem assignedValue_of_actual_children_for
   let expected := assignmentExpected operator valueInitial place.type
   have valueOrigin :
       (valueInitial = placeState ∧ expected = placeState.resolve place.type) ∨
-      (Detail.unify placeState place.type .word = .ok valueInitial ∧ expected = .word) := by
+      (Detail.unify placeState place.type
+          (Detail.compoundOperandType operator (placeState.resolve place.type)) = .ok valueInitial ∧
+        expected = Detail.compoundOperandType operator (valueInitial.resolve place.type)) := by
     cases operator with
     | equal =>
         have same : placeState = valueInitial := Except.ok.inj fitting
@@ -260,8 +262,15 @@ theorem assignedValue_of_actual_children_for
       rw [resolved]
       exact sourcePlace_type_admissible placeTyped
     · rw [expectedEq]
-      exact TypeAdmissible.word (boundary.invariant.typeParameterBinders (by
-        simpa only [boundary.scope.owner, boundary.scope.parameters] using boundary.scope.canonical checked))
+      have binders := boundary.invariant.typeParameterBinders (by
+        simpa only [boundary.scope.owner, boundary.scope.parameters] using boundary.scope.canonical checked)
+      show TypeAdmissible target (.constructor _)
+      unfold Detail.compoundOperandConstructor
+      split
+      · cases operator <;> first
+          | exact TypeAdmissible.fixed binders _
+          | exact TypeAdmissible.word binders
+      · exact TypeAdmissible.word binders
   have expectedBound : ∀ type ∈ some expected, type.VariablesBelow valueInitial.inference.next := by
     intro type member
     have same : type = expected := Option.some.inj member.symm

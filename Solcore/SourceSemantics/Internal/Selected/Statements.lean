@@ -66,7 +66,9 @@ theorem inferAssignedValueFuel_children_actual_invariants
       assignment.target.references = place.references ∧
       assignment.target = { place with type := final.resolve place.type } ∧
       ((valueInitial = placeState ∧ expected = placeState.resolve place.type) ∨
-        (Detail.unify placeState place.type .word = .ok valueInitial ∧ expected = .word)) := by
+        (Detail.unify placeState place.type
+            (Detail.compoundOperandType operator (placeState.resolve place.type)) = .ok valueInitial ∧
+          expected = Detail.compoundOperandType operator (valueInitial.resolve place.type))) := by
   unfold Detail.inferAssignedValueFuel at success
   cases placeResult : Detail.inferPlaceFuel fuel inferenceContext
       targetExpression initial with
@@ -82,9 +84,9 @@ theorem inferAssignedValueFuel_children_actual_invariants
       have finishNonEqual
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                Detail.inferExprFuel fuel inferenceContext value (some (Detail.compoundOperandType operator (fittedState.resolve place.type)))
                   fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
@@ -105,14 +107,16 @@ theorem inferAssignedValueFuel_children_actual_invariants
             assignment.target =
               { actualPlace with type := final.resolve actualPlace.type } ∧
             ((valueInitial = actualPlaceState ∧ expected = actualPlaceState.resolve actualPlace.type) ∨
-              (Detail.unify actualPlaceState actualPlace.type .word = .ok valueInitial ∧ expected = .word)) := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+              (Detail.unify actualPlaceState actualPlace.type
+                  (Detail.compoundOperandType operator (actualPlaceState.resolve actualPlace.type)) = .ok valueInitial ∧
+                expected = Detail.compoundOperandType operator (valueInitial.resolve actualPlace.type))) := by
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some .word) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error => simp [valueResult] at tailSuccess
             | ok valuePair =>
                 rcases valuePair with ⟨inferredValue, finalState⟩
@@ -158,7 +162,8 @@ theorem inferAssignedValueFuel_children_actual_invariants
                   placeInvariant.unify placeTypeBelow
                     (Ty.variablesBelow_constructor _ _)
                     outerFitted unifyResult
-                exact ⟨place, placeState, .word, fittedState, rfl,
+                exact ⟨place, placeState,
+                  Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState, rfl,
                   placeInvariant, valueResult, fittedInvariant,
                   Ty.variablesBelow_constructor _ _, rfl, rfl, .inr ⟨unifyResult, rfl⟩⟩
       cases operator with
@@ -354,7 +359,14 @@ theorem actualInferAssignedValueFuel_children_rootedSound
         simpa only [State.resolve, InferState.resolve] using placeInvariant.substitutionExtension place.type
       rw [resolved]
       exact sourcePlace_type_admissible placeTyped
-    · exact TypeAdmissible.word (initialInvariant.typeParameterBinders (by simpa only [ownerEq, parametersEq] using signatureParameters))
+    · have binders := initialInvariant.typeParameterBinders (by simpa only [ownerEq, parametersEq] using signatureParameters)
+      show TypeAdmissible semanticContext (.constructor _)
+      unfold Detail.compoundOperandConstructor
+      split
+      · cases operator <;> first
+          | exact TypeAdmissible.fixed binders _
+          | exact TypeAdmissible.word binders
+      · exact TypeAdmissible.word binders
   have valueTyped : ExpressionHasType
       ((parentState.toTypedSource roots).applySubstitution
         finalized.substitution)

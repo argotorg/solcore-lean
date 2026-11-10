@@ -495,7 +495,7 @@ theorem bare_head (index : ActualBodyInvocation.Index compiled bodyRelation) {ta
   subst target
   have lowered := index.assignment_lowered receipt.accepted
   obtain ⟨_, writable, rightTyped, profile⟩ :=
-    ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare typed
+    ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile typed
   obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rightTyped
   exact GenericAssignmentStatements.Head.of_lower_bare_with_token receipt.bare unique writable rightTyped profile
     (fun _ generated => ⟨node, found, generated⟩) lowered
@@ -564,7 +564,7 @@ theorem projected_head (index : ActualBodyInvocation.Index compiled bodyRelation
   subst target
   have lowered := index.assignment_lowered receipt.accepted
   obtain ⟨sourceTyped, writable, rightTyped, profile⟩ :=
-    ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route typed
+    ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile typed
   exact CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
     unique signatures sourceTyped writable rightTyped profile
     (fun id _ member generated _ => by

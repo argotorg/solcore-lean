@@ -318,6 +318,7 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun root _ same projections refs => .intro root (projections (by rooted_live(refs))) same)
     (fun _ _ requirements target value refs => .equal (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
     (fun operator _ _ requirements target value refs => .wordCompound operator (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
+    (fun operator _ _ requirements target value refs => .fixedCompound operator (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
     (fun _ requirements target refs => .intro (target (by rooted_live(refs))) requirements)
     (fun contains form mono generalizes binding type live => by
       have refs := ($transport).statement_children contains live

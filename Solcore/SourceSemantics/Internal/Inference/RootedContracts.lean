@@ -24,7 +24,9 @@ namespace Solcore.SourceSemantics.SourceInferenceExecution
 open Frontend SourceInference TypeSystem Detail
 
 def assignmentFit (operator : Syntax.ValueAssignOp) (state : State) (type : Ty) : Except Error State :=
-  match operator with | .equal => pure state | _ => Detail.unify state type .word
+  match operator with
+  | .equal => pure state
+  | _ => Detail.unify state type (compoundOperandType operator (state.resolve type))
 
 theorem assignmentFit_properties
     {operator : Syntax.ValueAssignOp} {state fitted : State} {type : Ty}

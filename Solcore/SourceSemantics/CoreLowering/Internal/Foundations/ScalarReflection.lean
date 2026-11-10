@@ -1168,8 +1168,9 @@ private theorem equal_operands_valid {previous : Option Dynamic.Value} {right : 
   | uninitialized notEqual => exact notEqual rfl
   | compound corresponds _ => cases corresponds
 
-private theorem equal_operands_no_panic {previous : Option Dynamic.Value} {right : Dynamic.Value} {code : UInt8}
-    (panics : Dynamic.AssignmentOperandsPanic .equal previous right code) : False := by
+private theorem equal_operands_no_panic {targetType : TypeSystem.Ty} {previous : Option Dynamic.Value}
+    {right : Dynamic.Value} {code : UInt8}
+    (panics : Dynamic.AssignmentOperandsPanic targetType .equal previous right code) : False := by
   cases panics with
   | compound corresponds _ => cases corresponds
 

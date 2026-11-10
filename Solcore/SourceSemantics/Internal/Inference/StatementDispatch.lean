@@ -81,9 +81,9 @@ theorem inferAssignedValueFuel_children_invariants
       have finishNonEqual
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                Detail.inferExprFuel fuel inferenceContext value (some (Detail.compoundOperandType operator (fittedState.resolve place.type)))
                   fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
@@ -103,13 +103,13 @@ theorem inferAssignedValueFuel_children_invariants
             assignment.target.references = actualPlace.references ∧
             assignment.target =
               { actualPlace with type := final.resolve actualPlace.type } := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some .word) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error => simp [valueResult] at tailSuccess
             | ok valuePair =>
                 rcases valuePair with ⟨inferredValue, finalState⟩
@@ -155,7 +155,8 @@ theorem inferAssignedValueFuel_children_invariants
                   placeInvariant.unify placeTypeBelow
                     (Ty.variablesBelow_constructor _ _)
                     outerFitted unifyResult
-                exact ⟨place, placeState, .word, fittedState, rfl,
+                exact ⟨place, placeState,
+                  Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState, rfl,
                   placeInvariant, valueResult, fittedInvariant,
                   Ty.variablesBelow_constructor _ _, rfl, rfl⟩
       cases operator with

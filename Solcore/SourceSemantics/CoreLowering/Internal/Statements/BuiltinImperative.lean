@@ -146,7 +146,8 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.V
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   exact GenericAssignmentStatements.Head.preserves_prefix functions extension program evidence
-    (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) faithful observations head environments heaps locals agrees actualTyped trace
+    (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) faithful observations head environments heaps locals agrees actualTyped
+    ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
 theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
@@ -179,8 +180,9 @@ theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors regist
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  exact GenericAssignmentStatements.Head.reflects functions extension program evidence
+  have result := GenericAssignmentStatements.Head.reflects functions extension program evidence
     (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing) faithful observations head environments heaps locals agrees actualTyped functionTypes errors completed
+  rwa [Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain] at result
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.BuiltinAssignmentStatements

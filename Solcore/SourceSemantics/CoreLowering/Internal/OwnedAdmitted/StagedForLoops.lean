@@ -633,7 +633,7 @@ theorem prepend_assignment {assignment : AssignmentResolution} {operator : Synta
     (snapshot : BareTarget environment before assignment.target target)
     (child : Size.Expression program stages childSize invocation context environment before rhs (.value value) middle)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
       middle target updated written)
     (next : Trace program stages invocation context environment written items test post body size outcome after) :
     Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
@@ -688,7 +688,7 @@ theorem assignment_panic {assignment : AssignmentResolution} {operator : Syntax.
     (rootType : currentCell.type = target.rootType)
     (initialValue : Dynamic.RootInitialValue currentCell initial)
     (pathRead : Dynamic.ProjectionsRead initial target.projections currentSelected)
-    (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code) :
+    (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) :
     Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
       (Size.stepSize [Size.stepSize [childSize]]) (.fault (.semantic (.panic code))) after :=
   .initializerFault (.assignmentPanic snapshot child currentRead rootType initialValue pathRead panics)
@@ -799,12 +799,12 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
       Size.Expression program stages childSize invocation context environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ childSize nextSize value middle written updated,
       size = Size.stepSize [childSize, nextSize] ∧
       Size.Expression program stages childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       Trace program stages invocation context environment written items test post body nextSize outcome after) := by
   cases trace with
@@ -934,7 +934,7 @@ theorem prepend_projected_assignment
     (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
     (child : Size.Expression program stages childSize invocation context environment targetHeap rhs (.value right) middle)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
       middle target updated written)
     (next : Trace program stages invocation context environment written items test post body size outcome after) :
     Trace program stages invocation context environment before (.assignValue assignment operator rhs :: items) test post body
@@ -2855,7 +2855,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
                 reached conditioned nextAdmitted
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-              .assignment snapshot childTrace write trace, represented,
+              .assignment snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
       · have errors := PreparedAssignmentReachedDiagnostics.shape_errors (environment := environment) headErrors semantic diagnostics assignmentTyped initial
@@ -2895,7 +2895,8 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨_, finalContext, outcome, after, finalMap, finalWorld,
-            .projectedAssignment bare keysTrace snapshot childTrace write trace, represented,
+            .projectedAssignment bare keysTrace snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+              trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @bitNot context scope assignment rest body head remaining tailSites headErrors ih =>
@@ -3317,7 +3318,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
               (context := context) (scope := scope) (administrative := administrative)
               bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-              (typedChildren childSize childStrict) snapshot childTrace write
+              (typedChildren childSize childStrict) snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3398,7 +3399,8 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               (context := context) (scope := scope) (administrative := administrative)
               bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
               budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
-              snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega) write
+              snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+              ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2
@@ -3663,7 +3665,7 @@ inductive Result (program : Program) (registry : Registry) (invocation : Scope)
       (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
       (child : Size.Expression program registry childSize invocation context environment targetHeap rhs (.value right) middle)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
         middle target updated written)
       (next : Trace program registry invocation context environment written rest test post body tailSize outcome after) :
       Result program registry invocation context environment before assignment operator rhs rest test post body

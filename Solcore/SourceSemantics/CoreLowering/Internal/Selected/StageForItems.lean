@@ -75,14 +75,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -216,7 +216,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => preservation n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega)
+                ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (Nat.le_trans (Nat.le_of_lt tailStrict) within)
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -759,7 +760,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
           (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-          (preservation stagedSize) snapshot measured write
+          (preservation stagedSize) snapshot measured
+          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (Nat.le_trans (Nat.le_of_lt tailStrict) within)
         ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -1312,7 +1314,8 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
           (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-          (preservation stagedSize) snapshot measured write
+          (preservation stagedSize) snapshot measured
+          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨_, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (Nat.le_trans (Nat.le_of_lt tailStrict) within)
         ⟨_, _, _, environments.extend maps worlds, middleHeaps,

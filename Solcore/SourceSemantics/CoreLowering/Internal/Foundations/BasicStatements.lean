@@ -579,7 +579,9 @@ theorem assign_prefix
         (Core.LocalSequence.assign resultType (.var index) expression body) result finalStore := by
   exact ⟨SourceCoreBasic.lowerStatements_assign metadata form target lowered tailLowered,
     prepend contains (by intro expression; rw [form]; intro impossible; cases impossible)
-      (.assignValue contains form assignmentSource) tailSource,
+      (.assignValue contains form
+        ((Dynamic.CompoundAssignmentApplies.eq_of_plain
+          (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assignmentSource)) tailSource,
     Core.LocalSequence.assign_success resultType (.var lookup) rhsCore readable written tailCore⟩
 
 end Prefix

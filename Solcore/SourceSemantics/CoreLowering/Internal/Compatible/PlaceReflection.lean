@@ -494,7 +494,10 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
       obtain ⟨futureWorld, _, represented, helperHeaps, extension, helperFrame, _⟩ := reflectSetter setterEvaluated
       cases represented with
       | updated root changed updatedRep =>
-        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨passes, remaining⟩ | ⟨operation, selected, zero, resultEq, storeEq⟩
+        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨passes, remaining⟩ | ⟨operation, selected, zero, resultEq, storeEq⟩ |
+            ⟨_, _, _, ranged, _⟩
+        rotate_left 2
+        · exact absurd ranged SourceCoreCompatibleDataPlaces.binaryOperator_not_range
         · rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, _⟩
           · cases remaining with
             | letE writeEvaluated continuation =>
@@ -524,9 +527,9 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
             | nonzero nonzero => exact (nonzero rfl).elim
           · -- The latest root is traversable, so the source panics on its operands.
             obtain ⟨_, read⟩ := changed.readable
-            have panicked : Dynamic.AssignmentOperandsPanic operator target.selected right.right
+            have panicked : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right.right
                 SourceCorePanics.divisionByZero := by
-              rw [resolution.selectedEq]; exact panicked
+              rw [resolution.selectedEq]; exact panicked target.valueType
             subst resultEq storeEq
             exact .fault (.panic sourceTrace rhsTrace latest.read cellType root read panicked) rfl
               (FunctionCalls.FaultTokens.panic _) helperHeaps (resolution.maps.trans right.meaning.maps)
@@ -577,7 +580,7 @@ inductive Generated (compilation : SourceCoreCompatibleDataPlaces.Context) (sign
       Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
         reasonAt invalidProjection invalidOperand missing
         (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value next outputType
-          (binaryOperator (route.leafType = Core.Ty.integer) operator) rhs.isNone invalidOperand)
+          (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
 
 /-- The receipt follows actual successful compiler branches. It does not
 replace or reinterpret the executable place compiler. -/
@@ -611,12 +614,12 @@ theorem generated_of_lower {compilation : SourceCoreCompatibleDataPlaces.Context
           (completed : (show Except SourceCoreBasic.Error Expr from match rhs with
             | none => .ok (execute prepared (.var index) (SourceCoreCalls.packArguments keys)
                 (LanguageResult.success .unit) next outputType
-                (binaryOperator (route.leafType = Core.Ty.integer) operator) rhs.isNone invalidOperand)
+                (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
             | some id => do
                 let value ← expression fuel source scope id reasonAt
                 SourceCoreBasic.ensureType site route.leafType value.type
                 pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value.expression next outputType
-                  (binaryOperator (route.leafType = Core.Ty.integer) operator) rhs.isNone invalidOperand)) = .ok lowered) :
+                  (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)) = .ok lowered) :
           Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
             reasonAt invalidProjection invalidOperand missing lowered := by
         cases rhs with
@@ -883,7 +886,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type ∧
       right.type = prepared.route.leafType ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) right.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand := by
+        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand := by
   have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
@@ -901,7 +904,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       have nodeType : node.type = assignment.target.type := by simpa only [same] using nodeType
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, ⟨route, described, preparedBy⟩, binding, rootEq,
         by simpa only [routeEq] using lookup, layout, ordinary, rhsGenerated, found, certified,
-        by simpa only [nodeType] using leafView, rhsType, by simp [routeEq]⟩
+        by simpa only [nodeType] using leafView, rhsType, by simp [routeEq, placeModifier]⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceLayoutCertificates
 end
@@ -2253,6 +2256,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, actualPreparation, binding, rootEq, slot, layout, ordinary,
       generated, found, certified, rhsView, rhsType, lowering⟩ :=
     CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped nonempty extract accepted typed
+  rw [assignmentModifier_plain (checkedCompound_of_profile operatorProfile)] at lowering
   obtain ⟨typedNode, contains, nodeType⟩ := rightTyped.stored_type
   have same := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
   have leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type := by

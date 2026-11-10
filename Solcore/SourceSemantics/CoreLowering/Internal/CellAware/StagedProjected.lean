@@ -1277,7 +1277,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       cases represented with
       | updated root changed updatedRep =>
         rcases DataPlaceGuard.inv_sized remaining with ⟨passes, child, bound, remaining⟩ |
-          ⟨operation, selected, zero, resultEq, storeEq⟩
+          ⟨operation, selected, zero, resultEq, storeEq⟩ | ⟨_, _, _, ranged, _⟩
+        rotate_left 2
+        · exact absurd ranged SourceCoreCompatibleDataPlaces.binaryOperator_not_range
         · rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, _⟩
           · cases remaining with
             | letE writeEvaluated continuation =>
@@ -1318,9 +1320,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
             | nonzero nonzero => exact (nonzero rfl).elim
           · -- The latest root is traversable, so the source panics on its operands.
             obtain ⟨_, read⟩ := changed.readable
-            have panicked : Dynamic.AssignmentOperandsPanic operator target.selected right.right
+            have panicked : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right.right
                 SourceCorePanics.divisionByZero := by
-              rw [resolution.selectedEq]; exact panicked
+              rw [resolution.selectedEq]; exact panicked target.valueType
             subst resultEq storeEq
             let reached := transport.extend rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
             have phaseRelated := transport.related rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
@@ -1929,7 +1931,8 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
     (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
     (initialValue : Dynamic.RootInitialValue cell initial)
     (pathRead : Dynamic.ProjectionsRead initial sourceTarget.projections currentSelected)
-    (panics : Dynamic.AssignmentOperandsPanic operator sourceTarget.selected right code)
+    (panicPlain : ∀ type, sourceTarget.valueType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : Dynamic.AssignmentOperandsPanic sourceTarget.valueType operator sourceTarget.selected right code)
     (next : Expr) (outputType : Ty) (invalidOperand : Word) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
@@ -1969,11 +1972,11 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
     rw [resolution.selectedEq] at panics
     -- The panic fixes a panicking modifier, a zero divisor and its code.
     obtain ⟨operation, selected, zero, sameCode⟩ : ∃ operation,
-        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ ∧
+        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightValue = .word Word.zero ∧ code = SourceCorePanics.divisionByZero := by
       rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
-      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics other⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies panicPlain panics applied).elim
+      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics (other _)⟩
     subst zero sameCode
     have present : ∃ sourceRoot, initial = some sourceRoot := by
       cases initial with
@@ -2686,19 +2689,18 @@ theorem Execution.reflects (execution : Execution checked registry functions cel
         cases same
         subst_vars
         -- The right-hand side is Unit, so no modifier check can fail.
-        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨_, remaining⟩ | ⟨_, _, impossible, _, _⟩
-        · cases remaining with
-          | letE written continuation =>
-            obtain ⟨optional, read⟩ := execution.read
-            have actual : Evaluates
-                (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
-                  (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
-                (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
-              .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
-            obtain ⟨same, stores⟩ := evaluation_deterministic written actual
-            subst_vars
-            exact continuation
-        · cases impossible
+        have remaining := SourceCoreDataPlaces.guard_unit_inv remaining
+        cases remaining with
+        | letE written continuation =>
+          obtain ⟨optional, read⟩ := execution.read
+          have actual : Evaluates
+              (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
+                (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
+              (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
+            .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
+          obtain ⟨same, stores⟩ := evaluation_deterministic written actual
+          subst_vars
+          exact continuation
 
 theorem Execution.reflects_size (execution : Execution checked registry functions cells instances prepared codes environment store mapping world
     target keys snapshot before after updated operator invalid)
@@ -2734,8 +2736,7 @@ theorem Execution.reflects_size (execution : Execution checked registry function
         cases same
         subst_vars
         -- The right-hand side is Unit, so the modifier's check cannot fail.
-        rcases DataPlaceGuard.inv_sized remaining with ⟨_, child, bound, remaining⟩ | ⟨_, _, impossible, _, _⟩
-        case inr => cases impossible
+        obtain ⟨child, bound, remaining⟩ := DataPlaceGuard.inv_sized_unit remaining
         cases remaining with
         | letE written continuation =>
           obtain ⟨optional, read⟩ := execution.read

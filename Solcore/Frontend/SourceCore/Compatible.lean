@@ -1192,8 +1192,71 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option SourceCore
   | .uncheckedAdd => some (SourceCoreDataPlaces.Modifier.total .wordAdd)
   | .uncheckedSubtract => some (SourceCoreDataPlaces.Modifier.total .wordSub)
   | .uncheckedMultiply => some (SourceCoreDataPlaces.Modifier.total .wordMul)
-  | .uncheckedDivide => some ⟨.wordDiv, true⟩
-  | .uncheckedModulo => some ⟨.wordMod, true⟩
+  | .uncheckedDivide => some ⟨.wordDiv, .divisor⟩
+  | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
+
+/-- The modifier of a value assignment at its target's static type, as
+`SourceCoreDataPlaces.assignmentModifier`: checked `+= -= *=` at a fixed-width
+integer type, `binaryOperator`'s otherwise. -/
+def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
+    Option SourceCoreDataPlaces.Modifier :=
+  match SourceCoreDataPlaces.checkedCompound target operator with
+  | some (type, binary) => some ⟨SourceCoreDataPlaces.checkedWordOperation binary, .range type binary⟩
+  | none => binaryOperator integer operator
+
+/-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/
+theorem assignmentModifier_plain {target : TypeSystem.Ty} {integer : Bool} {operator : Syntax.ValueAssignOp}
+    (plain : SourceCoreDataPlaces.checkedCompound target operator = none) :
+    assignmentModifier target integer operator = binaryOperator integer operator := by
+  simp [assignmentModifier, plain]
+
+/-- `binaryOperator` never selects the range check. -/
+theorem binaryOperator_not_range {integer : Bool} {operator : Syntax.ValueAssignOp} {operation : Core.BinaryOp}
+    {type : TypeSystem.FixedInteger} {binary : Syntax.BinaryOp} :
+    binaryOperator integer operator ≠ some ⟨operation, .range type binary⟩ := by
+  cases operator <;> simp [binaryOperator, SourceCoreDataPlaces.Modifier.total]
+
+/-- The modifier the place lowering emits: in-place `~` keeps
+`binaryOperator`'s, and a value assignment takes `assignmentModifier`'s. -/
+def placeModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) (bitNot : Bool) :
+    Option SourceCoreDataPlaces.Modifier :=
+  if bitNot then binaryOperator integer operator else assignmentModifier target integer operator
+
+/-- A checked compound assignment is at a fixed-width integer type, which the
+metadata view keeps. -/
+theorem runtimeType_of_checkedCompound {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {type : TypeSystem.FixedInteger} {binary : Syntax.BinaryOp}
+    (checked : SourceCoreDataPlaces.checkedCompound target operator = some (type, binary)) :
+    SourceCoreRawMetadata.runtimeType target = .fixed type ∧ operator ≠ .equal := by
+  unfold SourceCoreDataPlaces.checkedCompound at checked
+  split at checked <;> simp only [Option.some.injEq, Prod.mk.injEq, reduceCtorEq] at checked
+  all_goals
+    obtain ⟨rfl, _⟩ := checked
+    exact ⟨rfl, by decide⟩
+
+/-- The operator profiles of the meaning proofs (plain assignment, a Word or an
+Integer target) have no checked compound assignment. -/
+theorem checkedCompound_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType target = .word ∨
+      SourceCoreRawMetadata.runtimeType target = .integer ∧ operator.wordOnly = false) :
+    SourceCoreDataPlaces.checkedCompound target operator = none := by
+  cases checked : SourceCoreDataPlaces.checkedCompound target operator with
+  | none => rfl
+  | some pair =>
+    obtain ⟨type, binary⟩ := pair
+    obtain ⟨runtime, notEqual⟩ := runtimeType_of_checkedCompound checked
+    rcases profile with same | word | ⟨integer, _⟩
+    · exact absurd same notEqual
+    · rw [runtime] at word; cases word
+    · rw [runtime] at integer; cases integer
+
+/-- So does the receipts' source profile. -/
+theorem checkedCompound_of_sourceProfile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ target = .word) :
+    SourceCoreDataPlaces.checkedCompound target operator = none := by
+  rcases profile with rfl | rfl
+  · exact SourceCoreDataPlaces.checkedCompound_equal _
+  · exact SourceCoreDataPlaces.checkedCompound_word _
 
 def modified (type : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
@@ -1248,7 +1311,7 @@ def lower (context : Context) (signatures : ProgramSignatures) (expression : Exp
         SourceCoreBasic.ensureType site route.leafType value.type
         pure value.expression
   pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) rhs next outputType
-    (binaryOperator (route.leafType = .integer) operator) bitNot invalidOperand)
+    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand)
 
 /-- A key failure stops before snapshot selection, RHS and structural write.
 The premise uses the actual inserted reference environment. -/

@@ -637,13 +637,13 @@ theorem projected_first {program : SourceSemantics.Program} {source : TypedSourc
       (phaseHeap base none active []) key (.word (Word.ofNatModulo 3)) (phaseHeap base none active []))
     (rightTrace : Dynamic.ExpressionEvaluates program context evidence source environment
       (phaseHeap base none active []) rhs (.word right) (phaseHeap base none active suffix)) :
-    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .equal)
+    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies .word .equal)
       environment (phaseHeap base none active []) ⟨root,[.index key],.word⟩ rhs (mappingValue right)
       (phaseHeap base (some right) active suffix) := by
   exact .intro (.intro lookup (phaseHeap.table base none active []) (.index keyTrace .nil)
     (phaseHeap.table base none active []) (.emptyMapping .word .word) (.indexDefault .nil .word .nil))
     rightTrace (.intro (phaseHeap.table base none active suffix) rfl (.emptyMapping .word .word)
-      (.indexDefault .nil .word (.leaf (.equal _ _)) (.append .nil))
+      (.indexDefault .nil .word (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) (.append .nil))
       (phaseHeap.write_table base none right active suffix))
 
 theorem projected_add {program : SourceSemantics.Program} {source : TypedSource}
@@ -655,13 +655,13 @@ theorem projected_add {program : SourceSemantics.Program} {source : TypedSource}
       (phaseHeap base (some old) active suffix) key (.word (Word.ofNatModulo 3)) (phaseHeap base (some old) active suffix))
     (rightTrace : Dynamic.ExpressionEvaluates program context evidence source environment
       (phaseHeap base (some old) active suffix) rhs (.word right) (phaseHeap base (some old) active suffix)) :
-    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .add)
+    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies .word .add)
       environment (phaseHeap base (some old) active suffix) ⟨root,[.index key],.word⟩ rhs (mappingValue (old.add right))
       (phaseHeap base (some (old.add right)) active suffix) := by
   exact .intro (.intro lookup (phaseHeap.table base (some old) active suffix) (.index keyTrace .nil)
     (phaseHeap.table base (some old) active suffix) .initialized (.indexFound (.head (.refl (.word _))) .nil))
     rightTrace (.intro (phaseHeap.table base (some old) active suffix) rfl .initialized
-      (.indexFound (.head (.refl (.word _))) (.leaf (.add (.wordAdd _ _))) (.update (.head (.refl (.word _)))))
+      (.indexFound (.head (.refl (.word _))) (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr rfl)) (.add (.wordAdd _ _)))) (.update (.head (.refl (.word _)))))
       (phaseHeap.write_table base (some old) (old.add right) active suffix))
 
 end Tests.SourceCoreMixedIndexRead
@@ -700,6 +700,7 @@ private theorem Shape.header_add {program : SourceSemantics.Program} {source : T
       (phaseEnvironment shape base environment)
       (phaseHeap base (some (old.add (Word.ofNatModulo right.resolution.rawValue))) active suffix) := by
   cases typed with
+  | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
   | wordCompound _ place rightTyped _ =>
     obtain ⟨_,keyTyped⟩ := projected_key_typed place
     have keyTrace := key.evaluates (program := program) evidence (phaseEnvironment shape base environment)
@@ -726,7 +727,7 @@ private theorem Shape.loop_body {program : SourceSemantics.Program} {source : Ty
         (phaseHeap.active base (some value) true suffix) .initialized .nil)
       (boolean_value shape.falseNode)
       (.intro (phaseHeap.active base (some value) true suffix) rfl .initialized
-        (.leaf (.equal _ _)) (phaseHeap.write_active base (some value) true false suffix)))
+        (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) (phaseHeap.write_active base (some value) true false suffix)))
   exact .cons assigned (.terminal
     (.continueStmt (lookupStatement?_sound shape.continuing.found) shape.continuing.formEq) (.continuing _))
 
@@ -964,7 +965,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
           apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound shape.returned.found)
           · intro expression impossible; rw [shape.returned.formEq] at impossible; cases impossible
           · exact returned
-    | wordCompound impossible _ _ _ => cases impossible
+    | wordCompound impossible _ _ _ | fixedCompound impossible _ _ _ => cases impossible
 
 end Tests.SourceCoreMixedIndexRead
 end
@@ -2235,13 +2236,13 @@ theorem projected_first {program : SourceSemantics.Program} {source : TypedSourc
       (phaseHeap base none active []) key (.word (Word.ofNatModulo 3)) (phaseHeap base none active []))
     (rightTrace : Dynamic.ExpressionEvaluates program context evidence source environment
       (phaseHeap base none active []) rhs (.word right) (phaseHeap base none active suffix)) :
-    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .equal)
+    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies .word .equal)
       environment (phaseHeap base none active []) ⟨root,[.index key],.word⟩ rhs (mappingValue right)
       (phaseHeap base (some right) active suffix) := by
   exact .intro (.intro lookup (phaseHeap.table base none active []) (.index keyTrace .nil)
     (phaseHeap.table base none active []) (.emptyMapping .word .word) (.indexDefault .nil .word .nil))
     rightTrace (.intro (phaseHeap.table base none active suffix) rfl (.emptyMapping .word .word)
-      (.indexDefault .nil .word (.leaf (.equal _ _)) (.append .nil))
+      (.indexDefault .nil .word (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) (.append .nil))
       (phaseHeap.write_table base none right active suffix))
 
 theorem projected_add {program : SourceSemantics.Program} {source : TypedSource}
@@ -2253,13 +2254,13 @@ theorem projected_add {program : SourceSemantics.Program} {source : TypedSource}
       (phaseHeap base (some old) active suffix) key (.word (Word.ofNatModulo 3)) (phaseHeap base (some old) active suffix))
     (rightTrace : Dynamic.ExpressionEvaluates program context evidence source environment
       (phaseHeap base (some old) active suffix) rhs (.word right) (phaseHeap base (some old) active suffix)) :
-    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .add)
+    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies .word .add)
       environment (phaseHeap base (some old) active suffix) ⟨root,[.index key],.word⟩ rhs (mappingValue (old.add right))
       (phaseHeap base (some (old.add right)) active suffix) := by
   exact .intro (.intro lookup (phaseHeap.table base (some old) active suffix) (.index keyTrace .nil)
     (phaseHeap.table base (some old) active suffix) .initialized (.indexFound (.head (.refl (.word _))) .nil))
     rightTrace (.intro (phaseHeap.table base (some old) active suffix) rfl .initialized
-      (.indexFound (.head (.refl (.word _))) (.leaf (.add (.wordAdd _ _))) (.update (.head (.refl (.word _)))))
+      (.indexFound (.head (.refl (.word _))) (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr rfl)) (.add (.wordAdd _ _)))) (.update (.head (.refl (.word _)))))
       (phaseHeap.write_table base (some old) (old.add right) active suffix))
 
 end Tests.SourceCoreMixedProjected
@@ -2298,6 +2299,7 @@ private theorem Shape.header_add {program : SourceSemantics.Program} {source : T
       (phaseEnvironment shape base environment)
       (phaseHeap base (some (old.add (Word.ofNatModulo right.resolution.rawValue))) active suffix) := by
   cases typed with
+  | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
   | wordCompound _ place rightTyped _ =>
     obtain ⟨_,keyTyped⟩ := projected_key_typed place
     have keyTrace := key.evaluates (program := program) evidence (phaseEnvironment shape base environment)
@@ -2324,7 +2326,7 @@ private theorem Shape.loop_body {program : SourceSemantics.Program} {source : Ty
         (phaseHeap.active base (some value) true suffix) .initialized .nil)
       (boolean_value shape.falseNode)
       (.intro (phaseHeap.active base (some value) true suffix) rfl .initialized
-        (.leaf (.equal _ _)) (phaseHeap.write_active base (some value) true false suffix)))
+        (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) (phaseHeap.write_active base (some value) true false suffix)))
   exact .cons assigned (.terminal
     (.continueStmt (lookupStatement?_sound shape.continuing.found) shape.continuing.formEq) (.continuing _))
 
@@ -2536,7 +2538,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
           apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound shape.returned.found)
           · intro expression impossible; rw [shape.returned.formEq] at impossible; cases impossible
           · exact returned
-    | wordCompound impossible _ _ _ => cases impossible
+    | wordCompound impossible _ _ _ | fixedCompound impossible _ _ _ => cases impossible
 
 end Tests.SourceCoreMixedProjected
 end

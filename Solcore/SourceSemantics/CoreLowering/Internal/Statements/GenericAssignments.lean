@@ -58,6 +58,8 @@ structure Head (values : ValuesContext) (source : TypedSource)
   rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
   rightType : lowered.type = prepared.route.leafType
   profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
+  /-- The target is not a checked compound assignment's fixed-width target. -/
+  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator
 
 namespace Head
 variable {values : ValuesContext} {source : TypedSource}
@@ -161,11 +163,12 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
       code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
     CompatibleBareAssignment.of_lower bare accepted
+  rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
   obtain ⟨node, found, tree⟩ := extract lowered generated
   have rawType := stored_type unique found rightTyped
   refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
     .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-    by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq, rfl⟩
+    by simpa only [rawType] using rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq, rfl⟩
   rcases profile with equal | word | ⟨integer, notWordOnly⟩
   · exact .inl equal
   · exact .inr (.inl (rawView.trans word))
@@ -289,7 +292,9 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
         have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl, ?_⟩
+          found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          by simp [Head.emit, routeEq, SourceCoreCompatibleDataPlaces.placeModifier,
+            assignmentModifier_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))
@@ -430,25 +435,46 @@ def token (table : Table) (site : SourceCoreElaboration.ErrorSite) (root : Resol
     (operator : Syntax.ValueAssignOp) : Word :=
   if operator = .equal then .zero else table.reasonAt site root (.value operator)
 
+/-- A compound assignment whose target has a diagnostic site (Word, Integer or
+one of the twelve fixed-width integer types) has the table's operand token. -/
+theorem prepared_operands_target {source : TypedSource} {first : Nat} {table : Table}
+    {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
+    (occurs : OperandAt node assignment operator)
+    (target : operator = .equal ∨ operandTarget assignment.target.type = true) :
+    AssignmentOperandDiagnostics.OperandsLaw (OperandRep table) operator
+      (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
+  apply AssignmentOperandDiagnostics.of_not_equal
+  intro different
+  obtain ⟨site, _, _, _, kind, reason, diagnostic⟩ :=
+    Certificates.prepare_operand prepared member occurs different (target.resolve_left different)
+  refine ⟨site.diagnostic, site.rhsType, ?_, ?_⟩
+  · simpa only [token, if_neg different, reason] using diagnostic
+  · simp only [Site.diagnostic, kind]
+
 theorem prepared_operands {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator)
     (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false) :
     AssignmentOperandDiagnostics.OperandsLaw (OperandRep table) operator
-      (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
-  apply AssignmentOperandDiagnostics.of_not_equal
-  intro different
-  have scalar : assignment.target.type = .word ∨ assignment.target.type = .integer := by
-    rcases rawProfile with equal | scalar
-    · exact (different equal).elim
-    · exact scalar.imp_right And.left
-  obtain ⟨site, _, _, _, kind, reason, diagnostic⟩ := Certificates.prepare_operand prepared member occurs different scalar
-  refine ⟨site.diagnostic, site.rhsType, ?_, ?_⟩
-  · simpa only [token, if_neg different, reason] using diagnostic
-  · simp only [Site.diagnostic, kind]
+      (token table (.occurrence node.id.occurrence) assignment.target.root operator) :=
+  prepared_operands_target prepared member occurs
+    (rawProfile.imp_right fun scalar => operandTarget_of_scalar (scalar.imp_right And.left))
 
 /-- Relating operand diagnostics to a larger fault inventory is explicit. -/
+theorem prepared_operands_included_target {source : TypedSource} {first : Nat} {table : Table}
+    {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    {faults : FunctionCalls.FaultRep}
+    (included : ∀ reason word, OperandRep table reason word → faults reason word)
+    (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
+    (occurs : OperandAt node assignment operator)
+    (target : operator = .equal ∨ operandTarget assignment.target.type = true) :
+    AssignmentOperandDiagnostics.OperandsLaw faults operator
+      (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
+  intro previous right invalid
+  exact included _ _ (prepared_operands_target prepared member occurs target previous right invalid)
+
 theorem prepared_operands_included {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     {faults : FunctionCalls.FaultRep}
@@ -588,7 +614,7 @@ variable {values : ValuesContext} {source : TypedSource}
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -597,7 +623,8 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
@@ -620,14 +647,15 @@ theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : h
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     exact CompatibleBareAssignment.preserves_fault_reachable layout empty extension meaning observations right found rightView rightType profile
-      environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
+      targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
   | projected layout ordinary =>
     exact CompatibleRenamedPlaceFaults.preserves layout ordinary extension meaning faithful observations
-      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps locals agrees actualTyped slot writable trace next output invalid
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
@@ -653,14 +681,16 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) [Fun
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
     have result := CompatibleBareAssignment.reflects_reachable layout empty extension reflection observations right found rightView rightType profile
@@ -688,7 +718,8 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) [FunctionCalls
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

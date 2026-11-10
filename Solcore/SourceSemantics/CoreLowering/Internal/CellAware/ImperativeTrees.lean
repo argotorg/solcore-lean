@@ -1344,7 +1344,7 @@ theorem collected
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
       rw [assignmentPolicy] at accepted
       obtain ⟨_projections, writable, rightTyped, runtimeProfile⟩ :=
-        ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare assignmentTyped
+        ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare profile assignmentTyped
       obtain ⟨actualBinder, preparedPlace, index, lowered, _binding, _rootType, _rawView, _slot,
         _layout, generated, _sameType, _profile, codeEq⟩ := CompatibleBareAssignment.of_lower bare accepted
       obtain ⟨_, rhsNative⟩ := (CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_children
@@ -1383,7 +1383,7 @@ theorem collected
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
       rw [assignmentPolicy] at accepted
       obtain ⟨sourceTyped, writable, rightTyped, runtimeProfile⟩ :=
-        ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route assignmentTyped
+        ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route profile assignmentTyped
       obtain ⟨head, emitted, token, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
           unique sourceSignatures sourceTyped writable rightTyped runtimeProfile

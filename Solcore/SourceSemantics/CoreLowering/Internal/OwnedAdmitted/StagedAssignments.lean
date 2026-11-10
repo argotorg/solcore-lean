@@ -898,7 +898,7 @@ theorem preserves_value (budget : Nat)
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -929,7 +929,7 @@ theorem preserves_value (budget : Nat)
       · exact CallableIndexedOwnedStagedProjectedAssignmentAdmission.heap_after_assignment unique found assignmentTyped
           locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
           keyValues keyHeap resolution.metadata snapshot (rhsResult.sourcePost _ rfl).2
-          (rhsResult.sourcePost _ rfl).1 rhsResult.metadata write
+          (rhsResult.sourcePost _ rfl).1 rhsResult.metadata ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
       · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame
 
 include environments heaps locals agrees actualTyped initial admitted unique assignmentTyped projected in
@@ -948,7 +948,7 @@ theorem preserves_key_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -996,7 +996,7 @@ theorem preserves_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -1050,7 +1050,7 @@ theorem preserves_getter_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1124,7 +1124,7 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1156,7 +1156,8 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
         obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
           ProtectedStagedProjectedFaults.preserves_panic layout ordinary extension callerProtocol transport faithful observations
             generated found rightView rightType profile environments agrees actualTyped initial resolution coreLookup
-            resolutionState resolutionRelated ordinaryRhs rhsPost read initialValue pathRead panics (next.rename ξ) output invalid
+            resolutionState resolutionRelated ordinaryRhs rhsPost read initialValue pathRead
+          (fun type typeEq => targetPlain type (by cases snapshot; exact typeEq)) panics (next.rename ξ) output invalid
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, RecursiveStageMeaning.FaultTokens.panic _,
           finalHeaps, maps, worlds, frame, metadata, reached, related,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -1242,7 +1243,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     ResultAt bridge size values.checked registry functions context stages invocation faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1351,7 +1352,8 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
               (by simpa only [GenericAssignmentStatements.Head.writtenContext] using typed)
               reached related
               ⟨CallableIndexedOwnedStagedProjectedAssignmentAdmission.heap_after_assignment unique found assignmentTyped locals
-                keyRow keyValues getterHeap resolution.metadata snapshot middleTyped rightTyped result.metadata write,
+                keyRow keyValues getterHeap resolution.metadata snapshot middleTyped rightTyped result.metadata
+                ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write),
                 StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
               (by omega) continuation
 
@@ -1517,7 +1519,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (rootType : current.type = target.rootType)
       (initialized : Dynamic.RootInitialValue current initialValue)
       (path : Dynamic.ProjectionsRead initialValue target.projections selected)
-      (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+      (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code)
       (same : value = .inLeft output (.word token))
       (matched : faults (.semantic (.panic code)) token)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after finalStore)
@@ -1577,7 +1579,7 @@ include extension environments heaps locals agrees bare head in
 pre-RHS snapshot; no Source assignment execution is assumed. -/
 theorem target_snapshot :
     ∃ target, Staging.Recursive.BareTarget environment before assignment.target target := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1597,7 +1599,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     ResultAt bridge size values.checked registry functions context stages invocation faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1608,7 +1610,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     have result := ProtectedStagedBareAssignment.reflects_with_rhs callerProtocol transport budget initial layout empty extension
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
-      rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView)
+      rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
       environments heaps locals agrees actualTyped slot writable invalidToken completed bounded
     cases result with
     | fault snapshot trace same matched finalHeaps maps worlds preservation metadata post =>
@@ -1628,7 +1630,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
       exact .success snapshot trace write finalHeaps maps worlds preservation metadata count
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
-        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped
+        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile
           locals snapshot middleTyped rightTyped write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩ strict remaining
 include transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
@@ -1649,7 +1651,7 @@ theorem preserves_value {sourceSize : Nat}
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1661,13 +1663,13 @@ theorem preserves_value {sourceSize : Nat}
       ProtectedStagedBareAssignment.preserves_value_with_rhs callerProtocol transport initial layout empty extension snapshot trace write
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView)
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
         environments heaps locals agrees actualTyped slot writable invalid
     obtain ⟨reached, related⟩ := post
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
-      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped
+      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile
         locals snapshot middleTyped rightTyped write,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩,
       agreement⟩
@@ -1685,7 +1687,7 @@ theorem preserves_fault {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1719,7 +1721,7 @@ theorem preserves_operands {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1731,7 +1733,7 @@ theorem preserves_operands {sourceSize : Nat}
       ProtectedStagedBareAssignment.preserves_operands_with_rhs callerProtocol initial layout empty extension snapshot invalidOperands
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView)
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
         environments heaps locals agrees slot writable next output invalid invalidToken
     obtain ⟨reached, related⟩ := post
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
@@ -1743,7 +1745,7 @@ theorem preserves_panic {sourceSize : Nat}
     (meaning : PreservesAt bridge context (payloadModel values.checked registry functions) stages invocation certificate faults sourceSize)
     {right : Dynamic.Value} {after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} {code : UInt8}
     (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
-    (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+    (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code)
     (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before rhs (.value right) after)
     (next : Expr) (output : Ty) :
     ∃ finalStore finalMap finalWorld,
@@ -1753,7 +1755,7 @@ theorem preserves_panic {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1762,10 +1764,11 @@ theorem preserves_panic {sourceSize : Nat}
   | bare empty layout =>
     have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
     obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-      ProtectedStagedBareAssignment.preserves_panic_with_rhs callerProtocol initial layout empty extension snapshot panics
+      ProtectedStagedBareAssignment.preserves_panic_with_rhs callerProtocol initial layout empty extension snapshot
+        (fun type typeEq => targetPlain type (by cases snapshot; exact typeEq)) panics
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView)
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
         environments heaps locals agrees slot writable next output invalid
     obtain ⟨reached, related⟩ := post
     exact ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata,

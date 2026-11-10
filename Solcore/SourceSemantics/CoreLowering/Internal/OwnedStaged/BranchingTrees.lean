@@ -1212,12 +1212,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
       Size.Expression program registry childSize invocation context environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ childSize tailSize value middle written updated,
       size = Size.stepSize [childSize, tailSize] ∧
       Size.Expression program registry childSize invocation context environment before rhs (.value value) middle ∧
       Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       Size.Statements program registry tailSize invocation context environment written rest finalContext outcome after) := by
   have shape {other : StatementNode} (present : ContainsStatement invocation.source id other) :

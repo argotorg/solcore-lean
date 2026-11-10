@@ -551,7 +551,8 @@ theorem value_success (unique : NodeOccurrencesUnique source) (found : source.lo
     (form : node.form = .assignValue assignment operator rhs)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     finalContext = context ∧ outcome = .fallthrough environment ∧ ∃ child updated,
-      SourceExecutionSize.SourcePlaceAssignment program child context evidence source (Dynamic.AssignmentValueApplies operator)
+      SourceExecutionSize.SourcePlaceAssignment program child context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧ child < size := by
   have shapes := shape unique found
   clear found
@@ -1124,7 +1125,8 @@ theorem preservesAt_match_with_eliminator
         cases same
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentPost, continuation⟩ :=
           assignments _ contextValid head (assignmentSites.assignment (sites.head sourceFacts) found form)
-            environments heaps locals agrees actualTyped installed initialReady assigned
+            environments heaps locals agrees actualTyped installed initialReady
+            ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
             (Nat.le_of_lt (Nat.lt_trans childSmaller (Nat.lt_of_lt_of_le headSmaller bounded)))
         obtain ⟨writeState, assignmentRelated, writeReady⟩ := assignmentPost
         have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
@@ -2734,7 +2736,7 @@ theorem reflectsAt_match_with_eliminator
       | @success sourceSize remainingSize updated middle written middleMap middleWorld slots trace middleHeaps maps worlds preservation metadata count typed assignmentPost smaller continuation =>
         obtain ⟨writeState, assignmentRelated, writeReady⟩ := assignmentPost
         have tailFacts := sites.tail (environment := environment) (before := before) sourceFacts found (by intro _ _; simp [form])
-          (.assignValue (lookupStatement?_sound found) form trace.sound)
+          (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound))
         have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
         obtain ⟨tailSourceSize, resultContext, outcome, after, finalMap, finalWorld, tail, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical, tailPost⟩ :=
           ih remainingSize (Nat.lt_trans smaller bounded) contextValid tailFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2742,7 +2744,8 @@ theorem reflectsAt_match_with_eliminator
             (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 writeState guarded writeReady
             (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
         exact ⟨resultContext, outcome, after, finalMap, finalWorld,
-          prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignValue (lookupStatement?_sound found) form trace.sound) tail.sound,
+          prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
+            (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound)) tail.sound,
           represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, lexical, Reached.continue (protocol := protocol) (readiness := readiness) assignmentRelated tailPost⟩
     · intro context scope mode id node assignment rest expected type body found form head remaining ih headErrors
       intro size bounded contextValid sourceFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped installed guarded initialReady evaluated

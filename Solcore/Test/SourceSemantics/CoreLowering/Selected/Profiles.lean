@@ -2987,6 +2987,7 @@ structure CompoundShape (source : TypedSource) (operation : Operation) where
   assignmentForm : assignment.form = .assignValue resolution operation.operator rhs.node.id
   targetRoot : resolution.target.root = left.id
   targetBare : resolution.target.projections = []
+  targetType : resolution.target.type = .word
   returnedFound : source.lookupStatement? returned.id = some returned
   returnedForm : returned.form = .returnStmt (some result.node.id)
 
@@ -3102,7 +3103,9 @@ theorem compound_call {operation : Operation} (shape : CompoundShape header.func
     apply Dynamic.SourcePlaceAssignment.intro resolve
     · exact read_word shape.rhs header.context header.function.evidence environment (inputHeap before left right)
         (location first) right .head rightAllocation.reads_new
-    · exact .intro leftRead rfl .initialized (.leaf (operation.applies left right)) write
+    · exact .intro leftRead rfl .initialized
+        (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr shape.targetType))
+          (operation.applies left right))) write
   have finalRead : Dynamic.Heap.Reads (resultHeap before right (operation.apply left right))
       (location before) ⟨.word, some (.word (operation.apply left right)), none⟩ := by
     exact .intro ((Dynamic.Heap.CellAt.append_last before.cells _).append_left)
@@ -3361,10 +3364,11 @@ def observeCompound (source : TypedSource) (operation : Operation) : IO (Compoun
   let ⟨assignmentForm⟩ ← observed (assignment.form = .assignValue resolution operation.operator rhs.node.id) "compound original operator"
   let ⟨targetRoot⟩ ← observed (resolution.target.root = left.id) "compound target identity"
   let ⟨targetBare⟩ ← observed (resolution.target.projections = []) "compound bare target"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "compound target type"
   let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "compound return identity"
   let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some result.node.id)) "compound return read"
   return ⟨left, right, resolution, assignment, returned, rhs, result, inputs, leftScheme, rightScheme,
-    distinct, roots, assignmentFound, assignmentForm, targetRoot, targetBare, returnedFound, returnedForm⟩
+    distinct, roots, assignmentFound, assignmentForm, targetRoot, targetBare, targetType, returnedFound, returnedForm⟩
 
 def observeMissing (source : TypedSource) : IO (MissingShape source) := do
   let [right] := source.inputs | throw (IO.userError "missing parameter count")

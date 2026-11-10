@@ -412,22 +412,22 @@ theorem inferAssignedValueFuel_ledgerPreservation
       have finishNonEqual
           (tailSuccess :
             (do
-              let fittedState ← Detail.unify placeState place.type .word
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ←
-                Detail.inferExprFuel fuel context value (some .word)
+                Detail.inferExprFuel fuel context value (some (Detail.compoundOperandType operator (fittedState.resolve place.type)))
                   fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue, finalState)) =
                 .ok (assignment, inferred, final)) :
           RecursiveLedgerInvariant final pending := by
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
             cases valueResult : Detail.inferExprFuel fuel context value
-                (some .word) fittedState with
+                (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error => simp [valueResult] at tailSuccess
             | ok valuePair =>
                 rcases valuePair with ⟨inferredValue, finalState⟩

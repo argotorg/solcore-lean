@@ -446,7 +446,7 @@ private theorem lambda_prefix_local {context : SourceInference.Context}
 
 private theorem assignment_fitting_local {operator : Syntax.ValueAssignOp}
     {before after : State} {type : Ty}
-    (accepted : (match operator with | .equal => pure before | _ => unify before type .word) =
+    (accepted : (match operator with | .equal => pure before | _ => unify before type (compoundOperandType operator (before.resolve type))) =
       (Except.ok after : Except Error State)) : after.nextLocal = before.nextLocal := by
   cases operator
   all_goals first

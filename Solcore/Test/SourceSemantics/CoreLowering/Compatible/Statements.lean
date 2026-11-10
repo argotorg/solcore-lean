@@ -644,7 +644,8 @@ private theorem sourceAssigned : Dynamic.SourcePlaceAssignment program context [
 private theorem sourceTrace (mode : Bool) : TypedScopedStatements.Executes mode program context [] source environment before
     [statement 0, statement 1] context (.returned (.bool true)) after := by
   have first : Dynamic.StatementExecutes program context [] source environment before (statement 0) context (.fallthrough environment) after :=
-    .assignValue (lookupStatement?_sound rfl) rfl sourceAssigned
+    .assignValue (lookupStatement?_sound rfl) rfl
+      ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ sourceAssigned)
   have last : Dynamic.StatementExecutes program context [] source environment after (statement 1) context (.returned (.bool true)) after :=
     .returnValue (lookupStatement?_sound rfl) rfl (.intro (node := literal) (lookupExpression?_sound rfl) (.builtinBoolean rfl) .nil)
   exact TypedScopedStatements.prepend (lookupStatement?_sound (show source.lookupStatement? (statement 0) = some assigned from rfl))
@@ -967,6 +968,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -992,7 +994,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence valid unique uninitialized missing
   exact CompatibleRenamedPlaceFaults.preserves layout ordinary registryExtension meaning faithful observations
-    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile environments heaps locals agrees actualTyped
+    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile targetPlain environments heaps locals agrees actualTyped
     slot rootTyped trace next outputType invalid
 
 
@@ -2826,6 +2828,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -2849,7 +2852,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence valid unique uninitialized missing
   exact CompatibleTypedPlaceAssignmentFaults.preserves layout ordinary registryExtension meaning faithful observations
-    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile environments heaps locals
+    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile targetPlain environments heaps locals
     slot rootTyped trace next outputType invalid
 
 private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α

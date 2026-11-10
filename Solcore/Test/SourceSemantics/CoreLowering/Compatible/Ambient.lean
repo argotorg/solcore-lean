@@ -1570,6 +1570,7 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
+    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1594,7 +1595,7 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
     program context evidence source (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
   exact CompatibleBareAssignment.preserves_fault layout bare extension meaning observations generated found rhsView rhsCore profile
-    environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid invalidToken
+    targetPlain environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid invalidToken
 
 theorem reflects [FunctionCalls.FaultTokens faults]
     (layout : Layout compilation prepared) (bare : place.projections = [])

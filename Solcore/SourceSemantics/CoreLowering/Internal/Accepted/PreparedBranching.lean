@@ -446,6 +446,28 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 open Core Frontend SourceInference
 
+/-- The operand law at a compound assignment whose target has a diagnostic
+site: Word, Integer or one of the twelve fixed-width integer types. -/
+theorem operands_target {source : TypedSource} {first : Nat} {table : SourceCoreAssignmentFaultSites.Table}
+    {faults : FunctionCalls.FaultRep}
+    (prepared : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
+    (included : ∀ reason word, GenericAssignmentDiagnostics.OperandRep table reason word → faults reason word)
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    (origin : AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs)
+    (target : operator = .equal ∨ SourceCoreAssignmentFaultSites.operandTarget assignment.target.type = true) :
+    AssignmentOperandDiagnostics.OperandsLaw faults operator
+      (GenericAssignmentDiagnostics.token table site assignment.target.root operator) := by
+  cases origin with
+  | statement found form =>
+    have present := lookupStatement?_sound found
+    rw [← present.2]
+    exact GenericAssignmentDiagnostics.prepared_operands_included_target included prepared present.1 (.statement form) target
+  | header found form member =>
+    have present := lookupStatement?_sound found
+    rw [← present.2]
+    exact GenericAssignmentDiagnostics.prepared_operands_included_target included prepared present.1 (.header form member) target
+
 theorem operands {source : TypedSource} {first : Nat} {table : SourceCoreAssignmentFaultSites.Table}
     {faults : FunctionCalls.FaultRep}
     (prepared : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -455,18 +477,8 @@ theorem operands {source : TypedSource} {first : Nat} {table : SourceCoreAssignm
     (origin : AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs)
     (profile : operator = .equal ∨ assignment.target.type = .word) :
     AssignmentOperandDiagnostics.OperandsLaw faults operator
-      (GenericAssignmentDiagnostics.token table site assignment.target.root operator) := by
-  have raw : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false :=
-    profile.elim Or.inl (fun word => .inr (.inl word))
-  cases origin with
-  | statement found form =>
-    have present := lookupStatement?_sound found
-    rw [← present.2]
-    exact GenericAssignmentDiagnostics.prepared_operands_included included prepared present.1 (.statement form) raw
-  | header found form member =>
-    have present := lookupStatement?_sound found
-    rw [← present.2]
-    exact GenericAssignmentDiagnostics.prepared_operands_included included prepared present.1 (.header form member) raw
+      (GenericAssignmentDiagnostics.token table site assignment.target.root operator) :=
+  operands_target prepared included origin (profile.imp_right fun word => by rw [word]; rfl)
 
 end Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 end

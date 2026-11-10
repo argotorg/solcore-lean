@@ -492,7 +492,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
       cases first with | assignValue assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentTransition, prefixAgreement⟩ :=
           assignments _ valid head (sites.assignment itemFact)
-            environments heaps locals agrees actualTyped state ready assigned (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+            environments heaps locals agrees actualTyped state ready ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
         obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
         have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue assigned.sound)
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, tailRelated, ⟨tailReturn⟩, tailReady, agreement⟩ :=
@@ -1012,7 +1012,7 @@ theorem Tree.preserves_fault_reachable_bounded_for_with_eliminator
         cases first with | assignValue assigned =>
           obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentTransition, prefixAgreement⟩ :=
             assignments _ valid head (sites.assignment itemFact)
-              environments heaps locals agrees actualTyped state ready assigned (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+              environments heaps locals agrees actualTyped state ready ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
           obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
           have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue assigned.sound)
           obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
@@ -1569,13 +1569,15 @@ theorem Tree.reflects_reachable_bounded_for_with_eliminator
         exact .fault (.head (.assignValue trace)) same matched finalHeaps maps worlds preservation metadata assignmentTransition
       | success trace middleHeaps maps worlds preservation metadata count typed assignmentTransition smaller remainingEval =>
         obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
-        have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue trace.sound)
+        have nextFacts := sites.tail (environment := environment) itemsFacts
+          (Dynamic.ForItemExecutes.assignValue ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound))
         have reflected := ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
           (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
           ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
           (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 middleState gate middleReady
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval) (Nat.le_trans (Nat.le_of_lt smaller) bounded)
-        exact reflected.prepend middleState assignmentRelated (.assignValue trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
+        exact reflected.prepend middleState assignmentRelated
+          (.assignValue ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) maps worlds preservation metadata (Nat.le_of_lt smaller)
 
     · intro context scope assignment rest body head headPayload ih
       intro valid itemsFacts mapping world actualContext environment canonical actual before store finalStore value ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready size evaluated bounded
@@ -3025,7 +3027,8 @@ theorem preservesAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : A
       obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, observed, continuation⟩ :=
         ProtectedAssignmentHeads.Head.preserves_prefix functions extension program evidence transport
           (meaning _ contextValid) faithful observations head
-          environments heaps locals agrees actualTyped installed assigned
+          environments heaps locals agrees actualTyped installed
+          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
       have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
       obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
         ih contextValid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3476,7 +3479,8 @@ theorem reflectsAt_for [FunctionCalls.FaultTokens faults] (diagnosticPolicy : As
           (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 observed
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
       exact ⟨resultContext, outcome, after, finalMap, finalWorld,
-        prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignValue (lookupStatement?_sound found) form trace) tail,
+        prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
+          (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) tail,
         represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>

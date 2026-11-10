@@ -137,6 +137,9 @@ def applyExpressionRequirementPlan (substitution : ParameterSubstitution) :
 @[simp] theorem apply_word (substitution : ParameterSubstitution) :
     substitution.apply Ty.word = Ty.word := rfl
 
+@[simp] theorem apply_fixed (substitution : ParameterSubstitution) (type : TypeSystem.FixedInteger) :
+    substitution.apply (Ty.fixed type) = Ty.fixed type := rfl
+
 @[simp] theorem apply_integer (substitution : ParameterSubstitution) :
     substitution.apply Ty.integer = Ty.integer := rfl
 
@@ -5077,6 +5080,13 @@ theorem StatementsHaveType.applyParameters
         targetInduction catalog contextValid)
       (by simpa using valueInduction catalog contextValid)
       (by simpa [applyAssignmentResolution] using requirementsEq)
+  · intro context assignment operator value type operatorKind targetType valueType
+      requirementsEq targetInduction valueInduction catalog contextValid
+    exact .fixedCompound operatorKind
+      (by simpa [applyAssignmentResolution, applyPlaceResolution] using
+        targetInduction catalog contextValid)
+      (by simpa using valueInduction catalog contextValid)
+      (by simpa [applyAssignmentResolution] using requirementsEq)
   · intro context assignment targetType requirementsEq targetInduction catalog
       contextValid
     exact .intro
@@ -6372,6 +6382,9 @@ structure ContextSubstitutionValid (substitution : Substitution)
 
 @[simp] theorem apply_word (substitution : Substitution) :
     substitution.apply Ty.word = Ty.word := rfl
+
+@[simp] theorem apply_fixed (substitution : Substitution) (type : TypeSystem.FixedInteger) :
+    substitution.apply (Ty.fixed type) = Ty.fixed type := rfl
 
 @[simp] theorem apply_integer (substitution : Substitution) :
     substitution.apply Ty.integer = Ty.integer := rfl
@@ -12311,6 +12324,15 @@ theorem StatementsHaveType.applySubstitution
       requirementsEq targetInduction valueInduction targetContext catalog
       contextValid
     exact .wordCompound operatorKind
+      (by simpa [AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution] using
+          targetInduction targetContext catalog contextValid)
+      (by simpa using valueInduction targetContext catalog contextValid)
+      (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
+  · intro context assignment operator value type operatorKind targetType valueType
+      requirementsEq targetInduction valueInduction targetContext catalog
+      contextValid
+    exact .fixedCompound operatorKind
       (by simpa [AssignmentResolution.applySubstitution,
         PlaceResolution.applySubstitution] using
           targetInduction targetContext catalog contextValid)

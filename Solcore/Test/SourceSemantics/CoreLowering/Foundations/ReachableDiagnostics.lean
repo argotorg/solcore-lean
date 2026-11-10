@@ -2497,20 +2497,23 @@ open AssignmentDiagnosticOrigins
 variable {source : TypedSource} {context : SourceSemantics.Context}
   {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
 
-theorem compound_raw_word (different : operator ≠ .equal)
-    (typed : SourceAssignmentHasType source context assignment operator rhs) : assignment.target.type = .word := by
+theorem compound_raw_target (different : operator ≠ .equal)
+    (typed : SourceAssignmentHasType source context assignment operator rhs) :
+    assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type := by
   cases typed with
   | equal => exact (different rfl).elim
-  | wordCompound _ target _ _ => cases target with | intro _ _ same => exact same
+  | wordCompound _ target _ _ => cases target with | intro _ _ same => exact .inl same
+  | fixedCompound _ target _ _ => cases target with | intro _ _ same => exact .inr ⟨_, same⟩
 
 /-- A normalized alias cannot silently satisfy the actual table guard. -/
 theorem comptime_word_not_compound (different : operator ≠ .equal)
     (raw : assignment.target.type = .comptime .word) :
     ¬ SourceAssignmentHasType source context assignment operator rhs := by
   intro typed
-  have same := compound_raw_word different typed
-  rw [raw] at same
-  cases same
+  rcases compound_raw_target different typed with same | ⟨_, same⟩
+  all_goals
+    rw [raw] at same
+    cases same
 
 theorem initializer_suffix_origin {id : StatementId} {node : StatementNode}
     {beforeItems rest post : List ForItemForm} {condition : ExpressionId} {body : List StatementId}

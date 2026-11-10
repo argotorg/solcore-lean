@@ -59,6 +59,25 @@ theorem snapshot_prefix_sized
   obtain ⟨third, thirdBound, thirdEval⟩ := secondEval.bind_success (snapshot.getter layout)
   exact ⟨third, by omega, thirdEval⟩
 
+/-- A modifier fails on an absent snapshot, so a successful one had a present
+snapshot. -/
+private theorem modified_absent {environment : Environment} {store after : Store} {type : Ty}
+    {modifier : Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {rhs : Expr} {invalid : Word}
+    {changed : Value} {rightType : Ty} {payload : Value}
+    (found : environment[1]? = some (.inLeft rightType payload))
+    (evaluated : Evaluates environment store (modified type (some modifier) bitNot (.var 1) rhs invalid)
+      (.inRight .word changed) after) : False := by
+  unfold modified at evaluated
+  split at evaluated
+  all_goals
+    cases evaluated with
+    | caseLeft scrutinee branch =>
+      simp only [LanguageResult.failure] at branch
+      cases branch
+    | caseRight scrutinee _ =>
+      cases scrutinee with
+      | var other => rw [found] at other; cases other
+
 /-- A completed run whose right-hand side is Unit passes the modifier's check. -/
 theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier}
@@ -87,9 +106,17 @@ theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Ex
   obtain ⟨_, _, fourthEval⟩ := thirdEval.bind_success rightEvaluated
   obtain ⟨_, _, fifthEval⟩ := fourthEval.bind_success modifiedEvaluated
   obtain ⟨_, _, sixthEval⟩ := fifthEval.bind_success setterEvaluated
-  rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, _⟩ | ⟨_, _, zero, _, _⟩
+  rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, _⟩ | ⟨_, _, zero, _, _⟩ |
+      ⟨_, _, _, rfl, ⟨rangePasses, _⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
   · exact passes
   · cases zero
+  · -- A Unit right-hand side passes the range check only on an absent snapshot,
+    -- where the modifier has failed.
+    rcases rangePasses with ⟨_, _, absent⟩ | ⟨_, _, _, _, impossible, _⟩
+    · subst absent
+      exact (modified_absent rfl modifiedEvaluated).elim
+    · cases impossible
+  · cases impossible
 
 /-- One inversion for the actual emitted prefix. The six supplied phase
 executions align values/stores; all costs come from the original derivation.
@@ -125,21 +152,48 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
   obtain ⟨fourth, fourthBound, fourthEval⟩ := thirdEval.bind_success rightEvaluated
   obtain ⟨fifth, fifthBound, fifthEval⟩ := fourthEval.bind_success modifiedEvaluated
   obtain ⟨sixth, sixthBound, sixthEval⟩ := fifthEval.bind_success setterEvaluated
-  rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, seventh, seventhBound, seventhEval⟩ |
-    ⟨operation, selected, zero, _, _⟩
-  case inr =>
-    -- The terminal run meets the same check, which fails.
-    subst selected zero
-    have failed : Evaluates actual before
-        (execute prepared reference keys rhs .unit outputType (some ⟨operation, true⟩) bitNot invalid)
-        (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
-      .letE (referenceSelected.evaluates before)
-        (LanguageResult.bind_success _ keysEvaluated
-          (LanguageResult.bind_success _ snapshotEvaluated
-            (LanguageResult.bind_success _ rightEvaluated
-              (LanguageResult.bind_success _ modifiedEvaluated
-                (LanguageResult.bind_success _ setterEvaluated SourceCoreDataPlaces.guard_panic)))))
-    cases (evaluation_deterministic terminal failed).1
+  -- The check passed, through a replayable guard, or failed, as the terminal run would.
+  obtain ⟨replay, seventh, seventhBound, seventhEval⟩ :
+      (∀ {write : Expr} {result : Value} {after : Store},
+        Evaluates (updated :: modifiedEnvironment prepared.route.rootType target keyValue saved right changed actual)
+          setterStore write result after →
+        Evaluates (updated :: modifiedEnvironment prepared.route.rootType target keyValue saved right changed actual)
+          setterStore (SourceCoreDataPlaces.guard outputType operator write) result after) ∧
+      ∃ seventh, seventh ≤ sixth ∧
+        EvaluationSize seventh (updated :: modifiedEnvironment prepared.route.rootType target keyValue saved right changed actual)
+          setterStore (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)) value finalStore := by
+    rcases DataPlaceGuard.inv_sized sixthEval with ⟨passes, seventh, seventhBound, seventhEval⟩ |
+        ⟨operation, selected, zero, _, _⟩ |
+        ⟨operation, type, binary, rfl, ⟨rangePasses, seventh, seventhBound, seventhEval⟩ |
+          ⟨⟨leftType, left, rightWord, head, rightEq, outside⟩, _, _⟩⟩
+    · exact ⟨fun written => SourceCoreDataPlaces.guard_passes passes written, seventh, seventhBound, seventhEval⟩
+    · -- The terminal run meets the same check, which fails.
+      subst selected zero
+      have failed : Evaluates actual before
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .divisor⟩) bitNot invalid)
+          (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
+        .letE (referenceSelected.evaluates before)
+          (LanguageResult.bind_success _ keysEvaluated
+            (LanguageResult.bind_success _ snapshotEvaluated
+              (LanguageResult.bind_success _ rightEvaluated
+                (LanguageResult.bind_success _ modifiedEvaluated
+                  (LanguageResult.bind_success _ setterEvaluated SourceCoreDataPlaces.guard_panic)))))
+      cases (evaluation_deterministic terminal failed).1
+    · exact ⟨fun written => SourceCoreDataPlaces.guard_rangePasses rangePasses written, seventh, seventhBound,
+        seventhEval⟩
+    · -- The terminal run meets the same range check, which fails.
+      simp only [List.head?_cons, Option.some.injEq] at head
+      subst head rightEq
+      have failed : Evaluates actual before
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid)
+          (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) setterStore :=
+        .letE (referenceSelected.evaluates before)
+          (LanguageResult.bind_success _ keysEvaluated
+            (LanguageResult.bind_success _ snapshotEvaluated
+              (LanguageResult.bind_success _ rightEvaluated
+                (LanguageResult.bind_success _ modifiedEvaluated
+                  (LanguageResult.bind_success _ setterEvaluated (SourceCoreDataPlaces.guard_overflow outside))))))
+      cases (evaluation_deterministic terminal failed).1
   cases seventhEval with
   | @letE writeSize remainingSize _ _ writtenStore _ _ _ _ _ write remaining =>
     cases write with
@@ -152,9 +206,11 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
               (LanguageResult.bind_success _ rightEvaluated
                 (LanguageResult.bind_success _ modifiedEvaluated
                   (LanguageResult.bind_success _ setterEvaluated
-                    (SourceCoreDataPlaces.guard_passes passes
+                    (replay
                     (.letE (.storeCell referenceEval.sound read input.sound written)
-                      (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
+                      (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt,
+                          modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment,
+                          referenceEnvironment] using
                         (Evaluates.unit (environment := .unit :: updated :: changed :: right :: saved :: keyValue ::
                           .cellRef (OptionalCell.cellType prepared.route.rootType) target :: actual) (store := writtenStore))))))))))
       obtain ⟨_, sameStore⟩ := evaluation_deterministic nativePrefix terminal

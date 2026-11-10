@@ -444,9 +444,10 @@ private theorem fixed_assignment_occurrence
     subst id
     have same : lowered = value := Except.ok.inj (compiled.symm.trans generated)
     subst lowered
-    exact ⟨_, CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
+    exact ⟨_, CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs_assignment
       (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
-      (rhs := value.expression) (next := next) (output := output) (operator := operator) (codeEq ▸ typed)⟩
+      (rhs := value.expression) (next := next) (output := output) (target := assignment.target.type)
+      (operator := operator) (codeEq ▸ typed)⟩
   · cases generated_of_lower accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
@@ -457,10 +458,12 @@ private theorem fixed_assignment_occurrence
         · subst id
           have same : lowered = right := Except.ok.inj (compiled.symm.trans rightGenerated)
           subst lowered
-          exact ⟨_, CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
+          exact ⟨_, CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs_assignment
             (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments codes)
-            (rhs := right.expression) (next := next) (output := output) (operator := operator)
-            (by simpa only [routeEq, Option.isNone_some] using typed)⟩
+            (rhs := right.expression) (next := next) (output := output) (target := assignment.target.type)
+            (operator := operator)
+            (by simpa only [routeEq, Option.isNone_some, SourceCoreCompatibleDataPlaces.placeModifier,
+              Bool.false_eq_true, ↓reduceIte] using typed)⟩
         · obtain ⟨_, ⟨packedType, packedTyped⟩⟩ :=
             CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_children typed
           have locate : ∀ {keys codes}, ListRel (KeyGenerated expression fuel source scope reasonAt) keys codes →

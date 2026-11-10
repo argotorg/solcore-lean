@@ -242,8 +242,7 @@ theorem Execution.reflects_size (execution : Execution checked registry function
         cases same
         subst_vars
         -- The right-hand side is Unit, so the modifier's check cannot fail.
-        rcases DataPlaceGuard.inv_sized remaining with ⟨_, child, bound, remaining⟩ | ⟨_, _, impossible, _, _⟩
-        case inr => cases impossible
+        obtain ⟨child, bound, remaining⟩ := DataPlaceGuard.inv_sized_unit remaining
         cases remaining with
         | letE written continuation =>
           obtain ⟨optional, read⟩ := execution.read

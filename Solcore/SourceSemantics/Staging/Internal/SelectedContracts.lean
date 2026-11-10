@@ -597,11 +597,11 @@ theorem projected_target_typed {source : TypedSource} {context : Context}
 
 /-- Reconstruct the path from the latest root while retaining its earlier snapshot. -/
 theorem projected_write_equal {context : Context} {before middle after : Heap}
-    {target : ResolvedPlace} {root leaf : Ty} {value updated : Dynamic.Value}
+    {target : ResolvedPlace} {root leaf targetType : Ty} {value updated : Dynamic.Value}
     (targetTyped : ResolvedPlaceHasType context before target root leaf)
     (rhs : ExpressionEvaluationPreserved context before middle value leaf)
     (write : ResolvedPlaceWrites
-      (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+      (fun _ replacement => CompoundAssignmentApplies targetType .equal target.selected value replacement)
       middle target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   have currentTarget := targetTyped.mono rhs.heap_extends
@@ -613,7 +613,7 @@ theorem projected_write_equal {context : Context} {before middle after : Heap}
         rw [← currentTarget.root_type, ← rootType]
         exact initialTyped
       have modification : LeafModificationPreservesType context middle
-          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement) leaf := by
+          (fun _ replacement => CompoundAssignmentApplies targetType .equal target.selected value replacement) leaf := by
         intro current replacement _ applies
         exact applies.equalPreserves rhs.value_typed
       have updatedTyped := update.preserves currentTarget.projections initialRoot modification
@@ -624,12 +624,13 @@ theorem projected_write_equal {context : Context} {before middle after : Heap}
         rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
 
 theorem projected_write_compound {context : Context} {before middle after : Heap}
-    {target : ResolvedPlace} {root : Ty} {value updated : Dynamic.Value} {operator : Syntax.ValueAssignOp}
-    (kind : WordCompoundAssignmentOperator operator)
-    (targetTyped : ResolvedPlaceHasType context before target root .word)
-    (rhs : ExpressionEvaluationPreserved context before middle value .word)
+    {target : ResolvedPlace} {root leaf targetType : Ty} {value updated : Dynamic.Value}
+    {operator : Syntax.ValueAssignOp}
+    (kind : CompoundAssignmentTyping operator leaf) (targetEq : targetType = leaf)
+    (targetTyped : ResolvedPlaceHasType context before target root leaf)
+    (rhs : ExpressionEvaluationPreserved context before middle value leaf)
     (write : ResolvedPlaceWrites
-      (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+      (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement)
       middle target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   have currentTarget := targetTyped.mono rhs.heap_extends
@@ -641,9 +642,9 @@ theorem projected_write_compound {context : Context} {before middle after : Heap
         rw [← currentTarget.root_type, ← rootType]
         exact initialTyped
       have modification : LeafModificationPreservesType context middle
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement) .word := by
+          (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement) leaf := by
         intro current replacement _ applies
-        exact applies.wordCompoundPreserves kind currentTarget.selected rhs.value_typed
+        exact applies.preserves kind targetEq currentTarget.selected rhs.value_typed
       have updatedTyped := update.preserves currentTarget.projections initialRoot modification
       have updatedCell : ValueHasType context middle updated currentCell.type := by
         rw [rootType, currentTarget.root_type]

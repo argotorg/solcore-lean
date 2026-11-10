@@ -1705,17 +1705,17 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
               exact expectedSafe) _ valueRun
           exact valueFixed
       have finishNonEqual
-          (ih : ∀ fitted, InferExprFuelFixedness protectedVars fuel context value (some .word) fitted)
+          (ih : ∀ fitted, InferExprFuelFixedness protectedVars fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted)
           (accepted : (do
-            let fitted ← Detail.unify placeState place.type .word
-            let (inferredValue, finalState) ← inferExprFuel fuel context value (some .word) fitted
+            let fitted ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+            let (inferredValue, finalState) ← inferExprFuel fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted
             pure (({ target := { place with type := finalState.resolve place.type } } : AssignmentResolution), inferredValue, finalState)) = .ok result) :
           FixesProtected protectedVars result.2.2 := by
-        cases fittedRun : Detail.unify placeState place.type .word with
+        cases fittedRun : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error => simp [fittedRun, bind, Except.bind] at accepted
         | ok fitted =>
           simp only [fittedRun, bind, Except.bind] at accepted
-          have wordSafe : Safe protectedVars placeState .word := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+          have wordSafe : Safe protectedVars placeState (Detail.compoundOperandType operator (placeState.resolve place.type)) := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
           have fittedPrivacy := ProtectedVariables.unify placePrivacy.2.1 wordSafe fittedRun
           exact finishValue fitted
             (unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fittedRun)
@@ -1723,7 +1723,8 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             (unify_preserves_requirementsWellFormed fittedRun placeWF) fittedPrivacy
             (placePrivacy.2.2.1.unify placePrivacy.2.1 wordSafe fittedRun)
             (unify_fixes_protected placeFixed placePrivacy.2.1 wordSafe fittedRun) (Detail.unify_requirements_eq fittedRun)
-            .word (Ty.variablesBelow_constructor _ _) (fittedPrivacy _ wordSafe) (ih fitted) accepted
+            (Detail.compoundOperandType operator (fitted.resolve place.type)) (Ty.variablesBelow_constructor _ _)
+            (safe_closed _ _ (Ty.variablesBelow_constructor 0 _)) (ih fitted) accepted
       cases operator with
       | equal =>
         simp only [pure, Pure.pure, Except.pure] at success

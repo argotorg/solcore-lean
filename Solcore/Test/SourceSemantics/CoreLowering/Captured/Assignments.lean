@@ -1031,7 +1031,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
             cases sameOperator
             cases sameRhs
             cases typedAssignment with
-            | wordCompound operator _ _ _ => cases operator
+            | wordCompound operator _ _ _ | fixedCompound operator _ _ _ => cases operator
             | equal target rhs requirements =>
               cases target with
               | intro writable projections targetType =>

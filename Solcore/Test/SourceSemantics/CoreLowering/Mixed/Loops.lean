@@ -602,11 +602,12 @@ private theorem bare_assign {program : SourceSemantics.Program} {source : TypedS
     (read : Dynamic.Heap.Reads before location ⟨type,some old,none⟩)
     (evaluates : Dynamic.ExpressionEvaluates program context evidence source environment before rhs right before)
     (operation : Dynamic.AssignmentValueApplies operator (some old) right updated)
-    (write : Dynamic.Heap.Writes before location (some updated) after) :
-    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (write : Dynamic.Heap.Writes before location (some updated) after)
+    (plain : ∀ fixed, type = .fixed fixed → ¬ FixedCheckedCompound operator := by intro _ same; cases same) :
+    Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies type operator)
       environment before ⟨binder,[],type⟩ rhs updated after :=
   .intro (.intro lookup read .nil read .initialized .nil) evaluates
-    (.intro read rfl .initialized (.leaf operation) write)
+    (.intro read rfl .initialized (.leaf (.primitive plain operation)) write)
 
 private theorem Shape.post_trace {program : SourceSemantics.Program} {source : TypedSource}
     (shape : Shape source) {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
@@ -675,7 +676,9 @@ theorem Shape.loop_trace {program : SourceSemantics.Program} {source : TypedSour
           cases assigned with
           | assignValue assigned =>
             have oneTyped : ExpressionHasType source loopContext shape.one.node.id .word := by
-              cases assigned with | wordCompound _ _ value _ => exact value
+              cases assigned with
+              | wordCompound _ _ value _ => exact value
+              | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
             have allocated : Dynamic.Heap.Allocates (outerHeap base true (Word.ofNatModulo 0))
                 shape.active.scheme.body (some (.bool flag)) ⟨base.cells.length+2⟩
                 (phaseHeap base flag true (Word.ofNatModulo 0)) := by
@@ -2096,12 +2099,13 @@ private theorem bare_assign {program : SourceSemantics.Program} {source : TypedS
     (read : Dynamic.Heap.Reads before location ⟨type,some old,none⟩)
     (evaluates : Dynamic.ExpressionEvaluates program context evidence source environment before rhs right before)
     (operation : Dynamic.AssignmentValueApplies operator (some old) right updated)
-    (write : Dynamic.Heap.Writes before location (some updated) after) :
+    (write : Dynamic.Heap.Writes before location (some updated) after)
+    (plain : ∀ fixed, type = .fixed fixed → ¬ FixedCheckedCompound operator := by intro _ same; cases same) :
     Dynamic.StatementExecutes program context evidence source environment before site.node.id context
       (.fallthrough environment) after := by
   apply Dynamic.StatementExecutes.assignValue (updatedRoot := updated) (lookupStatement?_sound site.found) site.formEq
   refine .intro (.intro lookup read .nil read .initialized .nil) evaluates ?_
-  exact .intro read rfl .initialized (.leaf operation) write
+  exact .intro read rfl .initialized (.leaf (.primitive plain operation)) write
 
 private theorem Shape.increment_trace {program : SourceSemantics.Program} {source : TypedSource}
     (shape : Shape source) {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
@@ -2163,7 +2167,9 @@ theorem Shape.loop_trace {program : SourceSemantics.Program} {source : TypedSour
     cases incrementForm with
     | assignValue assigned =>
       have oneTyped : ExpressionHasType source context shape.one.node.id .word := by
-        cases assigned with | wordCompound _ _ value _ => exact value
+        cases assigned with
+        | wordCompound _ _ value _ => exact value
+        | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
       apply Dynamic.StatementExecutes.whileLoop (finalContext := context)
         (outcome := .fallthrough (phaseEnvironment shape base environment))
         (lookupStatement?_sound shape.loop.found) shape.loop.formEq

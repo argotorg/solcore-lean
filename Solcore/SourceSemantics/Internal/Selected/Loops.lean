@@ -55,6 +55,8 @@ theorem sourceAssignment_transportExpressions {before after : TypedSource}
   | equal target value requirements => exact .equal (place target) (children _ (by simp) _ value) requirements
   | wordCompound operator target value requirements =>
     exact .wordCompound operator (place target) (children _ (by simp) _ value) requirements
+  | fixedCompound operator target value requirements =>
+    exact .fixedCompound operator (place target) (children _ (by simp) _ value) requirements
 
 theorem ActualStateInvariant.ofForItemPreservingBinders
     {fuel : Nat} {context : Frontend.SourceInference.Context}

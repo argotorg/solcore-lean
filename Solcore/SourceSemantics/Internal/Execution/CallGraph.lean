@@ -125,7 +125,7 @@ inductive AnnotationExpected (context : SourceInference.Context) :
 def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type : Ty) : Ty :=
   match operator with
   | .equal => state.resolve type
-  | _ => .word
+  | _ => compoundOperandType operator (state.resolve type)
 
 /-- The actual dispatch tests selecting an indirect callee after its arguments. -/
 def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
@@ -466,7 +466,7 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       {fitted childFinal : State} {childValue : InferredExpression}
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
-      (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type .word) = (Except.ok fitted : Except Error State))
+      (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
       (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted) :
       ChildStep (CallIndex.assignedValue fuel context target operator value initial assignment inferred final) (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal)
   | place_group
@@ -889,7 +889,7 @@ theorem optionalFit {initial fitted : State} {expected : Option Ty} {type : Ty}
   | some type => exact unifyRun accepted closed
 
 theorem assignedFit {initial fitted : State} {operator : Syntax.ValueAssignOp} {target : Ty}
-    (accepted : (match operator with | .equal => pure initial | _ => unify initial target .word) =
+    (accepted : (match operator with | .equal => pure initial | _ => unify initial target (compoundOperandType operator (initial.resolve target))) =
       (Except.ok fitted : Except Error State))
     (closed : NodesClosed initial.nodes) : NodesClosed fitted.nodes := by
   cases operator
@@ -1557,7 +1557,7 @@ theorem assignedValue_actual_prefix
       .ok (assignment, inferred, final)) :
     ∃ place placeState fitted,
       inferPlaceFuel fuel context target initial = .ok (place, placeState) ∧
-      (match operator with | .equal => pure placeState | _ => unify placeState place.type .word) =
+      (match operator with | .equal => pure placeState | _ => unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))) =
         (Except.ok fitted : Except Error State) ∧
       inferExprFuel fuel context value (some (assignmentExpected operator fitted place.type)) fitted =
         .ok (inferred, final) ∧

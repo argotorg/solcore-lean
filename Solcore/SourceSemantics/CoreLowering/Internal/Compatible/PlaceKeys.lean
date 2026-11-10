@@ -906,9 +906,10 @@ theorem initialized_outcome
         (.inRight .word value) store ∧
       ((Dynamic.AssignmentValueApplies operator (some left) right result ∧
           ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right) ∨
-        (∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧
+        (∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightCore = .word Word.zero ∧
-          Dynamic.AssignmentOperandsPanic operator (some left) right SourceCorePanics.divisionByZero)) := by
+          (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator (some left) right
+            SourceCorePanics.divisionByZero))) := by
   by_cases zero : operator.mayPanic = true ∧ right = .word Word.zero
   · obtain ⟨panics, rfl⟩ := zero
     have word : SourceCoreRawMetadata.runtimeType sourceType = .word := by
@@ -927,11 +928,11 @@ theorem initialized_outcome
     · exact ⟨_, _, .compatible (actual := .word) word (.word (left.udiv Word.zero)),
         .caseRight (snapshotSelected.evaluates store)
           (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
-        .inr ⟨.wordDiv, rfl, rfl, .compound .uncheckedDivide (.wordUncheckedDivide left)⟩⟩
+        .inr ⟨.wordDiv, rfl, rfl, fun _ => .compound .uncheckedDivide (.primitive (.wordUncheckedDivide left))⟩⟩
     · exact ⟨_, _, .compatible (actual := .word) word (.word (left.umod Word.zero)),
         .caseRight (snapshotSelected.evaluates store)
           (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
-        .inr ⟨.wordMod, rfl, rfl, .compound .uncheckedModulo (.wordUncheckedModulo left)⟩⟩
+        .inr ⟨.wordMod, rfl, rfl, fun _ => .compound .uncheckedModulo (.primitive (.wordUncheckedModulo left))⟩⟩
   · have divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero := by
       by_cases panics : operator.mayPanic = true
       · exact .inr fun same => zero ⟨panics, same⟩

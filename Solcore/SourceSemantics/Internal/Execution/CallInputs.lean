@@ -1624,7 +1624,7 @@ private theorem optionalFit {initial fitted : State} {expected : Option Ty} {res
   | none => cases Except.ok.inj accepted; exact below
   | some type => exact unify_preserves_localBindersBelowNextLocal below accepted
 private theorem assignedFit {initial fitted : State} {operator : Syntax.ValueAssignOp} {target : Ty}
-    (accepted : (match operator with | .equal => pure initial | _ => unify initial target .word) =
+    (accepted : (match operator with | .equal => pure initial | _ => unify initial target (compoundOperandType operator (initial.resolve target))) =
       (Except.ok fitted : Except Error State))
     (below : initial.LocalBindersBelowNextLocal) : fitted.LocalBindersBelowNextLocal := by
   cases operator

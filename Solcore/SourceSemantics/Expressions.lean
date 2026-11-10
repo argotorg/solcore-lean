@@ -1166,10 +1166,36 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | uncheckedDivide : WordCompoundAssignmentOperator .uncheckedDivide
   | uncheckedModulo : WordCompoundAssignmentOperator .uncheckedModulo
 
+/-- The compound assignments on a fixed-width integer target: those whose
+binary operator is a builtin there, so compound assignment takes the target's
+type. `+= -= *=` are checked, and `&= |= ^=` are Word's. -/
+inductive FixedCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
+  | add : FixedCompoundAssignmentOperator .add
+  | subtract : FixedCompoundAssignmentOperator .subtract
+  | multiply : FixedCompoundAssignmentOperator .multiply
+  | bitAnd : FixedCompoundAssignmentOperator .bitAnd
+  | bitXor : FixedCompoundAssignmentOperator .bitXor
+  | bitOr : FixedCompoundAssignmentOperator .bitOr
+
+/-- The compound assignments that are checked on a fixed-width integer target. -/
+inductive FixedCheckedCompound : Syntax.ValueAssignOp → Prop where
+  | add : FixedCheckedCompound .add
+  | subtract : FixedCheckedCompound .subtract
+  | multiply : FixedCheckedCompound .multiply
+
+/-- The operand type of a compound assignment: Word's operators at a Word
+target, or the fixed-width ones at a target of a fixed-width integer type. -/
+inductive CompoundAssignmentTyping : Syntax.ValueAssignOp → TypeSystem.Ty → Prop where
+  | word {operator : Syntax.ValueAssignOp} (kind : WordCompoundAssignmentOperator operator) :
+      CompoundAssignmentTyping operator .word
+  | fixed {operator : Syntax.ValueAssignOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedCompoundAssignmentOperator operator) :
+      CompoundAssignmentTyping operator (.fixed type)
+
 /-- A value assignment validates its place and right-hand occurrence.  Plain
-assignment is homogeneous at any place type; current compound forms are
-homogeneous at Word.  Neither form owns trait requirements in this runtime
-profile. -/
+assignment is homogeneous at any place type; compound forms are homogeneous at
+Word or at a fixed-width integer type.  Neither form owns trait requirements in
+this runtime profile. -/
 inductive AssignmentHasType
     (context : Context)
     (ExpressionTyping : ExpressionId → TypeSystem.Ty → Prop) :
@@ -1190,6 +1216,17 @@ inductive AssignmentHasType
       (target_type : PlaceHasType context ExpressionTyping
         assignment.target .word)
       (value_type : ExpressionTyping value .word)
+      (requirements_eq : assignment.requirements = []) :
+      AssignmentHasType context ExpressionTyping assignment operator value
+  | fixedCompound
+      {assignment : AssignmentResolution}
+      {operator : Syntax.ValueAssignOp}
+      {value : ExpressionId}
+      {type : TypeSystem.FixedInteger}
+      (operator_kind : FixedCompoundAssignmentOperator operator)
+      (target_type : PlaceHasType context ExpressionTyping
+        assignment.target (.fixed type))
+      (value_type : ExpressionTyping value (.fixed type))
       (requirements_eq : assignment.requirements = []) :
       AssignmentHasType context ExpressionTyping assignment operator value
 
@@ -1224,6 +1261,8 @@ theorem operand_types
   | equal target_type value_type => exact ⟨_, target_type, value_type⟩
   | wordCompound _ target_type value_type =>
       exact ⟨.word, target_type, value_type⟩
+  | fixedCompound _ target_type value_type =>
+      exact ⟨_, target_type, value_type⟩
 
 end AssignmentHasType
 

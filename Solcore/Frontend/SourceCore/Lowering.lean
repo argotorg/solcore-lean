@@ -1359,6 +1359,140 @@ theorem checkedBinary_right_failure {environment : Core.Environment}
   rcases checked with rfl | rfl | rfl <;>
     exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
 
+/-- The Integer `fixedInteger` computes from a word: its value, or for a signed
+type its two's complement reading. -/
+def fixedIntegerValue (signed : Bool) (word : Core.Word) : Int :=
+  if signed then (if word.val < 2 ^ 255 then (word.val : Int) else (word.val : Int) - 2 ^ 256)
+  else (word.val : Int)
+
+/-- The exact result `checkedOperator` computes. -/
+def checkedIntegerValue : Syntax.BinaryOp → Int → Int → Int
+  | .add, left, right => left + right
+  | .subtract, left, right => left - right
+  | _, left, right => left * right
+
+/-- Whether checked `+ - *` on two words of a fixed-width integer type give a
+result in the type's range. -/
+def checkedInRange (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (left right : Core.Word) : Bool :=
+  decide (type.min ≤ checkedIntegerValue operator (fixedIntegerValue type.signed left)
+      (fixedIntegerValue type.signed right) ∧
+    checkedIntegerValue operator (fixedIntegerValue type.signed left)
+      (fixedIntegerValue type.signed right) ≤ type.max)
+
+/-- Whether checked `+ - *` on the words at indices `left` and `right` give a
+result outside the type's range, as a Core Bool. -/
+def checkedOutside (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Nat) :
+    Core.Expr :=
+  .letE (.binary (checkedOperator operator) (fixedInteger type.signed (.var left))
+      (fixedInteger type.signed (.var right)))
+    (.ifE (.binary .integerLt (.var 0) (.integer type.min)) (.bool true)
+      (.binary .integerLt (.integer type.max) (.var 0)))
+
+theorem fixedInteger_evaluates {environment : Core.Environment} {store : Core.Store} {k : Nat}
+    {word : Core.Word} (signed : Bool) (found : environment[k]? = some (.word word)) :
+    Core.Evaluates environment store (fixedInteger signed (.var k))
+      (.integer (fixedIntegerValue signed word)) store := by
+  unfold fixedInteger fixedIntegerValue
+  cases signed
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    exact .unary (.var found) rfl
+  · simp only [↓reduceIte]
+    by_cases small : word.val < 2 ^ 255
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary (.var found) rfl)
+        (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; omega)) (.var rfl))
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary (.var found) rfl)
+        (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; omega))
+          (.binary (.var rfl) .integer rfl))
+
+theorem checkedOperator_apply (operator : Syntax.BinaryOp) (left right : Int) :
+    (checkedOperator operator).apply (.integer left) (.integer right) =
+      some (.integer (checkedIntegerValue operator left right)) := by
+  cases operator <;> rfl
+
+/-- The range test is `true` exactly outside the type's range. -/
+theorem checkedOutside_evaluates {environment : Core.Environment} {store : Core.Store}
+    {left right : Nat} {a b : Core.Word} (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (leftFound : environment[left]? = some (.word a)) (rightFound : environment[right]? = some (.word b)) :
+    Core.Evaluates environment store (checkedOutside type operator left right)
+      (.bool (!checkedInRange type operator a b)) store := by
+  unfold checkedOutside checkedInRange
+  generalize valueEq : checkedIntegerValue operator (fixedIntegerValue type.signed a)
+    (fixedIntegerValue type.signed b) = value
+  have evaluated : Core.Evaluates environment store
+      (.binary (checkedOperator operator) (fixedInteger type.signed (.var left))
+        (fixedInteger type.signed (.var right))) (.integer value) store := by
+    rw [← valueEq]
+    exact .binary (fixedInteger_evaluates _ leftFound) (fixedInteger_evaluates _ rightFound)
+      (checkedOperator_apply _ _ _)
+  by_cases low : value < type.min
+  · have result : (!decide (type.min ≤ value ∧ value ≤ type.max)) = true := by
+      simp only [Bool.not_eq_true', decide_eq_false_iff_not]
+      omega
+    rw [result]
+    exact .letE evaluated (.ifTrue (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; exact low)) .bool)
+  · have result : (!decide (type.min ≤ value ∧ value ≤ type.max)) = decide (type.max < value) := by
+      by_cases high : type.max < value
+      · simp only [high, decide_true, Bool.not_eq_true', decide_eq_false_iff_not]
+        omega
+      · simp only [high, decide_false, Bool.not_eq_false', decide_eq_true_eq]
+        omega
+    rw [result]
+    exact .letE evaluated (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; omega))
+      (.binary .integer (.var rfl) rfl))
+
+theorem wordToInteger_apply {value result : Core.Value}
+    (applied : Core.UnaryOp.wordToInteger.apply value = some result) : ∃ word, value = .word word := by
+  cases value <;> simp [Core.UnaryOp.apply] at applied
+  exact ⟨_, rfl⟩
+
+/-- `fixedInteger` evaluates only on a word. -/
+theorem fixedInteger_inv {environment : Core.Environment} {store after : Core.Store} {value : Core.Value}
+    {signed : Bool} {k : Nat}
+    (evaluated : Core.Evaluates environment store (fixedInteger signed (.var k)) value after) :
+    ∃ word, environment[k]? = some (.word word) := by
+  unfold fixedInteger at evaluated
+  cases signed with
+  | false =>
+    simp only [Bool.false_eq_true, ↓reduceIte] at evaluated
+    cases evaluated with
+    | unary operand applied =>
+      obtain ⟨word, rfl⟩ := wordToInteger_apply applied
+      cases operand with
+      | var found => exact ⟨word, found⟩
+  | true =>
+    simp only [↓reduceIte] at evaluated
+    cases evaluated with
+    | letE bound _ =>
+      cases bound with
+      | unary operand applied =>
+        obtain ⟨word, rfl⟩ := wordToInteger_apply applied
+        cases operand with
+        | var found => exact ⟨word, found⟩
+
+/-- The range test evaluates only on two words, to `checkedOutside_evaluates`'s
+value, without effects. -/
+theorem checkedOutside_inv {environment : Core.Environment} {store after : Core.Store} {value : Core.Value}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Nat}
+    (evaluated : Core.Evaluates environment store (checkedOutside type operator left right) value after) :
+    ∃ a b, environment[left]? = some (.word a) ∧ environment[right]? = some (.word b) ∧
+      value = .bool (!checkedInRange type operator a b) ∧ after = store := by
+  have operands : ∃ a b, environment[left]? = some (.word a) ∧ environment[right]? = some (.word b) := by
+    unfold checkedOutside at evaluated
+    cases evaluated with
+    | letE bound _ =>
+      cases bound with
+      | binary first second _ =>
+        obtain ⟨a, foundA⟩ := fixedInteger_inv first
+        obtain ⟨b, foundB⟩ := fixedInteger_inv second
+        exact ⟨a, b, foundA, foundB⟩
+  obtain ⟨a, b, foundA, foundB⟩ := operands
+  obtain ⟨same, sameStore⟩ :=
+    Core.evaluation_deterministic evaluated (checkedOutside_evaluates (store := store) type operator foundA foundB)
+  exact ⟨a, b, foundA, foundB, same, sameStore⟩
+
 theorem signedStrictBinaryBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     (operator : Syntax.BinaryOp) :
     Core.HasType (binaryOperandType operator :: binaryOperandType operator :: scope)

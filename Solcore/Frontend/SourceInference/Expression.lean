@@ -1974,10 +1974,10 @@ mutual
     let (target, state) ← inferPlaceFuel fuel context target state
     let state ← match operator with
       | .equal => pure state
-      | _ => unify state target.type .word
+      | _ => unify state target.type (compoundOperandType operator (state.resolve target.type))
     let expected := match operator with
       | .equal => state.resolve target.type
-      | _ => Ty.word
+      | _ => compoundOperandType operator (state.resolve target.type)
     let (value, state) ← inferExprFuel fuel context value (some expected) state
     pure ({ target := { target with type := state.resolve target.type } }, value,
       state)

@@ -350,12 +350,12 @@ theorem execute_panic {prepared : Prepared} {reference rhs next : Expr} {keys : 
     (rhsEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType location keyValue snapshot environment) snapshotStore
       (shift 3 rhs) (.inRight .word (.word Word.zero)) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType location keyValue snapshot (.word Word.zero) environment) rhsStore
-      (modified prepared.route.leafType (some ⟨operation, true⟩) bitNot (.var 1) (.var 0) invalidOperand)
+      (modified prepared.route.leafType (some ⟨operation, .divisor⟩) bitNot (.var 1) (.var 0) invalidOperand)
       (.inRight .word changed) modifiedStore)
     (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType location keyValue snapshot (.word Word.zero) changed environment) modifiedStore
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0)))) (.inRight .word updated) setterStore) :
     Evaluates environment before
-      (execute prepared reference keys rhs next outputType (some ⟨operation, true⟩) bitNot invalidOperand)
+      (execute prepared reference keys rhs next outputType (some ⟨operation, .divisor⟩) bitNot invalidOperand)
       (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore := by
   exact .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated
@@ -2284,7 +2284,8 @@ theorem of_lower {checked : Checked} {signatures : ProgramSignatures} {source : 
         prepared codes sourceTypes context ∧
       RhsGenerated expression fuel source scope reasonAt prepared.route.leafType rhs value ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) value next outputType
-        (binaryOperator (prepared.route.leafType = .integer) sourceOperator) rhs.isNone invalidOperand := by
+        (placeModifier assignment.target.type (prepared.route.leafType = .integer) sourceOperator rhs.isNone)
+        rhs.isNone invalidOperand := by
   have generated := generated_of_lower accepted
   cases generated with
   | intro route prepared index keys value described lookup preparedBy keysGenerated operatorValid rhsGenerated =>

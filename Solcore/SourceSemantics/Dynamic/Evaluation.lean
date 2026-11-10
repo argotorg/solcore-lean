@@ -244,6 +244,57 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
       (applies : BinaryPrimitiveApplies .uncheckedModulo left right result) :
       AssignmentValueApplies .uncheckedModulo (some left) right result
 
+/-- A value assignment at its target's static type: Word's, Integer's or plain
+assignment where the meaning is that, and checked `+= -= *=` at a fixed-width
+integer target, whose result is the exact one in the type's range. -/
+inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
+    Syntax.ValueAssignOp → Option Value → Value → Value → Prop where
+  | primitive {operator : Syntax.ValueAssignOp} {current : Option Value} {right result : Value}
+      (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator)
+      (applies : AssignmentValueApplies operator current right result) :
+      CompoundAssignmentApplies targetType operator current right result
+  | add {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .add left right result) :
+      CompoundAssignmentApplies targetType .add (some left) right result
+  | subtract {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .subtract left right result) :
+      CompoundAssignmentApplies targetType .subtract (some left) right result
+  | multiply {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .multiply left right result) :
+      CompoundAssignmentApplies targetType .multiply (some left) right result
+
+namespace CompoundAssignmentApplies
+
+/-- No checked compound assignment is plain assignment or at a Word target. -/
+theorem plain_of_profile {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ targetType = .word) :
+    ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator := by
+  intro type target checked
+  rcases profile with rfl | rfl
+  · cases checked
+  · cases target
+
+/-- Away from checked `+= -= *=` at a fixed-width integer target, the relation
+is `AssignmentValueApplies`. -/
+theorem eq_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator) :
+    CompoundAssignmentApplies targetType operator = AssignmentValueApplies operator := by
+  funext current right result
+  apply propext
+  constructor
+  · intro applies
+    cases applies with
+    | primitive _ applies => exact applies
+    | add target _ => exact absurd .add (plain _ target)
+    | subtract target _ => exact absurd .subtract (plain _ target)
+    | multiply target _ => exact absurd .multiply (plain _ target)
+  · exact .primitive plain
+
+end CompoundAssignmentApplies
+
 /-- Bit-not assignment operates on the leaf snapshot captured by place
 resolution. -/
 inductive BitNotSnapshot : Option Value → Value → Prop where
@@ -982,7 +1033,7 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .assignValue assignment operator rhs)
         (assignment_executes : SourcePlaceAssignment program context evidence source
-          (AssignmentValueApplies operator) environment before assignment.target rhs
+          (CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs
           updatedRoot after) :
         StatementExecutes program context evidence source environment before id
           context (.fallthrough environment) after
@@ -1243,7 +1294,7 @@ mutual
         {context evidence source environment before after assignment operator rhs
           updatedRoot}
         (execute : SourcePlaceAssignment program context evidence source
-          (AssignmentValueApplies operator) environment before assignment.target rhs
+          (CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs
           updatedRoot after) :
         ForItemExecutes program context evidence source environment before
           (.assignValue assignment operator rhs) context environment after

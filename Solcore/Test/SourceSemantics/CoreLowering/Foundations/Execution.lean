@@ -4119,14 +4119,33 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function sub8s(x: int8, y: int8) returns (int8) { return x - y; }",
   "function mul8s(x: int8, y: int8) returns (int8) { return x * y; }",
   "function sub256s(x: int256, y: int256) returns (int256) { return x - y; }",
-  "function mul256s(x: int256, y: int256) returns (int256) { return x * y; }"
+  "function mul256s(x: int256, y: int256) returns (int256) { return x * y; }",
+  "function addAssign8u(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r += y; return r; }",
+  "function subAssign8u(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r -= y; return r; }",
+  "function mulAssign8u(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r *= y; return r; }",
+  "function addAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; r += y; return r; }",
+  "function subAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; r -= y; return r; }",
+  "function mulAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; r *= y; return r; }",
+  "function addAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r += y; return r; }",
+  "function subAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r -= y; return r; }",
+  "function mulAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r *= y; return r; }",
+  "function addAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; r += y; return r; }",
+  "function subAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; r -= y; return r; }",
+  "function mulAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; r *= y; return r; }",
+  "function andAssign8u(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r &= y; return r; }",
+  "function orAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r |= y; return r; }",
+  "function xorAssign16u(x: uint16, y: uint16) returns (uint16) { let r: uint16 = x; r ^= y; return r; }",
+  "function tableAdd8u(x: uint8, y: uint8) returns (uint8) { let table: mapping(Word => uint8); table[7] = x; table[7] += y; return table[7]; }",
+  "function absentAdd8u(y: uint8) returns (uint8) { let r: uint8; r += y; return r; }"
 ]
 
 private def names : List String :=
   ["eq8", "ne16", "lt32", "le64", "gt128", "ge256", "and8", "or16", "xor32", "eqSigned", "mixed",
     "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u", "lt8s", "ge16s", "gt256s", "le32s",
     "not8u", "not16u", "not128u", "add8u", "sub16u", "mul32u", "add256u", "mul256u", "add8s", "sub8s",
-    "mul8s", "sub256s", "mul256s"]
+    "mul8s", "sub256s", "mul256s", "addAssign8u", "subAssign8u", "mulAssign8u", "addAssign256u",
+    "subAssign256u", "mulAssign256u", "addAssign8s", "subAssign8s", "mulAssign8s", "addAssign256s",
+    "subAssign256s", "mulAssign256s", "andAssign8u", "orAssign8s", "xorAssign16u", "tableAdd8u", "absentAdd8u"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4157,6 +4176,23 @@ private def panics {artifact : Artifact} (session : Session artifact) (key : Key
       let data := ((SourceCorePanics.code? reason).map SourceCorePanics.revertData).map ByteArray.toList
       require (data == some ([0x4e, 0x48, 0x7b, 0x71] ++ List.replicate 31 0 ++ [0x11]))
         s!"{label} revert data {reprStr data}"
+      pure next
+  | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
+  | .ok _ => throw (IO.userError s!"{label} did not fail")
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
+/-- A run that fails on an absent compound-assignment operand: the reason is
+the assignment's own diagnostic site, which names the operator and the target's
+type. -/
+private def invalidOperands {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
+    (expected : SourceTypedRuntime.RuntimeError) (label : String) : IO (Session artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.failed reason next) =>
+      require (reason != Core.Word.zero) s!"{label} failed with reason zero"
+      match session.diagnostic key reason with
+      | .ok (some diagnostic) =>
+          require (decide (diagnostic.error = expected)) s!"{label} decoded {reprStr diagnostic.error}"
+      | other => throw (IO.userError s!"{label} decoded {reprStr other}")
       pure next
   | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
   | .ok _ => throw (IO.userError s!"{label} did not fail")
@@ -4217,14 +4253,42 @@ def run : IO Unit := do
     (30, [word (modulus - 1), word 127], word (modulus - 128)),
     (31, [word (modulus - 64), word 2], word (modulus - 128)),
     (32, [word 5, word 7], word (modulus - 2)),
-    (33, [word (2 ^ 127), word (2 ^ 127)], word (2 ^ 254)), (33, [word (modulus - 1), word (modulus - 1)], word 1)]
+    (33, [word (2 ^ 127), word (2 ^ 127)], word (2 ^ 254)), (33, [word (modulus - 1), word (modulus - 1)], word 1),
+    -- Checked compound assignment at the range edges, checked after the setter.
+    (34, [word 200, word 55], word 255), (34, [word 0, word 0], word 0),
+    (35, [word 5, word 5], word 0), (35, [word 255, word 1], word 254),
+    (36, [word 15, word 17], word 255), (36, [word 0, word 255], word 0),
+    (37, [word (modulus - 2), word 1], word (modulus - 1)),
+    (38, [word 1, word 1], word 0), (38, [word (modulus - 1), word (modulus - 1)], word 0),
+    (39, [word (2 ^ 128), word (2 ^ 128 - 1)], word (modulus - 2 ^ 128)),
+    (40, [word 127, word 0], word 127), (40, [word (modulus - 100), word (modulus - 28)], word (modulus - 128)),
+    (41, [word (modulus - 1), word 127], word (modulus - 128)), (41, [word 127, word 127], word 0),
+    (42, [word (modulus - 64), word 2], word (modulus - 128)), (42, [word (modulus - 1), word (modulus - 127)], word 127),
+    (43, [word (2 ^ 255 - 1), word 0], word (2 ^ 255 - 1)), (43, [word (2 ^ 255), word (2 ^ 255 - 1)], word (modulus - 1)),
+    (44, [word (2 ^ 255), word 0], word (2 ^ 255)), (44, [word 0, word (2 ^ 255 - 1)], word (2 ^ 255 + 1)),
+    (45, [word (modulus - 1), word (2 ^ 255 - 1)], word (2 ^ 255 + 1)), (45, [word (2 ^ 127), word (2 ^ 127)], word (2 ^ 254)),
+    -- `&= |= ^=` are Word's on canonical words.
+    (46, [word 0xF0, word 0x3C], word 0x30), (47, [word (modulus - 128), word 1], word (modulus - 127)),
+    (48, [word 0xFFFF, word 0x00FF], word 0xFF00),
+    -- A mapping element.
+    (49, [word 200, word 55], word 255)]
   let panicCases : List (Nat × List Value) := [
     (24, [word 200, word 56]), (25, [word 3, word 5]), (26, [word 65536, word 65536]),
     (27, [word (modulus - 1), word 1]), (28, [word (2 ^ 128), word (2 ^ 128)]),
     (29, [word 127, word 1]), (29, [word (modulus - 128), word (modulus - 1)]),
     (30, [word (modulus - 128), word 1]), (30, [word 0, word (modulus - 128)]),
     (31, [word (modulus - 128), word (modulus - 1)]), (32, [word (2 ^ 255), word 1]),
-    (33, [word (modulus - 1), word (2 ^ 255)])]
+    (33, [word (modulus - 1), word (2 ^ 255)]),
+    -- One past each edge of the compound forms: `Panic(0x11)` after the setter.
+    (34, [word 200, word 56]), (35, [word 5, word 6]), (36, [word 16, word 16]),
+    (37, [word (modulus - 1), word 1]), (38, [word 0, word 1]), (39, [word (2 ^ 128), word (2 ^ 128)]),
+    (40, [word 127, word 1]), (40, [word (modulus - 100), word (modulus - 29)]),
+    (41, [word 0, word (modulus - 128)]), (41, [word (modulus - 128), word 1]),
+    (42, [word (modulus - 128), word (modulus - 1)]), (42, [word 64, word 2]),
+    (43, [word (2 ^ 255 - 1), word 1]), (43, [word (2 ^ 255), word (modulus - 1)]),
+    (44, [word 0, word (2 ^ 255)]), (44, [word (2 ^ 255), word 1]),
+    (45, [word (2 ^ 255), word (modulus - 1)]), (45, [word (2 ^ 127), word (2 ^ 128)]),
+    (49, [word 200, word 56])]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
@@ -4232,11 +4296,18 @@ def run : IO Unit := do
     session := completed.session
   for (index, arguments) in panicCases do
     session ← panics session (← key index) arguments s!"{names[index]?} on {reprStr arguments}"
+  -- An absent operand fails with the compound assignment's own diagnostic.
+  let uint8 ← match TypeSystem.FixedInteger.ofName? "uint8" with
+    | some type => pure type | none => throw (IO.userError "uint8 missing")
+  discard <| invalidOperands session (← key 50) [word 1]
+    (.invalidAssignmentOperands .add none (some (.fixed uint8))) "absentAdd8u"
   rejectedByInference "operands of different types"
     ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
-  rejectedByInference "compound assignment is not yet defined"
-    ["function bad(x: uint8, y: uint8) returns (uint8) { x &= y; return x; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic panicking with 0x11 outside the range, with canonical results, and compound assignment and mixed operand types still rejected"
+  rejectedByInference "/= on uint8 is not yet defined"
+    ["function bad(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r /= y; return r; }"]
+  rejectedByInference "in-place ~ on uint8 is not yet defined"
+    ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }"]
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= panicking with 0x11 outside the range, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, /= and in-place ~ still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

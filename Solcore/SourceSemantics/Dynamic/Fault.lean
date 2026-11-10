@@ -722,15 +722,51 @@ inductive AssignmentOperandsInvalid :
       (invalid : BinaryPrimitiveOperandsInvalid binary left right) :
       AssignmentOperandsInvalid operator (some left) right
 
-/-- A compound assignment whose operation panics on its operands. -/
-inductive AssignmentOperandsPanic :
+/-- A compound assignment whose operation panics on its operands, at the
+target's static type: an unchecked `/=` or `%=` by zero, or checked arithmetic
+out of the target type's range. -/
+inductive AssignmentOperandsPanic (targetType : TypeSystem.Ty) :
     Syntax.ValueAssignOp → Option Value → Value → UInt8 → Prop where
   | compound
       {operator : Syntax.ValueAssignOp} {binary : Syntax.BinaryOp}
       {left right : Value} {code : UInt8}
       (corresponds : AssignmentOperatorBinary operator binary)
-      (panics : BinaryPrimitivePanics binary left right code) :
-      AssignmentOperandsPanic operator (some left) right code
+      (panics : BinaryValuePanics (some targetType) binary left right code) :
+      AssignmentOperandsPanic targetType operator (some left) right code
+
+namespace AssignmentOperandsPanic
+
+/-- Away from checked `+= -= *=` at a fixed-width integer target, a compound
+assignment panics only by its primitive operation: an unchecked `/=` or `%=` by
+zero. -/
+theorem primitive_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {current : Option Value} {right : Value} {code : UInt8}
+    (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : AssignmentOperandsPanic targetType operator current right code) :
+    ∃ binary left, AssignmentOperatorBinary operator binary ∧ current = some left ∧
+      BinaryPrimitivePanics binary left right code := by
+  cases panics with
+  | compound corresponds panics =>
+    cases panics with
+    | primitive panics => exact ⟨_, _, corresponds, rfl, panics⟩
+    | fixed operand panics =>
+      cases panics with
+      | overflow kind =>
+        cases Option.some.inj operand
+        cases kind <;> cases corresponds
+        · exact absurd .add (plain _ rfl)
+        · exact absurd .subtract (plain _ rfl)
+        · exact absurd .multiply (plain _ rfl)
+
+/-- The primitive panics are panics at every target type. -/
+theorem of_primitive {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {binary : Syntax.BinaryOp} {left right : Value} {code : UInt8}
+    (corresponds : AssignmentOperatorBinary operator binary)
+    (panics : BinaryPrimitivePanics binary left right code) :
+    AssignmentOperandsPanic targetType operator (some left) right code :=
+  .compound corresponds (.primitive panics)
+
+end AssignmentOperandsPanic
 
 /-- Known primitive coercions reject only a wrong-shaped source value. -/
 inductive PrimitiveCoercionInputInvalid : CoercionStep → Value → Prop where
@@ -2180,7 +2216,7 @@ mutual
         (root_type_eq : currentCell.type = target.rootType)
         (initial_value : RootInitialValue currentCell initial)
         (path_read : ProjectionsRead initial target.projections currentSelected)
-        (panics : AssignmentOperandsPanic operator target.selected right code) :
+        (panics : AssignmentOperandsPanic target.valueType operator target.selected right code) :
         SourcePlaceAssignmentFaults program context evidence source environment
           before place operator rhs (.panic code) rhsHeap
 

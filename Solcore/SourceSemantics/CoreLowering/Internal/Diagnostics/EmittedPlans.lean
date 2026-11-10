@@ -178,12 +178,12 @@ def OperandsTyped (source : TypedSource) : Prop :=
 theorem raw_profile {context : SourceSemantics.Context} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
-    operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false := by
+    operator = .equal ∨ SourceCoreAssignmentFaultSites.operandTarget assignment.target.type = true := by
   cases typed with
   | equal => exact .inl rfl
-  | wordCompound _ place _ _ =>
+  | wordCompound _ place _ _ | fixedCompound _ place _ _ =>
     cases place with
-    | intro _ _ same => exact .inr (.inl same)
+    | intro _ _ same => exact .inr (by rw [same]; rfl)
 
 theorem Occurs.prepared {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {first : Nat} {table : SourceCoreAssignmentFaultSites.Table} {faults : FunctionCalls.FaultRep}
@@ -197,11 +197,11 @@ theorem Occurs.prepared {assignment : AssignmentResolution} {operator : Syntax.V
   | statement found form =>
     have present := lookupStatement?_sound found
     rw [← present.2]
-    exact GenericAssignmentDiagnostics.prepared_operands_included included prepared present.1 (.statement form) (raw_profile sourceTyped)
+    exact GenericAssignmentDiagnostics.prepared_operands_included_target included prepared present.1 (.statement form) (raw_profile sourceTyped)
   | header found form member =>
     have present := lookupStatement?_sound found
     rw [← present.2]
-    exact GenericAssignmentDiagnostics.prepared_operands_included included prepared present.1 (.header form member) (raw_profile sourceTyped)
+    exact GenericAssignmentDiagnostics.prepared_operands_included_target included prepared present.1 (.header form member) (raw_profile sourceTyped)
 
 /-- A static local diagnostic factory. Its result retains all remaining laws. -/
 structure Factory (tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)

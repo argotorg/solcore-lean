@@ -55,7 +55,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       value.type = prepared.route.leafType ∧
       (operator = .equal ∨ prepared.route.leafType = .word ∨ prepared.route.leafType = .integer ∧ operator.wordOnly = false) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) value.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand := by
+        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand := by
   cases generated_of_lower accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -73,7 +73,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
             compilation.checked.catalog.project_runtimeType]
           exact description.leafProjected))
       refine ⟨binder, prepared, index, _, description.binding, rootEq, rootEq ▸ description.selectedType,
-        by simpa only [routeEq] using lookup, ?_, rhsAccepted, by simpa only [routeEq] using rhsType.symm, ?_, by simp [routeEq]⟩
+        by simpa only [routeEq] using lookup, ?_, rhsAccepted, by simpa only [routeEq] using rhsType.symm, ?_, by simp [routeEq, placeModifier]⟩
       · refine ⟨steps, keys, routeEq ▸ types, rootEq ▸ (routeEq ▸ description.rootProjected), ?_, ?_⟩
         · intro key value declared
           exact routeEq ▸ description.virtual key value (rootEq.symm.trans declared)
@@ -484,8 +484,9 @@ theorem modifier_total {sourceType : TypeSystem.Ty} {type : Ty} {initial : Optio
         (.inLeft type (.word invalid)) store) ∨
     ∃ result value, ValueRep checked registry functions mapping world sourceType result value type ∧
       (Dynamic.AssignmentValueApplies operator initial right result ∨
-        ∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧ rightCore = .word Word.zero ∧
-          Dynamic.AssignmentOperandsPanic operator initial right SourceCorePanics.divisionByZero) ∧
+        ∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧ rightCore = .word Word.zero ∧
+          (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator initial right
+            SourceCorePanics.divisionByZero)) ∧
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshotExpression rightExpression invalid)
         (.inRight .word value) store := by
   cases saved with
@@ -755,7 +756,7 @@ theorem reflects_reachable
               .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target]) rfl typed
             ((agreement next outputType).unwrap completed)
         · -- The setter runs and the check fails, so the source panics without a write.
-          have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ := by
+          have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
             simpa only [layout.sameType] using selected
           subst zero
           have nativeModified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value
@@ -775,7 +776,7 @@ theorem reflects_reachable
           cases result.trace with
           | value rhsTrace =>
             exact .fault (.panic (snapshot.resolves bare) rhsTrace latest.read
-              (latest.type.trans snapshot.type.symm) initialized .nil panics) rfl (FunctionCalls.FaultTokens.panic _)
+              (latest.type.trans snapshot.type.symm) initialized .nil (panics _)) rfl (FunctionCalls.FaultTokens.panic _)
               result.heaps result.maps result.worlds result.frame result.metadata
 
 /-- Compatibility entry point retaining the original unconditional token law. -/
@@ -873,7 +874,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
             compilation.checked.catalog.project_runtimeType]
           exact description.leafProjected))
       refine ⟨binder, prepared, index, description.binding, rootEq, rootEq ▸ view,
-        by simpa only [routeEq] using lookup, ?_, by simp [routeEq]⟩
+        by simpa only [routeEq] using lookup, ?_, by simp [routeEq, placeModifier]⟩
       exact ⟨steps, routeEq ▸ description.ordinary notMapping, routeEq ▸ types⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotCertificates
@@ -1504,9 +1505,10 @@ theorem initialized_outcome
         (.inRight .word value) store ∧
       ((Dynamic.AssignmentValueApplies operator (some left) right result ∧
           ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right) ∨
-        (∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧
+        (∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightCore = .word Word.zero ∧
-          Dynamic.AssignmentOperandsPanic operator (some left) right SourceCorePanics.divisionByZero)) := by
+          (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator (some left) right
+            SourceCorePanics.divisionByZero))) := by
   by_cases zero : operator.mayPanic = true ∧ right = .word Word.zero
   · obtain ⟨panics, rfl⟩ := zero
     have word : SourceCoreRawMetadata.runtimeType sourceType = .word := by
@@ -1520,11 +1522,11 @@ theorem initialized_outcome
     · exact ⟨_, _, .compatible (actual := .word) word (.word (left.udiv Word.zero)),
         .caseRight (snapshotSelected.evaluates store)
           (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
-        .inr ⟨.wordDiv, rfl, rfl, .compound .uncheckedDivide (.wordUncheckedDivide left)⟩⟩
+        .inr ⟨.wordDiv, rfl, rfl, fun _ => .compound .uncheckedDivide (.primitive (.wordUncheckedDivide left))⟩⟩
     · exact ⟨_, _, .compatible (actual := .word) word (.word (left.umod Word.zero)),
         .caseRight (snapshotSelected.evaluates store)
           (.inRight (.binary (.var rfl) ((rightSelected.weaken _).evaluates store) rfl)),
-        .inr ⟨.wordMod, rfl, rfl, .compound .uncheckedModulo (.wordUncheckedModulo left)⟩⟩
+        .inr ⟨.wordMod, rfl, rfl, fun _ => .compound .uncheckedModulo (.primitive (.wordUncheckedModulo left))⟩⟩
   · have divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero := by
       by_cases panics : operator.mayPanic = true
       · exact .inr fun same => zero ⟨panics, same⟩
@@ -1569,8 +1571,9 @@ theorem modifier_total {sourceType : TypeSystem.Ty} {type : Ty} {initial : Optio
         (.inLeft type (.word invalid)) store) ∨
     ∃ result value, ValueRep checked registry functions mapping world sourceType result value type ∧
       (Dynamic.AssignmentValueApplies operator initial right result ∨
-        ∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, true⟩ ∧ rightCore = .word Word.zero ∧
-          Dynamic.AssignmentOperandsPanic operator initial right SourceCorePanics.divisionByZero) ∧
+        ∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧ rightCore = .word Word.zero ∧
+          (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator initial right
+            SourceCorePanics.divisionByZero)) ∧
       Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshotExpression rightExpression invalid)
         (.inRight .word value) store := by
   cases saved with

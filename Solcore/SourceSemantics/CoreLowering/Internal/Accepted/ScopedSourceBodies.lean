@@ -751,6 +751,7 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (targetType : binder.scheme.body = assignment.target.type)
     (bare : assignment.target.projections = [])
+    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
@@ -764,6 +765,10 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     cases typed with
     | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
     | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+    | fixedCompound kind place value _ =>
+      rcases sourceProfile with rfl | word
+      · cases kind
+      · cases word.symm.trans place.type_eq
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -788,6 +793,7 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     (unique : NodeOccurrencesUnique source)
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
+    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
@@ -801,6 +807,10 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     cases typed with
     | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
     | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+    | fixedCompound kind place value _ =>
+      rcases sourceProfile with rfl | word
+      · cases kind
+      · cases word.symm.trans place.type_eq
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -892,7 +902,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         cases head with
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
-            assignment_facts declaration targetType bare assignment
+            assignment_facts declaration targetType bare profile assignment
           apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
@@ -906,7 +916,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         cases head with
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
-            projected_assignment_facts unique declaration route assignment
+            projected_assignment_facts unique declaration route profile assignment
           apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
           · intro child member
             rcases List.mem_cons.mp member with equal | member
@@ -1303,7 +1313,7 @@ theorem Scan.syntax {source approved expected mode statements}
       cases original with
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
-          ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare assignment
+          ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare profile assignment
         apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
         · intro child member
           simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
@@ -1318,7 +1328,7 @@ theorem Scan.syntax {source approved expected mode statements}
       cases original with
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
-          ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route assignment
+          ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route profile assignment
         apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
         · intro child member
           rcases List.mem_cons.mp member with equal | member

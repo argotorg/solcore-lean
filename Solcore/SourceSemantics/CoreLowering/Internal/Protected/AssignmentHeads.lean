@@ -1199,7 +1199,7 @@ theorem ShapeErrors.of_uniform {values : SourceCoreCompatibleValues.Context} {re
     [FunctionCalls.FaultTokens faults] (errors : head.ReachableErrors registry faults) :
     ShapeErrors values registry functions protocol source context certificate scope administrative environment
       assignment.target head.prepared operator head.invalid initial faults head.shape := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   change ShapeErrors values registry functions protocol source context certificate scope administrative environment
     assignment.target prepared operator invalid initial faults shape
   cases shape with
@@ -1249,7 +1249,7 @@ theorem preserves_prefix_bounded (budget : Nat)
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation, post⟩ :=
@@ -1278,20 +1278,20 @@ theorem preserves_fault_bounded_with_diagnostics [FunctionCalls.FaultTokens faul
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initialState faults shape at errors
   cases errors with
   | @bare empty layout operands =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩ :=
       ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initialState layout empty extension boundedMeaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
+        targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       post⟩
   | @projected codes leaf sourceTypes site layout ordinary missingFor uninitializedFor =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
       ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded_with_diagnostics budget layout ordinary extension protocol transport boundedMeaning faithful observations
-      right found rightView rightType profile environments heaps locals agrees actualTyped initialState missingFor uninitializedFor slot writable trace bounded next output invalid
+      right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped initialState missingFor uninitializedFor slot writable trace bounded next output invalid
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       post⟩
 
@@ -1323,7 +1323,7 @@ theorem reflects_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (bu
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
       before store mapping world initialState (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initialState faults shape at errors
   cases errors with
@@ -1416,7 +1416,7 @@ theorem preserves_prefix_bare_bounded (budget : Nat)
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1443,7 +1443,7 @@ theorem preserves_fault_reachable_bare_bounded (budget : Nat)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1452,7 +1452,7 @@ theorem preserves_fault_reachable_bare_bounded (budget : Nat)
   | bare empty layout =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩ :=
       ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initial layout empty extension boundedMeaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
+        targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩
 
 include observations transport extension environments heaps locals agrees actualTyped initial bare in
@@ -1463,7 +1463,7 @@ theorem reflects_reachable_bare_bounded (budget : Nat)
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1539,7 +1539,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       entry scope finalMap finalWorld after finalStore canonical ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>
@@ -1559,13 +1559,13 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
       ProtectedPlaceAssignmentFaults.preserves layout ordinary extension transport meaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped installed slot writable trace next output invalid
+      errors.missing errors.uninitialized right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped installed slot writable trace next output invalid
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       transport.extend installed maps worlds frame metadata⟩
 
@@ -1589,7 +1589,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       entry scope finalMap finalWorld after written canonical ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>

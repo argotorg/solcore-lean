@@ -286,13 +286,13 @@ theorem bare_target_typed
 theorem bare_write
     {source : TypedSource} {context : Context} {environment : Dynamic.Environment}
     {before middle after : Heap} {place : PlaceResolution} {target : ResolvedPlace}
-    {value updated : Value} {type : Ty}
+    {value updated : Value} {type targetType : Ty}
     (locals : EnvironmentAgrees before context.locals environment)
     (heap : HeapWellTyped context before)
     (targetTyped : SourcePlaceHasType source context place type)
     (snapshot : BareTarget environment before place target)
     (rhs : ExpressionEvaluationPreserved context before middle value type)
-    (write : ResolvedPlaceWrites (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+    (write : ResolvedPlaceWrites (fun _ replacement => CompoundAssignmentApplies targetType .equal target.selected value replacement)
       middle target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   obtain ⟨rootType, targetBefore⟩ := bare_target_typed locals heap targetTyped snapshot
@@ -305,7 +305,7 @@ theorem bare_write
         rw [← targetMiddle.root_type, ← rootEq]
         exact initialTyped
       have modification : LeafModificationPreservesType context middle
-          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement) type := by
+          (fun _ replacement => CompoundAssignmentApplies targetType .equal target.selected value replacement) type := by
         intro current replacement _currentTyped applies
         exact applies.equalPreserves rhs.value_typed
       have updatedTyped := update.preserves targetMiddle.projections initialRoot modification
@@ -318,14 +318,14 @@ theorem bare_write
 theorem bare_write_compound
     {source : TypedSource} {context : Context} {environment : Dynamic.Environment}
     {before middle after : Heap} {place : PlaceResolution} {target : ResolvedPlace}
-    {value updated : Value} {operator : Syntax.ValueAssignOp}
-    (kind : WordCompoundAssignmentOperator operator)
+    {value updated : Value} {operator : Syntax.ValueAssignOp} {leaf targetType : Ty}
+    (kind : CompoundAssignmentTyping operator leaf) (targetEq : targetType = leaf)
     (locals : EnvironmentAgrees before context.locals environment)
     (heap : HeapWellTyped context before)
-    (targetTyped : SourcePlaceHasType source context place .word)
+    (targetTyped : SourcePlaceHasType source context place leaf)
     (snapshot : BareTarget environment before place target)
-    (rhs : ExpressionEvaluationPreserved context before middle value .word)
-    (write : ResolvedPlaceWrites (fun _ replacement => AssignmentValueApplies operator target.selected value replacement)
+    (rhs : ExpressionEvaluationPreserved context before middle value leaf)
+    (write : ResolvedPlaceWrites (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement)
       middle target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   obtain ⟨rootType, targetBefore⟩ := bare_target_typed locals heap targetTyped snapshot
@@ -338,9 +338,9 @@ theorem bare_write_compound
         rw [← targetMiddle.root_type, ← rootEq]
         exact initialTyped
       have modification : LeafModificationPreservesType context middle
-          (fun _ replacement => AssignmentValueApplies operator target.selected value replacement) .word := by
+          (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement) leaf := by
         intro current replacement _currentTyped applies
-        exact applies.wordCompoundPreserves kind targetMiddle.selected rhs.value_typed
+        exact applies.preserves kind targetEq targetMiddle.selected rhs.value_typed
       have updatedTyped := update.preserves targetMiddle.projections initialRoot modification
       have updatedCell : ValueHasType context middle updated currentCell.type := by
         rw [rootEq, targetMiddle.root_type]
@@ -1644,7 +1644,20 @@ theorem for_items_step (size : Nat)
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                     runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound kind savedTyped first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first write
+                  have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                    (locals.mono totalExtends) writtenTyped tailTyped next
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+              | fixedCompound kind targetTyped rhsTyped _ =>
+                  obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+                  have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                    runtime covers locals heap keyTyped keys
+                  obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                    locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+                  have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                    runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
@@ -1657,7 +1670,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
@@ -1669,7 +1682,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
@@ -1681,7 +1694,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
@@ -1695,7 +1708,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+              | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
@@ -1717,7 +1730,13 @@ theorem for_items_step (size : Nat)
                   exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
               | wordCompound kind targetTyped rhsTyped _ =>
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound kind locals heap targetTyped snapshot first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+                  have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                    (locals.mono writtenExtends) writtenTyped tailTyped next
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+              | fixedCompound kind targetTyped rhsTyped _ =>
+                  have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first write
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
                   exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
@@ -1730,7 +1749,7 @@ theorem for_items_step (size : Nat)
               | equal _targetTyped rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
-              | wordCompound _ _ rhsTyped _ =>
+              | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
@@ -1740,7 +1759,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | @assignmentPanic childSize scope context environment before after assignment operator rhs target right
@@ -1750,7 +1769,7 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignValue assignmentTyped =>
               cases assignmentTyped with
-              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+              | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
   | bitNotFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
@@ -2266,7 +2285,24 @@ theorem statements_step (size : Nat)
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound kind savedTyped first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first write
+              have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+          | fixedCompound kind targetTyped rhsTyped _ =>
+              obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
+              have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap keyTyped keys
+              obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
+                locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+              have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
@@ -2283,7 +2319,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -2295,7 +2331,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -2307,7 +2343,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -2321,7 +2357,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -2348,7 +2384,17 @@ theorem statements_step (size : Nat)
               exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
           | wordCompound kind targetTyped rhsTyped _ =>
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound kind locals heap targetTyped snapshot first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono writtenExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+          | fixedCompound kind targetTyped rhsTyped _ =>
+              have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first write
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
@@ -2384,7 +2430,7 @@ theorem statements_step (size : Nat)
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
               exact fault_statements post.heap_typed post.heap_extends
-          | wordCompound _ _ rhsTyped _ =>
+          | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
               exact fault_statements post.heap_typed post.heap_extends
@@ -2395,7 +2441,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
               exact fault_statements post.heap_typed post.heap_extends
@@ -2406,7 +2452,7 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
               exact fault_statements post.heap_typed post.heap_extends

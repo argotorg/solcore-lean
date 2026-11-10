@@ -2072,15 +2072,15 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             _ valueRun continuation captures
           exact ⟨(continuation place.type).symm ▸ placeFormation.1, valueFormation⟩
       have finishNonEqual
-          (child : ∀ fitted, InferExprFuelFormation semantic outer fuel context value (some .word) fitted)
+          (child : ∀ fitted, InferExprFuelFormation semantic outer fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted)
           (accepted : (do
-            let fitted ← Detail.unify placeState place.type .word
-            let (inferred, finalState) ← inferExprFuel fuel context value (some .word) fitted
+            let fitted ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+            let (inferred, finalState) ← inferExprFuel fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted
             pure (({target := {place with type := finalState.resolve place.type}} : AssignmentResolution), inferred, finalState)) = .ok result) :
           TypeAdmissible semantic (outer.apply result.1.target.type) ∧
             TypeAdmissible semantic (outer.apply result.2.1.type) ∧
             NormalizedStateFormation semantic outer result.2.2 := by
-        cases fitRun : Detail.unify placeState place.type .word with
+        cases fitRun : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error => simp [fitRun, bind, Except.bind] at accepted
         | ok fitted =>
           simp only [fitRun, bind, Except.bind] at accepted
@@ -2095,7 +2095,15 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             exact placeNodes node member
           exact finishValue fitted progress fitReady fitNodes (unify_occurrenceState_eq fitRun).1
             (congrArg LexicalScope.binders (unify_preserves_lexicalScope fitRun)) (unify_requirements_eq fitRun)
-            .word (Ty.variablesBelow_constructor _ _) (fun _ _ => .word formation.scope.binders)
+            (Detail.compoundOperandType operator (fitted.resolve place.type)) (Ty.variablesBelow_constructor _ _)
+            (fun _ _ => by
+              show TypeAdmissible semantic (.constructor _)
+              unfold Detail.compoundOperandConstructor
+              split
+              · cases operator <;> first
+                  | exact TypeAdmissible.fixed formation.scope.binders _
+                  | exact TypeAdmissible.word formation.scope.binders
+              · exact TypeAdmissible.word formation.scope.binders)
             (child fitted) accepted
       cases operator with
       | equal =>

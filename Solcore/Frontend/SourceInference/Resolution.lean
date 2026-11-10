@@ -482,6 +482,34 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
   unfold fixedUnaryOperator
   split <;> rfl
 
+/-- The type constructor of a compound assignment's operand type at a target
+type. Compound assignment takes the target's type where its binary operator is
+a builtin there: `+= -= *=` (checked) and `&= |= ^=` (Word's on canonical
+words) at a fixed-width integer type. Elsewhere the compound operators are
+Word's. -/
+def compoundOperandConstructor (operator : Syntax.ValueAssignOp) : Ty → TypeSystem.TypeConstructorId
+  | .constructor (.builtin (.fixed type)) =>
+      match operator with
+      | .add | .subtract | .multiply | .bitAnd | .bitXor | .bitOr => .builtin (.fixed type)
+      | _ => .builtin .word
+  | _ => .builtin .word
+
+/-- The operand type of a compound assignment at a target type, built from
+`compoundOperandConstructor`. -/
+abbrev compoundOperandType (operator : Syntax.ValueAssignOp) (target : Ty) : Ty :=
+  .constructor (compoundOperandConstructor operator target)
+
+/-- The operand type at an operand type is that operand type. -/
+theorem compoundOperandConstructor_idem (operator : Syntax.ValueAssignOp) (target : Ty) :
+    compoundOperandConstructor operator (compoundOperandType operator target) =
+      compoundOperandConstructor operator target := by
+  cases target with
+  | constructor id =>
+      cases id with
+      | builtin builtin => cases builtin <;> cases operator <;> rfl
+      | _ => cases operator <;> rfl
+  | _ => cases operator <;> rfl
+
 /-- The builtin operand type of a binary operator at one operand type: the
 operand itself when it is a fixed-width integer type that takes the operator
 as a builtin (`fixedBinaryOperator`), and `binaryBuiltinType` otherwise. -/

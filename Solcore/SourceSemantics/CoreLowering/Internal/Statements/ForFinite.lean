@@ -90,12 +90,15 @@ theorem execute_continuation {size : Nat} {prepared : Prepared} {reference rhs n
   obtain ⟨rhsSize, fourth, rhsRest⟩ := snapshotRest.bind_success rhsEvaluated
   obtain ⟨modifiedSize, fifth, modifiedRest⟩ := rhsRest.bind_success modifiedEvaluated
   obtain ⟨setterSize, sixth, setterRest⟩ := modifiedRest.bind_success setterEvaluated
-  rcases DataPlaceGuard.inv_sized setterRest with ⟨_, guarded, guardedBound, setterRest⟩ | ⟨_, selected, zero, _, _⟩
-  case inr =>
-    subst selected zero
+  rcases DataPlaceGuard.inv_sized setterRest with ⟨_, guarded, guardedBound, setterRest⟩ | ⟨_, selected, zero, _, _⟩ |
+      ⟨_, _, _, ranged, _⟩
+  rotate_left
+  · subst selected zero
     cases passes with
     | total total => cases total _ rfl
     | nonzero nonzero => exact (nonzero rfl).elim
+  · subst ranged
+    exact passes.not_range.elim
   obtain ⟨remainingSize, seventh, remaining⟩ := setterRest.let_body
     (.storeCell (.var rfl) read (.inRight (.var rfl)) write)
   exact ⟨remainingSize, by omega, remaining⟩
@@ -555,7 +558,8 @@ theorem success_assign
   · obtain ⟨rfl, sameEnv, updated, assigned⟩ := assignValue unique contains form head
     cases sameEnv
     obtain ⟨staged, location, updatedStore, _, typed, rhsCore, lookup, ⟨old, readable⟩, written, updatedHeaps, writeFrame⟩ :=
-      ScalarAssignmentReflection.source_success tree unique target.slot target.bare environments heaps assigned
+      ScalarAssignmentReflection.source_success tree unique target.slot target.bare environments heaps
+        ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assigned)
     have actualLookup := layout.agrees lookup
     have referenceTyped : Core.RuntimeValueHasType world
         (.cellRef (Core.OptionalCell.cellType payload) location) (Core.OptionalCell.referenceType payload) := by
@@ -1109,7 +1113,8 @@ theorem fault_assign
   · obtain ⟨rfl, sameEnv, updated, assigned⟩ := assignValue unique contains form head
     cases sameEnv
     obtain ⟨staged, location, updatedStore, _, typed, rhsCore, lookup, ⟨old, readable⟩, written, updatedHeaps, writeFrame⟩ :=
-      ScalarAssignmentReflection.source_success tree unique target.slot target.bare environments heaps assigned
+      ScalarAssignmentReflection.source_success tree unique target.slot target.bare environments heaps
+        ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assigned)
     have actualLookup := layout.agrees lookup
     have referenceTyped : Core.RuntimeValueHasType world
         (.cellRef (Core.OptionalCell.cellType payload) location) (Core.OptionalCell.referenceType payload) := by

@@ -724,6 +724,58 @@ own view keeps the twelve types.
   rely on each Core type having one source type. The catalog projections,
   which the public pipelines use, lower the twelve types to `word`.
 
+### Row 1's compound assignments: checked at the guard, outside the meaning proofs
+
+Made on 2026-11-10, during step 3d.
+
+- **Typing.** Compound assignment takes the target's type where its binary
+  operator is a builtin there (`Detail.compoundOperandType`): `+= -= *=`
+  (checked) and `&= |= ^=` (Word's on canonical words) at the twelve types. So
+  `&= |= ^=` come with this step. The other compound forms stay Word's until
+  their binary operators are builtins at the twelve types: `/=` and `%=` with
+  step 5, the shifts and the unchecked forms with step 7. In-place `~` stays
+  Word's.
+- **Semantics.** The value-assignment rules apply `CompoundAssignmentApplies`
+  at the target's static type: `AssignmentValueApplies` where the meaning is
+  Word's, Integer's or plain assignment, and checked `+= -= *=` by
+  `FixedBinaryApplies` at a fixed-width target. `AssignmentOperandsPanic` takes
+  the target's type, so checked arithmetic outside the range panics with
+  `Panic(0x11)`, after the latest root has been traversed, as `/=` and `%=` do.
+- **Lowering.** The place lowering chooses the modifier from the target's
+  static type (`assignmentModifier`). Checked `+= -= *=` compute Word's
+  operation, which in range is the exact result's word, and `guard` checks the
+  exact result, read from the snapshot and the right-hand side, against the
+  type's range after the setter (`Check.range`). So a structural fault on the
+  latest root still wins over the panic. `&= |= ^=` keep Word's modifier.
+  `CompatibleBareAssignment.of_lower` states the new choice.
+- **Fault sites.** The assignment fault-site table gives a fixed-width target
+  its own site (`SourceCoreAssignmentFaultSites.operandTarget`), so an absent
+  operand of a compound assignment at the twelve types fails with its own
+  `invalidAssignmentOperands` diagnostic, naming the target's type, as at
+  Word. No existing table changes: these assignments did not type before.
+- **Outside the meaning proofs.** The meaning proofs' operator profiles
+  (`operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`,
+  on the metadata view, which keeps the twelve types) exclude fixed-width
+  compound targets, as the receipts' `sourceProfile`
+  (`operator = .equal ∨ T = .word`) excludes Integer targets. So these
+  assignments are compiled but not covered. Inside the profiles,
+  `assignmentModifier_plain` turns the compiler's choice back into
+  `binaryOperator`'s, and `CompoundAssignmentApplies.eq_of_plain` the relation
+  back into `AssignmentValueApplies`.
+- **Bringing them in** would take:
+  - a fixed disjunct in the profiles, `T = .fixed t ∧
+    FixedCompoundAssignmentOperator operator`, and in the receipts'
+    `sourceProfile`;
+  - a checked case in `DataPlaceModifier`'s modifier lemmas: in range, Word's
+    `+ - *` is the exact result's word (congruence modulo `2^256`), and
+    `SourceCorePrimitive.checkedInRange` is `Dynamic.FixedInRange` of
+    `checkedResult` by definition;
+  - the range check in the place pipelines, through `guard_inRange`,
+    `guard_overflow` and `guard_range_inv`, which read the snapshot, the
+    guard's fourth binder (`RangePasses`);
+  - for `&= |= ^=`, the canonical words of the representation
+    (`ValueRep.fixed`) in the modifier's result.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be

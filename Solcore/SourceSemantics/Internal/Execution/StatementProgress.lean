@@ -1265,7 +1265,7 @@ theorem assignedValue_value
       {fitted childFinal : State} {childValue : InferredExpression}
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
-      (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type .word) = (Except.ok fitted : Except Error State))
+      (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
       (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted)
     (inputs : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Inputs) :
     (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).final.InferenceProgress (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).final := by

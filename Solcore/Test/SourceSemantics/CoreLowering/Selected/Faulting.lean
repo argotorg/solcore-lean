@@ -2412,7 +2412,9 @@ theorem write_rhs_typed {key : Key} (shape : WriteShape header.function.source k
       cases Option.some.inj ((lookupStatement?_complete header.unique contains).symm.trans shape.assignedFound)
       rw [shape.assignedForm] at form
       cases form
-      cases assigned with | wordCompound _ _ typed _ => exact typed
+      cases assigned with
+      | wordCompound _ _ typed _ => exact typed
+      | fixedCompound _ place _ _ => exact absurd (place.type_eq.symm.trans shape.targetType) (by intro same; cases same)
     | _ =>
       have same := Option.some.inj ((lookupStatement?_complete header.unique (by assumption)).symm.trans shape.assignedFound)
       cases same
@@ -2465,7 +2467,7 @@ theorem write_plain {key : Key} (shape : WriteShape header.function.source key)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
     refine .intro resolve (shape.right.evaluates _ _ _ header.unique (write_rhs_typed header shape certified)) ?_
     exact .intro rootRead rfl .initialized
-      (.indexFound (.head (Dynamic.ValueEquivalent.refl key.comparable)) (.leaf (.add (.wordAdd _ _)))
+      (.indexFound (.head (Dynamic.ValueEquivalent.refl key.comparable)) (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr shape.targetType)) (.add (.wordAdd _ _))))
         (.update (.head (Dynamic.ValueEquivalent.refl key.comparable)))) write
   have finalRootRead : Dynamic.Heap.Reads after (location before) ⟨mappingType key,some replacement,none⟩ := by
     obtain ⟨cell,readBefore,readAfter⟩ := write.reads_updated

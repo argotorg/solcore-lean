@@ -31,7 +31,7 @@ theorem statement_value (unique : NodeOccurrencesUnique source)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     ∃ assignedSize updated, assignedSize < size ∧ finalContext = context ∧ outcome = .fallthrough environment ∧
       SourceExecutionSize.SourcePlaceAssignment program assignedSize context evidence source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target rhs updated after := by
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated after := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
     exact Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
@@ -70,7 +70,7 @@ theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
         environment before assignment.target operator rhs reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceAssignment program assignedSize context invocation.evidence invocation.source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target rhs updated written ∧
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated written ∧
       PlainStatements program mode tailSize invocation context environment written rest finalContext outcome after) := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
     (by intro expression equal; rw [form] at equal; cases equal) trace with
@@ -100,7 +100,7 @@ theorem item_value {nextEnvironment : Dynamic.Environment}
       before (.assignValue assignment operator rhs) finalContext nextEnvironment after) :
     ∃ assignedSize updated, assignedSize < size ∧ finalContext = context ∧ nextEnvironment = environment ∧
       SourceExecutionSize.SourcePlaceAssignment program assignedSize context evidence source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target rhs updated after := by
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated after := by
   cases trace with
   | assignValue assigned => exact ⟨_, _, SourceExecutionSize.child_lt_stepSize (by simp), rfl, rfl, assigned⟩
 
@@ -121,7 +121,7 @@ theorem item_and_tail {invocation : Staging.Recursive.Scope} {rest : List ForIte
         environment before assignment.target operator rhs reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceAssignment program assignedSize context invocation.evidence invocation.source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target rhs updated written ∧
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated written ∧
       PlainItems program tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
   | done trace =>
@@ -218,7 +218,7 @@ private theorem statement_value (unique : NodeOccurrencesUnique source)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     ∃ child value middle updated, child < size ∧ finalContext = context ∧ outcome = .fallthrough environment ∧
       SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs value middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated after := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
@@ -250,7 +250,7 @@ private theorem statement_fault (unique : NodeOccurrencesUnique source)
       SourceExecutionSize.ExpressionEvaluates program child context evidence source environment before rhs right after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) := by
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
     exact Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
@@ -309,11 +309,11 @@ theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
         environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       PlainStatements program mode tailSize invocation context environment written rest finalContext outcome after) := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
@@ -510,14 +510,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -651,7 +651,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => preservation n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega)
+                ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (Nat.le_trans (Nat.le_of_lt tailStrict) within) (environments.extend maps worlds) middleHeaps
               (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped reference
@@ -659,7 +660,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
               (framePreserved contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
               middleState conditioned nextAdmitted tail
             exact ⟨nextContext, result, finalHeap,
-              .assignProjected (lookupStatement?_sound found) form projected keys snapshot lifted write restTrace, restAdapted⟩
+              .assignProjected (lookupStatement?_sound found) form projected keys snapshot lifted
+                write restTrace, restAdapted⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageProjectedAssignmentLifting
 end
@@ -774,7 +776,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
           (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-          (preservation stagedSize) snapshot measured write
+          (preservation stagedSize) snapshot measured
+          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (Nat.le_trans (Nat.le_of_lt tailStrict) within) (environments.extend maps worlds) middleHeaps
         (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped reference
@@ -808,7 +811,7 @@ theorem assignProjected {program : Program} {invocation : Staging.Recursive.Scop
         environment before assignment.target operator rhs reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceAssignment program assignedSize context invocation.evidence invocation.source
-        (Dynamic.AssignmentValueApplies operator) environment before assignment.target rhs updated written ∧
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated written ∧
       PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
   rcases head trace with ⟨_, reason, strict, same, failed⟩ |
     ⟨_, _, _, _, _, _, childStrict, tailStrict, same, executed, tail⟩
@@ -882,14 +885,14 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -1050,7 +1053,8 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => preservation n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega)
+                ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextSize, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (Nat.le_trans (Nat.le_of_lt tailStrict) within)
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -1060,7 +1064,8 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
                 middleState, conditioned, nextAdmitted⟩ tail
             exact ⟨_, result, finalHeap,
               CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_assignment
-                projected measuredKeys snapshot measuredRhs write restTrace, restAdapted⟩
+                projected measuredKeys snapshot measuredRhs
+                write restTrace, restAdapted⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialLifting
 end

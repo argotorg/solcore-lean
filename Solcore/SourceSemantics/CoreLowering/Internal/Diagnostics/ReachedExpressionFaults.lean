@@ -1207,14 +1207,12 @@ theorem add_preserves_found {owner : Resolved.DeclarationId} {first : Nat} {site
 theorem add_lookup {owner : Resolved.DeclarationId} {first : Nat} {sites next : List Site}
     {location : SourceCoreElaboration.ErrorSite} {span : Syntax.SourceSpan}
     {assignment : AssignmentResolution} {kind : Kind}
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer)
+    (rawScalar : operandTarget assignment.target.type = true)
     (accepted : add owner first sites location span assignment kind = .ok next) :
     ∃ site, next.find? (Matches location assignment.target.root kind) = some site := by
   by_cases owned : assignment.target.root.owner = owner
-  · have eligible : ¬ (assignment.target.type ≠ .word ∧ assignment.target.type ≠ .integer) := by
-      intro excluded
-      exact rawScalar.elim excluded.1 excluded.2
-    simp only [add, owned, ne_eq, not_true_eq_false, eligible, ↓reduceIte, bind, Except.bind, pure, Except.pure] at accepted
+  · simp only [add, owned, ne_eq, not_true_eq_false, rawScalar, Bool.true_eq_false, ↓reduceIte, bind, Except.bind,
+      pure, Except.pure] at accepted
     split at accepted
     · rename_i present
       obtain ⟨site, member, matched⟩ := List.any_eq_true.mp present
@@ -1352,7 +1350,7 @@ inductive OperandAt (node : StatementNode) (assignment : AssignmentResolution)
 private theorem statement_lookup {owner : Resolved.DeclarationId} {first : Nat} {sites next : List Site}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     (occurs : OperandAt node assignment operator) (different : operator ≠ .equal)
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer)
+    (rawScalar : operandTarget assignment.target.type = true)
     (accepted : addStatement owner first sites node = .ok next) :
     ∃ site, next.find? (Matches (.occurrence node.id.occurrence) assignment.target.root (.value operator)) = some site := by
   by_cases owned : node.id.occurrence.owner = owner
@@ -1388,7 +1386,7 @@ theorem prepare_lookup {source : TypedSource} {first : Nat} {table : Table}
     (accepted : prepare source first = .ok table)
     (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator) (different : operator ≠ .equal)
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer) :
+    (rawScalar : operandTarget assignment.target.type = true) :
     ∃ site, table.sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root (.value operator)) = some site := by
   unfold prepare at accepted
   obtain ⟨sites, folded, returned⟩ := bind_ok accepted
@@ -1446,7 +1444,7 @@ theorem prepare_operand {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     (accepted : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator) (different : operator ≠ .equal)
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer) :
+    (rawScalar : operandTarget assignment.target.type = true) :
     ∃ site, table.sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root (.value operator)) = some site ∧
       site.site = .occurrence node.id.occurrence ∧ site.binder = assignment.target.root ∧ site.kind = .value operator ∧
       table.reasonAt (.occurrence node.id.occurrence) assignment.target.root (.value operator) = site.reason ∧
@@ -1475,7 +1473,7 @@ private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first :
     cases occurs with
     | statement form =>
       simp only [form] at accepted
-      exact add_lookup rawScalar accepted
+      exact add_lookup (operandTarget_of_scalar rawScalar) accepted
     | header form member =>
       simp only [form] at accepted
       apply fold_contains (selected := ForItemForm.assignBitNot assignment)
@@ -1483,7 +1481,7 @@ private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first :
       · intro sites item next ⟨site, found⟩ step
         exact ⟨site, item_preserves step found⟩
       · intro sites next step
-        exact add_lookup rawScalar step
+        exact add_lookup (operandTarget_of_scalar rawScalar) step
   · simp [addStatement, owned, throw, bind, Except.bind] at accepted
 
 /-- The saved original table fold also authenticates actual unary occurrences.

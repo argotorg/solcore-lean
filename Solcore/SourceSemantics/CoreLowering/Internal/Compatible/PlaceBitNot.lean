@@ -330,19 +330,18 @@ theorem Execution.reflects (execution : Execution checked registry functions pre
         cases same
         subst_vars
         -- The right-hand side is Unit, so no modifier check can fail.
-        rcases SourceCoreDataPlaces.guard_inv remaining with ⟨_, remaining⟩ | ⟨_, _, impossible, _, _⟩
-        · cases remaining with
-          | letE written continuation =>
-            obtain ⟨optional, read⟩ := execution.read
-            have actual : Evaluates
-                (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
-                  (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
-                (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
-              .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
-            obtain ⟨same, stores⟩ := evaluation_deterministic written actual
-            subst_vars
-            exact continuation
-        · cases impossible
+        have remaining := SourceCoreDataPlaces.guard_unit_inv remaining
+        cases remaining with
+        | letE written continuation =>
+          obtain ⟨optional, read⟩ := execution.read
+          have actual : Evaluates
+              (execution.value :: modifiedEnvironment prepared.route.rootType target (packValues keys)
+                (.inRight .unit snapshot) .unit execution.replacement environment) execution.helperStore
+              (.storeCell (.var 5) (.inRight .unit (.var 0))) .unit execution.finalStore :=
+            .storeCell (.var rfl) read (.inRight (.var rfl)) execution.written
+          obtain ⟨same, stores⟩ := evaluation_deterministic written actual
+          subst_vars
+          exact continuation
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCommit
 end
@@ -647,7 +646,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
         simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using
           operatorValid.imp_right (Or.imp_right And.left)
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
-        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile, by simp [routeEq]⟩
+        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile, by simp [routeEq, placeModifier]⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
 end

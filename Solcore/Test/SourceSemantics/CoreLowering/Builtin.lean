@@ -3582,7 +3582,8 @@ private theorem headerSyntax : BuiltinForHeader.Syntax source context items := b
 
 private theorem headerTrace : Dynamic.ForItemsExecute program context [] source environment before items context environment after := by
   cases sourceTrace with
-  | value trace => exact .cons (.expression trace) (.cons (.assignValue sourceAssigned) .nil)
+  | value trace => exact .cons (.expression trace) (.cons (.assignValue
+      ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ sourceAssigned)) .nil)
 
 section CompilerBridge
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : SourceSpecialization.SpecializationKey}
@@ -3898,7 +3899,8 @@ private theorem sourceAssigned : Dynamic.SourcePlaceAssignment program context [
 private theorem sourceTrace (mode : Bool) : TypedScopedStatements.Executes mode program context [] source environment before
     statements context (.returned (.bool true)) after := by
   have assignedTrace : Dynamic.StatementExecutes program context [] source environment before (statement 0) context (.fallthrough environment) after :=
-    .assignValue (lookupStatement?_sound rfl) rfl sourceAssigned
+    .assignValue (lookupStatement?_sound rfl) rfl
+      ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ sourceAssigned)
   have loopTrace : Dynamic.StatementExecutes program context [] source environment before (statement 3) context (.fallthrough environment) after := by
     apply Dynamic.StatementExecutes.forLoop (outcome := .fallthrough environment) (lookupStatement?_sound (node := loopNode) rfl) rfl
       (.cons (.expression (booleanTrace _)) .nil)

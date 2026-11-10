@@ -1205,7 +1205,7 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
         cases head with
         | assignValue assignment =>
           obtain ⟨_, _, value, _⟩ :=
-            ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare assignment
+            ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile assignment
           obtain ⟨node, contains, same⟩ := value.stored_type
           exact .assign receipt.declaration targetType receipt.sourceProfile receipt.bare
             (lookupExpression?_complete unique contains) same
@@ -1219,7 +1219,7 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
         cases head with
         | assignValue assignment =>
           obtain ⟨_, _, value, _⟩ :=
-            ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route assignment
+            ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile assignment
           obtain ⟨node, contains, same⟩ := value.stored_type
           refine .assignProjected receipt.description.binding route receipt.sourceProfile receipt.projected ?_
             (lookupExpression?_complete unique contains) same
@@ -1445,7 +1445,7 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
       cases original with
       | assignValue assignment =>
         obtain ⟨_, _, value, _⟩ :=
-          ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare assignment
+          ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile assignment
         obtain ⟨node, contains, same⟩ := value.stored_type
         exact .assign found form receipt.declaration targetType receipt.sourceProfile receipt.bare
           (lookupExpression?_complete unique contains) same
@@ -1460,7 +1460,7 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
       cases original with
       | assignValue assignment =>
         obtain ⟨_, _, value, _⟩ :=
-          ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route assignment
+          ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile assignment
         obtain ⟨node, contains, same⟩ := value.stored_type
         refine .assignProjected found form receipt.description.binding route receipt.sourceProfile receipt.projected ?_
           (lookupExpression?_complete unique contains) same

@@ -698,6 +698,15 @@ mutual
         (value_type : ExpressionHasType source context value .word)
         (requirements_eq : assignment.requirements = []) :
         SourceAssignmentHasType source context assignment operator value
+    | fixedCompound
+        {context : Context} {assignment : AssignmentResolution}
+        {operator : Syntax.ValueAssignOp} {value : ExpressionId}
+        {type : TypeSystem.FixedInteger}
+        (operator_kind : FixedCompoundAssignmentOperator operator)
+        (target_type : SourcePlaceHasType source context assignment.target (.fixed type))
+        (value_type : ExpressionHasType source context value (.fixed type))
+        (requirements_eq : assignment.requirements = []) :
+        SourceAssignmentHasType source context assignment operator value
 
   /-- Bit-not assignment in the current executable source profile. -/
   inductive SourceBitNotAssignmentValid (source : TypedSource) :
@@ -1252,6 +1261,9 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun operatorKind targetType valueType requirementsEq targetInduction
         valueInduction =>
       .wordCompound operatorKind targetInduction valueInduction requirementsEq)
+    (fun operatorKind targetType valueType requirementsEq targetInduction
+        valueInduction =>
+      .fixedCompound operatorKind targetInduction valueInduction requirementsEq)
     (fun targetType requirementsEq targetInduction =>
       .intro targetInduction requirementsEq)
     (fun contains formEq monomorphic generalizes binderExtension typeEq =>
@@ -1516,6 +1528,15 @@ termination_by leading.length
 end SourceProjectionsHaveType
 
 namespace SourcePlaceHasType
+
+/-- The result of source place typing is the place's retained type. -/
+theorem type_eq
+    {source : TypedSource} {context : Context}
+    {place : PlaceResolution} {type : TypeSystem.Ty}
+    (typing : SourcePlaceHasType source context place type) :
+    place.type = type := by
+  cases typing with
+  | intro _ _ storedTypeEq => exact storedTypeEq
 
 /-- Appending one already typed mapping index to a well-typed base place
 produces a place at the mapping's value type. -/

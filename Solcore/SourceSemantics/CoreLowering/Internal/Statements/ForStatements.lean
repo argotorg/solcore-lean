@@ -702,7 +702,7 @@ theorem reflects_assign
         tail wellFormed valid updatedEnvironments updatedHeaps nextLayout
           (by simpa only [rename_insert] using continuation.sound)
       exact ⟨finalContext, outcome, after, finalMap, finalWorld,
-        prepend contains (by intros; simp [form]) (.assignValue contains form assigned) meaning,
+        prepend contains (by intros; simp [form]) (.assignValue contains form ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assigned)) meaning,
         finalHeaps, maps, worlds, writeFrame.trans frame⟩
   | uninitialized site location origin =>
     cases sourceEval with
@@ -1052,7 +1052,7 @@ theorem Tree.construct
         have nextLayout := ((layout.insert referenceTyped).insert (stagedTyped staged world)).insert Core.RuntimeValueHasType.unit
         have restResult := ih valid updatedEnvironments updatedHeaps nextLayout
         simp only [rename_insert] at restResult
-        apply Result.prepend (.assignValue assigned) (.refl _ _) (.refl _) (.refl _) writeFrame (tail := restResult)
+        apply Result.prepend (.assignValue ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assigned)) (.refl _ _) (.refl _) (.refl _) writeFrame (tail := restResult)
         simp only [Core.LoopRenaming.assign]
         refine (ContinuationAgreement.letE (Core.Evaluates.var actualLookup)).trans ?_
         refine (ContinuationAgreement.bind
@@ -1567,7 +1567,8 @@ theorem Tree.source_success
       cases head with
       | assignValue assigned =>
         obtain ⟨staged, location, writtenStore, _, typed, rhsCore, lookup, ⟨old, readable⟩, written,
-          updatedHeaps, writeFrame⟩ := ScalarAssignmentReflection.source_success valueTree unique target.slot target.bare environments heaps assigned
+          updatedHeaps, writeFrame⟩ := ScalarAssignmentReflection.source_success valueTree unique target.slot target.bare environments heaps
+            ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assigned)
         have actualLookup := layout.agrees lookup
         have referenceTyped : Core.RuntimeValueHasType world
             (.cellRef (Core.OptionalCell.cellType payload) location) (Core.OptionalCell.referenceType payload) := by

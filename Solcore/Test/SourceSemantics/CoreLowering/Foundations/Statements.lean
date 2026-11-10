@@ -262,7 +262,8 @@ theorem reflects [FunctionCalls.FaultTokens faults]
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1540,7 +1541,7 @@ private theorem source_evaluates (program : SourceSemantics.Program)
     apply Dynamic.SourcePlaceAssignment.intro
     · exact .intro .head (.intro .head) .nil (.intro .head) initial .nil
     · exact rhs
-    · exact .intro (.intro .head) rfl initial (.leaf (.equal none (.bool true)))
+    · exact .intro (.intro .head) rfl initial (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal none (.bool true))))
         (.intro (.intro .head) .head)
   have returned : Dynamic.StatementExecutes program localContext evidence source environment presentHeap
       (statement 2) localContext (.returned (.bool true)) presentHeap :=
@@ -4549,7 +4550,7 @@ private theorem source_assignment (program : Program) (context : SourceSemantics
 private theorem source_body (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment) :
     Dynamic.StatementsExecute program context evidence source sourceEnvironment (sourceHeap true) [stmtId 1, stmtId 2]
       context (.continuing sourceEnvironment) (sourceHeap false) :=
-  .cons (.assignValue assign_contains rfl (source_assignment program context evidence))
+  .cons (.assignValue assign_contains rfl ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ source_assignment program context evidence))
     (.terminal (.continueStmt continue_contains rfl) (.continuing _))
 
 /-- The finite source derivation itself supplies the two guard observations. -/
@@ -4996,7 +4997,7 @@ private theorem source_body (program : Program) :
     Dynamic.StatementsExecute program context [] source sourceEnvironment (sourceHeap (some true)) [stmtId 1, stmtId 2, stmtId 3]
       context (.continuing sourceEnvironment) (sourceHeap (some false)) :=
   .cons (.whileLoop inner_contains rfl (.done (source_false program)))
-    (.cons (.assignValue assign_contains rfl (source_assignment program))
+    (.cons (.assignValue assign_contains rfl ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ source_assignment program))
       (.terminal (.continueStmt continue_contains rfl) (.continuing _)))
 private theorem source_success (program : Program) :
     Dynamic.FunctionStatementsExecuteOutcome program context [] source sourceEnvironment (sourceHeap (some true)) [stmtId 0]

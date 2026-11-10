@@ -678,7 +678,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return_reachable
       cases first with | assignValue assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentTransition, prefixAgreement⟩ :=
           assignments _ valid head (sites.assignment itemFact)
-            environments heaps locals agrees actualTyped state ready assigned (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+            environments heaps locals agrees actualTyped state ready ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
         obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
         have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue assigned.sound)
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, tailRelated, ⟨tailReturn⟩, tailReady, agreement⟩ :=

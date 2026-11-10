@@ -1351,13 +1351,13 @@ def writes {invocation : Staging.Recursive.Scope}
     intro context site assignment operator rhs origin typed
     obtain ⟨first, prepared⟩ := assignments
     rw [sourceEq] at origin typed
-    have raw : operator = .equal ∨ assignment.target.type = .word := by
+    have raw : operator = .equal ∨ SourceCoreAssignmentFaultSites.operandTarget assignment.target.type = true := by
       cases typed with
       | equal => exact .inl rfl
-      | wordCompound _ place _ _ =>
+      | wordCompound _ place _ _ | fixedCompound _ place _ _ =>
         cases place with
-        | intro _ _ same => exact .inr same
-    exact PreparedBranchingAssignmentDiagnostics.operands prepared
+        | intro _ _ same => exact .inr (by rw [same]; rfl)
+    exact PreparedBranchingAssignmentDiagnostics.operands_target prepared
       (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands generation issued receiver represented)
       origin raw
   unary := by

@@ -60,19 +60,57 @@ theorem passes_of_total {operator : Syntax.ValueAssignOp} (total : operator.mayP
     simp only [binaryOperator, SourceCoreDataPlaces.Modifier.total, Option.some.injEq, reduceCtorEq] at selected <;>
     first | (subst selected; rfl) | simp [Syntax.ValueAssignOp.mayPanic] at total
 
-/-- A compound assignment that panics gives no result. -/
-theorem panic_excludes_applies {operator : Syntax.ValueAssignOp} {snapshot : Option Dynamic.Value}
-    {right result : Dynamic.Value} {code : UInt8}
-    (panics : Dynamic.AssignmentOperandsPanic operator snapshot right code)
-    (applied : Dynamic.AssignmentValueApplies operator snapshot right result) : False := by
-  cases panics with
-  | compound corresponds panics =>
-    cases corresponds <;> cases applied <;> exact panics.excludes_application (by assumption)
+/-- A resolved place keeps its static type. -/
+theorem resolved_valueType {program : Program} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {place : PlaceResolution} {target : Dynamic.ResolvedPlace}
+    (resolve : Dynamic.SourcePlaceResolves program context evidence source environment before place target after) :
+    target.valueType = place.type := by
+  cases resolve
+  rfl
 
-theorem panic_functional {operator : Syntax.ValueAssignOp} {snapshot : Option Dynamic.Value}
-    {right : Dynamic.Value} {first second : UInt8}
-    (firstPanic : Dynamic.AssignmentOperandsPanic operator snapshot right first)
-    (secondPanic : Dynamic.AssignmentOperandsPanic operator snapshot right second) : first = second := by
+/-- Away from checked arithmetic at the place's type, so at its resolved
+target. -/
+theorem resolved_plain {program : Program} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {place : PlaceResolution} {target : Dynamic.ResolvedPlace}
+    {operator : Syntax.ValueAssignOp}
+    (plain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (resolve : Dynamic.SourcePlaceResolves program context evidence source environment before place target after) :
+    ∀ type, target.valueType = .fixed type → ¬ FixedCheckedCompound operator := by
+  rw [resolved_valueType resolve]
+  exact plain
+
+/-- The operator profiles exclude checked arithmetic at a fixed-width target. -/
+theorem plain_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType target = .word ∨
+      SourceCoreRawMetadata.runtimeType target = .integer ∧ operator.wordOnly = false) :
+    ∀ type, target = .fixed type → ¬ FixedCheckedCompound operator :=
+  DataPlaceModifier.plain_of_checkedCompound (checkedCompound_of_profile profile)
+
+/-- A compound assignment that panics gives no result, away from checked
+arithmetic at a fixed-width target. -/
+theorem panic_excludes_applies {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {snapshot : Option Dynamic.Value} {right result : Dynamic.Value} {code : UInt8}
+    (plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : Dynamic.AssignmentOperandsPanic targetType operator snapshot right code)
+    (applied : Dynamic.AssignmentValueApplies operator snapshot right result) : False := by
+  obtain ⟨binary, left, corresponds, rfl, panics⟩ := panics.primitive_of_plain plain
+  cases corresponds <;> cases applied <;> exact panics.excludes_application (by assumption)
+
+/-- A Core outcome's panic, a primitive one at every type, excludes an applied
+source operation. -/
+theorem outcome_excludes_applies {operator : Syntax.ValueAssignOp}
+    {snapshot : Option Dynamic.Value} {right result : Dynamic.Value} {code : UInt8}
+    (panics : ∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator snapshot right code)
+    (applied : Dynamic.AssignmentValueApplies operator snapshot right result) : False :=
+  panic_excludes_applies (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr rfl)) (panics .word) applied
+
+theorem panic_functional {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {snapshot : Option Dynamic.Value} {right : Dynamic.Value} {first second : UInt8}
+    (firstPanic : Dynamic.AssignmentOperandsPanic targetType operator snapshot right first)
+    (secondPanic : Dynamic.AssignmentOperandsPanic targetType operator snapshot right second) :
+    first = second := by
   cases firstPanic with
   | compound corresponds panics =>
     cases secondPanic with
@@ -94,7 +132,7 @@ theorem initialized_valid
     (environment := [rightCore, .inRight .unit leftCore]) (.var (index := 1) rfl) (.var (index := 0) rfl) [] Word.zero
   rcases outcome with ⟨_, valid⟩ | ⟨_, _, _, panics⟩
   · exact valid
-  · exact DataPlaceModifier.panic_excludes_invalid panics
+  · exact DataPlaceModifier.panic_excludes_invalid (panics .word)
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
 end
@@ -112,12 +150,15 @@ theorem agreement {environment : Environment} {store : Store} {outputType : Ty}
     ContinuationAgreement (updated :: changed :: right :: environment) store
       (SourceCoreDataPlaces.guard outputType operator write) (updated :: changed :: right :: environment) store write := by
   refine ⟨fun written => SourceCoreDataPlaces.guard_passes passes written, fun evaluated => ?_⟩
-  rcases SourceCoreDataPlaces.guard_inv evaluated with ⟨_, written⟩ | ⟨operation, selected, zero, _, _⟩
+  rcases SourceCoreDataPlaces.guard_inv evaluated with ⟨_, written⟩ | ⟨operation, selected, zero, _, _⟩ |
+      ⟨operation, type, binary, selected, _⟩
   · exact written
   · subst selected zero
     cases passes with
     | total total => cases total _ rfl
     | nonzero nonzero => exact (nonzero rfl).elim
+  · subst selected
+    exact passes.not_range.elim
 
 /-- A sized check either passed, with its write no larger, or panicked. -/
 theorem inv_sized {environment : Environment} {before after : Store} {outputType : Ty}
@@ -127,15 +168,23 @@ theorem inv_sized {environment : Environment} {before after : Store} {outputType
       (SourceCoreDataPlaces.guard outputType operator write) result after) :
     (SourceCoreDataPlaces.Passes operator right ∧ ∃ child, child ≤ size ∧
       EvaluationSize child (updated :: changed :: right :: environment) before write result after) ∨
-    (∃ operation, operator = some ⟨operation, true⟩ ∧ right = .word Word.zero ∧
+    (∃ operation, operator = some ⟨operation, .divisor⟩ ∧ right = .word Word.zero ∧
       result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
-      after = before) := by
-  rcases SourceCoreDataPlaces.guard_inv evaluated.sound with ⟨passes, _⟩ | panic
+      after = before) ∨
+    (∃ operation type binary, operator = some ⟨operation, .range type binary⟩ ∧
+      ((SourceCoreDataPlaces.RangePasses type binary environment right ∧ ∃ child, child ≤ size ∧
+          EvaluationSize child (updated :: changed :: right :: environment) before write result after) ∨
+        ((∃ leftType left rightWord, environment.head? = some (.inRight leftType (.word left)) ∧
+            right = .word rightWord ∧ SourceCorePrimitive.checkedInRange type binary left rightWord = false) ∧
+          result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)) ∧
+          after = before))) := by
+  rcases SourceCoreDataPlaces.guard_inv evaluated.sound with ⟨passes, _⟩ | panic | range
   · refine .inl ⟨passes, ?_⟩
     match operator, passes, evaluated with
     | none, _, evaluated => exact ⟨size, Nat.le_refl _, evaluated⟩
-    | some ⟨_, false⟩, _, evaluated => exact ⟨size, Nat.le_refl _, evaluated⟩
-    | some ⟨_, true⟩, passes, evaluated =>
+    | some ⟨_, .total⟩, _, evaluated => exact ⟨size, Nat.le_refl _, evaluated⟩
+    | some ⟨_, .range _ _⟩, passes, _ => exact passes.not_range.elim
+    | some ⟨_, .divisor⟩, passes, evaluated =>
       cases evaluated with
       | ifTrue condition _ =>
         exfalso
@@ -157,25 +206,58 @@ theorem inv_sized {environment : Environment} {before after : Store} {outputType
           cases zero
           refine ⟨_, ?_, branch⟩
           omega
-  · exact .inr panic
+  · exact .inr (.inl panic)
+  · obtain ⟨operation, type, binary, rfl, _⟩ := range
+    refine .inr (.inr ⟨operation, type, binary, rfl, ?_⟩)
+    cases evaluated with
+    | ifTrue condition failed =>
+      obtain ⟨sameStore, _, outside⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
+      subst sameStore
+      cases failed.sound with
+      | inLeft reason => cases reason; exact .inr ⟨outside rfl, rfl, rfl⟩
+    | ifFalse condition branch =>
+      obtain ⟨sameStore, passes, _⟩ := SourceCoreDataPlaces.range_condition_inv condition.sound
+      subst sameStore
+      refine .inl ⟨passes rfl, _, ?_, branch⟩
+      omega
+
+/-- With a Unit right-hand side no check fails, so a sized guard is its write. -/
+theorem inv_sized_unit {environment : Environment} {before after : Store} {outputType : Ty}
+    {operator : Option SourceCoreDataPlaces.Modifier} {write : Expr} {result : Value}
+    {updated changed : Value} {size : Nat}
+    (evaluated : EvaluationSize size (updated :: changed :: .unit :: environment) before
+      (SourceCoreDataPlaces.guard outputType operator write) result after) :
+    ∃ child, child ≤ size ∧
+      EvaluationSize child (updated :: changed :: .unit :: environment) before write result after := by
+  rcases inv_sized evaluated with ⟨_, written⟩ | ⟨_, _, impossible, _, _⟩ |
+      ⟨_, _, _, _, ⟨_, written⟩ | ⟨⟨_, _, _, _, impossible, _⟩, _⟩⟩
+  · exact written
+  · cases impossible
+  · exact written
+  · cases impossible
 
 /-- A selected panicking modifier with a zero right-hand side fails at the check. -/
 theorem panic_of_selected {environment : Environment} {store : Store} {outputType : Ty}
     {operator : Option SourceCoreDataPlaces.Modifier} {operation : BinaryOp} {write : Expr} {updated changed : Value}
-    (selected : operator = some ⟨operation, true⟩) :
+    (selected : operator = some ⟨operation, .divisor⟩) :
     Evaluates (updated :: changed :: .word Word.zero :: environment) store
       (SourceCoreDataPlaces.guard outputType operator write)
       (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) store := by
   subst selected
   exact SourceCoreDataPlaces.guard_panic
 
-/-- The check reads only its own three binders, so renaming under them reaches
-the write alone. -/
+/-- The check reads only its own three binders and the snapshot, so renaming
+under them reaches the write alone. -/
 theorem rename_lift (outputType : Ty) (operator : Option SourceCoreDataPlaces.Modifier) (write : Expr) (ξ : Renaming) :
-    (SourceCoreDataPlaces.guard outputType operator write).rename ξ.lift.lift.lift =
-      SourceCoreDataPlaces.guard outputType operator (write.rename ξ.lift.lift.lift) := by
-  rcases operator with _ | ⟨operation, _ | _⟩ <;>
-    simp [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift]
+    (SourceCoreDataPlaces.guard outputType operator write).rename ξ.lift.lift.lift.lift =
+      SourceCoreDataPlaces.guard outputType operator (write.rename ξ.lift.lift.lift.lift) := by
+  rcases operator with _ | ⟨operation, _ | _ | ⟨type, binary⟩⟩
+  · simp [SourceCoreDataPlaces.guard]
+  · simp [SourceCoreDataPlaces.guard]
+  · simp [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift]
+  · simp only [SourceCoreDataPlaces.guard, Expr.rename, LanguageResult.failure, Renaming.lift,
+      SourceCorePrimitive.checkedOutside, SourceCorePrimitive.fixedInteger]
+    cases type.signed <;> rfl
 
 end Solcore.SourceSemantics.CoreLowering.DataPlaceGuard
 end
@@ -1575,7 +1657,8 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
             | caseLeft _ impossible => cases impossible
             | caseRight setterEvaluated tail =>
               rename_i setterStore setterType updatedValue
-              rcases SourceCoreDataPlaces.guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩
+              rcases SourceCoreDataPlaces.guard_inv tail with ⟨passes, tail⟩ | ⟨_, _, _, impossible, _⟩ |
+                  ⟨operation, type, binary, rfl, ⟨passes, tail⟩ | ⟨_, impossible, _⟩⟩
               · cases tail with
                 | letE writeEvaluated terminal =>
                   rename_i writtenStore writtenValue
@@ -1588,6 +1671,19 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
                     exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
                       (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
                         (SourceCoreDataPlaces.guard_passes passes (.letE writeEvaluated continuation)))))))
+              · cases impossible
+              · cases tail with
+                | letE writeEvaluated terminal =>
+                  rename_i writtenStore writtenValue
+                  simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] at terminal
+                  cases terminal with
+                  | inRight unitEvaluated =>
+                    cases unitEvaluated
+                    refine ⟨[writtenValue, updatedValue, modifiedValue, rightValue, snapshotValue, keyValue, referenceValue], rfl, ?_⟩
+                    intro next outputType value finalStore continuation
+                    exact .letE referenceEvaluated (.caseRight keysEvaluated (.caseRight snapshotEvaluated
+                      (.caseRight rhsEvaluated (.caseRight modifiedEvaluated (.caseRight setterEvaluated
+                        (SourceCoreDataPlaces.guard_rangePasses passes (.letE writeEvaluated continuation)))))))
               · cases impossible
 
 /-- A universal expression IH supplies the continuation evaluation at the

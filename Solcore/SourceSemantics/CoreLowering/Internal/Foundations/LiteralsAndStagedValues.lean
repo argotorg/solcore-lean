@@ -412,7 +412,8 @@ theorem assignValue {assignment : AssignmentResolution} {operator : Syntax.Value
     (form : node.form = .assignValue assignment operator rhs)
     (evaluated : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
     finalContext = context ∧ outcome = .fallthrough environment ∧ ∃ updated,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source
+        (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after := by
   have shape := statement_shape unique contains form
   clear contains form

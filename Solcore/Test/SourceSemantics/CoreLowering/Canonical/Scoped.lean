@@ -1413,7 +1413,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
     (remaining : GenericImperativeMatch.Syntax source approved context (.statements mode rest) .word) :
     GenericImperativeMatch.Syntax source approved context (.statements mode (id :: rest)) .word := by
   cases typed with
-  | wordCompound operator _ _ _ => cases operator
+  | wordCompound operator _ _ _ | fixedCompound operator _ _ _ => cases operator
   | equal target rhs _requirements =>
       cases target with
       | intro writable projections target =>

@@ -770,7 +770,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       cases represented with
       | updated root changed updatedRep =>
         rcases DataPlaceGuard.inv_sized remaining with ⟨passes, child, bound, remaining⟩ |
-          ⟨operation, selected, zero, resultEq, storeEq⟩
+          ⟨operation, selected, zero, resultEq, storeEq⟩ | ⟨_, _, _, ranged, _⟩
+        rotate_left 2
+        · exact absurd ranged SourceCoreCompatibleDataPlaces.binaryOperator_not_range
         · rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, _⟩
           · cases remaining with
             | letE writeEvaluated continuation =>
@@ -810,9 +812,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
             | nonzero nonzero => exact (nonzero rfl).elim
           · -- The latest root is traversable, so the source panics on its operands.
             obtain ⟨_, read⟩ := changed.readable
-            have panicked : Dynamic.AssignmentOperandsPanic operator target.selected right.right
+            have panicked : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right.right
                 SourceCorePanics.divisionByZero := by
-              rw [resolution.selectedEq]; exact panicked
+              rw [resolution.selectedEq]; exact panicked target.valueType
             subst resultEq storeEq
             let reached := transport.extend rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
             have phaseRelated := transport.related rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)
@@ -1401,7 +1403,8 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
     (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
     (initialValue : Dynamic.RootInitialValue cell initial)
     (pathRead : Dynamic.ProjectionsRead initial sourceTarget.projections currentSelected)
-    (panics : Dynamic.AssignmentOperandsPanic operator sourceTarget.selected right code)
+    (panicPlain : ∀ type, sourceTarget.valueType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : Dynamic.AssignmentOperandsPanic sourceTarget.valueType operator sourceTarget.selected right code)
     (next : Expr) (outputType : Ty) (invalidOperand : Word) :
     ∃ finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
@@ -1436,11 +1439,11 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
     rw [resolution.selectedEq] at panics
     -- The panic fixes a panicking modifier, a zero divisor and its code.
     obtain ⟨operation, selected, zero, sameCode⟩ : ∃ operation,
-        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ ∧
+        binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ ∧
           rightValue = .word Word.zero ∧ code = SourceCorePanics.divisionByZero := by
       rcases outcome with ⟨applied, _⟩ | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
-      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics other⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies panicPlain panics applied).elim
+      · exact ⟨operation, selected, zero, CompatiblePlaceModifier.panic_functional panics (other _)⟩
     subst zero sameCode
     have present : ∃ sourceRoot, initial = some sourceRoot := by
       cases initial with
@@ -1582,7 +1585,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (rootType : current.type = target.rootType)
       (initialized : Dynamic.RootInitialValue current initialValue)
       (path : Dynamic.ProjectionsRead initialValue target.projections selected)
-      (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+      (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code)
       (same : value = .inLeft output (.word token))
       (matched : faults (.semantic (.panic code)) token)
       (heaps : HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore)
@@ -1701,7 +1704,7 @@ theorem reflects_with_rhs (budget : Nat)
           · rcases outcome with applied | ⟨operation, selected, zero, panics⟩
             case inr =>
               -- The setter runs and the check fails, so the source panics without a write.
-              have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ := by
+              have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
                 simpa only [layout.sameType] using selected
               subst zero
               have nativeModified : Evaluates
@@ -1717,7 +1720,7 @@ theorem reflects_with_rhs (budget : Nat)
                     (DataPlaceGuard.panic_of_selected selected))))
               obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound evaluated
               exact .panic bareSnapshot result.trace latest.read
-                (latest.type.trans snapshot.type.symm) initialized .nil panics rfl
+                (latest.type.trans snapshot.type.symm) initialized .nil (panics _) rfl
                 (RecursiveStageMeaning.FaultTokens.panic _) result.heaps result.maps result.worlds
                 result.frame result.metadata rhsPost
             have nativeModified : Evaluates
@@ -1828,7 +1831,7 @@ theorem preserves_value_with_rhs
             ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, outcome, modified⟩
         · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
         · rcases outcome with generatedApply | ⟨_, _, _, panics⟩
-          case inr => exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
+          case inr => exact (CompatiblePlaceModifier.outcome_excludes_applies panics applied).elim
           have same := DataPlaceModifier.assignment_functional generatedApply applied
           subst replacement
           have passes := CompatibleBareWordModifier.passes_of_applies profile rightRep applied
@@ -1946,7 +1949,7 @@ theorem preserves_operands_with_rhs
         invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata, post⟩
     · rcases outcome with applied | ⟨_, _, _, panics⟩
       · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-      · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
+      · exact (DataPlaceModifier.panic_excludes_invalid (panics .word) invalidOperands).elim
 
 /-- A source panic on the operands: the setter runs and the check fails. -/
 theorem preserves_panic_with_rhs
@@ -1955,7 +1958,8 @@ theorem preserves_panic_with_rhs
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {sourceSize : Nat} {right : Dynamic.Value} {after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} {code : UInt8}
     (targetSnapshot : Staging.Recursive.BareTarget environment before place target)
-    (panics : Dynamic.AssignmentOperandsPanic operator target.selected right code)
+    (panicPlain : ∀ type, target.valueType = .fixed type → ¬ FixedCheckedCompound operator)
+    (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code)
     (rhsMeaning : ∀ (snapshot : Snapshot compilation.checked registry functions prepared place environment actual before store mapping world (ξ index)),
       ∃ value finalStore finalMap finalWorld,
         RhsResult (program := program) (context := context) (stages := stages) (invocation := invocation)
@@ -2001,10 +2005,10 @@ theorem preserves_panic_with_rhs
         ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, outcome, modified⟩
     · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
     · rcases outcome with applied | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panics applied).elim
-      · have sameCode := CompatiblePlaceModifier.panic_functional panics other
+      · exact (CompatiblePlaceModifier.panic_excludes_applies panicPlain panics applied).elim
+      · have sameCode := CompatiblePlaceModifier.panic_functional panics (other _)
         subst sameCode zero
-        have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, true⟩ := by
+        have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
           simpa only [layout.sameType] using selected
         have nativeModified : Evaluates
             (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value (.word Word.zero) actual) rhsStore

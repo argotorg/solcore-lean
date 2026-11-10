@@ -201,14 +201,14 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative compiled.indexed.layouts.definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CellAwareScopeProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -345,7 +345,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (environments.extend maps worlds) middleHeaps
               (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped runtime covers sameLedger suffix
@@ -834,14 +834,14 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative compiled.indexed.layouts.definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CellAwareScopeProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -1005,7 +1005,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextSize, result, finalHeap, restTrace, restAdapted⟩ := remaining
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
                 locals.mono metadata, DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped,
@@ -1454,7 +1454,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured write
+          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         ⟨_, _, _, environments.extend maps worlds, middleHeaps, locals.mono metadata,
           DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped, runtime, covers, sameLedger,
@@ -2129,14 +2129,14 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative compiled.indexed.layouts.definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
     have keyTyped := CellAwareScopeProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source
@@ -2273,7 +2273,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) write
+                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
                 locals.mono metadata, DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped,
@@ -2680,7 +2680,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured write
+          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         ⟨_, _, _, environments.extend maps worlds, middleHeaps, locals.mono metadata,
           DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped, runtime, covers, sameLedger,
@@ -3056,7 +3056,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured write
+          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (environments.extend maps worlds) middleHeaps (locals.mono metadata)
         (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped runtime covers sameLedger suffix

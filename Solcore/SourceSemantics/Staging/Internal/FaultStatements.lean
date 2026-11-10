@@ -339,7 +339,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ =>
               exact expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
-          | wordCompound _ _ rhsTyped _ =>
+          | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               exact expressionIH childSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap rhsTyped child
   | @assignBareOperands childSize mode scope context environment before after id rest node assignment operator rhs
@@ -349,7 +349,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               have post := expression_value wellFormed runtime covers locals heap rhsTyped child
               exact ⟨post.heap_typed, post.heap_extends⟩
   | @assignBarePanic childSize mode scope context environment before after id rest node assignment operator rhs
@@ -359,7 +359,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
               have post := expression_value wellFormed runtime covers locals heap rhsTyped child
               exact ⟨post.heap_typed, post.heap_extends⟩
   | bitNotBareFault => exact ⟨heap, .refl _⟩
@@ -456,7 +456,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               exact expressions_fault_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -467,7 +467,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys
@@ -479,7 +479,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys
@@ -493,7 +493,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       cases formTyped with
       | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys
@@ -990,7 +990,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
           cases assignmentTyped with
           | equal _ rhsTyped _ =>
             exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-          | wordCompound _ _ rhsTyped _ =>
+          | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
             exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
   | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
       currentCell initial currentSelected rest _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
@@ -999,7 +999,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
             have post := expression_value wellFormed runtime covers locals heap rhsTyped child
             exact ⟨post.heap_typed, post.heap_extends⟩
   | @assignmentPanic childSize scope context environment before after assignment operator rhs target right
@@ -1009,7 +1009,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
+          | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ =>
             have post := expression_value wellFormed runtime covers locals heap rhsTyped child
             exact ⟨post.heap_typed, post.heap_extends⟩
   | @projectedBitNot keysSize nextSize scope context finalContext environment before targetHeap written after assignment values target updated rest outcome
@@ -1058,7 +1058,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               exact expressions_fault_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
@@ -1069,7 +1069,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys
@@ -1081,7 +1081,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys
@@ -1095,7 +1095,7 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
         cases headTyped with
         | assignValue assignmentTyped =>
           cases assignmentTyped with
-          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ =>
+          | equal targetTyped rhsTyped _ | wordCompound _ targetTyped rhsTyped _ | fixedCompound _ targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := SelectedPreservation.projected_place_keys_typed targetTyped
               obtain ⟨_keyValues, keyHeap, keyExtends⟩ := expressions_values wellFormed
                 runtime covers locals heap keyTyped keys

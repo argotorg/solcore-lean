@@ -2555,27 +2555,28 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
             safe_resolved valueProperties.2.1 (valuePrivacy.1 _ (fitPrivacy _ placePrivacy.2.1)),
             valuePrivacy.2.1, valuePrivacy.2.2.1, allRows⟩
       have finishNonEqual
-          (ih : ∀ fitted, InferExprFuelPrivacy protectedVars fuel context value (some .word) fitted)
+          (ih : ∀ fitted, InferExprFuelPrivacy protectedVars fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted)
           (accepted : (do
-            let fitted ← Detail.unify placeState place.type .word
-            let (inferredValue, finalState) ← inferExprFuel fuel context value (some .word) fitted
+            let fitted ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+            let (inferredValue, finalState) ← inferExprFuel fuel context value (some (Detail.compoundOperandType operator (fitted.resolve place.type))) fitted
             pure (({ target := { place with type := finalState.resolve place.type } } : AssignmentResolution), inferredValue, finalState)) = .ok result) :
           SafeTransport protectedVars initial result.2.2 ∧
             Safe protectedVars result.2.2 result.1.target.type ∧
             Safe protectedVars result.2.2 result.2.1.type ∧ LiveBindersSafe protectedVars result.2.2 ∧
             ∀ row ∈ result.2.2.requirements, row ∉ initial.requirements → PredicateSafe protectedVars result.2.2 row.predicate := by
-        cases fittedRun : Detail.unify placeState place.type .word with
+        cases fittedRun : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error => simp [fittedRun, bind, Except.bind] at accepted
         | ok fitted =>
           simp only [fittedRun, bind, Except.bind] at accepted
-          have wordSafe : Safe protectedVars placeState .word := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+          have wordSafe : Safe protectedVars placeState (Detail.compoundOperandType operator (placeState.resolve place.type)) := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
           have fittedPrivacy := ProtectedVariables.unify placePrivacy.2.1 wordSafe fittedRun
           exact finishValue fitted
             (unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fittedRun)
             (unify_preserves_inferenceReady placeProperties.2.1 placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fittedRun)
             (unify_preserves_requirementsWellFormed fittedRun placeWF) fittedPrivacy
             (placePrivacy.2.2.1.unify placePrivacy.2.1 wordSafe fittedRun) (unify_requirements fittedRun)
-            .word (Ty.variablesBelow_constructor _ _) (fittedPrivacy _ wordSafe) (ih fitted) accepted
+            (Detail.compoundOperandType operator (fitted.resolve place.type)) (Ty.variablesBelow_constructor _ _)
+            (safe_closed _ _ (Ty.variablesBelow_constructor 0 _)) (ih fitted) accepted
       cases operator with
       | equal =>
         simp only [pure, Pure.pure, Except.pure] at success

@@ -623,6 +623,7 @@ include extension faithful observations environments heaps locals agrees actualT
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped unique owners in
 theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
+    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (next : Expr) (outputType : Ty) (invalid : Word)
     (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
     ∃ token finalStore finalMap finalWorld,
@@ -638,7 +639,7 @@ theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : 
       (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing unique owners) budget)
     observations generated found rhsView rhsCore profile
-    environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid invalidToken
+    targetPlain environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid invalidToken
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped in

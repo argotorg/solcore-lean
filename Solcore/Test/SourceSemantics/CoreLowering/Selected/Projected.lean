@@ -203,7 +203,9 @@ theorem update_call {operator} (shape : UpdateShape header.function.source opera
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
     refine .intro resolve (read_value shape.rightRead _ _ _ _ _ _ .head rightAllocation.reads_new) ?_
     exact .intro rootRead rfl .initialized
-      (.indexFound (.head equalKey) (.leaf operation) (.update (.head equalKey))) write
+      (.indexFound (.head equalKey)
+        (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr shape.targetType)) operation))
+        (.update (.head equalKey))) write
   have finalRootRead : Dynamic.Heap.Reads
       (parameterHeap before ((.word key, .word updated) :: tail) key right)
       (location before) ⟨mappingType, some replacement, none⟩ := by
@@ -573,7 +575,8 @@ theorem initializer_call (shape : InitializerShape header.function.source)
       · apply Dynamic.ForItemExecutes.assignValue (updatedRoot := replacement)
         refine .intro resolve (read_value shape.rightRead _ _ _ _ _ _ .head rightAllocation.reads_new) ?_
         exact .intro rootRead rfl .initialized
-          (.indexFound (.head equalKey) (.leaf (.equal _ _)) (.update (.head equalKey))) write
+          (.indexFound (.head equalKey) (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _)))
+            (.update (.head equalKey))) write
       · exact .nil
     have condition : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
         header.context header.function.evidence header.function.source environment
@@ -668,6 +671,7 @@ structure NestedShape (source : TypedSource) where
   assignedForm : assigned.form = .assignValue resolution .add rightRead.node.id
   targetRoot : resolution.target.root = table.id
   targetProjections : resolution.target.projections = [.index firstRead.node.id, .index secondRead.node.id]
+  targetType : resolution.target.type = .word
   returnedFound : source.lookupStatement? returned.id = some returned
   returnedForm : returned.form = .returnStmt (some outer.node.id)
 
@@ -751,7 +755,8 @@ theorem nested_call (shape : NestedShape header.function.source)
     refine .intro resolve (read_value shape.rightRead _ _ _ _ _ _ .head rightAllocation.reads_new) ?_
     exact .intro rootRead rfl .initialized
       (.indexFound (.head firstEqual)
-        (.indexFound (.head secondEqual) (.leaf (.add (.wordAdd previous right))) (.update (.head secondEqual)))
+        (.indexFound (.head secondEqual) (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr shape.targetType))
+          (.add (.wordAdd previous right)))) (.update (.head secondEqual)))
         (.update (.head firstEqual))) write
   let finalTable := appendCell before nestedType (some replacement)
   let finalFirst := appendCell finalTable .word (some (.word first))
@@ -1079,10 +1084,11 @@ def observeNested (source : TypedSource) : IO (NestedShape source) := do
   let ⟨assignedForm⟩ ← observed (assigned.form = .assignValue resolution .add rightRead.node.id) "nested assignedForm"
   let ⟨targetRoot⟩ ← observed (resolution.target.root = table.id) "nested targetRoot"
   let ⟨targetProjections⟩ ← observed (resolution.target.projections = [.index firstRead.node.id, .index secondRead.node.id]) "nested targetProjections"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "nested targetType"
   let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "nested returnedFound"
   let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some outer.node.id)) "nested returnedForm"
   return ⟨table, first, second, right, resolution, assigned, returned, firstRead, secondRead, rightRead,
-    baseRead, returnFirst, returnSecond, inner, outer, inputs, tableScheme, firstScheme, secondScheme, rightScheme, firstTable, secondTable, secondFirst, rightTable, rightFirst, rightSecond, roots, assignedFound, assignedForm, targetRoot, targetProjections, returnedFound, returnedForm⟩
+    baseRead, returnFirst, returnSecond, inner, outer, inputs, tableScheme, firstScheme, secondScheme, rightScheme, firstTable, secondTable, secondFirst, rightTable, rightFirst, rightSecond, roots, assignedFound, assignedForm, targetRoot, targetProjections, targetType, returnedFound, returnedForm⟩
 
 structure ObservedProgram (fixture : CompiledFixture) where
   nestedRow : Row fixture

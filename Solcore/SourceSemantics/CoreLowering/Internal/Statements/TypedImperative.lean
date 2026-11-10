@@ -908,9 +908,11 @@ private theorem guard_typed {context : Core.Context} {outputType result : Ty}
     {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {write : Expr} {definitions : DataEnvironment}
     (typed : HasType context (Frontend.SourceCoreDataPlaces.guard outputType operator write) result definitions) :
     HasType context write result definitions := by
-  rcases operator with _ | ⟨operation, _ | _⟩
+  rcases operator with _ | ⟨operation, _ | _ | _⟩
   · exact typed
   · exact typed
+  · cases typed with
+    | ifE _ _ written => exact written
   · cases typed with
     | ifE _ _ written => exact written
 

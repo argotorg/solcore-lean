@@ -920,7 +920,7 @@ theorem item_value {nextEnvironment : Dynamic.Environment}
     ∃ child value middle updated, child < size ∧ finalContext = context ∧ nextEnvironment = environment ∧
       SourceExecutionSize.ExpressionEvaluates program child context invocation.evidence invocation.source environment
         before rhs value middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated after := by
   cases trace with
   | assignValue assigned =>
@@ -950,7 +950,7 @@ theorem item_fault
         before rhs right after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) := by
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) := by
   cases trace with
   | assignValue failed =>
     cases failed with
@@ -992,11 +992,11 @@ theorem child_and_tail {rest : List ForItemForm}
         environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       PlainItems program tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
@@ -1233,11 +1233,11 @@ theorem assign {assignment : AssignmentResolution} {operator : Syntax.ValueAssig
         environment before rhs (.value right) after ∧
       Dynamic.Heap.Reads after target.location currentCell ∧ currentCell.type = target.rootType ∧
       Dynamic.RootInitialValue currentCell initial ∧ Dynamic.ProjectionsRead initial target.projections currentSelected ∧
-      Dynamic.AssignmentOperandsPanic operator target.selected right code) ∨
+      Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code) ∨
     (∃ child tailSize value middle updated written, child < size ∧ tailSize < size ∧
       RecursiveNamedCallBounds.ExpressionOutcome program child context invocation.evidence invocation.source
         environment before rhs (.value value) middle ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected value replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
         middle target updated written ∧
       PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
   rcases head trace with ⟨_, reason, strict, same, failed⟩ |

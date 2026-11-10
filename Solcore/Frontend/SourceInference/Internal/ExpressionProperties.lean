@@ -12723,15 +12723,15 @@ private theorem inferFuel_inferenceProperties_internal :
             throughValue.resolve_variablesBelow placeProperties.2.2
           exact ⟨placeProperties.1.trans throughValue,
             inferredProperties.2.1, targetBelow, inferredProperties.2.2⟩
-      have finishNonEqual
+      have finishNonEqual (operator : Syntax.ValueAssignOp)
           (valueProperties : ∀ fittedState : State,
             InferExprFuelInferenceProperties fuel context value
-              (some .word) fittedState)
+              (some (compoundOperandType operator (fittedState.resolve place.type))) fittedState)
           (tailSuccess :
             (do
-              let fittedState ← unify placeState place.type .word
+              let fittedState ← unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ← inferExprFuel fuel context
-                value (some .word) fittedState
+                value (some (compoundOperandType operator (fittedState.resolve place.type))) fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue,
@@ -12742,7 +12742,7 @@ private theorem inferFuel_inferenceProperties_internal :
               result.2.2.inference.next ∧
             result.2.1.type.VariablesBelow
               result.2.2.inference.next := by
-        cases unifyResult : unify placeState place.type .word with
+        cases unifyResult : unify placeState place.type (compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
@@ -12753,7 +12753,7 @@ private theorem inferFuel_inferenceProperties_internal :
           have fittedReady := unify_preserves_inferenceReady
             placeProperties.2.1 placeProperties.2.2
             (Ty.variablesBelow_constructor _ _) unifyResult
-          exact finishValue fittedState fitProgress fittedReady .word
+          exact finishValue fittedState fitProgress fittedReady (compoundOperandType operator (fittedState.resolve place.type))
             (Ty.variablesBelow_constructor _ _)
             (valueProperties fittedState) tailSuccess
       cases operator with
@@ -12765,21 +12765,21 @@ private theorem inferFuel_inferenceProperties_internal :
             (placeProperties.2.1.solved.variablesBelow_apply
               placeProperties.2.2)
             (valueInduction place placeState) success
-      | add => exact finishNonEqual (valueInduction place) success
-      | subtract => exact finishNonEqual (valueInduction place) success
-      | multiply => exact finishNonEqual (valueInduction place) success
-      | divide => exact finishNonEqual (valueInduction place) success
-      | modulo => exact finishNonEqual (valueInduction place) success
-      | bitAnd => exact finishNonEqual (valueInduction place) success
-      | bitXor => exact finishNonEqual (valueInduction place) success
-      | bitOr => exact finishNonEqual (valueInduction place) success
-      | shiftLeft => exact finishNonEqual (valueInduction place) success
-      | shiftRight => exact finishNonEqual (valueInduction place) success
-      | uncheckedAdd => exact finishNonEqual (valueInduction place) success
-      | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
-      | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
-      | uncheckedDivide => exact finishNonEqual (valueInduction place) success
-      | uncheckedModulo => exact finishNonEqual (valueInduction place) success
+      | add => exact finishNonEqual .add (valueInduction place) success
+      | subtract => exact finishNonEqual .subtract (valueInduction place) success
+      | multiply => exact finishNonEqual .multiply (valueInduction place) success
+      | divide => exact finishNonEqual .divide (valueInduction place) success
+      | modulo => exact finishNonEqual .modulo (valueInduction place) success
+      | bitAnd => exact finishNonEqual .bitAnd (valueInduction place) success
+      | bitXor => exact finishNonEqual .bitXor (valueInduction place) success
+      | bitOr => exact finishNonEqual .bitOr (valueInduction place) success
+      | shiftLeft => exact finishNonEqual .shiftLeft (valueInduction place) success
+      | shiftRight => exact finishNonEqual .shiftRight (valueInduction place) success
+      | uncheckedAdd => exact finishNonEqual .uncheckedAdd (valueInduction place) success
+      | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract (valueInduction place) success
+      | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
+      | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
+      | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
   case case71 =>
     simp [InferExprsFuelInferenceProperties, inferExprsFuel]
   case case72 =>
@@ -14118,48 +14118,48 @@ private theorem inferFuel_preserves_lexicalScope_internal :
           rw [← resultEq]
           exact (valueProperties (inferredValue, finalState) valueResult).trans
             (fittedScope.trans placeScope)
-      have finishNonEqual
+      have finishNonEqual (operator : Syntax.ValueAssignOp)
           (valueProperties : ∀ fittedState : State,
             PreservesLexicalScope Prod.snd fittedState
-              (inferExprFuel fuel context value (some .word) fittedState))
+              (inferExprFuel fuel context value (some (compoundOperandType operator (fittedState.resolve place.type))) fittedState))
           (tailSuccess :
             (do
-              let fittedState ← unify placeState place.type .word
+              let fittedState ← unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))
               let (inferredValue, finalState) ← inferExprFuel fuel context
-                value (some .word) fittedState
+                value (some (compoundOperandType operator (fittedState.resolve place.type))) fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue,
                 finalState)) = .ok result) :
           result.2.2.lexicalScope = initial.lexicalScope := by
-        cases unifyResult : unify placeState place.type .word with
+        cases unifyResult : unify placeState place.type (compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
           simp only [unifyResult, bind, Except.bind] at tailSuccess
           exact finishValue fittedState
-            (unify_preserves_lexicalScope unifyResult) .word
+            (unify_preserves_lexicalScope unifyResult) (compoundOperandType operator (fittedState.resolve place.type))
             (valueProperties fittedState) tailSuccess
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
           exact finishValue placeState rfl (placeState.resolve place.type)
             (valueInduction place placeState) success
-      | add => exact finishNonEqual (valueInduction place) success
-      | subtract => exact finishNonEqual (valueInduction place) success
-      | multiply => exact finishNonEqual (valueInduction place) success
-      | divide => exact finishNonEqual (valueInduction place) success
-      | modulo => exact finishNonEqual (valueInduction place) success
-      | bitAnd => exact finishNonEqual (valueInduction place) success
-      | bitXor => exact finishNonEqual (valueInduction place) success
-      | bitOr => exact finishNonEqual (valueInduction place) success
-      | shiftLeft => exact finishNonEqual (valueInduction place) success
-      | shiftRight => exact finishNonEqual (valueInduction place) success
-      | uncheckedAdd => exact finishNonEqual (valueInduction place) success
-      | uncheckedSubtract => exact finishNonEqual (valueInduction place) success
-      | uncheckedMultiply => exact finishNonEqual (valueInduction place) success
-      | uncheckedDivide => exact finishNonEqual (valueInduction place) success
-      | uncheckedModulo => exact finishNonEqual (valueInduction place) success
+      | add => exact finishNonEqual .add (valueInduction place) success
+      | subtract => exact finishNonEqual .subtract (valueInduction place) success
+      | multiply => exact finishNonEqual .multiply (valueInduction place) success
+      | divide => exact finishNonEqual .divide (valueInduction place) success
+      | modulo => exact finishNonEqual .modulo (valueInduction place) success
+      | bitAnd => exact finishNonEqual .bitAnd (valueInduction place) success
+      | bitXor => exact finishNonEqual .bitXor (valueInduction place) success
+      | bitOr => exact finishNonEqual .bitOr (valueInduction place) success
+      | shiftLeft => exact finishNonEqual .shiftLeft (valueInduction place) success
+      | shiftRight => exact finishNonEqual .shiftRight (valueInduction place) success
+      | uncheckedAdd => exact finishNonEqual .uncheckedAdd (valueInduction place) success
+      | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract (valueInduction place) success
+      | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
+      | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
+      | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
   -- A grouped place delegates directly to its inner place.
   case case67 =>
     intros

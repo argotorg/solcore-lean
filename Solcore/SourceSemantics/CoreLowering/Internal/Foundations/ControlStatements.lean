@@ -1258,7 +1258,7 @@ theorem Tree.preserves
                 (.cellRef (Core.OptionalCell.cellType payloadType) coreLocation) (SourceStagedValue.toCore staged)
               have sourceExecution := prepend metadata.contains
                 (by intros _ _ expression; rw [form]; intro impossible; cases impossible)
-                (.assignValue metadata.contains form assignmentSource) tailSource
+                (.assignValue metadata.contains form ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ assignmentSource)) tailSource
               exact ⟨_, _, _, _, _, _, _, sourceExecution, tailRelated,
                 Core.LocalSequence.assign_success (Core.LocalControl.controlType resultType) (.var lookup)
                   rhsShifted readable written shifted, finalHeaps, mapsExtended, extended, updatedFrame.trans tailFrame⟩
